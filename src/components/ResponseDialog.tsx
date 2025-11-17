@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Loader2 } from "lucide-react";
+import { Loader2, Copy } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface ResponseDialogProps {
   open: boolean;
@@ -22,6 +23,23 @@ interface ResponseDialogProps {
 export const ResponseDialog = ({ open, onOpenChange, message, onSend }: ResponseDialogProps) => {
   const [response, setResponse] = useState("");
   const [sending, setSending] = useState(false);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (!open) {
+      setResponse("");
+    }
+  }, [open]);
+
+  const handleLoadDraft = () => {
+    if (message?.metadata?.ai_draft_response) {
+      setResponse(message.metadata.ai_draft_response);
+      toast({
+        title: "Draft loaded",
+        description: "AI draft response loaded into editor. You can now refine it.",
+      });
+    }
+  };
 
   const handleSend = async () => {
     if (!message || !response.trim()) return;
@@ -58,8 +76,21 @@ export const ResponseDialog = ({ open, onOpenChange, message, onSend }: Response
 
           {message.metadata?.ai_draft_response && (
             <div>
-              <Label className="text-sm font-medium">AI Draft Response</Label>
-              <div className="mt-2 rounded-lg bg-primary/5 border-l-4 border-primary p-3">
+              <div className="flex items-center justify-between mb-2">
+                <Label className="text-sm font-medium">AI Draft Response</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleLoadDraft}
+                  disabled={sending}
+                  className="h-8"
+                >
+                  <Copy className="mr-2 h-3 w-3" />
+                  Use as Template
+                </Button>
+              </div>
+              <div className="rounded-lg bg-primary/5 border-l-4 border-primary p-3">
                 <p className="text-sm whitespace-pre-wrap text-foreground/90">
                   {message.metadata.ai_draft_response}
                 </p>
@@ -71,7 +102,7 @@ export const ResponseDialog = ({ open, onOpenChange, message, onSend }: Response
             <Label htmlFor="response">Your Response</Label>
             <Textarea
               id="response"
-              placeholder="Type your response here..."
+              placeholder="Type your response here or use the AI draft above..."
               value={response}
               onChange={(e) => setResponse(e.target.value)}
               className="mt-2 min-h-[150px]"
