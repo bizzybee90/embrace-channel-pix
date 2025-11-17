@@ -16,6 +16,7 @@ interface MessageCardProps {
     status: string;
     escalated_at: string;
     n8n_workflow_id: string | null;
+    metadata?: any;
   };
   onRespond: (messageId: string) => void;
 }
@@ -110,6 +111,17 @@ export const MessageCard = ({ message, onRespond }: MessageCardProps) => {
               ) : (
                 <pre className="text-xs overflow-auto">{JSON.stringify(message.conversation_context, null, 2)}</pre>
               )}
+            </div>
+          </div>
+        )}
+
+        {message.metadata && (message.metadata as any).ai_draft_response && (
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-foreground">AI Draft Response</p>
+            <div className="rounded-lg bg-primary/5 border-l-4 border-primary p-3">
+              <p className="text-sm text-foreground/90 whitespace-pre-wrap">
+                {(message.metadata as any).ai_draft_response}
+              </p>
             </div>
           </div>
         )}

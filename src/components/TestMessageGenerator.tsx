@@ -19,6 +19,9 @@ const testScenarios = [
     customer_identifier: "+1-555-0123",
     message_content: "I need to speak to a human right now! This is urgent regarding my order #12345. The AI keeps giving me the wrong information!",
     priority: "high",
+    metadata: {
+      ai_draft_response: "I understand you're frustrated with the information you've received about order #12345. I can see there's been some confusion in our conversation. Let me personally look into this right away and get you accurate information. Could you please give me 2-3 minutes to pull up your complete order history?"
+    },
     conversation_context: [
       { role: "customer", content: "Where is my order #12345?" },
       { role: "ai", content: "Hi Sarah! I'd be happy to help you track your order. Let me look that up for you. Order #12345 was shipped on November 15th and should arrive by November 20th." },
@@ -35,6 +38,9 @@ const testScenarios = [
     customer_identifier: "+1-555-0456",
     message_content: "Your AI assistant told me my refund was processed but my bank says otherwise. I've been waiting 2 weeks!",
     priority: "high",
+    metadata: {
+      ai_draft_response: "I sincerely apologize for this concerning situation with your refund. This definitely requires immediate investigation with our finance team. I can see the refund was marked as processed on November 10th for $249.99. Let me reach out to our payment processor directly to trace this transaction and find out exactly where your money is. I'll prioritize this and get back to you within 24 hours with a definitive answer."
+    },
     conversation_context: [
       { role: "customer", content: "Hi, I returned my product last week. When will I get my refund?" },
       { role: "ai", content: "Hello Michael! Thank you for reaching out. Refunds typically take 5-7 business days to process after we receive the returned item. Let me check the status of your return." },
@@ -51,6 +57,9 @@ const testScenarios = [
     customer_identifier: "jennifer.m@company.com",
     message_content: "I received a damaged product and the AI chatbot cannot process my return. I need a human to handle this warranty claim immediately.",
     priority: "medium",
+    metadata: {
+      ai_draft_response: "I'm so sorry about the damaged laptop you received, Jennifer. I can see from your photos that the screen is indeed cracked and the packaging shows shipping damage. Since this is a high-value electronic item under warranty, I'll personally handle this case. I'm arranging for immediate pickup of the damaged unit and expediting a replacement laptop to you. You should receive shipping labels via email within the hour."
+    },
     conversation_context: [
       { role: "customer", content: "I received my laptop yesterday and the screen is cracked. I need to return it." },
       { role: "ai", content: "I'm sorry to hear about the damaged laptop, Jennifer. I can help you with the return process. To get started, could you please provide your order number?" },
@@ -67,6 +76,9 @@ const testScenarios = [
     customer_identifier: "+1-555-0789",
     message_content: "Transcript: Customer is extremely upset about being billed twice. AI attempted to explain but customer demanded supervisor. Escalating immediately.",
     priority: "high",
+    metadata: {
+      ai_draft_response: "Robert, I sincerely apologize for this billing error and for the frustration you've experienced. I can confirm there are two charges of $49.99 - one is your regular subscription, and one appears to be from a previous failed payment that processed incorrectly. I'm issuing an immediate refund for the duplicate charge, which should appear in your account within 24-48 hours. I'm also adding a $10 account credit as an apology for this inconvenience."
+    },
     conversation_context: [
       { role: "ai", content: "Thank you for calling customer support. I'm Claude, your AI assistant. How can I help you today?" },
       { role: "customer", content: "You charged me twice for my subscription! I see two charges of $49.99 on my card!" },
@@ -84,6 +96,9 @@ const testScenarios = [
     customer_identifier: "emma.t.92@email.com",
     message_content: "The AI keeps giving me generic responses about my technical issue. I need actual technical support, not canned answers!",
     priority: "medium",
+    metadata: {
+      ai_draft_response: "Emma, I apologize for the generic responses you've received. You're absolutely right that this requires specific technical expertise. The CSV export crash in version 3.2.1 is a known issue affecting certain data sets with special characters. Our development team is working on a patch for the next update. In the meantime, I can offer you a workaround: export to JSON format instead, or I can manually process your CSV export on our backend. Which would you prefer?"
+    },
     conversation_context: [
       { role: "customer", content: "My app crashes every time I try to export data" },
       { role: "ai", content: "I'm sorry you're experiencing this issue. Have you tried restarting the app?" },

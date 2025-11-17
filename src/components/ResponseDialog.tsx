@@ -14,6 +14,7 @@ interface ResponseDialogProps {
     customer_name: string | null;
     customer_identifier: string;
     message_content: string;
+    metadata?: any;
   } | null;
   onSend: (messageId: string, response: string) => Promise<void>;
 }
@@ -54,6 +55,17 @@ export const ResponseDialog = ({ open, onOpenChange, message, onSend }: Response
               <p className="text-sm whitespace-pre-wrap">{message.message_content}</p>
             </div>
           </div>
+
+          {message.metadata?.ai_draft_response && (
+            <div>
+              <Label className="text-sm font-medium">AI Draft Response</Label>
+              <div className="mt-2 rounded-lg bg-primary/5 border-l-4 border-primary p-3">
+                <p className="text-sm whitespace-pre-wrap text-foreground/90">
+                  {message.metadata.ai_draft_response}
+                </p>
+              </div>
+            </div>
+          )}
 
           <div>
             <Label htmlFor="response">Your Response</Label>
