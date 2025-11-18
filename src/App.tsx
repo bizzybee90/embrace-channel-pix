@@ -7,6 +7,7 @@ import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import Dashboard from "./pages/Dashboard";
 import { EscalationHub } from "./pages/EscalationHub";
+import { AuthGuard } from "./components/AuthGuard";
 
 const queryClient = new QueryClient();
 
@@ -17,12 +18,12 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<EscalationHub filter="all-open" />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/unassigned" element={<EscalationHub filter="unassigned" />} />
-          <Route path="/sla-risk" element={<EscalationHub filter="sla-risk" />} />
-          <Route path="/all-open" element={<EscalationHub filter="all-open" />} />
           <Route path="/auth" element={<Auth />} />
+          <Route path="/" element={<AuthGuard><EscalationHub filter="all-open" /></AuthGuard>} />
+          <Route path="/dashboard" element={<AuthGuard><Dashboard /></AuthGuard>} />
+          <Route path="/unassigned" element={<AuthGuard><EscalationHub filter="unassigned" /></AuthGuard>} />
+          <Route path="/sla-risk" element={<AuthGuard><EscalationHub filter="sla-risk" /></AuthGuard>} />
+          <Route path="/all-open" element={<AuthGuard><EscalationHub filter="all-open" /></AuthGuard>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
