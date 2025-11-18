@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { useInterfaceMode } from '@/hooks/useInterfaceMode';
 import { Card } from '@/components/ui/card';
 import { useState, useEffect } from 'react';
+import beeLogo from '@/assets/bee-logo.png';
 
 export const Sidebar = () => {
   const { interfaceMode, toggleMode, loading } = useInterfaceMode();
@@ -33,14 +34,17 @@ export const Sidebar = () => {
   };
   return (
     <div className="flex flex-col h-full p-4">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-primary">🐝 BizzyBee</h1>
+      <div className="mb-6 flex items-center gap-3">
+        <div className="flex-shrink-0">
+          <img src={beeLogo} alt="BizzyBee Logo" className="h-10 w-10 rounded-lg" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <h1 className="text-xl font-bold text-primary">BizzyBee</h1>
           <p className="text-sm text-muted-foreground">Escalation Hub</p>
         </div>
         <Popover>
           <PopoverTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8">
+            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0">
               <Settings className="h-4 w-4" />
             </Button>
           </PopoverTrigger>
@@ -87,48 +91,56 @@ export const Sidebar = () => {
       </div>
 
       <nav className="space-y-1 mb-6">
-        <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+        <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-1">
           Views
         </h2>
         {visibleFilters.myTickets && (
           <NavLink
             to="/"
             end
-            className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm hover:bg-accent transition-colors"
-            activeClassName="bg-accent text-accent-foreground font-medium"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm hover:bg-accent/50 transition-all hover-scale"
+            activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
           >
-            <Inbox className="h-4 w-4" />
-            My Tickets
+            <div className="flex items-center justify-center w-8 h-8 rounded-md bg-primary/10">
+              <Inbox className="h-4 w-4 text-primary" />
+            </div>
+            <span>My Tickets</span>
           </NavLink>
         )}
         {visibleFilters.unassigned && (
           <NavLink
             to="/unassigned"
-            className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm hover:bg-accent transition-colors"
-            activeClassName="bg-accent text-accent-foreground font-medium"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm hover:bg-accent/50 transition-all hover-scale"
+            activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
           >
-            <AlertTriangle className="h-4 w-4" />
-            Unassigned
+            <div className="flex items-center justify-center w-8 h-8 rounded-md bg-destructive/10">
+              <AlertTriangle className="h-4 w-4 text-destructive" />
+            </div>
+            <span>Unassigned</span>
           </NavLink>
         )}
         {visibleFilters.slaRisk && (
           <NavLink
             to="/sla-risk"
-            className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm hover:bg-accent transition-colors"
-            activeClassName="bg-accent text-accent-foreground font-medium"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm hover:bg-accent/50 transition-all hover-scale"
+            activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
           >
-            <Clock className="h-4 w-4" />
-            SLA at Risk
+            <div className="flex items-center justify-center w-8 h-8 rounded-md bg-orange-500/10">
+              <Clock className="h-4 w-4 text-orange-500" />
+            </div>
+            <span>SLA at Risk</span>
           </NavLink>
         )}
         {visibleFilters.allOpen && (
           <NavLink
             to="/all-open"
-            className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm hover:bg-accent transition-colors"
-            activeClassName="bg-accent text-accent-foreground font-medium"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm hover:bg-accent/50 transition-all hover-scale"
+            activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
           >
-            <CheckCircle2 className="h-4 w-4" />
-            All Open
+            <div className="flex items-center justify-center w-8 h-8 rounded-md bg-green-500/10">
+              <CheckCircle2 className="h-4 w-4 text-green-500" />
+            </div>
+            <span>All Open</span>
           </NavLink>
         )}
       </nav>
@@ -136,25 +148,23 @@ export const Sidebar = () => {
       <Separator className="my-4" />
 
       <div className="mb-6">
-        <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+        <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-1">
           Saved Filters
         </h2>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="w-full justify-start text-sm"
-        >
-          <Filter className="h-4 w-4 mr-2" />
-          High Priority
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="w-full justify-start text-sm"
-        >
-          <Filter className="h-4 w-4 mr-2" />
-          VIP Customers
-        </Button>
+        <div className="space-y-1">
+          <Button variant="ghost" className="w-full justify-start gap-3 px-3 py-2.5 h-auto hover-scale">
+            <div className="flex items-center justify-center w-8 h-8 rounded-md bg-blue-500/10">
+              <Zap className="h-4 w-4 text-blue-500" />
+            </div>
+            <span className="text-sm">High Priority</span>
+          </Button>
+          <Button variant="ghost" className="w-full justify-start gap-3 px-3 py-2.5 h-auto hover-scale">
+            <div className="flex items-center justify-center w-8 h-8 rounded-md bg-purple-500/10">
+              <Filter className="h-4 w-4 text-purple-500" />
+            </div>
+            <span className="text-sm">VIP Customers</span>
+          </Button>
+        </div>
       </div>
 
       <Separator className="my-4" />

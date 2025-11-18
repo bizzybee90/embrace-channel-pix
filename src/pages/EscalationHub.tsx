@@ -205,18 +205,11 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
               )}
             </div>
             
-            {/* Right Sidebar - Quick Actions & Customer Context */}
+            {/* Right Sidebar - Customer Context (moved Quick Actions to bottom) */}
             <div className="hidden md:flex md:flex-col w-[340px] border-l border-border bg-card overflow-y-auto">
-              <div className="p-4 space-y-4">
+              <div className="p-4">
                 {selectedConversation && (
-                  <>
-                    <QuickActions 
-                      conversation={selectedConversation} 
-                      onUpdate={handleUpdate}
-                      onBack={handleClose}
-                    />
-                    <CustomerContext conversation={selectedConversation} onUpdate={handleUpdate} />
-                  </>
+                  <CustomerContext conversation={selectedConversation} onUpdate={handleUpdate} />
                 )}
               </div>
             </div>
