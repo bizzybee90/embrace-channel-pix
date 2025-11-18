@@ -6,6 +6,7 @@ import { ConversationList } from '@/components/conversations/ConversationList';
 import { ConversationThread } from '@/components/conversations/ConversationThread';
 import { CustomerContext } from '@/components/context/CustomerContext';
 import { QuickActions } from '@/components/conversations/QuickActions';
+import { MobileQuickActions } from '@/components/conversations/MobileQuickActions';
 import { Conversation } from '@/lib/types';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { useInterfaceMode } from '@/hooks/useInterfaceMode';
@@ -191,27 +192,45 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
               </Button>
             </div>
           )}
-          <div className="flex-1 w-full min-h-0 overflow-y-auto">
-            {selectedConversation && (
-              <ConversationThread
-                key={refreshKey}
-                conversation={selectedConversation}
-                onUpdate={handleUpdate}
-                onBack={handleClose}
-              />
-            )}
-          </div>
-          <div className="h-full overflow-y-auto bg-card border-l border-border p-4 space-y-4" style={{ width: '340px' }}>
-            {selectedConversation && (
-              <>
-                <QuickActions 
-                  conversation={selectedConversation} 
+          <div className="flex flex-1 h-full overflow-hidden">
+            {/* Main Content - Conversation */}
+            <div className="flex-1 flex flex-col overflow-hidden">
+              {selectedConversation && (
+                <ConversationThread
+                  key={refreshKey}
+                  conversation={selectedConversation}
                   onUpdate={handleUpdate}
                   onBack={handleClose}
                 />
-                <CustomerContext conversation={selectedConversation} onUpdate={handleUpdate} />
-              </>
-            )}
+              )}
+            </div>
+            
+            {/* Right Sidebar - Quick Actions & Customer Context */}
+            <div className="hidden md:flex md:flex-col w-[340px] border-l border-border bg-card overflow-y-auto">
+              <div className="p-4 space-y-4">
+                {selectedConversation && (
+                  <>
+                    <QuickActions 
+                      conversation={selectedConversation} 
+                      onUpdate={handleUpdate}
+                      onBack={handleClose}
+                    />
+                    <CustomerContext conversation={selectedConversation} onUpdate={handleUpdate} />
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Mobile Bottom Sheet for Quick Actions */}
+            <div className="md:hidden">
+              {selectedConversation && (
+                <MobileQuickActions 
+                  conversation={selectedConversation}
+                  onUpdate={handleUpdate}
+                  onClose={handleClose}
+                />
+              )}
+            </div>
           </div>
         </DialogContent>
       </Dialog>

@@ -86,11 +86,7 @@ export const ConversationHeader = ({ conversation, onUpdate, onBack }: Conversat
           )}
         </div>
         <div className="flex items-center gap-2">
-          <SLABadge
-            slaStatus={conversation.sla_status}
-            slaDueAt={conversation.sla_due_at}
-            size="default"
-          />
+          <SLABadge conversation={conversation} />
         </div>
       </div>
 

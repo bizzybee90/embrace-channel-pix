@@ -1,54 +1,42 @@
 import { Badge } from '@/components/ui/badge';
-import { formatDistanceToNow } from 'date-fns';
-import { Clock, AlertTriangle, CheckCircle } from 'lucide-react';
+import { SLACountdown } from './SLACountdown';
+import { Conversation } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 interface SLABadgeProps {
-  slaStatus: string;
-  slaDueAt: string | null;
-  size?: 'sm' | 'default';
+  conversation: Conversation;
+  compact?: boolean;
 }
 
-export const SLABadge = ({ slaStatus, slaDueAt, size = 'sm' }: SLABadgeProps) => {
-  if (!slaDueAt) return null;
+export const SLABadge = ({ conversation, compact = false }: SLABadgeProps) => {
+  if (!conversation.sla_due_at) {
+    return null;
+  }
 
-  const dueDate = new Date(slaDueAt);
   const now = new Date();
-  const isOverdue = dueDate < now;
-  
-  const timeText = isOverdue
-    ? `Overdue ${formatDistanceToNow(dueDate, { addSuffix: true })}`
-    : formatDistanceToNow(dueDate, { addSuffix: true });
+  const dueDate = new Date(conversation.sla_due_at);
+  const isOverdue = now > dueDate;
 
-  const getStatusConfig = () => {
-    if (isOverdue || slaStatus === 'breached') {
-      return {
-        color: 'bg-urgent/10 text-urgent border-urgent/30',
-        icon: AlertTriangle,
-        label: 'Overdue'
-      };
-    }
-    if (slaStatus === 'warning') {
-      return {
-        color: 'bg-warning/10 text-warning border-warning/30',
-        icon: Clock,
-        label: 'Due Soon'
-      };
-    }
-    return {
-      color: 'bg-safe/10 text-safe border-safe/30',
-      icon: CheckCircle,
-      label: 'On Track'
-    };
-  };
-
-  const config = getStatusConfig();
-  const Icon = config.icon;
+  if (compact) {
+    // Mobile compact version - just a colored dot
+    return (
+      <div 
+        className={cn(
+          "h-2 w-2 rounded-full",
+          isOverdue && "bg-destructive",
+          !isOverdue && "bg-success"
+        )}
+        title={isOverdue ? 'Overdue' : 'On time'}
+      />
+    );
+  }
 
   return (
-    <Badge variant="outline" className={cn('flex items-center gap-1', config.color, size === 'sm' && 'text-xs')}>
-      <Icon className="h-3 w-3" />
-      {config.label}
+    <Badge 
+      variant={isOverdue ? "destructive" : "secondary"}
+      className="text-xs font-medium"
+    >
+      {isOverdue ? 'Overdue' : <SLACountdown slaDueAt={conversation.sla_due_at} />}
     </Badge>
   );
 };

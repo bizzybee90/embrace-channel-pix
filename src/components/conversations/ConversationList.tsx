@@ -126,12 +126,12 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
             <p className="text-muted-foreground/60 text-xs mt-1">Try adjusting your search or filters</p>
           </div>
         ) : (
-          <div className="divide-y divide-border">
+          <div className="space-y-1 p-2 md:p-0">
             {conversations.map((conversation) => (
               <ConversationCard
                 key={conversation.id}
                 conversation={conversation}
-                isSelected={conversation.id === selectedId}
+                selected={conversation.id === selectedId}
                 onClick={() => onSelect(conversation)}
               />
             ))}
