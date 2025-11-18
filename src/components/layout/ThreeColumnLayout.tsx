@@ -1,16 +1,14 @@
 import { ReactNode, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, PanelLeftClose, PanelRightClose } from 'lucide-react';
+import { ChevronRight, PanelLeftClose } from 'lucide-react';
 
 interface ThreeColumnLayoutProps {
   sidebar: ReactNode;
   main: ReactNode;
-  contextPanel: ReactNode;
 }
 
-export const ThreeColumnLayout = ({ sidebar, main, contextPanel }: ThreeColumnLayoutProps) => {
+export const ThreeColumnLayout = ({ sidebar, main }: ThreeColumnLayoutProps) => {
   const [leftCollapsed, setLeftCollapsed] = useState(false);
-  const [rightCollapsed, setRightCollapsed] = useState(false);
 
   return (
     <div className="flex h-screen w-full bg-background overflow-hidden">
@@ -33,21 +31,6 @@ export const ThreeColumnLayout = ({ sidebar, main, contextPanel }: ThreeColumnLa
       <main className="flex-1 flex flex-col overflow-hidden">
         {main}
       </main>
-
-      {/* Context Panel */}
-      <aside className={`border-l border-border bg-card flex-shrink-0 overflow-hidden transition-all duration-300 relative ${rightCollapsed ? 'w-12' : 'w-80'}`}>
-        {!rightCollapsed && contextPanel}
-        <div className={`absolute top-4 z-10 transition-all duration-300 ${rightCollapsed ? 'right-2' : 'left-2'}`}>
-          <Button
-            variant={rightCollapsed ? "outline" : "ghost"}
-            size="icon"
-            onClick={() => setRightCollapsed(!rightCollapsed)}
-            className="h-8 w-8 bg-background/95 backdrop-blur"
-          >
-            {rightCollapsed ? <ChevronLeft className="h-4 w-4" /> : <PanelRightClose className="h-4 w-4" />}
-          </Button>
-        </div>
-      </aside>
     </div>
   );
 };
