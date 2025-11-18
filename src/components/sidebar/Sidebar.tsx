@@ -1,4 +1,4 @@
-import { Inbox, AlertTriangle, CheckCircle2, Clock, Filter, Zap, Columns, Settings } from 'lucide-react';
+import { Inbox, AlertTriangle, CheckCircle2, Clock, Filter, Zap, Columns, Settings, ChevronRight, PanelLeftClose } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { TeamStatus } from './TeamStatus';
 import { Button } from '@/components/ui/button';
@@ -12,12 +12,9 @@ import { useState, useEffect } from 'react';
 import beeLogo from '@/assets/bee-logo.png';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
-interface SidebarProps {
-  collapsed?: boolean;
-}
-
-export const Sidebar = ({ collapsed = false }: SidebarProps) => {
+export const Sidebar = () => {
   const { interfaceMode, toggleMode, loading } = useInterfaceMode();
+  const [collapsed, setCollapsed] = useState(false);
   const [visibleFilters, setVisibleFilters] = useState({
     myTickets: true,
     unassigned: true,
@@ -39,7 +36,19 @@ export const Sidebar = ({ collapsed = false }: SidebarProps) => {
   };
   return (
     <TooltipProvider>
-      <div className="flex flex-col h-full p-4">
+      <div className={`flex flex-col h-full p-4 transition-all duration-300 ${collapsed ? 'w-16' : 'w-60'} relative`}>
+        {/* Collapse Toggle */}
+        <div className="absolute top-4 right-2 z-10">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setCollapsed(!collapsed)}
+            className="h-8 w-8 bg-background/95 backdrop-blur hover:bg-accent"
+          >
+            {collapsed ? <ChevronRight className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+          </Button>
+        </div>
+
         {/* Logo Section */}
         <div className={`mb-6 flex items-center ${collapsed ? 'justify-center' : 'gap-3'}`}>
           {collapsed ? (
