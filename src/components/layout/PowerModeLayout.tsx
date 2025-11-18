@@ -23,8 +23,8 @@ export const PowerModeLayout = ({ filter = 'all-open' }: PowerModeLayoutProps) =
 
   return (
     <div className="flex h-screen w-full bg-background overflow-hidden">
-      {/* Sidebar */}
-      <aside className="w-60 border-r border-border bg-card flex-shrink-0">
+      {/* Sidebar - width controlled by Sidebar component itself */}
+      <aside className="border-r border-border bg-card flex-shrink-0">
         <Sidebar />
       </aside>
 
