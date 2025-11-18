@@ -5,13 +5,17 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Mail, Phone, MessageSquare, Crown } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 interface CustomerContextProps {
   conversation: Conversation;
+  onUpdate: () => void;
 }
 
-export const CustomerContext = ({ conversation }: CustomerContextProps) => {
+export const CustomerContext = ({ conversation, onUpdate }: CustomerContextProps) => {
   const customer = conversation.customer;
+  const { toast } = useToast();
 
   if (!customer) {
     return (
@@ -124,7 +128,7 @@ export const CustomerContext = ({ conversation }: CustomerContextProps) => {
             </SelectContent>
           </Select>
 
-          <Button variant="outline" className="w-full">
+          <Button variant="outline" className="w-full" onClick={handleAssignToMe}>
             Assign to Me
           </Button>
         </div>
@@ -133,10 +137,35 @@ export const CustomerContext = ({ conversation }: CustomerContextProps) => {
   );
 
   async function updatePriority(priority: string) {
-    // Implementation in parent component
+    await supabase
+      .from('conversations')
+      .update({ priority })
+      .eq('id', conversation.id);
+    onUpdate();
   }
 
   async function updateStatus(status: string) {
-    // Implementation in parent component
+    await supabase
+      .from('conversations')
+      .update({ status })
+      .eq('id', conversation.id);
+    onUpdate();
+  }
+
+  async function handleAssignToMe() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    await supabase
+      .from('conversations')
+      .update({ assigned_to: user.id })
+      .eq('id', conversation.id);
+    
+    toast({
+      title: "Conversation assigned",
+      description: "This conversation has been assigned to you.",
+    });
+    
+    onUpdate();
   }
 };

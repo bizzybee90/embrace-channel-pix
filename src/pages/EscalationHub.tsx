@@ -50,7 +50,7 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
           </div>
           <div className="w-80 border-l border-border overflow-y-auto bg-card">
             {selectedConversation && (
-              <CustomerContext conversation={selectedConversation} />
+              <CustomerContext conversation={selectedConversation} onUpdate={handleUpdate} />
             )}
           </div>
         </DialogContent>
