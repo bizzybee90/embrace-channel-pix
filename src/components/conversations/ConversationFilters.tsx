@@ -25,7 +25,13 @@ export const ConversationFilters = ({
     <div className="flex gap-2">
       <Select value={statusFilter} onValueChange={setStatusFilter}>
         <SelectTrigger className="w-[140px]">
-          <SelectValue placeholder="Status" />
+          <SelectValue>
+            {statusFilter === 'all' ? 'Status: All' : 
+             statusFilter === 'new' ? 'Status: New' :
+             statusFilter === 'open' ? 'Status: Open' :
+             statusFilter === 'waiting_customer' ? 'Status: Waiting Customer' :
+             'Status: Resolved'}
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">All Status</SelectItem>
@@ -38,7 +44,12 @@ export const ConversationFilters = ({
 
       <Select value={priorityFilter} onValueChange={setPriorityFilter}>
         <SelectTrigger className="w-[140px]">
-          <SelectValue placeholder="Priority" />
+          <SelectValue>
+            {priorityFilter === 'all' ? 'Priority: All' :
+             priorityFilter === 'high' ? 'Priority: High' :
+             priorityFilter === 'medium' ? 'Priority: Medium' :
+             'Priority: Low'}
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">All Priority</SelectItem>
@@ -50,7 +61,13 @@ export const ConversationFilters = ({
 
       <Select value={channelFilter} onValueChange={setChannelFilter}>
         <SelectTrigger className="w-[140px]">
-          <SelectValue placeholder="Channel" />
+          <SelectValue>
+            {channelFilter === 'all' ? 'Channel: All' :
+             channelFilter === 'sms' ? 'Channel: SMS' :
+             channelFilter === 'whatsapp' ? 'Channel: WhatsApp' :
+             channelFilter === 'email' ? 'Channel: Email' :
+             'Channel: Web Chat'}
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">All Channels</SelectItem>
@@ -63,7 +80,15 @@ export const ConversationFilters = ({
 
       <Select value={categoryFilter} onValueChange={setCategoryFilter}>
         <SelectTrigger className="w-[140px]">
-          <SelectValue placeholder="Category" />
+          <SelectValue>
+            {categoryFilter === 'all' ? 'Category: All' :
+             categoryFilter === 'billing_payment' ? 'Category: Billing & Payment' :
+             categoryFilter === 'technical_support' ? 'Category: Technical Support' :
+             categoryFilter === 'account_management' ? 'Category: Account Management' :
+             categoryFilter === 'product_inquiry' ? 'Category: Product Inquiry' :
+             categoryFilter === 'complaint' ? 'Category: Complaint' :
+             'Category: Other'}
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">All Categories</SelectItem>
