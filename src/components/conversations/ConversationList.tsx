@@ -34,11 +34,11 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open' }: 
 
       // Apply view filter
       if (filter === 'my-tickets') {
-        query = query.eq('assigned_to', user.id);
+        query = query.eq('assigned_to', user.id).in('status', ['new', 'open', 'waiting_customer', 'waiting_internal']);
       } else if (filter === 'unassigned') {
-        query = query.is('assigned_to', null);
+        query = query.is('assigned_to', null).in('status', ['new', 'open', 'waiting_customer', 'waiting_internal']);
       } else if (filter === 'sla-risk') {
-        query = query.in('sla_status', ['warning', 'breached']);
+        query = query.in('sla_status', ['warning', 'breached']).in('status', ['new', 'open', 'waiting_customer', 'waiting_internal']);
       } else if (filter === 'all-open') {
         query = query.in('status', ['new', 'open', 'waiting_customer', 'waiting_internal']);
       }
