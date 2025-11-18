@@ -10,9 +10,10 @@ import { Loader2 } from 'lucide-react';
 interface ConversationThreadProps {
   conversation: Conversation;
   onUpdate: () => void;
+  onBack?: () => void;
 }
 
-export const ConversationThread = ({ conversation, onUpdate }: ConversationThreadProps) => {
+export const ConversationThread = ({ conversation, onUpdate, onBack }: ConversationThreadProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -95,7 +96,7 @@ export const ConversationThread = ({ conversation, onUpdate }: ConversationThrea
 
   return (
     <div className="flex flex-col h-full">
-      <ConversationHeader conversation={conversation} onUpdate={onUpdate} />
+      <ConversationHeader conversation={conversation} onUpdate={onUpdate} onBack={onBack} />
       
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         <AIContextPanel conversation={conversation} />

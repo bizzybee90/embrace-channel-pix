@@ -18,6 +18,10 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
     setRefreshKey(prev => prev + 1);
   };
 
+  const handleBack = () => {
+    setSelectedConversation(null);
+  };
+
   return (
     <ThreeColumnLayout
       sidebar={<Sidebar />}
@@ -27,6 +31,7 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
             key={refreshKey}
             conversation={selectedConversation}
             onUpdate={handleUpdate}
+            onBack={handleBack}
           />
         ) : (
           <ConversationList

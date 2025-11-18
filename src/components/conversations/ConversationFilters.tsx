@@ -7,6 +7,8 @@ interface ConversationFiltersProps {
   setPriorityFilter: (value: string) => void;
   channelFilter: string;
   setChannelFilter: (value: string) => void;
+  categoryFilter: string;
+  setCategoryFilter: (value: string) => void;
 }
 
 export const ConversationFilters = ({
@@ -15,7 +17,9 @@ export const ConversationFilters = ({
   priorityFilter,
   setPriorityFilter,
   channelFilter,
-  setChannelFilter
+  setChannelFilter,
+  categoryFilter,
+  setCategoryFilter
 }: ConversationFiltersProps) => {
   return (
     <div className="flex gap-2">
@@ -54,6 +58,21 @@ export const ConversationFilters = ({
           <SelectItem value="whatsapp">WhatsApp</SelectItem>
           <SelectItem value="email">Email</SelectItem>
           <SelectItem value="web_chat">Web Chat</SelectItem>
+        </SelectContent>
+      </Select>
+
+      <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+        <SelectTrigger className="w-[140px]">
+          <SelectValue placeholder="Category" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All Categories</SelectItem>
+          <SelectItem value="billing_payment">Billing & Payment</SelectItem>
+          <SelectItem value="technical_support">Technical Support</SelectItem>
+          <SelectItem value="account_management">Account Management</SelectItem>
+          <SelectItem value="product_inquiry">Product Inquiry</SelectItem>
+          <SelectItem value="complaint">Complaint</SelectItem>
+          <SelectItem value="other">Other</SelectItem>
         </SelectContent>
       </Select>
     </div>

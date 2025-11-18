@@ -17,6 +17,7 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open' }: 
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
   const [channelFilter, setChannelFilter] = useState<string>('all');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
 
   useEffect(() => {
     const fetchConversations = async () => {
@@ -53,6 +54,9 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open' }: 
       if (channelFilter !== 'all') {
         query = query.eq('channel', channelFilter);
       }
+      if (categoryFilter !== 'all') {
+        query = query.eq('category', categoryFilter);
+      }
 
       const { data } = await query;
       if (data) {
@@ -82,7 +86,7 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open' }: 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [filter, statusFilter, priorityFilter, channelFilter]);
+  }, [filter, statusFilter, priorityFilter, channelFilter, categoryFilter]);
 
   if (loading) {
     return (
@@ -102,6 +106,8 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open' }: 
           setPriorityFilter={setPriorityFilter}
           channelFilter={channelFilter}
           setChannelFilter={setChannelFilter}
+          categoryFilter={categoryFilter}
+          setCategoryFilter={setCategoryFilter}
         />
       </div>
       
