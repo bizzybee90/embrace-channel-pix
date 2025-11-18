@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
-import { Clock } from 'lucide-react';
+import { Clock, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface SLACountdownProps {
@@ -10,7 +10,7 @@ interface SLACountdownProps {
 
 export const SLACountdown = ({ slaDueAt, className }: SLACountdownProps) => {
   const [timeRemaining, setTimeRemaining] = useState<string>('');
-  const [isBreached, setIsBreached] = useState(false);
+  const [isOverdue, setIsOverdue] = useState(false);
   const [isUrgent, setIsUrgent] = useState(false);
 
   useEffect(() => {
@@ -21,13 +21,13 @@ export const SLACountdown = ({ slaDueAt, className }: SLACountdownProps) => {
       const dueDate = new Date(slaDueAt);
       const minutesRemaining = (dueDate.getTime() - now.getTime()) / 1000 / 60;
 
-      setIsBreached(minutesRemaining <= 0);
+      setIsOverdue(minutesRemaining <= 0);
       setIsUrgent(minutesRemaining > 0 && minutesRemaining <= 15);
       
       if (minutesRemaining <= 0) {
-        setTimeRemaining('BREACHED');
+        setTimeRemaining('OVERDUE');
       } else if (minutesRemaining <= 60) {
-        setTimeRemaining(`${Math.floor(minutesRemaining)}m remaining`);
+        setTimeRemaining(`${Math.floor(minutesRemaining)}m left`);
       } else {
         setTimeRemaining(formatDistanceToNow(dueDate, { addSuffix: true }));
       }
@@ -41,15 +41,17 @@ export const SLACountdown = ({ slaDueAt, className }: SLACountdownProps) => {
 
   if (!slaDueAt) return null;
 
+  const Icon = isOverdue ? AlertTriangle : Clock;
+
   return (
     <div className={cn(
       'flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md',
-      isBreached && 'bg-destructive text-destructive-foreground animate-pulse',
-      isUrgent && !isBreached && 'bg-warning text-warning-foreground',
-      !isBreached && !isUrgent && 'bg-success/10 text-success',
+      isOverdue && 'bg-urgent/10 text-urgent animate-pulse',
+      isUrgent && !isOverdue && 'bg-warning/10 text-warning',
+      !isOverdue && !isUrgent && 'bg-safe/10 text-safe',
       className
     )}>
-      <Clock className="h-3 w-3" />
+      <Icon className="h-3 w-3" />
       {timeRemaining}
     </div>
   );

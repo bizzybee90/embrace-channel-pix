@@ -106,6 +106,7 @@ export const ConversationThread = ({ conversation, onUpdate, onBack }: Conversat
       <ReplyArea
         conversationId={conversation.id}
         channel={conversation.channel}
+        aiDraftResponse={conversation.metadata?.ai_draft_response as string}
         onSend={handleReply}
       />
     </div>

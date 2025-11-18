@@ -1,6 +1,6 @@
 import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow } from 'date-fns';
-import { Clock } from 'lucide-react';
+import { Clock, AlertTriangle, CheckCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface SLABadgeProps {
@@ -14,26 +14,41 @@ export const SLABadge = ({ slaStatus, slaDueAt, size = 'sm' }: SLABadgeProps) =>
 
   const dueDate = new Date(slaDueAt);
   const now = new Date();
-  const isBreached = dueDate < now;
+  const isOverdue = dueDate < now;
   
-  const timeText = isBreached
-    ? `Breached ${formatDistanceToNow(dueDate, { addSuffix: true })}`
+  const timeText = isOverdue
+    ? `Overdue ${formatDistanceToNow(dueDate, { addSuffix: true })}`
     : formatDistanceToNow(dueDate, { addSuffix: true });
 
-  const getStatusColor = () => {
-    if (isBreached || slaStatus === 'breached') {
-      return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
+  const getStatusConfig = () => {
+    if (isOverdue || slaStatus === 'breached') {
+      return {
+        color: 'bg-urgent/10 text-urgent border-urgent/30',
+        icon: AlertTriangle,
+        label: 'Overdue'
+      };
     }
     if (slaStatus === 'warning') {
-      return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400';
+      return {
+        color: 'bg-warning/10 text-warning border-warning/30',
+        icon: Clock,
+        label: 'Due Soon'
+      };
     }
-    return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
+    return {
+      color: 'bg-safe/10 text-safe border-safe/30',
+      icon: CheckCircle,
+      label: 'On Track'
+    };
   };
 
+  const config = getStatusConfig();
+  const Icon = config.icon;
+
   return (
-    <Badge variant="outline" className={cn('flex items-center gap-1', getStatusColor(), size === 'sm' && 'text-xs')}>
-      <Clock className="h-3 w-3" />
-      {timeText}
+    <Badge variant="outline" className={cn('flex items-center gap-1', config.color, size === 'sm' && 'text-xs')}>
+      <Icon className="h-3 w-3" />
+      {config.label}
     </Badge>
   );
 };

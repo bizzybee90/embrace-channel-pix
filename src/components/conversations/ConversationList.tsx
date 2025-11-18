@@ -121,8 +121,9 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
       
       <div className="flex-1 overflow-y-auto">
         {conversations.length === 0 ? (
-          <div className="flex items-center justify-center h-64">
-            <p className="text-muted-foreground">No conversations found</p>
+          <div className="flex flex-col items-center justify-center h-64 px-4">
+            <p className="text-muted-foreground text-sm">No conversations match your filters</p>
+            <p className="text-muted-foreground/60 text-xs mt-1">Try adjusting your search or filters</p>
           </div>
         ) : (
           <div className="divide-y divide-border">
