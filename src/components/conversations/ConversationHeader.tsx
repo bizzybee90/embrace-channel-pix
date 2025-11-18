@@ -4,14 +4,18 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { SLABadge } from '../sla/SLABadge';
-import { Crown } from 'lucide-react';
+import { Crown, ArrowLeft } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 interface ConversationHeaderProps {
   conversation: Conversation;
   onUpdate: () => void;
+  onBack?: () => void;
 }
 
-export const ConversationHeader = ({ conversation, onUpdate }: ConversationHeaderProps) => {
+export const ConversationHeader = ({ conversation, onUpdate, onBack }: ConversationHeaderProps) => {
+  const { toast } = useToast();
+  
   const updateField = async (field: string, value: any) => {
     await supabase
       .from('conversations')
@@ -20,10 +24,37 @@ export const ConversationHeader = ({ conversation, onUpdate }: ConversationHeade
     onUpdate();
   };
 
+  const handleAssignToMe = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    await supabase
+      .from('conversations')
+      .update({ assigned_to: user.id })
+      .eq('id', conversation.id);
+    
+    toast({
+      title: "Conversation assigned",
+      description: "This conversation has been assigned to you.",
+    });
+    
+    onUpdate();
+  };
+
   return (
     <div className="border-b border-border p-4">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
+          {onBack && (
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={onBack}
+              className="h-8 w-8"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          )}
           <h2 className="text-lg font-semibold">
             {conversation.customer?.name || 'Unknown Customer'}
           </h2>
@@ -73,8 +104,8 @@ export const ConversationHeader = ({ conversation, onUpdate }: ConversationHeade
           </SelectContent>
         </Select>
 
-        <Button variant="outline" size="sm">
-          Assign
+        <Button variant="outline" size="sm" onClick={handleAssignToMe}>
+          Assign to Me
         </Button>
       </div>
     </div>
