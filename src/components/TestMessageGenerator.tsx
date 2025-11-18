@@ -127,6 +127,7 @@ export const TestMessageGenerator = () => {
           ...scenario,
           status: "pending" as const,
           metadata: {
+            ...scenario.metadata,
             test_message: true,
             generated_at: new Date().toISOString()
           }
@@ -159,6 +160,7 @@ export const TestMessageGenerator = () => {
             ...scenario,
             status: "pending" as const,
             metadata: {
+              ...scenario.metadata,
               test_message: true,
               generated_at: new Date().toISOString()
             }
