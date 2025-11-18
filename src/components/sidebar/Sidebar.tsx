@@ -267,7 +267,7 @@ export const Sidebar = () => {
 
         {/* Interface Mode Toggle */}
         {!loading && (
-          <Card className="p-3 bg-muted/50">
+          <Card className={`bg-muted/50 ${collapsed ? 'p-1.5' : 'p-3'}`}>
             {!collapsed && (
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-semibold text-muted-foreground uppercase">Interface</span>
@@ -280,7 +280,7 @@ export const Sidebar = () => {
                     <Button
                       variant={interfaceMode === 'focus' ? 'default' : 'ghost'}
                       size="icon"
-                      className="h-9 w-9"
+                      className="h-8 w-8"
                       onClick={() => interfaceMode === 'power' && toggleMode()}
                     >
                       <Zap className="h-4 w-4" />
@@ -295,7 +295,7 @@ export const Sidebar = () => {
                     <Button
                       variant={interfaceMode === 'power' ? 'default' : 'ghost'}
                       size="icon"
-                      className="h-9 w-9"
+                      className="h-8 w-8"
                       onClick={() => interfaceMode === 'focus' && toggleMode()}
                     >
                       <Columns className="h-4 w-4" />
