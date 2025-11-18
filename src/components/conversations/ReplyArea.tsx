@@ -52,43 +52,6 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend }: 
         </TabsList>
 
         <TabsContent value="reply" className="space-y-2 mt-0">
-          {aiDraftResponse && !draftUsed && (
-            <Card className="p-3 bg-primary/5 border-primary/20">
-              <div className="flex items-start gap-2 mb-2">
-                <Sparkles className="h-4 w-4 text-primary mt-0.5" />
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-foreground mb-1">AI Suggested Response</p>
-                  <p className="text-sm text-foreground/80 whitespace-pre-wrap">{aiDraftResponse}</p>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={handleUseDraft}
-                  className="flex-1"
-                >
-                  <Edit2 className="h-3 w-3 mr-1" />
-                  Use & Edit
-                </Button>
-                <Button 
-                  variant="default" 
-                  size="sm" 
-                  onClick={async () => {
-                    setSending(true);
-                    await onSend(aiDraftResponse, false);
-                    setDraftUsed(true);
-                    setSending(false);
-                  }}
-                  disabled={sending}
-                  className="flex-1"
-                >
-                  <Send className="h-3 w-3 mr-1" />
-                  Send as-is
-                </Button>
-              </div>
-            </Card>
-          )}
           
           <div className="flex items-center gap-2">
             <Select value={selectedChannel} onValueChange={setSelectedChannel}>

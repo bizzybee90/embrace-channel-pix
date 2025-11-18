@@ -2,10 +2,9 @@ import { Conversation } from '@/lib/types';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Lightbulb, AlertTriangle, BarChart3, FolderOpen, ThumbsUp, ThumbsDown, Send } from 'lucide-react';
+import { Lightbulb, AlertTriangle, BarChart3, FolderOpen, ThumbsUp, ThumbsDown, Send, ChevronDown, ChevronUp } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useState } from 'react';
-import { ChevronDown } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -19,6 +18,7 @@ export const AIContextPanel = ({ conversation, onUpdate }: AIContextPanelProps) 
   const [isOpen, setIsOpen] = useState(true);
   const [feedback, setFeedback] = useState<'up' | 'down' | null>(null);
   const [isSending, setIsSending] = useState(false);
+  const [isDraftExpanded, setIsDraftExpanded] = useState(false);
 
   const escalatedAt = conversation.created_at 
     ? formatDistanceToNow(new Date(conversation.created_at), { addSuffix: true })
@@ -119,31 +119,55 @@ export const AIContextPanel = ({ conversation, onUpdate }: AIContextPanelProps) 
             {/* AI Draft Response */}
             {conversation.metadata?.ai_draft_response && (
               <div className="space-y-2">
-                <div className="flex items-start gap-2">
-                  <Lightbulb className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-                  <div className="flex-1 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <h3 className="font-semibold text-sm">AI Draft Response</h3>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Send className="h-4 w-4 text-primary" />
+                    <h3 className="font-semibold text-sm">AI Draft Response</h3>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsDraftExpanded(!isDraftExpanded)}
+                    className="h-7 px-2"
+                  >
+                    {isDraftExpanded ? (
+                      <>
+                        <ChevronUp className="h-4 w-4 mr-1" />
+                        Collapse
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown className="h-4 w-4 mr-1" />
+                        Expand
+                      </>
+                    )}
+                  </Button>
+                </div>
+                <Collapsible open={isDraftExpanded}>
+                  <CollapsibleContent>
+                    <div className="space-y-2 pl-6">
+                      <div className="bg-primary/5 border border-primary/20 rounded-lg p-3">
+                        <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                          {conversation.metadata.ai_draft_response}
+                        </p>
+                      </div>
                       <Button
                         size="sm"
                         onClick={handleSendDraft}
                         disabled={isSending}
-                        className="h-7"
+                        className="w-full"
                       >
-                        <Send className="h-3 w-3 mr-1" />
+                        <Send className="h-3 w-3 mr-2" />
                         {isSending ? 'Sending...' : 'Send Draft'}
                       </Button>
                     </div>
-                    <div className="bg-primary/5 border border-primary/20 rounded-lg p-3">
-                      <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                        {conversation.metadata.ai_draft_response}
-                      </p>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      This draft is also available in the reply area below
-                    </p>
-                  </div>
-                </div>
+                  </CollapsibleContent>
+                </Collapsible>
+                {!isDraftExpanded && (
+                  <p className="text-xs text-muted-foreground pl-6 italic">
+                    Click "Expand" to view and send the AI-generated response
+                  </p>
+                )}
               </div>
             )}
 
