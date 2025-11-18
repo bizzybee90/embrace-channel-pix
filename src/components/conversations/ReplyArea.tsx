@@ -44,9 +44,9 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend }: 
   };
 
   return (
-    <div className="border-t border-border p-4 bg-card">
+    <div className="border-t border-border p-4 bg-card max-h-[400px] overflow-y-auto">
       <Tabs defaultValue="reply">
-        <TabsList className="mb-3">
+        <TabsList className="mb-3 sticky top-0 bg-card z-10">
           <TabsTrigger value="reply">Reply to Customer</TabsTrigger>
           <TabsTrigger value="note">Add Internal Note</TabsTrigger>
         </TabsList>
