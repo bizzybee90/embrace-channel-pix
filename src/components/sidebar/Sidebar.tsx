@@ -36,7 +36,7 @@ export const Sidebar = () => {
   };
   return (
     <TooltipProvider>
-      <div className={`flex flex-col h-full transition-all duration-300 relative ${collapsed ? 'w-20 p-2' : 'w-60 p-4'}`}>
+      <div className={`flex flex-col h-full transition-all duration-300 relative ${collapsed ? 'w-14 p-1.5' : 'w-60 p-4'}`}>
         {/* Collapse Toggle */}
         <Button
           variant="ghost"
