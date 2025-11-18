@@ -36,21 +36,19 @@ export const Sidebar = () => {
   };
   return (
     <TooltipProvider>
-      <div className={`flex flex-col h-full p-4 transition-all duration-300 ${collapsed ? 'w-16' : 'w-60'} relative`}>
+      <div className={`flex flex-col h-full p-4 transition-all duration-300 relative ${collapsed ? 'w-16' : 'w-60'}`}>
         {/* Collapse Toggle */}
-        <div className="absolute top-4 right-2 z-10">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setCollapsed(!collapsed)}
-            className="h-8 w-8 bg-background/95 backdrop-blur hover:bg-accent"
-          >
-            {collapsed ? <ChevronRight className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
-          </Button>
-        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setCollapsed(!collapsed)}
+          className={`absolute top-4 z-10 h-8 w-8 bg-background/95 backdrop-blur hover:bg-accent transition-all duration-300 ${collapsed ? 'left-2' : 'right-2'}`}
+        >
+          {collapsed ? <ChevronRight className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+        </Button>
 
         {/* Logo Section */}
-        <div className={`mb-6 flex items-center ${collapsed ? 'justify-center' : 'gap-3'}`}>
+        <div className={`mb-6 flex items-center ${collapsed ? 'justify-center mt-14' : 'gap-3 mt-0'}`}>
           {collapsed ? (
             <Tooltip>
               <TooltipTrigger asChild>
