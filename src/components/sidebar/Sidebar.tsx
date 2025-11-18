@@ -1,57 +1,136 @@
-import { Inbox, AlertTriangle, CheckCircle2, Clock, Filter, Zap, Columns } from 'lucide-react';
+import { Inbox, AlertTriangle, CheckCircle2, Clock, Filter, Zap, Columns, Settings } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { TeamStatus } from './TeamStatus';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { useInterfaceMode } from '@/hooks/useInterfaceMode';
 import { Card } from '@/components/ui/card';
+import { useState, useEffect } from 'react';
 
 export const Sidebar = () => {
   const { interfaceMode, toggleMode, loading } = useInterfaceMode();
+  const [visibleFilters, setVisibleFilters] = useState({
+    myTickets: true,
+    unassigned: true,
+    slaRisk: true,
+    allOpen: true,
+  });
+
+  useEffect(() => {
+    const saved = localStorage.getItem('visibleFilters');
+    if (saved) {
+      setVisibleFilters(JSON.parse(saved));
+    }
+  }, []);
+
+  const toggleFilter = (filter: keyof typeof visibleFilters) => {
+    const updated = { ...visibleFilters, [filter]: !visibleFilters[filter] };
+    setVisibleFilters(updated);
+    localStorage.setItem('visibleFilters', JSON.stringify(updated));
+  };
   return (
     <div className="flex flex-col h-full p-4">
-      <div className="mb-6">
-        <h1 className="text-xl font-bold text-primary">🐝 BizzyBee</h1>
-        <p className="text-sm text-muted-foreground">Escalation Hub</p>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-primary">🐝 BizzyBee</h1>
+          <p className="text-sm text-muted-foreground">Escalation Hub</p>
+        </div>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8">
+              <Settings className="h-4 w-4" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-64" align="end">
+            <div className="space-y-4">
+              <h3 className="font-semibold">Filter Visibility</h3>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="my-tickets">My Tickets</Label>
+                  <Switch
+                    id="my-tickets"
+                    checked={visibleFilters.myTickets}
+                    onCheckedChange={() => toggleFilter('myTickets')}
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="unassigned">Unassigned</Label>
+                  <Switch
+                    id="unassigned"
+                    checked={visibleFilters.unassigned}
+                    onCheckedChange={() => toggleFilter('unassigned')}
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="sla-risk">SLA at Risk</Label>
+                  <Switch
+                    id="sla-risk"
+                    checked={visibleFilters.slaRisk}
+                    onCheckedChange={() => toggleFilter('slaRisk')}
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="all-open">All Open</Label>
+                  <Switch
+                    id="all-open"
+                    checked={visibleFilters.allOpen}
+                    onCheckedChange={() => toggleFilter('allOpen')}
+                  />
+                </div>
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
       </div>
 
       <nav className="space-y-1 mb-6">
         <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
           Views
         </h2>
-        <NavLink
-          to="/"
-          end
-          className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm hover:bg-accent transition-colors"
-          activeClassName="bg-accent text-accent-foreground font-medium"
-        >
-          <Inbox className="h-4 w-4" />
-          My Tickets
-        </NavLink>
-        <NavLink
-          to="/unassigned"
-          className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm hover:bg-accent transition-colors"
-          activeClassName="bg-accent text-accent-foreground font-medium"
-        >
-          <AlertTriangle className="h-4 w-4" />
-          Unassigned
-        </NavLink>
-        <NavLink
-          to="/sla-risk"
-          className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm hover:bg-accent transition-colors"
-          activeClassName="bg-accent text-accent-foreground font-medium"
-        >
-          <Clock className="h-4 w-4" />
-          SLA at Risk
-        </NavLink>
-        <NavLink
-          to="/all-open"
-          className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm hover:bg-accent transition-colors"
-          activeClassName="bg-accent text-accent-foreground font-medium"
-        >
-          <CheckCircle2 className="h-4 w-4" />
-          All Open
-        </NavLink>
+        {visibleFilters.myTickets && (
+          <NavLink
+            to="/"
+            end
+            className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm hover:bg-accent transition-colors"
+            activeClassName="bg-accent text-accent-foreground font-medium"
+          >
+            <Inbox className="h-4 w-4" />
+            My Tickets
+          </NavLink>
+        )}
+        {visibleFilters.unassigned && (
+          <NavLink
+            to="/unassigned"
+            className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm hover:bg-accent transition-colors"
+            activeClassName="bg-accent text-accent-foreground font-medium"
+          >
+            <AlertTriangle className="h-4 w-4" />
+            Unassigned
+          </NavLink>
+        )}
+        {visibleFilters.slaRisk && (
+          <NavLink
+            to="/sla-risk"
+            className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm hover:bg-accent transition-colors"
+            activeClassName="bg-accent text-accent-foreground font-medium"
+          >
+            <Clock className="h-4 w-4" />
+            SLA at Risk
+          </NavLink>
+        )}
+        {visibleFilters.allOpen && (
+          <NavLink
+            to="/all-open"
+            className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm hover:bg-accent transition-colors"
+            activeClassName="bg-accent text-accent-foreground font-medium"
+          >
+            <CheckCircle2 className="h-4 w-4" />
+            All Open
+          </NavLink>
+        )}
       </nav>
 
       <Separator className="my-4" />

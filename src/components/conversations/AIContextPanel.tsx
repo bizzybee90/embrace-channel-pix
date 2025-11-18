@@ -84,6 +84,26 @@ export const AIContextPanel = ({ conversation }: AIContextPanelProps) => {
               </div>
             )}
 
+            {/* AI Draft Response */}
+            {conversation.metadata?.ai_draft_response && (
+              <div className="space-y-2">
+                <div className="flex items-start gap-2">
+                  <Lightbulb className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <h3 className="font-semibold text-sm">AI Draft Response</h3>
+                    <div className="bg-primary/5 border border-primary/20 rounded-lg p-3">
+                      <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                        {conversation.metadata.ai_draft_response}
+                      </p>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      This draft will be available in the reply area below
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="flex items-center gap-4 pl-6 flex-wrap">
               {conversation.ai_confidence !== null && (
                 <div className="flex items-center gap-2">

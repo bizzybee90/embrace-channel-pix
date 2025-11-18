@@ -39,9 +39,11 @@ export const useInterfaceMode = () => {
     setInterfaceModeState(mode);
   };
 
-  const toggleMode = () => {
+  const toggleMode = async () => {
     const newMode = interfaceMode === 'focus' ? 'power' : 'focus';
-    setInterfaceMode(newMode);
+    await setInterfaceMode(newMode);
+    // Force page reload to switch interface immediately
+    window.location.reload();
   };
 
   return { interfaceMode, setInterfaceMode, toggleMode, loading };
