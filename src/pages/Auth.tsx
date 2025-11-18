@@ -96,7 +96,7 @@ const Auth = () => {
     
     try {
       // Try to sign in with demo account first
-      const { error: signInError } = await supabase.auth.signInWithPassword({
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
         email: "demo@agent.local",
         password: "demo123456",
       });
@@ -108,13 +108,16 @@ const Auth = () => {
           password: "demo123456",
           options: {
             emailRedirectTo: `${window.location.origin}/`,
+            data: {
+              name: "Demo Agent"
+            }
           },
         });
 
         if (signUpError) throw signUpError;
 
         // Try signing in again
-        const { error: retryError } = await supabase.auth.signInWithPassword({
+        const { data: retryData, error: retryError } = await supabase.auth.signInWithPassword({
           email: "demo@agent.local",
           password: "demo123456",
         });
@@ -122,9 +125,21 @@ const Auth = () => {
         if (retryError) throw retryError;
       }
 
+      // After successful login, set up demo workspace and data
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setTimeout(async () => {
+          try {
+            await setupDemoData(user.id);
+          } catch (error) {
+            console.error('Error setting up demo data:', error);
+          }
+        }, 0);
+      }
+
       toast({
         title: "Demo mode activated",
-        description: "Signed in as demo agent",
+        description: "Signed in as demo agent with test data",
       });
     } catch (error: any) {
       toast({
@@ -135,6 +150,178 @@ const Auth = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const setupDemoData = async (userId: string) => {
+    // Check if user already has a workspace
+    const { data: userData } = await supabase
+      .from('users')
+      .select('workspace_id')
+      .eq('id', userId)
+      .single();
+
+    let workspaceId = userData?.workspace_id;
+
+    // Create workspace if it doesn't exist
+    if (!workspaceId) {
+      const { data: workspace, error: workspaceError } = await supabase
+        .from('workspaces')
+        .insert({
+          name: 'Demo Workspace',
+          slug: `demo-${userId.substring(0, 8)}`,
+          timezone: 'America/New_York',
+          business_hours_start: '09:00',
+          business_hours_end: '17:00',
+          business_days: [1, 2, 3, 4, 5]
+        })
+        .select()
+        .single();
+
+      if (workspaceError) throw workspaceError;
+      workspaceId = workspace.id;
+
+      // Update user's workspace_id
+      await supabase
+        .from('users')
+        .update({ workspace_id: workspaceId })
+        .eq('id', userId);
+    }
+
+    // Check if demo data already exists
+    const { data: existingConversations } = await supabase
+      .from('conversations')
+      .select('id')
+      .eq('workspace_id', workspaceId)
+      .limit(1);
+
+    if (existingConversations && existingConversations.length > 0) {
+      return; // Demo data already exists
+    }
+
+    // Create demo customers
+    const { data: customers, error: customersError } = await supabase
+      .from('customers')
+      .insert([
+        {
+          workspace_id: workspaceId,
+          name: 'Sarah Johnson',
+          email: 'sarah.j@example.com',
+          phone: '+1-555-0123',
+          tier: 'premium',
+          preferred_channel: 'email'
+        },
+        {
+          workspace_id: workspaceId,
+          name: 'Mike Chen',
+          email: 'mike.chen@example.com',
+          phone: '+1-555-0456',
+          tier: 'regular',
+          preferred_channel: 'webchat'
+        },
+        {
+          workspace_id: workspaceId,
+          name: 'Emma Williams',
+          email: 'emma.w@example.com',
+          phone: '+1-555-0789',
+          tier: 'vip',
+          preferred_channel: 'phone'
+        }
+      ])
+      .select();
+
+    if (customersError) throw customersError;
+
+    // Create demo conversations
+    const now = new Date();
+    const conversations = [
+      {
+        workspace_id: workspaceId,
+        customer_id: customers[0].id,
+        title: 'Billing Issue - Premium Account',
+        channel: 'email',
+        status: 'new',
+        priority: 'high',
+        category: 'billing',
+        ai_sentiment: 'frustrated',
+        ai_confidence: 0.87,
+        ai_reason_for_escalation: 'Customer reports unauthorized charges on premium account',
+        summary_for_human: 'Premium customer Sarah Johnson is concerned about unexpected charges',
+        sla_status: 'safe',
+        sla_target_minutes: 120,
+        sla_due_at: new Date(now.getTime() + 2 * 60 * 60 * 1000).toISOString()
+      },
+      {
+        workspace_id: workspaceId,
+        customer_id: customers[1].id,
+        title: 'Feature Request - API Integration',
+        channel: 'webchat',
+        status: 'new',
+        priority: 'medium',
+        category: 'technical',
+        ai_sentiment: 'curious',
+        ai_confidence: 0.92,
+        ai_reason_for_escalation: 'Complex API integration question requiring technical expertise',
+        summary_for_human: 'Mike Chen asking about custom API integration capabilities',
+        sla_status: 'safe',
+        sla_target_minutes: 240,
+        sla_due_at: new Date(now.getTime() + 4 * 60 * 60 * 1000).toISOString()
+      },
+      {
+        workspace_id: workspaceId,
+        customer_id: customers[2].id,
+        title: 'VIP - Urgent Account Access',
+        channel: 'phone',
+        status: 'new',
+        priority: 'critical',
+        category: 'account',
+        ai_sentiment: 'urgent',
+        ai_confidence: 0.95,
+        ai_reason_for_escalation: 'VIP customer unable to access account, potential security issue',
+        summary_for_human: 'VIP customer Emma Williams locked out of account',
+        sla_status: 'at_risk',
+        sla_target_minutes: 60,
+        sla_due_at: new Date(now.getTime() + 30 * 60 * 1000).toISOString()
+      }
+    ];
+
+    const { data: createdConversations, error: conversationsError } = await supabase
+      .from('conversations')
+      .insert(conversations)
+      .select();
+
+    if (conversationsError) throw conversationsError;
+
+    // Create demo messages for each conversation
+    const messages = [
+      {
+        conversation_id: createdConversations[0].id,
+        body: "I noticed some unusual charges on my premium account this month. I was charged twice for the same service. Can someone please look into this urgently?",
+        channel: 'email',
+        direction: 'inbound',
+        actor_type: 'customer',
+        actor_name: 'Sarah Johnson'
+      },
+      {
+        conversation_id: createdConversations[1].id,
+        body: "Hi, I'm building a custom integration with your API. I need to understand if your webhook system supports retry logic for failed deliveries. The documentation doesn't cover this scenario.",
+        channel: 'webchat',
+        direction: 'inbound',
+        actor_type: 'customer',
+        actor_name: 'Mike Chen'
+      },
+      {
+        conversation_id: createdConversations[2].id,
+        body: "This is extremely urgent. I cannot access my account and I have a critical presentation in 2 hours. I've tried resetting my password three times but I'm not receiving the reset emails. Please help immediately!",
+        channel: 'phone',
+        direction: 'inbound',
+        actor_type: 'customer',
+        actor_name: 'Emma Williams'
+      }
+    ];
+
+    await supabase
+      .from('messages')
+      .insert(messages);
   };
 
   return (
