@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { SLABadge } from '../sla/SLABadge';
 import { SLACountdown } from '../sla/SLACountdown';
-import { Crown, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { Crown, ArrowLeft, CheckCircle2, TestTube } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface ConversationHeaderProps {
@@ -58,6 +58,40 @@ export const ConversationHeader = ({ conversation, onUpdate, onBack }: Conversat
     
     onUpdate();
     onBack?.();
+  };
+
+  const handleAddTestDraft = async () => {
+    const testDraft = `Dear ${conversation.customer?.name || 'Customer'},
+
+Thank you for reaching out to us. I understand your concern and I'd be happy to help you with this matter.
+
+Based on our review, here's what I can do for you:
+
+1. I'll process your request immediately
+2. You should see the changes within 24-48 hours
+3. I'll send you a confirmation email once it's complete
+
+If you have any other questions or concerns, please don't hesitate to reach out. We're here to help!
+
+Best regards,
+Customer Support Team`;
+
+    await supabase
+      .from('conversations')
+      .update({ 
+        metadata: { 
+          ...conversation.metadata,
+          ai_draft_response: testDraft 
+        }
+      })
+      .eq('id', conversation.id);
+    
+    toast({
+      title: "Test AI draft added",
+      description: "A sample AI draft response has been added to this conversation.",
+    });
+    
+    onUpdate();
   };
 
   return (
@@ -136,6 +170,13 @@ export const ConversationHeader = ({ conversation, onUpdate, onBack }: Conversat
           <Button variant="default" size="sm" onClick={handleResolve} className="bg-success hover:bg-success/90">
             <CheckCircle2 className="h-4 w-4 mr-1" />
             Resolve & Close
+          </Button>
+        )}
+
+        {!conversation.metadata?.ai_draft_response && (
+          <Button variant="outline" size="sm" onClick={handleAddTestDraft}>
+            <TestTube className="h-4 w-4 mr-1" />
+            Add Test AI Draft
           </Button>
         )}
       </div>
