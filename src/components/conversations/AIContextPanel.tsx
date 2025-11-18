@@ -54,7 +54,7 @@ export const AIContextPanel = ({ conversation, onUpdate }: AIContextPanelProps) 
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <Card className="bg-primary/5 border-primary/20">
+      <Card className="bg-primary/5 border-primary/20 card-elevation smooth-transition">
         <CollapsibleTrigger className="w-full p-4 flex items-center justify-between hover:bg-primary/10 transition-colors">
           <div className="flex items-center gap-2">
             <Lightbulb className="h-5 w-5 text-primary" />
@@ -67,7 +67,7 @@ export const AIContextPanel = ({ conversation, onUpdate }: AIContextPanelProps) 
           <div className="p-4 pt-0 space-y-4">
             {/* Escalation Reason - MOST IMPORTANT */}
             {conversation.ai_reason_for_escalation && (
-              <div className="bg-urgent/10 border border-urgent/30 rounded-lg p-3">
+              <div className="bg-urgent/10 border border-urgent/30 rounded-lg p-4 card-elevation">
                 <div className="flex items-center gap-2 mb-2">
                   <AlertTriangle className="h-4 w-4 text-urgent" />
                   <span className="text-sm font-semibold text-urgent">Why AI Escalated</span>

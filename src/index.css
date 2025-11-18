@@ -124,6 +124,29 @@ All colors MUST be HSL.
   }
 }
 
+
+@layer utilities {
+  .smooth-transition {
+    @apply transition-all duration-300 ease-in-out;
+  }
+  
+  .hover-lift {
+    @apply transition-transform duration-200 hover:-translate-y-0.5;
+  }
+  
+  .focus-mode-overlay {
+    @apply fixed inset-0 bg-background/60 backdrop-blur-sm z-40;
+  }
+  
+  .message-spacing {
+    @apply space-y-6;
+  }
+  
+  .card-elevation {
+    @apply shadow-sm border border-border/50;
+  }
+}
+
 @layer base {
   * {
     @apply border-border;

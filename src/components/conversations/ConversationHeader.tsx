@@ -62,8 +62,8 @@ export const ConversationHeader = ({ conversation, onUpdate, onBack }: Conversat
 
 
   return (
-    <div className="border-b border-border p-4">
-      <div className="flex items-center justify-between mb-3">
+    <div className="border-b border-border p-5 bg-card">
+      <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           {onBack && (
             <Button 
@@ -86,7 +86,6 @@ export const ConversationHeader = ({ conversation, onUpdate, onBack }: Conversat
           )}
         </div>
         <div className="flex items-center gap-2">
-          <SLACountdown slaDueAt={conversation.sla_due_at} />
           <SLABadge
             slaStatus={conversation.sla_status}
             slaDueAt={conversation.sla_due_at}

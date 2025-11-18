@@ -5,6 +5,7 @@ import { Sidebar } from '@/components/sidebar/Sidebar';
 import { ConversationList } from '@/components/conversations/ConversationList';
 import { ConversationThread } from '@/components/conversations/ConversationThread';
 import { CustomerContext } from '@/components/context/CustomerContext';
+import { QuickActions } from '@/components/conversations/QuickActions';
 import { Conversation } from '@/lib/types';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { useInterfaceMode } from '@/hooks/useInterfaceMode';
@@ -12,6 +13,8 @@ import { useSLANotifications } from '@/hooks/useSLANotifications';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface EscalationHubProps {
   filter?: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open';
@@ -21,10 +24,10 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [modalWidth, setModalWidth] = useState(90);
+  const [modalWidth, setModalWidth] = useState(75);
   const { interfaceMode, loading: modeLoading } = useInterfaceMode();
+  const { toast } = useToast();
   
-  // Enable SLA notifications
   useSLANotifications();
 
   const handleUpdate = () => {
@@ -54,11 +57,57 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
     return { current, total: conversations.length };
   };
 
+  const handleAssignToMe = async () => {
+    if (!selectedConversation) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    await supabase
+      .from('conversations')
+      .update({ assigned_to: user.id })
+      .eq('id', selectedConversation.id);
+    
+    toast({ title: "Assigned to you" });
+    handleUpdate();
+  };
+
+  const handleResolve = async () => {
+    if (!selectedConversation) return;
+    
+    await supabase
+      .from('conversations')
+      .update({ 
+        status: 'resolved',
+        resolved_at: new Date().toISOString()
+      })
+      .eq('id', selectedConversation.id);
+    
+    toast({ title: "Resolved" });
+    handleUpdate();
+    handleClose();
+  };
+
+  const handlePriorityChange = async (priority: string) => {
+    if (!selectedConversation) return;
+    
+    await supabase
+      .from('conversations')
+      .update({ priority })
+      .eq('id', selectedConversation.id);
+    
+    handleUpdate();
+  };
+
   // Keyboard shortcuts
   useKeyboardShortcuts([
     { key: 'Escape', callback: handleClose },
     { key: 'ArrowLeft', callback: () => navigateConversation('prev') },
     { key: 'ArrowRight', callback: () => navigateConversation('next') },
+    { key: 'a', callback: handleAssignToMe },
+    { key: 'r', callback: handleResolve },
+    { key: '1', callback: () => handlePriorityChange('high') },
+    { key: '2', callback: () => handlePriorityChange('medium') },
+    { key: '3', callback: () => handlePriorityChange('low') },
   ], !!selectedConversation);
 
   // If Power Mode is selected, render the 3-column layout
@@ -83,10 +132,14 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
         }
       />
       
+      {selectedConversation && (
+        <div className="focus-mode-overlay animate-fade-in" onClick={handleClose} />
+      )}
+      
       <Dialog open={!!selectedConversation} onOpenChange={(open) => !open && handleClose()}>
         <DialogContent 
-          className="p-0 overflow-hidden flex gap-0 transition-all duration-300"
-          style={{ maxWidth: `${modalWidth}vw`, width: '100%', height: '90vh' }}
+          className="max-w-none h-[90vh] min-h-0 p-0 gap-0 animate-scale-in z-50"
+          style={{ width: `${modalWidth}%` }}
         >
           {/* Resize handle - left edge */}
           <div 
@@ -138,7 +191,7 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
               </Button>
             </div>
           )}
-          <div className="flex-1 flex flex-col min-h-0">
+          <div className="flex-1 w-full min-h-0 overflow-y-auto">
             {selectedConversation && (
               <ConversationThread
                 key={refreshKey}
@@ -148,9 +201,16 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
               />
             )}
           </div>
-          <div className="w-80 border-l border-border overflow-y-auto bg-card">
+          <div className="h-full overflow-y-auto bg-card border-l border-border p-4 space-y-4" style={{ width: '340px' }}>
             {selectedConversation && (
-              <CustomerContext conversation={selectedConversation} onUpdate={handleUpdate} />
+              <>
+                <QuickActions 
+                  conversation={selectedConversation} 
+                  onUpdate={handleUpdate}
+                  onBack={handleClose}
+                />
+                <CustomerContext conversation={selectedConversation} onUpdate={handleUpdate} />
+              </>
             )}
           </div>
         </DialogContent>

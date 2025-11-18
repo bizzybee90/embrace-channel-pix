@@ -12,7 +12,7 @@ interface MessageTimelineProps {
 
 export const MessageTimeline = ({ messages }: MessageTimelineProps) => {
   return (
-    <div className="space-y-4">
+    <div className="message-spacing py-2">
       {messages.map((message) => {
         const isCustomer = message.actor_type === 'customer';
         const isAI = message.actor_type === 'ai_agent';
@@ -21,9 +21,9 @@ export const MessageTimeline = ({ messages }: MessageTimelineProps) => {
 
         if (isInternal) {
           return (
-            <div key={message.id} className="w-full">
-              <div className="bg-warning/10 border border-warning/30 rounded-lg p-3">
-                <div className="flex items-center gap-2 mb-1">
+            <div key={message.id} className="w-full animate-fade-in">
+              <div className="bg-warning/10 border border-warning/30 rounded-lg p-4 card-elevation">
+                <div className="flex items-center gap-2 mb-2">
                   <StickyNote className="h-4 w-4 text-warning" />
                   <Badge variant="outline" className="text-xs bg-warning/20 border-warning">Internal Note</Badge>
                   <ChannelIcon channel={message.channel} className="h-3 w-3" />
@@ -31,7 +31,7 @@ export const MessageTimeline = ({ messages }: MessageTimelineProps) => {
                     {message.actor_name} • {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
                   </span>
                 </div>
-                <p className="text-sm whitespace-pre-wrap">{message.body}</p>
+                <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.body}</p>
               </div>
             </div>
           );
@@ -41,22 +41,22 @@ export const MessageTimeline = ({ messages }: MessageTimelineProps) => {
           <div
             key={message.id}
             className={cn(
-              'flex gap-2',
+              'flex gap-3 animate-fade-in',
               (isCustomer || isAI) ? 'justify-start' : 'justify-end'
             )}
           >
             {(isCustomer || isAI) && (
               <div className="flex-shrink-0">
                 {isAI ? (
-                  <Avatar className="h-8 w-8">
+                  <Avatar className="h-10 w-10">
                     <AvatarFallback className="bg-primary/10">
-                      <Bot className="h-4 w-4 text-primary" />
+                      <Bot className="h-5 w-5 text-primary" />
                     </AvatarFallback>
                   </Avatar>
                 ) : (
-                  <Avatar className="h-8 w-8">
+                  <Avatar className="h-10 w-10">
                     <AvatarFallback className="bg-muted">
-                      <User className="h-4 w-4 text-muted-foreground" />
+                      <User className="h-5 w-5 text-muted-foreground" />
                     </AvatarFallback>
                   </Avatar>
                 )}
@@ -65,13 +65,13 @@ export const MessageTimeline = ({ messages }: MessageTimelineProps) => {
 
             <div
               className={cn(
-                'max-w-[70%] rounded-lg p-3',
+                'max-w-[70%] rounded-lg p-4 card-elevation',
                 isCustomer && 'bg-muted',
                 isAI && 'bg-primary/10 border border-primary/20',
                 isHuman && 'bg-success/10 border border-success/20'
               )}
             >
-              <div className="flex items-center gap-2 mb-1">
+              <div className="flex items-center gap-2 mb-2">
                 <ChannelIcon channel={message.channel} />
                 <span className="text-xs font-medium">
                   {message.actor_name || (isCustomer ? 'Customer' : 'Agent')}
@@ -81,14 +81,14 @@ export const MessageTimeline = ({ messages }: MessageTimelineProps) => {
                   {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
                 </span>
               </div>
-              <p className="text-sm whitespace-pre-wrap">{message.body}</p>
+              <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.body}</p>
             </div>
 
             {isHuman && (
               <div className="flex-shrink-0">
-                <Avatar className="h-8 w-8">
+                <Avatar className="h-10 w-10">
                   <AvatarFallback className="bg-success/10">
-                    <User className="h-4 w-4 text-success" />
+                    <User className="h-5 w-4 text-success" />
                   </AvatarFallback>
                 </Avatar>
               </div>
