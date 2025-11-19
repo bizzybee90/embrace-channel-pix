@@ -80,12 +80,15 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend }: 
             value={replyBody}
             onChange={(e) => setReplyBody(e.target.value)}
             rows={4}
-            className="resize-none"
+            className="resize-none border-border/80 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all"
           />
-          <Button onClick={handleSendReply} disabled={sending || !replyBody.trim()} className="w-full">
-            <Send className="h-4 w-4 mr-2" />
-            {sending ? 'Sending...' : 'Send Reply'}
-          </Button>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs text-muted-foreground">Cmd/Ctrl + Enter to send</span>
+            <Button onClick={handleSendReply} disabled={sending || !replyBody.trim()} className="hover:scale-105 transition-transform">
+              <Send className="h-4 w-4 mr-2" />
+              {sending ? 'Sending...' : 'Send Reply'}
+            </Button>
+          </div>
         </TabsContent>
 
         <TabsContent value="note" className="space-y-3 mt-0">
@@ -94,9 +97,9 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend }: 
             value={noteBody}
             onChange={(e) => setNoteBody(e.target.value)}
             rows={4}
-            className="resize-none"
+            className="resize-none border-border/80 focus:border-warning/50 focus:ring-2 focus:ring-warning/20 transition-all"
           />
-          <Button onClick={handleSendNote} disabled={sending || !noteBody.trim()} variant="outline" className="w-full">
+          <Button onClick={handleSendNote} disabled={sending || !noteBody.trim()} variant="outline" className="w-full hover:bg-warning/10 hover:border-warning/50 transition-all">
             {sending ? 'Adding...' : 'Add Note'}
           </Button>
         </TabsContent>

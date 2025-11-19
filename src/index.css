@@ -131,11 +131,11 @@ All colors MUST be HSL.
   }
   
   .hover-lift {
-    @apply transition-transform duration-200 hover:-translate-y-0.5;
+    @apply transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-md;
   }
   
   .focus-mode-overlay {
-    @apply fixed inset-0 bg-background/60 backdrop-blur-sm z-40;
+    @apply fixed inset-0 bg-background/50 backdrop-blur-sm z-40 animate-in fade-in-0 duration-200;
   }
   
   .message-spacing {
@@ -143,7 +143,7 @@ All colors MUST be HSL.
   }
   
   .card-elevation {
-    @apply shadow-sm border border-border/50;
+    @apply shadow-sm border border-border/50 transition-shadow hover:shadow-md;
   }
 }
 

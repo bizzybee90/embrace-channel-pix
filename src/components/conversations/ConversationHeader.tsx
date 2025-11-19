@@ -63,7 +63,7 @@ export const ConversationHeader = ({ conversation, onUpdate, onBack }: Conversat
 
 
   return (
-    <div className="border-b border-border p-4 bg-card">
+    <div className="border-b border-border p-4 bg-card shadow-sm">
       {/* Top row: Customer name, VIP badge, and SLA */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
