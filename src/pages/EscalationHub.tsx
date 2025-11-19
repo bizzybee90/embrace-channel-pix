@@ -149,11 +149,52 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
     { key: '3', callback: () => handlePriorityChange('low') },
   ], !!selectedConversation);
 
+  const getFilterTitle = () => {
+    switch (filter) {
+      case 'my-tickets': return 'My Tickets';
+      case 'unassigned': return 'Unassigned';
+      case 'sla-risk': return 'SLA Risk';
+      case 'all-open': return 'All Open';
+      default: return 'Conversations';
+    }
+  };
+
   // If Power Mode is selected, render the 3-column layout
   if (!modeLoading && interfaceMode === 'power') {
     return <PowerModeLayout filter={filter} />;
   }
 
+  // Mobile view - show either list or conversation detail
+  if (isMobile) {
+    if (selectedConversation) {
+      return (
+        <MobileConversationView
+          conversation={selectedConversation}
+          messages={messages}
+          onUpdate={handleUpdate}
+          onBack={handleClose}
+        />
+      );
+    }
+
+    return (
+      <MobileConversationList
+        conversations={conversations}
+        onSelect={handleSelectConversation}
+        filterTitle={getFilterTitle()}
+        statusFilter={statusFilter}
+        priorityFilter={priorityFilter}
+        channelFilter={channelFilter}
+        categoryFilter={categoryFilter}
+        onStatusFilterChange={setStatusFilter}
+        onPriorityFilterChange={setPriorityFilter}
+        onChannelFilterChange={setChannelFilter}
+        onCategoryFilterChange={setCategoryFilter}
+      />
+    );
+  }
+
+  // Desktop view
   return (
     <>
       <ThreeColumnLayout
