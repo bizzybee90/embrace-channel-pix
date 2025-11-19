@@ -5,8 +5,7 @@ import { ConversationThread } from '@/components/conversations/ConversationThrea
 import { CustomerContext } from '@/components/context/CustomerContext';
 import { Conversation } from '@/lib/types';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
-import { Button } from '@/components/ui/button';
-import { ChevronRight, MessageSquare, PanelLeftClose } from 'lucide-react';
+import { MessageSquare } from 'lucide-react';
 
 interface PowerModeLayoutProps {
   filter?: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open';
@@ -15,7 +14,6 @@ interface PowerModeLayoutProps {
 export const PowerModeLayout = ({ filter = 'all-open' }: PowerModeLayoutProps) => {
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [isListCollapsed, setIsListCollapsed] = useState(false);
 
   const handleUpdate = () => {
     setRefreshKey(prev => prev + 1);
@@ -33,40 +31,17 @@ export const PowerModeLayout = ({ filter = 'all-open' }: PowerModeLayoutProps) =
         {/* Conversation List Panel */}
         <ResizablePanel 
           defaultSize={25} 
-          minSize={isListCollapsed ? 3 : 20}
-          maxSize={isListCollapsed ? 3 : 35}
+          minSize={20}
+          maxSize={35}
           collapsible={false}
         >
-          {!isListCollapsed ? (
-            <div className="h-full flex flex-col relative border-r border-border/30">
-              <div className="absolute top-4 right-2 z-10">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setIsListCollapsed(true)}
-                  className="h-8 w-8 bg-background/95 backdrop-blur"
-                >
-                  <PanelLeftClose className="h-4 w-4" />
-                </Button>
-              </div>
-              <ConversationList
-                filter={filter}
-                selectedId={selectedConversation?.id}
-                onSelect={setSelectedConversation}
-              />
-            </div>
-          ) : (
-            <div className="h-full flex items-center justify-center bg-muted/20 border-r border-border/30">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsListCollapsed(false)}
-                className="h-8 w-8"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          )}
+          <div className="h-full flex flex-col border-r border-border/30">
+            <ConversationList
+              filter={filter}
+              selectedId={selectedConversation?.id}
+              onSelect={setSelectedConversation}
+            />
+          </div>
         </ResizablePanel>
 
         <ResizableHandle className="w-1 bg-border/50 hover:bg-border transition-colors" />
