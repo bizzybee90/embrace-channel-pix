@@ -4,8 +4,10 @@ import { MessageTimeline } from './MessageTimeline';
 import { AIContextPanel } from './AIContextPanel';
 import { CustomerContext } from '@/components/context/CustomerContext';
 import { QuickActions } from './QuickActions';
-import { MessageSquare, Sparkles, User, Zap } from 'lucide-react';
+import { Sparkles, User, Zap, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Button } from '@/components/ui/button';
 
 interface MobileConversationViewProps {
   conversation: Conversation;
@@ -14,98 +16,87 @@ interface MobileConversationViewProps {
   onBack: () => void;
 }
 
+type SheetType = 'ai' | 'profile' | 'actions' | null;
+
 export const MobileConversationView = ({ 
   conversation, 
   messages, 
   onUpdate, 
   onBack 
 }: MobileConversationViewProps) => {
-  const [activeTab, setActiveTab] = useState('conversation');
+  const [activeSheet, setActiveSheet] = useState<SheetType>(null);
 
   return (
-    <div className="flex-1 flex flex-col h-full">
-      {/* Apple-style Content Area with smooth transitions */}
-      <div className="flex-1 overflow-y-auto mobile-slide-up">
-        {activeTab === 'conversation' && (
-          <div className="p-4 pb-2 mobile-section-spacing">
-            <MessageTimeline messages={messages} />
-          </div>
-        )}
-        
-        {activeTab === 'ai' && (
-          <div className="p-4 mobile-section-spacing bg-muted/20">
-            <h2 className="text-xl font-bold mb-4 px-1">AI Context</h2>
+    <div className="flex-1 flex flex-col h-full relative">
+      {/* Main Conversation View - Always Visible */}
+      <div className="flex-1 overflow-y-auto pb-4">
+        <MessageTimeline messages={messages} />
+      </div>
+
+      {/* Floating Action Buttons */}
+      <div className="fixed right-4 bottom-24 flex flex-col gap-3 z-20">
+        <Button
+          onClick={() => setActiveSheet('ai')}
+          className="h-14 w-14 rounded-full shadow-lg mobile-spring-bounce bg-primary hover:bg-primary/90"
+          size="icon"
+        >
+          <Sparkles className="h-6 w-6" />
+        </Button>
+        <Button
+          onClick={() => setActiveSheet('profile')}
+          className="h-14 w-14 rounded-full shadow-lg mobile-spring-bounce bg-secondary hover:bg-secondary/90"
+          size="icon"
+        >
+          <User className="h-6 w-6" />
+        </Button>
+        <Button
+          onClick={() => setActiveSheet('actions')}
+          className="h-14 w-14 rounded-full shadow-lg mobile-spring-bounce bg-accent hover:bg-accent/90"
+          size="icon"
+        >
+          <Zap className="h-6 w-6" />
+        </Button>
+      </div>
+
+      {/* AI Context Sheet */}
+      <Sheet open={activeSheet === 'ai'} onOpenChange={(open) => !open && setActiveSheet(null)}>
+        <SheetContent side="bottom" className="h-[85vh] rounded-t-3xl mobile-frosted">
+          <SheetHeader className="mb-4">
+            <SheetTitle className="text-2xl font-bold">AI Context</SheetTitle>
+          </SheetHeader>
+          <div className="overflow-y-auto h-[calc(100%-60px)] pb-6">
             <AIContextPanel conversation={conversation} onUpdate={onUpdate} />
           </div>
-        )}
-        
-        {activeTab === 'profile' && (
-          <div className="p-4 mobile-section-spacing bg-muted/20">
-            <h2 className="text-xl font-bold mb-4 px-1">Customer Profile</h2>
+        </SheetContent>
+      </Sheet>
+
+      {/* Customer Profile Sheet */}
+      <Sheet open={activeSheet === 'profile'} onOpenChange={(open) => !open && setActiveSheet(null)}>
+        <SheetContent side="bottom" className="h-[85vh] rounded-t-3xl mobile-frosted">
+          <SheetHeader className="mb-4">
+            <SheetTitle className="text-2xl font-bold">Customer Profile</SheetTitle>
+          </SheetHeader>
+          <div className="overflow-y-auto h-[calc(100%-60px)] pb-6">
             <CustomerContext conversation={conversation} onUpdate={onUpdate} />
           </div>
-        )}
-        
-        {activeTab === 'actions' && (
-          <div className="p-4 mobile-section-spacing bg-muted/20">
-            <h2 className="text-xl font-bold mb-4 px-1">Quick Actions</h2>
+        </SheetContent>
+      </Sheet>
+
+      {/* Quick Actions Sheet */}
+      <Sheet open={activeSheet === 'actions'} onOpenChange={(open) => !open && setActiveSheet(null)}>
+        <SheetContent side="bottom" className="h-[85vh] rounded-t-3xl mobile-frosted">
+          <SheetHeader className="mb-4">
+            <SheetTitle className="text-2xl font-bold">Quick Actions</SheetTitle>
+          </SheetHeader>
+          <div className="overflow-y-auto h-[calc(100%-60px)] pb-6">
             <QuickActions 
               conversation={conversation} 
               onUpdate={onUpdate}
               onBack={onBack}
             />
           </div>
-        )}
-      </div>
-
-      {/* iOS-style Bottom Tab Bar */}
-      <div className="border-t border-border/30 bg-card/95 backdrop-blur-lg safe-area-bottom">
-        <div className="grid grid-cols-4 gap-1 px-2 py-1">
-          <button
-            onClick={() => setActiveTab('conversation')}
-            className={cn(
-              "mobile-bottom-tab mobile-spring-bounce",
-              activeTab === 'conversation' && "mobile-bottom-tab-active"
-            )}
-          >
-            <MessageSquare className="h-5 w-5" />
-            <span className="text-[10px] font-medium">Thread</span>
-          </button>
-          
-          <button
-            onClick={() => setActiveTab('ai')}
-            className={cn(
-              "mobile-bottom-tab mobile-spring-bounce",
-              activeTab === 'ai' && "mobile-bottom-tab-active"
-            )}
-          >
-            <Sparkles className="h-5 w-5" />
-            <span className="text-[10px] font-medium">AI</span>
-          </button>
-          
-          <button
-            onClick={() => setActiveTab('profile')}
-            className={cn(
-              "mobile-bottom-tab mobile-spring-bounce",
-              activeTab === 'profile' && "mobile-bottom-tab-active"
-            )}
-          >
-            <User className="h-5 w-5" />
-            <span className="text-[10px] font-medium">Profile</span>
-          </button>
-          
-          <button
-            onClick={() => setActiveTab('actions')}
-            className={cn(
-              "mobile-bottom-tab mobile-spring-bounce",
-              activeTab === 'actions' && "mobile-bottom-tab-active"
-            )}
-          >
-            <Zap className="h-5 w-5" />
-            <span className="text-[10px] font-medium">Actions</span>
-          </button>
-        </div>
-      </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 };

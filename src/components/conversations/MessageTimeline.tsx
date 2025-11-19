@@ -16,8 +16,16 @@ interface MessageTimelineProps {
 }
 
 export const MessageTimeline = ({ messages }: MessageTimelineProps) => {
+  if (!messages || messages.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-64 text-muted-foreground p-4">
+        No messages yet
+      </div>
+    );
+  }
+
   return (
-    <div className="message-spacing py-2">
+    <div className="message-spacing py-2 p-4">
       {messages.map((message) => {
         const isCustomer = message.actor_type === 'customer';
         const isAI = message.actor_type === 'ai_agent';
