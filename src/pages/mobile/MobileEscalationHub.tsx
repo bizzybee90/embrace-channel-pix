@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { MobileConversationList } from '@/components/conversations/MobileConversationList';
-import { MobileConversationView } from '@/components/conversations/MobileConversationView';
+import { MobileConversationList } from '@/components/conversations/mobile/MobileConversationList';
+import { MobileConversationView } from '@/components/conversations/mobile/MobileConversationView';
 import { Conversation, Message } from '@/lib/types';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -191,11 +191,9 @@ export const MobileEscalationHub = ({ filter = 'all-open' }: MobileEscalationHub
       statusFilter={statusFilter}
       priorityFilter={priorityFilter}
       channelFilter={channelFilter}
-      categoryFilter={categoryFilter}
       onStatusFilterChange={setStatusFilter}
       onPriorityFilterChange={setPriorityFilter}
       onChannelFilterChange={setChannelFilter}
-      onCategoryFilterChange={setCategoryFilter}
       onRefresh={handleRefresh}
     />
   );
