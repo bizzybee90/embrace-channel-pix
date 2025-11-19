@@ -67,39 +67,49 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend }: 
   };
 
   return (
-    <div className="border-t border-border p-4 bg-card max-h-[350px] overflow-y-auto">
+    <div className="border-t border-border p-3 md:p-4 bg-card max-h-[350px] overflow-y-auto sticky bottom-0 z-10 shadow-[0_-2px_8px_rgba(0,0,0,0.08)]">
       <Tabs defaultValue="reply">
-        <TabsList className="mb-3 w-full justify-center">
-          <TabsTrigger value="reply">Reply to Customer</TabsTrigger>
-          <TabsTrigger value="note">Internal Note</TabsTrigger>
+        <TabsList className="mb-3 w-full justify-center h-10">
+          <TabsTrigger value="reply" className="text-sm">Reply to Customer</TabsTrigger>
+          <TabsTrigger value="note" className="text-sm">Internal Note</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="reply" className="space-y-3 mt-0">
+        <TabsContent value="reply" className="space-y-2 md:space-y-3 mt-0">
           <Textarea
-            placeholder="Type your reply to the customer... (Cmd/Ctrl+Enter to send)"
+            placeholder="Type your reply to the customer..."
             value={replyBody}
             onChange={(e) => setReplyBody(e.target.value)}
-            rows={4}
-            className="resize-none border-border/80 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all"
+            rows={3}
+            className="resize-none border-border/80 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all text-sm md:text-base min-h-[80px]"
           />
           <div className="flex items-center justify-between gap-2">
-            <span className="text-xs text-muted-foreground">Cmd/Ctrl + Enter to send</span>
-            <Button onClick={handleSendReply} disabled={sending || !replyBody.trim()} className="hover:scale-105 transition-transform">
+            <span className="text-xs text-muted-foreground hidden md:inline">Cmd/Ctrl + Enter to send</span>
+            <Button 
+              onClick={handleSendReply} 
+              disabled={sending || !replyBody.trim()} 
+              className="hover:scale-105 transition-transform ml-auto w-full md:w-auto h-10"
+              size="default"
+            >
               <Send className="h-4 w-4 mr-2" />
               {sending ? 'Sending...' : 'Send Reply'}
             </Button>
           </div>
         </TabsContent>
 
-        <TabsContent value="note" className="space-y-3 mt-0">
+        <TabsContent value="note" className="space-y-2 md:space-y-3 mt-0">
           <Textarea
             placeholder="Add an internal note for your team..."
             value={noteBody}
             onChange={(e) => setNoteBody(e.target.value)}
-            rows={4}
-            className="resize-none border-border/80 focus:border-warning/50 focus:ring-2 focus:ring-warning/20 transition-all"
+            rows={3}
+            className="resize-none border-border/80 focus:border-warning/50 focus:ring-2 focus:ring-warning/20 transition-all text-sm md:text-base min-h-[80px]"
           />
-          <Button onClick={handleSendNote} disabled={sending || !noteBody.trim()} variant="outline" className="w-full hover:bg-warning/10 hover:border-warning/50 transition-all">
+          <Button 
+            onClick={handleSendNote} 
+            disabled={sending || !noteBody.trim()} 
+            variant="outline" 
+            className="w-full hover:bg-warning/10 hover:border-warning/50 transition-all h-10"
+          >
             {sending ? 'Adding...' : 'Add Note'}
           </Button>
         </TabsContent>

@@ -139,12 +139,12 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
       
       <Dialog open={!!selectedConversation} onOpenChange={(open) => !open && handleClose()}>
         <DialogContent 
-          className="max-w-none h-[90vh] min-h-0 p-0 gap-0 animate-scale-in z-50"
-          style={{ width: `${modalWidth}%` }}
+          className="max-w-none h-[100vh] md:h-[90vh] min-h-0 p-0 gap-0 animate-scale-in z-50 w-full md:w-auto"
+          style={{ width: window.innerWidth < 900 ? '100%' : `${modalWidth}%` }}
         >
-          {/* Resize handle - left edge */}
+          {/* Resize handle - left edge (hidden on mobile) */}
           <div 
-            className="w-1 bg-border hover:bg-primary cursor-ew-resize flex-shrink-0"
+            className="w-1 bg-border hover:bg-primary cursor-ew-resize flex-shrink-0 hidden md:block"
             onMouseDown={(e) => {
               e.preventDefault();
               const startX = e.clientX;
@@ -166,9 +166,9 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
             }}
           />
 
-          {/* Navigation controls */}
+          {/* Navigation controls (hidden on mobile) */}
           {conversations.length > 1 && (
-            <div className="absolute top-4 left-4 z-10 flex items-center gap-2 bg-background/95 backdrop-blur rounded-lg p-1 border border-border">
+            <div className="absolute top-4 left-4 z-10 hidden md:flex items-center gap-2 bg-background/95 backdrop-blur rounded-lg p-1 border border-border">
               <Button
                 variant="ghost"
                 size="icon"
@@ -192,9 +192,9 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
               </Button>
             </div>
           )}
-          <div className="flex flex-1 h-full overflow-hidden">
+          <div className="flex flex-1 h-full overflow-hidden flex-col md:flex-row">
             {/* Main Content - Conversation */}
-            <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="flex-1 flex flex-col overflow-hidden w-full md:w-auto">
               {selectedConversation && (
                 <ConversationThread
                   key={refreshKey}
@@ -205,9 +205,9 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
               )}
             </div>
             
-            {/* Right Sidebar - Customer Context (moved Quick Actions to bottom) */}
-            <div className="hidden md:flex md:flex-col w-[340px] border-l border-border bg-card overflow-y-auto">
-              <div className="p-4">
+            {/* Right Sidebar - Customer Context & Quick Actions (hidden on mobile) */}
+            <div className="hidden md:flex w-80 border-l border-border bg-card/50 flex-col overflow-hidden">
+              <div className="flex-1 overflow-y-auto p-4 space-y-6">
                 {selectedConversation && (
                   <CustomerContext conversation={selectedConversation} onUpdate={handleUpdate} />
                 )}

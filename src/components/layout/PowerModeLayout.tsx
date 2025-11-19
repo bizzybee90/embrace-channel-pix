@@ -21,21 +21,22 @@ export const PowerModeLayout = ({ filter = 'all-open' }: PowerModeLayoutProps) =
 
   return (
     <div className="flex h-screen w-full bg-background overflow-hidden">
-      {/* Sidebar - width controlled by Sidebar component itself */}
-      <aside className="border-r border-border bg-card flex-shrink-0">
+      {/* Sidebar - width controlled by Sidebar component itself (hidden on mobile) */}
+      <aside className="hidden md:flex border-r border-border bg-card flex-shrink-0">
         <Sidebar />
       </aside>
 
-      {/* Main Content - 3 Column Layout */}
+      {/* Main Content - 3 Column Layout (responsive) */}
       <ResizablePanelGroup direction="horizontal" className="flex-1">
-        {/* Conversation List Panel */}
+        {/* Conversation List Panel (hidden on mobile when conversation selected) */}
         <ResizablePanel 
           defaultSize={20} 
           minSize={18}
           maxSize={30}
           collapsible={false}
+          className={selectedConversation ? "hidden md:flex" : "flex"}
         >
-          <div className="h-full flex flex-col border-r border-border/30 bg-card">
+          <div className="h-full flex flex-col border-r border-border/30 bg-card w-full">
             <ConversationList
               filter={filter}
               selectedId={selectedConversation?.id}
@@ -44,16 +45,17 @@ export const PowerModeLayout = ({ filter = 'all-open' }: PowerModeLayoutProps) =
           </div>
         </ResizablePanel>
 
-        <ResizableHandle className="w-1 bg-border/50 hover:bg-border transition-colors" />
+        <ResizableHandle className="w-1 bg-border/50 hover:bg-border transition-colors hidden md:block" />
 
-        {/* Conversation Thread Panel */}
+        {/* Conversation Thread Panel (full width on mobile when selected) */}
         <ResizablePanel 
           defaultSize={52} 
           minSize={35}
           maxSize={70}
           collapsible={false}
+          className="w-full"
         >
-          <div className="h-full flex flex-col relative border-r border-border/30">
+          <div className="h-full flex flex-col relative border-r border-border/30 md:border-r w-full">
             {selectedConversation ? (
               <ConversationThread
                 key={refreshKey}
@@ -71,16 +73,17 @@ export const PowerModeLayout = ({ filter = 'all-open' }: PowerModeLayoutProps) =
           </div>
         </ResizablePanel>
 
-        <ResizableHandle className="w-1 bg-border/50 hover:bg-border transition-colors" />
+        <ResizableHandle className="w-1 bg-border/50 hover:bg-border transition-colors hidden md:block" />
 
-        {/* Customer Context Panel */}
+        {/* Customer Context Panel (hidden on mobile) */}
         <ResizablePanel 
           defaultSize={28} 
           minSize={20}
           maxSize={35}
           collapsible={false}
+          className="hidden md:flex"
         >
-          <div className="h-full overflow-y-auto bg-card/50 p-4">
+          <div className="h-full overflow-y-auto bg-card/50 p-4 hidden md:block">
             {selectedConversation ? (
               <CustomerContext conversation={selectedConversation} onUpdate={handleUpdate} />
             ) : (

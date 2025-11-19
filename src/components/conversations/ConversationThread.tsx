@@ -5,6 +5,8 @@ import { ConversationHeader } from './ConversationHeader';
 import { AIContextPanel } from './AIContextPanel';
 import { MessageTimeline } from './MessageTimeline';
 import { ReplyArea } from './ReplyArea';
+import { MobileConversationView } from './MobileConversationView';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { Loader2 } from 'lucide-react';
 
 interface ConversationThreadProps {
@@ -16,6 +18,7 @@ interface ConversationThreadProps {
 export const ConversationThread = ({ conversation, onUpdate, onBack }: ConversationThreadProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     const fetchMessages = async () => {
@@ -94,6 +97,30 @@ export const ConversationThread = ({ conversation, onUpdate, onBack }: Conversat
     );
   }
 
+  // Mobile layout with tabs
+  if (isMobile) {
+    return (
+      <div className="flex flex-col h-full">
+        <ConversationHeader conversation={conversation} onUpdate={onUpdate} onBack={onBack} />
+        
+        <MobileConversationView 
+          conversation={conversation}
+          messages={messages}
+          onUpdate={onUpdate}
+          onBack={onBack || (() => {})}
+        />
+
+        <ReplyArea
+          conversationId={conversation.id}
+          channel={conversation.channel}
+          aiDraftResponse={conversation.metadata?.ai_draft_response as string}
+          onSend={handleReply}
+        />
+      </div>
+    );
+  }
+
+  // Desktop layout
   return (
     <div className="flex flex-col h-full">
       <ConversationHeader conversation={conversation} onUpdate={onUpdate} onBack={onBack} />
