@@ -67,40 +67,22 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend }: 
   };
 
   return (
-    <div className="border-t border-border p-5 bg-card max-h-[400px] overflow-y-auto">
+    <div className="border-t border-border p-4 bg-card max-h-[350px] overflow-y-auto">
       <Tabs defaultValue="reply">
-        <TabsList className="mb-4 sticky top-0 bg-card z-10">
+        <TabsList className="mb-3 w-full justify-center">
           <TabsTrigger value="reply">Reply to Customer</TabsTrigger>
           <TabsTrigger value="note">Internal Note</TabsTrigger>
         </TabsList>
 
         <TabsContent value="reply" className="space-y-3 mt-0">
-          <div className="flex items-center gap-2">
-            <Select value={selectedChannel} onValueChange={setSelectedChannel}>
-              <SelectTrigger className="w-[150px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="sms">📱 SMS</SelectItem>
-                <SelectItem value="whatsapp">🟢 WhatsApp</SelectItem>
-                <SelectItem value="email">📧 Email</SelectItem>
-                <SelectItem value="web_chat">💬 Web Chat</SelectItem>
-              </SelectContent>
-            </Select>
-            {selectedChannel === 'sms' && (
-              <span className="text-xs text-muted-foreground">
-                {replyBody.length}/160
-              </span>
-            )}
-          </div>
           <Textarea
             placeholder="Type your reply to the customer... (Cmd/Ctrl+Enter to send)"
             value={replyBody}
             onChange={(e) => setReplyBody(e.target.value)}
-            rows={5}
+            rows={4}
             className="resize-none"
           />
-          <Button onClick={handleSendReply} disabled={sending || !replyBody.trim()} className="w-full smooth-transition">
+          <Button onClick={handleSendReply} disabled={sending || !replyBody.trim()} className="w-full">
             <Send className="h-4 w-4 mr-2" />
             {sending ? 'Sending...' : 'Send Reply'}
           </Button>
@@ -111,10 +93,10 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend }: 
             placeholder="Add an internal note for your team..."
             value={noteBody}
             onChange={(e) => setNoteBody(e.target.value)}
-            rows={5}
+            rows={4}
             className="resize-none"
           />
-          <Button onClick={handleSendNote} disabled={sending || !noteBody.trim()} variant="outline" className="w-full smooth-transition">
+          <Button onClick={handleSendNote} disabled={sending || !noteBody.trim()} variant="outline" className="w-full">
             {sending ? 'Adding...' : 'Add Note'}
           </Button>
         </TabsContent>
