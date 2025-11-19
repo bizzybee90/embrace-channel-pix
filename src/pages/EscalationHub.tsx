@@ -65,6 +65,10 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
     }
   };
 
+  const handleRefresh = async () => {
+    setRefreshKey(prev => prev + 1);
+  };
+
   const handleClose = () => {
     setSelectedConversation(null);
     setMessages([]);
@@ -198,6 +202,7 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
         onPriorityFilterChange={setPriorityFilter}
         onChannelFilterChange={setChannelFilter}
         onCategoryFilterChange={setCategoryFilter}
+        onRefresh={handleRefresh}
       />
     );
   }

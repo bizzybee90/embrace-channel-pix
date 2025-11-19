@@ -4,6 +4,7 @@ import { ChannelIcon } from '@/components/shared/ChannelIcon';
 import { ChevronRight } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
+import PullToRefresh from 'react-simple-pull-to-refresh';
 
 interface MobileConversationListProps {
   conversations: Conversation[];
@@ -17,6 +18,7 @@ interface MobileConversationListProps {
   onPriorityFilterChange: (value: string) => void;
   onChannelFilterChange: (value: string) => void;
   onCategoryFilterChange: (value: string) => void;
+  onRefresh: () => Promise<void>;
 }
 
 export const MobileConversationList = ({ 
@@ -30,7 +32,8 @@ export const MobileConversationList = ({
   onStatusFilterChange,
   onPriorityFilterChange,
   onChannelFilterChange,
-  onCategoryFilterChange
+  onCategoryFilterChange,
+  onRefresh
 }: MobileConversationListProps) => {
   const getPriorityColor = (priority: string | null) => {
     switch (priority) {
@@ -134,74 +137,85 @@ export const MobileConversationList = ({
         </div>
       </div>
 
-      {/* Conversation Cards */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="p-5 space-y-3">
-          {conversations.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
-              <p className="text-[17px] font-semibold text-foreground mb-2">No conversations</p>
-              <p className="text-[15px] text-muted-foreground">
-                There are no conversations matching your current filters.
-              </p>
+      {/* Conversation Cards with Pull-to-Refresh */}
+      <div className="flex-1 overflow-hidden">
+        <PullToRefresh
+          onRefresh={onRefresh}
+          pullingContent=""
+          refreshingContent={
+            <div className="flex justify-center py-4">
+              <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
             </div>
-          ) : (
-            conversations.map((conversation) => (
-              <button
-                key={conversation.id}
-                onClick={() => onSelect(conversation)}
-                className="w-full text-left bg-card rounded-[24px] p-4 shadow-sm border border-border/50 hover:shadow-md hover:scale-[1.01] transition-all active:scale-[0.99]"
-              >
-                {/* Top Row */}
-                <div className="flex items-start justify-between gap-3 mb-2">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="text-[17px] font-semibold text-foreground truncate">
-                        {conversation.title || 'Untitled Conversation'}
-                      </h3>
+          }
+          className="h-full overflow-y-auto"
+        >
+          <div className="p-5 space-y-3">
+            {conversations.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+                <p className="text-[17px] font-semibold text-foreground mb-2">No conversations</p>
+                <p className="text-[15px] text-muted-foreground">
+                  There are no conversations matching your current filters.
+                </p>
+              </div>
+            ) : (
+              conversations.map((conversation) => (
+                <button
+                  key={conversation.id}
+                  onClick={() => onSelect(conversation)}
+                  className="w-full text-left bg-card rounded-[24px] p-4 shadow-sm border border-border/50 hover:shadow-md hover:scale-[1.01] transition-all active:scale-[0.99]"
+                >
+                  {/* Top Row */}
+                  <div className="flex items-start justify-between gap-3 mb-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="text-[17px] font-semibold text-foreground truncate">
+                          {conversation.title || 'Untitled Conversation'}
+                        </h3>
+                      </div>
                     </div>
+                    <ChevronRight className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
                   </div>
-                  <ChevronRight className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
-                </div>
 
-                {/* Middle Row - Badges */}
-                <div className="flex items-center gap-2 mb-2 flex-wrap">
-                  <Badge 
-                    variant={getPriorityColor(conversation.priority)}
-                    className="rounded-full text-xs font-medium h-6 px-2"
-                  >
-                    {conversation.priority || 'medium'}
-                  </Badge>
-                  
-                  <div className="flex items-center gap-2 px-2 h-6 rounded-full bg-muted/50">
-                    <ChannelIcon channel={conversation.channel} className="h-3 w-3" />
-                    <span className="text-xs font-medium text-foreground capitalize">
-                      {conversation.channel}
+                  {/* Middle Row - Badges */}
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
+                    <Badge 
+                      variant={getPriorityColor(conversation.priority)}
+                      className="rounded-full text-xs font-medium h-6 px-2"
+                    >
+                      {conversation.priority || 'medium'}
+                    </Badge>
+                    
+                    <div className="flex items-center gap-2 px-2 h-6 rounded-full bg-muted/50">
+                      <ChannelIcon channel={conversation.channel} className="h-3 w-3" />
+                      <span className="text-xs font-medium text-foreground capitalize">
+                        {conversation.channel}
+                      </span>
+                    </div>
+
+                    {isOverdue(conversation) && (
+                      <Badge variant="destructive" className="rounded-full text-xs font-medium h-6 px-2">
+                        Overdue
+                      </Badge>
+                    )}
+                  </div>
+
+                  {/* Bottom Row - Metadata */}
+                  <div className="flex items-center gap-2 text-[13px] text-muted-foreground">
+                    {conversation.category && (
+                      <>
+                        <span className="capitalize">{conversation.category}</span>
+                        <span>•</span>
+                      </>
+                    )}
+                    <span>
+                      {conversation.created_at && formatDistanceToNow(new Date(conversation.created_at), { addSuffix: true })}
                     </span>
                   </div>
-
-                  {isOverdue(conversation) && (
-                    <Badge variant="destructive" className="rounded-full text-xs font-medium h-6 px-2">
-                      Overdue
-                    </Badge>
-                  )}
-                </div>
-
-                {/* Bottom Row - Metadata */}
-                <div className="flex items-center gap-2 text-[13px] text-muted-foreground">
-                  {conversation.category && (
-                    <>
-                      <span className="capitalize">{conversation.category}</span>
-                      <span>•</span>
-                    </>
-                  )}
-                  <span>
-                    {conversation.created_at && formatDistanceToNow(new Date(conversation.created_at), { addSuffix: true })}
-                  </span>
-                </div>
-              </button>
-            ))
-          )}
-        </div>
+                </button>
+              ))
+            )}
+          </div>
+        </PullToRefresh>
       </div>
     </div>
   );
