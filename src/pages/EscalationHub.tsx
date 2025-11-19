@@ -38,6 +38,14 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
   const { toast } = useToast();
   const isMobile = useIsMobile();
   
+  console.log('🔍 EscalationHub Debug:', { 
+    isMobile, 
+    filter, 
+    interfaceMode, 
+    modeLoading,
+    windowWidth: typeof window !== 'undefined' ? window.innerWidth : 'undefined'
+  });
+  
   useSLANotifications();
 
   const handleUpdate = async () => {
