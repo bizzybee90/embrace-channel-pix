@@ -6,9 +6,71 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import { EscalationHub } from "./pages/EscalationHub";
+import { MobileEscalationHub } from "./pages/mobile/MobileEscalationHub";
 import { AuthGuard } from "./components/AuthGuard";
+import { useIsMobile } from "./hooks/use-mobile";
 
 const queryClient = new QueryClient();
+
+const RouterContent = () => {
+  const isMobile = useIsMobile();
+
+  return (
+    <Routes>
+      <Route path="/auth" element={<Auth />} />
+      <Route 
+        path="/" 
+        element={
+          <AuthGuard>
+            {isMobile ? (
+              <MobileEscalationHub filter="my-tickets" />
+            ) : (
+              <EscalationHub filter="my-tickets" />
+            )}
+          </AuthGuard>
+        } 
+      />
+      <Route 
+        path="/unassigned" 
+        element={
+          <AuthGuard>
+            {isMobile ? (
+              <MobileEscalationHub filter="unassigned" />
+            ) : (
+              <EscalationHub filter="unassigned" />
+            )}
+          </AuthGuard>
+        } 
+      />
+      <Route 
+        path="/sla-risk" 
+        element={
+          <AuthGuard>
+            {isMobile ? (
+              <MobileEscalationHub filter="sla-risk" />
+            ) : (
+              <EscalationHub filter="sla-risk" />
+            )}
+          </AuthGuard>
+        } 
+      />
+      <Route 
+        path="/all-open" 
+        element={
+          <AuthGuard>
+            {isMobile ? (
+              <MobileEscalationHub filter="all-open" />
+            ) : (
+              <EscalationHub filter="all-open" />
+            )}
+          </AuthGuard>
+        } 
+      />
+      {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+      <Route path="*" element={<NotFound />} />
+    </Routes>
+  );
+};
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -16,15 +78,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
-          <Route path="/auth" element={<Auth />} />
-          <Route path="/" element={<AuthGuard><EscalationHub filter="my-tickets" /></AuthGuard>} />
-          <Route path="/unassigned" element={<AuthGuard><EscalationHub filter="unassigned" /></AuthGuard>} />
-          <Route path="/sla-risk" element={<AuthGuard><EscalationHub filter="sla-risk" /></AuthGuard>} />
-          <Route path="/all-open" element={<AuthGuard><EscalationHub filter="all-open" /></AuthGuard>} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <RouterContent />
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
