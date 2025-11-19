@@ -7,11 +7,14 @@ import { ConversationThread } from '@/components/conversations/ConversationThrea
 import { CustomerContext } from '@/components/context/CustomerContext';
 import { QuickActions } from '@/components/conversations/QuickActions';
 import { MobileQuickActions } from '@/components/conversations/MobileQuickActions';
-import { Conversation } from '@/lib/types';
+import { MobileConversationList } from '@/components/conversations/MobileConversationList';
+import { MobileConversationView } from '@/components/conversations/MobileConversationView';
+import { Conversation, Message } from '@/lib/types';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { useInterfaceMode } from '@/hooks/useInterfaceMode';
 import { useSLANotifications } from '@/hooks/useSLANotifications';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -25,18 +28,53 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [modalWidth, setModalWidth] = useState(75);
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [priorityFilter, setPriorityFilter] = useState<string>('all');
+  const [channelFilter, setChannelFilter] = useState<string>('all');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const { interfaceMode, loading: modeLoading } = useInterfaceMode();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   
   useSLANotifications();
 
-  const handleUpdate = () => {
+  const handleUpdate = async () => {
     setRefreshKey(prev => prev + 1);
+    
+    // Refresh messages if conversation is selected
+    if (selectedConversation) {
+      const { data } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('conversation_id', selectedConversation.id)
+        .order('created_at', { ascending: true });
+      
+      if (data) {
+        setMessages(data as Message[]);
+      }
+    }
   };
 
   const handleClose = () => {
     setSelectedConversation(null);
+    setMessages([]);
+  };
+
+  const handleSelectConversation = async (conversation: Conversation) => {
+    setSelectedConversation(conversation);
+    
+    // Fetch messages for the selected conversation
+    const { data } = await supabase
+      .from('messages')
+      .select('*')
+      .eq('conversation_id', conversation.id)
+      .order('created_at', { ascending: true });
+    
+    if (data) {
+      setMessages(data as Message[]);
+    }
   };
 
   const navigateConversation = (direction: 'prev' | 'next') => {
