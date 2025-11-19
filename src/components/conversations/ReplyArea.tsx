@@ -67,11 +67,11 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend }: 
   };
 
   return (
-    <div className="border-t border-border p-3 md:p-4 bg-card max-h-[350px] overflow-y-auto sticky bottom-0 z-10 shadow-[0_-2px_8px_rgba(0,0,0,0.08)]">
+    <div className="border-t border-border/30 p-3 md:p-4 bg-card/95 backdrop-blur-lg max-h-[350px] overflow-y-auto sticky bottom-0 z-10 shadow-[0_-4px_12px_rgba(0,0,0,0.08)] md:rounded-none mobile-frosted">
       <Tabs defaultValue="reply">
-        <TabsList className="mb-3 w-full justify-center h-10">
-          <TabsTrigger value="reply" className="text-sm">Reply to Customer</TabsTrigger>
-          <TabsTrigger value="note" className="text-sm">Internal Note</TabsTrigger>
+        <TabsList className="mb-3 w-full justify-center h-10 md:h-10 bg-muted/50">
+          <TabsTrigger value="reply" className="text-sm md:text-sm rounded-lg data-[state=active]:bg-card data-[state=active]:shadow-sm transition-all duration-150">Reply to Customer</TabsTrigger>
+          <TabsTrigger value="note" className="text-sm md:text-sm rounded-lg data-[state=active]:bg-card data-[state=active]:shadow-sm transition-all duration-150">Internal Note</TabsTrigger>
         </TabsList>
 
         <TabsContent value="reply" className="space-y-2 md:space-y-3 mt-0">
@@ -80,14 +80,14 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend }: 
             value={replyBody}
             onChange={(e) => setReplyBody(e.target.value)}
             rows={3}
-            className="resize-none border-border/80 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all text-sm md:text-base min-h-[80px]"
+            className="resize-none border-border/60 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all text-sm md:text-base min-h-[80px] rounded-2xl md:rounded-md bg-background shadow-sm"
           />
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs text-muted-foreground hidden md:inline">Cmd/Ctrl + Enter to send</span>
             <Button 
               onClick={handleSendReply} 
               disabled={sending || !replyBody.trim()} 
-              className="hover:scale-105 transition-transform ml-auto w-full md:w-auto h-10"
+              className="mobile-spring-bounce ml-auto w-full md:w-auto h-11 md:h-10 rounded-xl md:rounded-md font-medium shadow-sm"
               size="default"
             >
               <Send className="h-4 w-4 mr-2" />
@@ -102,13 +102,13 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend }: 
             value={noteBody}
             onChange={(e) => setNoteBody(e.target.value)}
             rows={3}
-            className="resize-none border-border/80 focus:border-warning/50 focus:ring-2 focus:ring-warning/20 transition-all text-sm md:text-base min-h-[80px]"
+            className="resize-none border-border/60 focus:border-warning/50 focus:ring-2 focus:ring-warning/20 transition-all text-sm md:text-base min-h-[80px] rounded-2xl md:rounded-md bg-background shadow-sm"
           />
           <Button 
             onClick={handleSendNote} 
             disabled={sending || !noteBody.trim()} 
             variant="outline" 
-            className="w-full hover:bg-warning/10 hover:border-warning/50 transition-all h-10"
+            className="w-full hover:bg-warning/10 hover:border-warning/50 transition-all h-11 md:h-10 rounded-xl md:rounded-md mobile-spring-bounce font-medium"
           >
             {sending ? 'Adding...' : 'Add Note'}
           </Button>

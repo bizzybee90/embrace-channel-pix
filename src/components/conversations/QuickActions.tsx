@@ -71,26 +71,24 @@ export const QuickActions = ({ conversation, onUpdate, onBack }: QuickActionsPro
 
   return (
     <>
-      <Card className="p-4 card-elevation space-y-3">
-        <h3 className="font-semibold text-sm uppercase text-muted-foreground">Quick Actions</h3>
-        
-        <div className="space-y-2">
-          {conversation.status !== 'resolved' && (
-            <Button 
-              onClick={handleResolve}
-              className="w-full justify-start bg-success hover:bg-success/90 smooth-transition"
-              size="sm"
-            >
-              <CheckCircle2 className="h-4 w-4 mr-2" />
-              Resolve & Close
-            </Button>
-          )}
+      <div className="space-y-3 mobile-section-spacing">
+        {conversation.status !== 'resolved' && (
+          <Button 
+            onClick={handleResolve}
+            className="w-full justify-center bg-success hover:bg-success/90 smooth-transition mobile-spring-bounce h-12 md:h-10 rounded-xl md:rounded-md font-semibold text-base md:text-sm shadow-sm"
+            size="lg"
+          >
+            <CheckCircle2 className="h-5 w-5 mr-2" />
+            Resolve & Close
+          </Button>
+        )}
 
+        <div className="mobile-native-card md:p-4 md:border md:shadow-sm space-y-2">
           <Button 
             onClick={() => setSnoozeOpen(true)}
             variant="outline"
-            className="w-full justify-start smooth-transition hover-lift"
-            size="sm"
+            className="w-full justify-start smooth-transition mobile-spring-bounce h-11 md:h-9 rounded-xl md:rounded-md"
+            size="default"
           >
             <Clock className="h-4 w-4 mr-2" />
             Snooze
@@ -100,8 +98,8 @@ export const QuickActions = ({ conversation, onUpdate, onBack }: QuickActionsPro
             <Button 
               onClick={handleAssignToMe}
               variant="outline"
-              className="w-full justify-start smooth-transition hover-lift"
-              size="sm"
+              className="w-full justify-start smooth-transition mobile-spring-bounce h-11 md:h-9 rounded-xl md:rounded-md"
+              size="default"
             >
               <UserPlus className="h-4 w-4 mr-2" />
               Assign to Me
@@ -109,10 +107,10 @@ export const QuickActions = ({ conversation, onUpdate, onBack }: QuickActionsPro
           )}
 
           <Select value={conversation.priority} onValueChange={handlePriorityChange}>
-            <SelectTrigger className="w-full">
+            <SelectTrigger className="w-full h-11 md:h-10 rounded-xl md:rounded-md">
               <SelectValue placeholder="Priority" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="rounded-xl md:rounded-md">
               <SelectItem value="high">🔴 High</SelectItem>
               <SelectItem value="medium">🟡 Medium</SelectItem>
               <SelectItem value="low">🟢 Low</SelectItem>
@@ -120,19 +118,18 @@ export const QuickActions = ({ conversation, onUpdate, onBack }: QuickActionsPro
           </Select>
 
           <Select value={conversation.status} onValueChange={handleStatusChange}>
-            <SelectTrigger className="w-full">
+            <SelectTrigger className="w-full h-11 md:h-10 rounded-xl md:rounded-md">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="new">New</SelectItem>
+            <SelectContent className="rounded-xl md:rounded-md">
               <SelectItem value="open">Open</SelectItem>
+              <SelectItem value="in_progress">In Progress</SelectItem>
               <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="snoozed">Snoozed</SelectItem>
               <SelectItem value="resolved">Resolved</SelectItem>
             </SelectContent>
           </Select>
         </div>
-      </Card>
+      </div>
 
       <SnoozeDialog
         conversationId={conversation.id}

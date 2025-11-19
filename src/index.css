@@ -145,6 +145,45 @@ All colors MUST be HSL.
   .card-elevation {
     @apply shadow-sm border border-border/50 transition-shadow hover:shadow-md;
   }
+  
+  /* Apple-quality mobile utilities */
+  @media (max-width: 900px) {
+    .mobile-native-card {
+      @apply rounded-2xl bg-card border border-border/30 shadow-sm p-4;
+    }
+    
+    .mobile-frosted {
+      @apply bg-card/95 backdrop-blur-md;
+    }
+    
+    .mobile-section-spacing {
+      @apply space-y-5;
+    }
+    
+    .mobile-touch-target {
+      @apply min-h-[44px] flex items-center;
+    }
+    
+    .mobile-bottom-tab {
+      @apply flex flex-col items-center justify-center gap-1 py-2 px-4 rounded-xl transition-all duration-150;
+    }
+    
+    .mobile-bottom-tab-active {
+      @apply bg-primary/10 text-primary;
+    }
+    
+    .mobile-message-bubble {
+      @apply rounded-[18px] px-4 py-3 max-w-[85%] shadow-sm;
+    }
+    
+    .mobile-spring-bounce {
+      @apply transition-transform duration-200 ease-out active:scale-[0.98];
+    }
+    
+    .mobile-slide-up {
+      @apply animate-in slide-in-from-bottom-4 duration-150;
+    }
+  }
 }
 
 @layer base {

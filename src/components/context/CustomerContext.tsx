@@ -42,56 +42,57 @@ export const CustomerContext = ({ conversation, onUpdate }: CustomerContextProps
   };
 
   return (
-    <div className="p-4 space-y-4">
-      <div>
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-lg font-semibold">Customer Profile</h2>
+    <div className="space-y-4 md:p-4 md:space-y-4 mobile-section-spacing">
+      <div className="mobile-native-card md:p-0 md:border-0 md:shadow-none md:rounded-none">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex-1">
+            <h3 className="text-2xl md:text-xl font-bold leading-tight">{customer.name || 'Unknown'}</h3>
+          </div>
           {getTierBadge(customer.tier)}
         </div>
-        <h3 className="text-xl font-bold">{customer.name || 'Unknown'}</h3>
       </div>
 
-      <Separator />
+      <Separator className="md:block" />
 
-      <div className="space-y-3">
-        <h4 className="text-sm font-semibold text-muted-foreground uppercase">Contact Info</h4>
+      <div className="mobile-native-card md:p-0 md:border-0 md:shadow-none md:rounded-none space-y-3">
+        <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Contact Info</h4>
         
         {customer.email && (
-          <div className="flex items-center gap-2 text-sm">
-            <Mail className="h-4 w-4 text-muted-foreground" />
+          <div className="flex items-center gap-3 text-sm mobile-touch-target">
+            <Mail className="h-4 w-4 text-primary flex-shrink-0" />
             <span className="break-all">{customer.email}</span>
           </div>
         )}
         
         {customer.phone && (
-          <div className="flex items-center gap-2 text-sm">
-            <Phone className="h-4 w-4 text-muted-foreground" />
+          <div className="flex items-center gap-3 text-sm mobile-touch-target">
+            <Phone className="h-4 w-4 text-primary flex-shrink-0" />
             <span>{customer.phone}</span>
           </div>
         )}
 
         {customer.preferred_channel && (
-          <div className="flex items-center gap-2 text-sm">
-            <MessageSquare className="h-4 w-4 text-muted-foreground" />
+          <div className="flex items-center gap-3 text-sm mobile-touch-target">
+            <MessageSquare className="h-4 w-4 text-primary flex-shrink-0" />
             <span>Prefers: {customer.preferred_channel}</span>
           </div>
         )}
       </div>
 
-      <Separator />
+      <Separator className="md:block" />
 
-      <div className="space-y-3">
-        <h4 className="text-sm font-semibold text-muted-foreground uppercase">Recent History</h4>
+      <div className="mobile-native-card md:p-0 md:border-0 md:shadow-none md:rounded-none space-y-3">
+        <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Recent History</h4>
         <p className="text-sm text-muted-foreground">No previous conversations</p>
       </div>
 
       {customer.notes && (
         <>
-          <Separator />
-          <div className="space-y-2">
-            <h4 className="text-sm font-semibold text-muted-foreground uppercase">Notes</h4>
-            <Card className="p-3 bg-muted/50">
-              <p className="text-sm whitespace-pre-wrap">{customer.notes}</p>
+          <Separator className="md:block" />
+          <div className="mobile-native-card md:p-0 md:border-0 md:shadow-none md:rounded-none space-y-2">
+            <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Notes</h4>
+            <Card className="p-3 md:p-3 bg-muted/30 rounded-xl md:rounded-lg border-border/30">
+              <p className="text-sm whitespace-pre-wrap leading-relaxed">{customer.notes}</p>
             </Card>
           </div>
         </>
