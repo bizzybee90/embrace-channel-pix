@@ -30,9 +30,9 @@ export const PowerModeLayout = ({ filter = 'all-open' }: PowerModeLayoutProps) =
       <ResizablePanelGroup direction="horizontal" className="flex-1">
         {/* Conversation List Panel */}
         <ResizablePanel 
-          defaultSize={25} 
-          minSize={20}
-          maxSize={35}
+          defaultSize={20} 
+          minSize={15}
+          maxSize={30}
           collapsible={false}
         >
           <div className="h-full flex flex-col border-r border-border/30">
@@ -48,8 +48,8 @@ export const PowerModeLayout = ({ filter = 'all-open' }: PowerModeLayoutProps) =
 
         {/* Conversation Thread Panel */}
         <ResizablePanel 
-          defaultSize={45} 
-          minSize={30}
+          defaultSize={52} 
+          minSize={35}
           maxSize={70}
           collapsible={false}
         >
@@ -75,9 +75,9 @@ export const PowerModeLayout = ({ filter = 'all-open' }: PowerModeLayoutProps) =
 
         {/* Customer Context Panel */}
         <ResizablePanel 
-          defaultSize={30} 
-          minSize={25}
-          maxSize={40}
+          defaultSize={28} 
+          minSize={20}
+          maxSize={35}
           collapsible={false}
         >
           <div className="h-full overflow-y-auto bg-card p-4">
