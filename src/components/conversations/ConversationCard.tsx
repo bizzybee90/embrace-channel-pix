@@ -53,50 +53,46 @@ export const ConversationCard = ({ conversation, selected, onClick }: Conversati
       {/* Desktop Layout: Responsive to width */}
       <div className="hidden md:block">
         <div className="flex flex-col gap-2">
-          {/* Top row: Title and SLA Badge */}
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              <div className="flex-shrink-0">
-                <ChannelIcon channel={conversation.channel} />
-              </div>
-              <h3 className="font-semibold text-sm truncate" title={conversation.title || 'Untitled Conversation'}>
+          {/* Top row: Channel, Title and SLA Badge */}
+          <div className="flex items-start gap-2">
+            <div className="flex-shrink-0 pt-0.5">
+              <ChannelIcon channel={conversation.channel} />
+            </div>
+            <div className="flex-1 min-w-0 flex items-start justify-between gap-2">
+              <h3 className="font-semibold text-sm truncate flex-1" title={conversation.title || 'Untitled Conversation'}>
                 {conversation.title || 'Untitled Conversation'}
               </h3>
-            </div>
-            <div className="flex-shrink-0">
-              <SLABadge conversation={conversation} />
+              <div className="flex-shrink-0">
+                <SLABadge conversation={conversation} compact />
+              </div>
             </div>
           </div>
           
-          {/* Summary - only show if there's space */}
-          <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed" title={conversation.summary_for_human || 'No summary available'}>
+          {/* Summary - hide at very narrow widths */}
+          <p className="text-xs text-muted-foreground line-clamp-1 leading-relaxed" title={conversation.summary_for_human || 'No summary available'}>
             {conversation.summary_for_human || 'No summary available'}
           </p>
           
-          {/* Bottom row: Category, Priority, Time */}
+          {/* Bottom row: Priority indicator and Time */}
           <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-1.5 flex-wrap min-w-0">
-              {conversation.category && (
-                <Badge variant="outline" className="text-xs truncate max-w-[100px]" title={conversation.category}>
-                  {conversation.category}
-                </Badge>
-              )}
+            <div className="flex items-center gap-1.5 min-w-0">
               {conversation.priority && (
-                <Badge 
-                  variant={
-                    conversation.priority === 'high' ? 'destructive' :
-                    conversation.priority === 'medium' ? 'default' :
-                    'secondary'
-                  }
-                  className="text-xs"
-                >
-                  {conversation.priority}
-                </Badge>
+                <div className={cn(
+                  "h-2 w-2 rounded-full flex-shrink-0",
+                  conversation.priority === 'high' && 'bg-destructive',
+                  conversation.priority === 'medium' && 'bg-warning',
+                  conversation.priority === 'low' && 'bg-muted-foreground'
+                )} />
+              )}
+              {conversation.category && (
+                <span className="text-xs text-muted-foreground truncate" title={conversation.category}>
+                  {conversation.category}
+                </span>
               )}
             </div>
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground flex-shrink-0">
+            <div className="flex items-center gap-1 text-xs text-muted-foreground flex-shrink-0">
               <Clock className="h-3 w-3" />
-              <span className="truncate">{formatDistanceToNow(new Date(conversation.created_at!), { addSuffix: true })}</span>
+              <span className="whitespace-nowrap">{formatDistanceToNow(new Date(conversation.created_at!), { addSuffix: true })}</span>
             </div>
           </div>
         </div>

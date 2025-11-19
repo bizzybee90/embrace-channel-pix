@@ -31,7 +31,7 @@ export const PowerModeLayout = ({ filter = 'all-open' }: PowerModeLayoutProps) =
         {/* Conversation List Panel */}
         <ResizablePanel 
           defaultSize={20} 
-          minSize={15}
+          minSize={18}
           maxSize={30}
           collapsible={false}
         >
