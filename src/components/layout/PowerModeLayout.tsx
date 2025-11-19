@@ -35,7 +35,7 @@ export const PowerModeLayout = ({ filter = 'all-open' }: PowerModeLayoutProps) =
           maxSize={30}
           collapsible={false}
         >
-          <div className="h-full flex flex-col border-r border-border/30">
+          <div className="h-full flex flex-col border-r border-border/30 bg-card">
             <ConversationList
               filter={filter}
               selectedId={selectedConversation?.id}
@@ -62,10 +62,10 @@ export const PowerModeLayout = ({ filter = 'all-open' }: PowerModeLayoutProps) =
                 onBack={() => setSelectedConversation(null)}
               />
             ) : (
-              <div className="flex flex-col items-center justify-center h-full text-muted-foreground bg-muted/20">
-                <MessageSquare className="h-12 w-12 mb-4 opacity-20" />
+              <div className="flex flex-col items-center justify-center h-full text-muted-foreground bg-muted/10">
+                <MessageSquare className="h-16 w-16 mb-4 opacity-10" />
                 <p className="text-lg font-medium">No conversation selected</p>
-                <p className="text-sm mt-1">Choose a conversation from the list to get started</p>
+                <p className="text-sm mt-1 opacity-75">Choose a conversation from the list to get started</p>
               </div>
             )}
           </div>
@@ -80,11 +80,11 @@ export const PowerModeLayout = ({ filter = 'all-open' }: PowerModeLayoutProps) =
           maxSize={35}
           collapsible={false}
         >
-          <div className="h-full overflow-y-auto bg-card p-4">
+          <div className="h-full overflow-y-auto bg-card/50 p-4">
             {selectedConversation ? (
               <CustomerContext conversation={selectedConversation} onUpdate={handleUpdate} />
             ) : (
-              <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm">
+              <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm opacity-60">
                 <p className="text-center">Customer details will appear here when you select a conversation</p>
               </div>
             )}

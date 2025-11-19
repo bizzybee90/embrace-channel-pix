@@ -18,8 +18,8 @@ export const ConversationCard = ({ conversation, selected, onClick }: Conversati
       onClick={onClick}
       className={cn(
         "p-3 md:p-4 border-b border-border cursor-pointer transition-all duration-200 rounded-lg md:rounded-none mb-1 md:mb-0",
-        "hover:bg-accent/50 active:bg-accent/70",
-        selected && "bg-accent border-l-4 border-l-primary shadow-sm"
+        "hover:bg-accent/50 hover:shadow-sm active:bg-accent/70",
+        selected && "bg-accent border-l-4 border-l-primary shadow-md"
       )}
     >
       {/* Mobile Layout: Compact single row */}

@@ -67,8 +67,8 @@ export const AIContextPanel = ({ conversation, onUpdate }: AIContextPanelProps) 
           <div className="p-4 pt-0 space-y-4">
             {/* Escalation Reason - MOST IMPORTANT */}
             {conversation.ai_reason_for_escalation && (
-              <div className="bg-urgent/10 border border-urgent/30 rounded-lg p-4 card-elevation">
-                <div className="flex items-center gap-2 mb-2">
+              <div className="bg-urgent/10 border border-urgent/30 rounded-lg p-3 card-elevation">
+                <div className="flex items-center gap-2 mb-1.5">
                   <AlertTriangle className="h-4 w-4 text-urgent" />
                   <span className="text-sm font-semibold text-urgent">Why AI Escalated</span>
                   {escalatedAt && (
@@ -77,12 +77,12 @@ export const AIContextPanel = ({ conversation, onUpdate }: AIContextPanelProps) 
                     </span>
                   )}
                 </div>
-                <p className="text-sm text-foreground">
+                <p className="text-sm text-foreground leading-relaxed">
                   {conversation.ai_reason_for_escalation}
                 </p>
                 
                 {/* Feedback buttons */}
-                <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border">
+                <div className="flex items-center gap-2 mt-2.5 pt-2.5 border-t border-border">
                   <span className="text-xs text-muted-foreground">Was this escalation helpful?</span>
                   <Button
                     variant={feedback === 'up' ? 'default' : 'ghost'}
@@ -118,17 +118,17 @@ export const AIContextPanel = ({ conversation, onUpdate }: AIContextPanelProps) 
 
             {/* AI Draft Response */}
             {conversation.metadata?.ai_draft_response && (
-              <div className="space-y-2">
+              <div className="bg-gradient-to-br from-primary/5 to-primary/10 border border-primary/30 rounded-lg p-4 card-elevation space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Send className="h-4 w-4 text-primary" />
-                    <h3 className="font-semibold text-sm">AI Draft Response</h3>
+                    <h3 className="font-semibold text-sm text-primary">AI Suggested Reply</h3>
                   </div>
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => setIsDraftExpanded(!isDraftExpanded)}
-                    className="h-7 px-2"
+                    className="h-7 px-2 hover:bg-primary/20"
                   >
                     {isDraftExpanded ? (
                       <>
@@ -145,8 +145,8 @@ export const AIContextPanel = ({ conversation, onUpdate }: AIContextPanelProps) 
                 </div>
                 <Collapsible open={isDraftExpanded}>
                   <CollapsibleContent>
-                    <div className="space-y-2 pl-6">
-                      <div className="bg-primary/5 border border-primary/20 rounded-lg p-3">
+                    <div className="space-y-3">
+                      <div className="bg-background/60 border border-primary/20 rounded-md p-3">
                         <p className="text-sm leading-relaxed whitespace-pre-wrap">
                           {conversation.metadata.ai_draft_response}
                         </p>
@@ -155,10 +155,10 @@ export const AIContextPanel = ({ conversation, onUpdate }: AIContextPanelProps) 
                         size="sm"
                         onClick={handleSendDraft}
                         disabled={isSending}
-                        className="w-full"
+                        className="w-full hover:scale-105 transition-transform"
                       >
                         <Send className="h-3 w-3 mr-2" />
-                        {isSending ? 'Sending...' : 'Send Draft'}
+                        {isSending ? 'Sending...' : 'Send Draft Reply'}
                       </Button>
                     </div>
                   </CollapsibleContent>

@@ -6,6 +6,11 @@ import { ChannelIcon } from '@/components/shared/ChannelIcon';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 
+const getInitials = (name: string | null) => {
+  if (!name) return '?';
+  return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+};
+
 interface MessageTimelineProps {
   messages: Message[];
 }
@@ -22,7 +27,7 @@ export const MessageTimeline = ({ messages }: MessageTimelineProps) => {
         if (isInternal) {
           return (
             <div key={message.id} className="w-full animate-fade-in">
-              <div className="bg-warning/10 border border-warning/30 rounded-lg p-4 card-elevation">
+              <div className="bg-warning/10 border border-warning/30 rounded-lg p-3.5 card-elevation">
                 <div className="flex items-center gap-2 mb-2">
                   <StickyNote className="h-4 w-4 text-warning" />
                   <Badge variant="outline" className="text-xs bg-warning/20 border-warning">Internal Note</Badge>
@@ -48,15 +53,15 @@ export const MessageTimeline = ({ messages }: MessageTimelineProps) => {
             {(isCustomer || isAI) && (
               <div className="flex-shrink-0">
                 {isAI ? (
-                  <Avatar className="h-10 w-10">
+                  <Avatar className="h-8 w-8">
                     <AvatarFallback className="bg-primary/10">
-                      <Bot className="h-5 w-5 text-primary" />
+                      <Bot className="h-4 w-4 text-primary" />
                     </AvatarFallback>
                   </Avatar>
                 ) : (
-                  <Avatar className="h-10 w-10">
-                    <AvatarFallback className="bg-muted">
-                      <User className="h-5 w-5 text-muted-foreground" />
+                  <Avatar className="h-8 w-8">
+                    <AvatarFallback className="bg-muted text-xs font-medium">
+                      {getInitials(message.actor_name)}
                     </AvatarFallback>
                   </Avatar>
                 )}
@@ -65,7 +70,7 @@ export const MessageTimeline = ({ messages }: MessageTimelineProps) => {
 
             <div
               className={cn(
-                'max-w-[70%] rounded-lg p-4 card-elevation',
+                'max-w-[70%] rounded-lg p-3.5 card-elevation transition-all hover:shadow-md',
                 isCustomer && 'bg-muted',
                 isAI && 'bg-primary/10 border border-primary/20',
                 isHuman && 'bg-success/10 border border-success/20'
@@ -86,9 +91,9 @@ export const MessageTimeline = ({ messages }: MessageTimelineProps) => {
 
             {isHuman && (
               <div className="flex-shrink-0">
-                <Avatar className="h-10 w-10">
-                  <AvatarFallback className="bg-success/10">
-                    <User className="h-5 w-4 text-success" />
+                <Avatar className="h-8 w-8">
+                  <AvatarFallback className="bg-success/10 text-xs font-medium text-success">
+                    {getInitials(message.actor_name)}
                   </AvatarFallback>
                 </Avatar>
               </div>
