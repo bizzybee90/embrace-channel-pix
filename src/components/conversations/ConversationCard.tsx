@@ -50,24 +50,34 @@ export const ConversationCard = ({ conversation, selected, onClick }: Conversati
         </div>
       </div>
 
-      {/* Desktop Layout: Full details */}
+      {/* Desktop Layout: Responsive to width */}
       <div className="hidden md:block">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <ChannelIcon channel={conversation.channel} />
-              <h3 className="font-semibold text-sm truncate">
+        <div className="flex flex-col gap-2">
+          {/* Top row: Title and SLA Badge */}
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <div className="flex-shrink-0">
+                <ChannelIcon channel={conversation.channel} />
+              </div>
+              <h3 className="font-semibold text-sm truncate" title={conversation.title || 'Untitled Conversation'}>
                 {conversation.title || 'Untitled Conversation'}
               </h3>
             </div>
-            
-            <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
-              {conversation.summary_for_human || 'No summary available'}
-            </p>
-            
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex-shrink-0">
+              <SLABadge conversation={conversation} />
+            </div>
+          </div>
+          
+          {/* Summary - only show if there's space */}
+          <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed" title={conversation.summary_for_human || 'No summary available'}>
+            {conversation.summary_for_human || 'No summary available'}
+          </p>
+          
+          {/* Bottom row: Category, Priority, Time */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 flex-wrap min-w-0">
               {conversation.category && (
-                <Badge variant="outline" className="text-xs">
+                <Badge variant="outline" className="text-xs truncate max-w-[100px]" title={conversation.category}>
                   {conversation.category}
                 </Badge>
               )}
@@ -84,13 +94,9 @@ export const ConversationCard = ({ conversation, selected, onClick }: Conversati
                 </Badge>
               )}
             </div>
-          </div>
-          
-          <div className="flex flex-col items-end gap-2 flex-shrink-0">
-            <SLABadge conversation={conversation} />
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground flex-shrink-0">
               <Clock className="h-3 w-3" />
-              <span>{formatDistanceToNow(new Date(conversation.created_at!), { addSuffix: true })}</span>
+              <span className="truncate">{formatDistanceToNow(new Date(conversation.created_at!), { addSuffix: true })}</span>
             </div>
           </div>
         </div>
