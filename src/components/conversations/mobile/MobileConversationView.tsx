@@ -120,7 +120,7 @@ export const MobileConversationView = ({
       <div className="flex-1 overflow-y-auto">
         <div className="px-4 py-6 space-y-6">
           {/* Status Pills */}
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center justify-center gap-2 flex-wrap">
             <div className="flex items-center gap-2 px-3 h-8 rounded-full bg-muted/50">
               <ChannelIcon channel={conversation.channel} className="h-3.5 w-3.5" />
               <span className="text-[12px] font-semibold capitalize">{conversation.channel}</span>
@@ -193,13 +193,13 @@ export const MobileConversationView = ({
                     </p>
                   </div>
                   <Button
-                    variant="outline"
+                    variant="default"
                     size="sm"
                     onClick={() => {
                       setReplyText("Hi there! I completely understand your frustration and I'm here to help. I've looked into this issue and we can get this resolved for you within the next 24 hours. Would you like me to walk you through the solution steps now, or would you prefer we handle it on our end?");
                       toast({ title: "Draft copied to reply" });
                     }}
-                    className="mt-2 rounded-full text-[12px] h-8"
+                    className="mt-2 w-full rounded-full text-[13px] h-9 font-semibold shadow-sm"
                   >
                     Use this draft
                   </Button>
