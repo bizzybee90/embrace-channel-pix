@@ -1,6 +1,6 @@
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface MobileFilterSheetProps {
@@ -58,20 +58,46 @@ export const MobileFilterSheet = ({
     { label: 'General', value: 'general' },
   ];
 
+  const hasActiveFilters = 
+    statusFilter !== 'all' || 
+    priorityFilter !== 'all' || 
+    channelFilter !== 'all' || 
+    categoryFilter !== 'all';
+
+  const handleClearAll = () => {
+    onStatusFilterChange('all');
+    onPriorityFilterChange('all');
+    onChannelFilterChange('all');
+    onCategoryFilterChange('all');
+  };
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="h-[85vh] p-0">
         <div className="flex flex-col h-full bg-background">
           {/* Header */}
           <div className="px-5 pt-safe pb-4 border-b border-border/40 bg-background/95 backdrop-blur-xl">
-            <div className="flex items-center gap-3 pt-4">
-              <button
-                onClick={() => onOpenChange(false)}
-                className="flex items-center justify-center w-9 h-9 rounded-full bg-muted active:scale-95 transition-transform"
-              >
-                <ChevronLeft className="h-5 w-5 text-foreground" />
-              </button>
-              <h2 className="text-[20px] font-semibold text-foreground">Filters</h2>
+            <div className="flex items-center justify-between pt-4">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => onOpenChange(false)}
+                  className="flex items-center justify-center w-9 h-9 rounded-full bg-muted active:scale-95 transition-transform"
+                >
+                  <ChevronLeft className="h-5 w-5 text-foreground" />
+                </button>
+                <h2 className="text-[20px] font-semibold text-foreground">Filters</h2>
+              </div>
+              
+              {/* Clear All Button */}
+              {hasActiveFilters && (
+                <button
+                  onClick={handleClearAll}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-muted text-muted-foreground text-[14px] font-medium active:scale-95 transition-all hover:bg-destructive/10 hover:text-destructive"
+                >
+                  <X className="h-4 w-4" />
+                  Clear All
+                </button>
+              )}
             </div>
           </div>
 

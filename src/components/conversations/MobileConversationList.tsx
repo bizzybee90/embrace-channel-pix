@@ -248,25 +248,22 @@ export const MobileConversationList = ({
         </PullToRefresh>
       </div>
 
-      {/* Sticky Filter Button at Bottom */}
-      <div className="sticky bottom-0 left-0 right-0 p-5 pb-safe bg-gradient-to-t from-background via-background to-transparent">
+      {/* Sticky Filter Button at Bottom - Minimal Design */}
+      <div className="sticky bottom-0 left-0 right-0 px-5 py-3 pb-safe">
         <button
           onClick={() => setIsFilterSheetOpen(true)}
           className={cn(
-            "w-full h-[56px] rounded-2xl text-[16px] font-semibold transition-all duration-200",
-            "flex items-center justify-center gap-2 border shadow-lg",
-            "active:scale-95",
+            "w-full h-[44px] rounded-full text-[14px] font-medium transition-all duration-200",
+            "flex items-center justify-center gap-2",
+            "active:scale-95 backdrop-blur-sm",
             activeFilterCount > 0
-              ? "bg-primary text-primary-foreground border-primary"
-              : "bg-background text-foreground border-border"
+              ? "bg-primary/90 text-primary-foreground shadow-sm"
+              : "bg-background/60 text-muted-foreground border border-border/30"
           )}
         >
-          <SlidersHorizontal className="h-5 w-5" />
-          Filters
+          <SlidersHorizontal className="h-4 w-4" />
           {activeFilterCount > 0 && (
-            <span className="ml-2 px-2.5 py-1 rounded-full bg-primary-foreground/20 text-[14px] font-bold">
-              {activeFilterCount}
-            </span>
+            <span className="font-semibold">{activeFilterCount}</span>
           )}
         </button>
       </div>
