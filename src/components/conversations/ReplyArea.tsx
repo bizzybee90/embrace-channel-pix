@@ -71,7 +71,7 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend }: 
       <Tabs defaultValue="reply">
         <TabsContent value="reply" className="mt-0">
           <div className="flex items-center gap-2">
-            <TabsList className="h-10 md:h-10 bg-muted/50 flex-shrink-0">
+            <TabsList className="h-10 md:h-10 bg-muted/50 flex-shrink-0 self-center">
               <TabsTrigger value="reply" className="text-sm md:text-sm rounded-lg data-[state=active]:bg-card data-[state=active]:shadow-sm transition-all duration-150">Reply</TabsTrigger>
               <TabsTrigger value="note" className="text-sm md:text-sm rounded-lg data-[state=active]:bg-card data-[state=active]:shadow-sm transition-all duration-150">Note</TabsTrigger>
             </TabsList>
@@ -79,13 +79,13 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend }: 
               placeholder="Type your reply..."
               value={replyBody}
               onChange={(e) => setReplyBody(e.target.value)}
-              rows={1}
-              className="resize-none border-border/60 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all text-sm md:text-base h-10 rounded-2xl md:rounded-md bg-background shadow-sm flex-1"
+              rows={2}
+              className="resize-none border-border/60 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all text-sm md:text-base min-h-[56px] rounded-2xl md:rounded-md bg-background shadow-sm flex-1"
             />
             <Button 
               onClick={handleSendReply} 
               disabled={sending || !replyBody.trim()} 
-              className="mobile-spring-bounce h-10 rounded-xl md:rounded-md font-medium shadow-sm flex-shrink-0"
+              className="mobile-spring-bounce h-10 w-10 rounded-xl md:rounded-md font-medium shadow-sm flex-shrink-0 self-center"
               size="icon"
             >
               <Send className="h-4 w-4" />
@@ -96,7 +96,7 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend }: 
 
         <TabsContent value="note" className="mt-0">
           <div className="flex items-center gap-2">
-            <TabsList className="h-10 md:h-10 bg-muted/50 flex-shrink-0">
+            <TabsList className="h-10 md:h-10 bg-muted/50 flex-shrink-0 self-center">
               <TabsTrigger value="reply" className="text-sm md:text-sm rounded-lg data-[state=active]:bg-card data-[state=active]:shadow-sm transition-all duration-150">Reply</TabsTrigger>
               <TabsTrigger value="note" className="text-sm md:text-sm rounded-lg data-[state=active]:bg-card data-[state=active]:shadow-sm transition-all duration-150">Note</TabsTrigger>
             </TabsList>
@@ -104,14 +104,14 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend }: 
               placeholder="Add an internal note..."
               value={noteBody}
               onChange={(e) => setNoteBody(e.target.value)}
-              rows={1}
-              className="resize-none border-border/60 focus:border-warning/50 focus:ring-2 focus:ring-warning/20 transition-all text-sm md:text-base h-10 rounded-2xl md:rounded-md bg-background shadow-sm flex-1"
+              rows={2}
+              className="resize-none border-border/60 focus:border-warning/50 focus:ring-2 focus:ring-warning/20 transition-all text-sm md:text-base min-h-[56px] rounded-2xl md:rounded-md bg-background shadow-sm flex-1"
             />
             <Button 
               onClick={handleSendNote} 
               disabled={sending || !noteBody.trim()} 
               variant="outline" 
-              className="hover:bg-warning/10 hover:border-warning/50 transition-all h-10 rounded-xl md:rounded-md mobile-spring-bounce font-medium flex-shrink-0"
+              className="hover:bg-warning/10 hover:border-warning/50 transition-all h-10 w-10 rounded-xl md:rounded-md mobile-spring-bounce font-medium flex-shrink-0 self-center"
               size="icon"
             >
               <Send className="h-4 w-4" />
