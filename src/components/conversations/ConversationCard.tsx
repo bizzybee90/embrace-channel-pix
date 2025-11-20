@@ -51,13 +51,17 @@ export const ConversationCard = ({ conversation, selected, onClick }: Conversati
           selected && "border-primary/50 apple-shadow-lg bg-gradient-to-br from-primary/8 via-primary/4 to-card"
         )}
       >
-        {/* Priority Accent Bar - Wraps Top Corners */}
+        {/* Priority Accent Bar */}
         {conversation.priority && (
           <div 
             className={cn(
-              "absolute top-0 left-0 right-0 h-1.5 rounded-t-[22px]",
+              "absolute top-0 left-0 right-0 h-0.5",
               getPriorityBarColor(conversation.priority)
-            )} 
+            )}
+            style={{
+              borderTopLeftRadius: '22px',
+              borderTopRightRadius: '22px'
+            }}
           />
         )}
         
@@ -128,13 +132,17 @@ export const ConversationCard = ({ conversation, selected, onClick }: Conversati
         selected && "border-primary/50 apple-shadow-lg bg-gradient-to-br from-primary/8 via-primary/4 to-card"
       )}
     >
-      {/* Priority Accent Bar - Wraps Top Corners */}
+      {/* Priority Accent Bar */}
       {conversation.priority && (
         <div 
           className={cn(
-            "absolute top-0 left-0 right-0 h-1.5 rounded-t-[22px]",
+            "absolute top-0 left-0 right-0 h-0.5",
             getPriorityBarColor(conversation.priority)
-          )} 
+          )}
+          style={{
+            borderTopLeftRadius: '22px',
+            borderTopRightRadius: '22px'
+          }}
         />
       )}
       
