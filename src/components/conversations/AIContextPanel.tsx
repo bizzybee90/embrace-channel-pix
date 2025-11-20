@@ -92,27 +92,33 @@ export const AIContextPanel = ({ conversation, onUpdate }: AIContextPanelProps) 
 
       {/* AI Draft Response */}
       {aiDraftResponse && (
-        <Card className="card-elevation mobile-native-card bg-gradient-to-br from-primary/5 to-primary/10 border-primary/30">
-          <div className="p-3 md:p-4">
-            <div className="flex items-start gap-2 mb-3">
-              <Sparkles className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+        <Card className="relative overflow-hidden apple-shadow-lg border-0 rounded-[22px] bg-gradient-to-br from-blue-500/15 via-blue-400/10 to-purple-500/15 animate-fade-in">
+          {/* Glow effect */}
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 via-transparent to-purple-500/20 blur-2xl" />
+          
+          <div className="relative p-4 md:p-5">
+            <div className="flex items-start gap-3 mb-4">
+              <div className="h-11 w-11 rounded-[18px] bg-gradient-to-br from-blue-500/20 to-purple-500/15 flex items-center justify-center spring-bounce backdrop-blur-sm border border-blue-500/20">
+                <Sparkles className="h-5 w-5 text-blue-600 dark:text-blue-400 animate-pulse" style={{ animationDuration: '2s' }} />
+              </div>
               <div className="flex-1">
-                <h3 className="font-semibold text-sm md:text-sm">AI Suggested Reply</h3>
+                <h3 className="font-bold text-base md:text-base text-foreground mb-1">AI Suggested Reply</h3>
+                <p className="text-xs text-muted-foreground">Ready to send</p>
               </div>
             </div>
             
-            <div className="bg-card rounded-xl md:rounded-lg p-3 md:p-3 mb-3 border border-border/50 shadow-sm">
-              <p className="text-sm whitespace-pre-wrap leading-relaxed">{aiDraftResponse}</p>
+            <div className="bg-background/90 backdrop-blur-sm rounded-[18px] p-4 mb-4 border border-border/30 apple-shadow-sm">
+              <p className="text-sm whitespace-pre-wrap leading-relaxed text-foreground">{aiDraftResponse}</p>
             </div>
 
             <Button
               onClick={handleUseDraft}
               disabled={draftUsed}
-              variant="outline"
+              variant={draftUsed ? "outline" : "default"}
               size="sm"
-              className="w-full smooth-transition mobile-spring-bounce rounded-xl md:rounded-md h-10 font-medium"
+              className="w-full smooth-transition spring-press rounded-[18px] h-11 font-semibold apple-shadow bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 border-0"
             >
-              {draftUsed ? 'Draft Used' : 'Use This Draft'}
+              {draftUsed ? '✓ Draft Used' : '✨ Use This Draft'}
             </Button>
           </div>
         </Card>

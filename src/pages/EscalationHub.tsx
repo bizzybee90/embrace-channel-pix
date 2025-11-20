@@ -286,7 +286,7 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
           )}
           <div className="flex flex-1 h-full overflow-hidden flex-col md:flex-row">
             {/* Main Content - Conversation */}
-            <div className="flex-1 flex flex-col overflow-hidden w-full md:w-auto">
+            <div className="flex-1 flex flex-col overflow-hidden w-full md:w-auto md:min-w-[600px]">
               {selectedConversation && (
                 <ConversationThread
                   key={refreshKey}
@@ -298,10 +298,13 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
             </div>
             
             {/* Right Sidebar - Customer Context & Quick Actions (hidden on mobile) */}
-            <div className="hidden md:flex w-80 border-l border-border bg-card/50 flex-col overflow-hidden">
+            <div className="hidden md:flex w-80 min-w-[320px] border-l border-border bg-card/50 flex-col overflow-hidden">
               <div className="flex-1 overflow-y-auto p-4 space-y-6">
                 {selectedConversation && (
-                  <CustomerContext conversation={selectedConversation} onUpdate={handleUpdate} />
+                  <>
+                    <CustomerContext conversation={selectedConversation} onUpdate={handleUpdate} />
+                    <QuickActions conversation={selectedConversation} onUpdate={handleUpdate} onBack={handleClose} />
+                  </>
                 )}
               </div>
             </div>

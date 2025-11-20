@@ -61,6 +61,27 @@ export const QuickActions = ({ conversation, onUpdate, onBack }: QuickActionsPro
     onUpdate();
   };
 
+  const handleAssignChange = async (value: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const assignedTo = value === 'me' ? user.id : null;
+    
+    await supabase
+      .from('conversations')
+      .update({ assigned_to: assignedTo })
+      .eq('id', conversation.id);
+    
+    if (value === 'me') {
+      toast({
+        title: "Assigned to you",
+        description: "This conversation is now yours.",
+      });
+    }
+    
+    onUpdate();
+  };
+
   const handleStatusChange = async (value: string) => {
     await supabase
       .from('conversations')
@@ -72,10 +93,12 @@ export const QuickActions = ({ conversation, onUpdate, onBack }: QuickActionsPro
   return (
     <>
       <div className="space-y-3 mobile-section-spacing">
+        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Quick Actions</h3>
+        
         {conversation.status !== 'resolved' && (
           <Button 
             onClick={handleResolve}
-            className="w-full justify-center bg-success hover:bg-success/90 smooth-transition mobile-spring-bounce h-12 md:h-10 rounded-xl md:rounded-md font-semibold text-base md:text-sm shadow-sm"
+            className="w-full justify-center bg-success hover:bg-success/90 smooth-transition spring-press h-12 md:h-10 rounded-[18px] font-semibold text-base md:text-sm apple-shadow"
             size="lg"
           >
             <CheckCircle2 className="h-5 w-5 mr-2" />
@@ -83,11 +106,45 @@ export const QuickActions = ({ conversation, onUpdate, onBack }: QuickActionsPro
           </Button>
         )}
 
-        <div className="mobile-native-card md:p-4 md:border md:shadow-sm space-y-2">
+        <div className="space-y-2">
+          <Select value={conversation.status || ''} onValueChange={handleStatusChange}>
+            <SelectTrigger className="w-full h-11 md:h-10 rounded-[18px] spring-press">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent className="rounded-[18px]">
+              <SelectItem value="open">Open</SelectItem>
+              <SelectItem value="in_progress">In Progress</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="resolved">Resolved</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={conversation.assigned_to || ''} onValueChange={handleAssignChange}>
+            <SelectTrigger className="w-full h-11 md:h-10 rounded-[18px] spring-press">
+              <SelectValue placeholder="Unassigned" />
+            </SelectTrigger>
+            <SelectContent className="rounded-[18px]">
+              <SelectItem value="unassigned">Unassigned</SelectItem>
+              <SelectItem value="me">Assign to Me</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={conversation.priority || 'medium'} onValueChange={handlePriorityChange}>
+            <SelectTrigger className="w-full h-11 md:h-10 rounded-[18px] spring-press">
+              <SelectValue placeholder="Priority" />
+            </SelectTrigger>
+            <SelectContent className="rounded-[18px]">
+              <SelectItem value="urgent">🔴 Urgent</SelectItem>
+              <SelectItem value="high">🟠 High</SelectItem>
+              <SelectItem value="medium">🟡 Medium</SelectItem>
+              <SelectItem value="low">🟢 Low</SelectItem>
+            </SelectContent>
+          </Select>
+
           <Button 
             onClick={() => setSnoozeOpen(true)}
             variant="outline"
-            className="w-full justify-start smooth-transition mobile-spring-bounce h-11 md:h-9 rounded-xl md:rounded-md"
+            className="w-full justify-start smooth-transition spring-press h-11 md:h-9 rounded-[18px]"
             size="default"
           >
             <Clock className="h-4 w-4 mr-2" />
@@ -98,36 +155,13 @@ export const QuickActions = ({ conversation, onUpdate, onBack }: QuickActionsPro
             <Button 
               onClick={handleAssignToMe}
               variant="outline"
-              className="w-full justify-start smooth-transition mobile-spring-bounce h-11 md:h-9 rounded-xl md:rounded-md"
+              className="w-full justify-start smooth-transition spring-press h-11 md:h-9 rounded-[18px]"
               size="default"
             >
               <UserPlus className="h-4 w-4 mr-2" />
               Assign to Me
             </Button>
           )}
-
-          <Select value={conversation.priority} onValueChange={handlePriorityChange}>
-            <SelectTrigger className="w-full h-11 md:h-10 rounded-xl md:rounded-md">
-              <SelectValue placeholder="Priority" />
-            </SelectTrigger>
-            <SelectContent className="rounded-xl md:rounded-md">
-              <SelectItem value="high">🔴 High</SelectItem>
-              <SelectItem value="medium">🟡 Medium</SelectItem>
-              <SelectItem value="low">🟢 Low</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select value={conversation.status} onValueChange={handleStatusChange}>
-            <SelectTrigger className="w-full h-11 md:h-10 rounded-xl md:rounded-md">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent className="rounded-xl md:rounded-md">
-              <SelectItem value="open">Open</SelectItem>
-              <SelectItem value="in_progress">In Progress</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="resolved">Resolved</SelectItem>
-            </SelectContent>
-          </Select>
         </div>
       </div>
 
