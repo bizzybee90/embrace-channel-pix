@@ -136,14 +136,12 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
                   </div>
                 </div>
 
-                {/* Conversation Content - Scrollable */}
-                <div className="flex-1 overflow-y-auto">
-                  <div className="mx-auto max-w-[720px] px-6 py-6">
-                    <ConversationThread
-                      conversation={selectedConversation}
-                      onUpdate={handleUpdate}
-                    />
-                  </div>
+                {/* Conversation Content - Scrollable with Desktop Styling */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                  <ConversationThread
+                    conversation={selectedConversation}
+                    onUpdate={handleUpdate}
+                  />
                 </div>
               </>
             ) : (
