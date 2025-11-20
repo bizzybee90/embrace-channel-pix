@@ -27,20 +27,20 @@ export const ConversationCard = ({ conversation, selected, onClick }: Conversati
     <div
       onClick={onClick}
       className={cn(
-        "p-5 cursor-pointer transition-all duration-200 rounded-[24px] mb-3",
-        "bg-background border border-border/50 hover:border-primary/20",
-        "hover:shadow-lg hover:shadow-primary/5 active:scale-[0.98]",
-        selected && "border-primary/40 shadow-xl shadow-primary/10 bg-gradient-to-br from-primary/10 via-primary/5 to-background"
+        "p-6 cursor-pointer transition-all duration-300 ease-out rounded-[22px] mb-3",
+        "bg-card border border-border/30 hover:border-primary/30",
+        "apple-shadow hover:apple-shadow-lg spring-press",
+        selected && "border-primary/50 apple-shadow-lg bg-gradient-to-br from-primary/8 via-primary/4 to-card"
       )}
     >
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-3.5">
         {/* Header: Channel + Title */}
-        <div className="flex items-start gap-3">
-          <div className="flex-shrink-0 pt-1">
+        <div className="flex items-start gap-3.5">
+          <div className="flex-shrink-0 pt-0.5">
             <ChannelIcon channel={conversation.channel} />
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="font-bold text-lg leading-snug mb-1.5 text-foreground">
+            <h3 className="font-semibold text-lg leading-snug mb-2 text-foreground">
               {conversation.title || 'Untitled Conversation'}
             </h3>
             <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
@@ -49,13 +49,22 @@ export const ConversationCard = ({ conversation, selected, onClick }: Conversati
           </div>
         </div>
         
+        {/* AI Escalation Reason */}
+        {conversation.ai_reason_for_escalation && (
+          <div className="px-3 py-2 rounded-xl bg-muted/50 border border-border/30">
+            <p className="text-xs text-muted-foreground line-clamp-1">
+              {conversation.ai_reason_for_escalation}
+            </p>
+          </div>
+        )}
+        
         {/* Footer: Badges + Time */}
         <div className="flex items-center justify-between gap-2 flex-wrap pt-1">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {conversation.priority && (
               <Badge 
                 variant={getPriorityVariant(conversation.priority)}
-                className="rounded-full px-3 py-1 text-xs font-medium"
+                className="rounded-full px-3 py-1.5 text-xs font-semibold shadow-sm"
               >
                 {conversation.priority.charAt(0).toUpperCase() + conversation.priority.slice(1)}
               </Badge>
@@ -63,7 +72,7 @@ export const ConversationCard = ({ conversation, selected, onClick }: Conversati
             {conversation.category && (
               <Badge 
                 variant="outline"
-                className="rounded-full px-3 py-1 text-xs font-medium"
+                className="rounded-full px-3 py-1.5 text-xs font-medium border-border/50"
               >
                 {conversation.category}
               </Badge>

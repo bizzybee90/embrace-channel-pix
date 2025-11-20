@@ -1,9 +1,11 @@
+import { useState } from 'react';
 import { Conversation, Message } from '@/lib/types';
 import { MessageTimeline } from './MessageTimeline';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { SLABadge } from '@/components/sla/SLABadge';
+import { ConfirmationDialog } from './ConfirmationDialog';
 import { Sparkles, User, Clock, AlertCircle, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
@@ -27,12 +29,25 @@ const getSentimentEmoji = (sentiment: string | null) => {
   }
 };
 
+const getPriorityVariant = (priority: string | null) => {
+  if (!priority) return 'secondary';
+  switch (priority.toLowerCase()) {
+    case 'urgent': return 'priority-urgent';
+    case 'high': return 'priority-high';
+    case 'medium': return 'priority-medium';
+    case 'low': return 'priority-low';
+    default: return 'secondary';
+  }
+};
+
 export const MobileConversationView = ({ 
   conversation, 
   messages, 
   onUpdate, 
   onBack 
 }: MobileConversationViewProps) => {
+  const [showResolveDialog, setShowResolveDialog] = useState(false);
+
   const handleStatusChange = async (newStatus: string) => {
     const { error } = await supabase
       .from('conversations')
@@ -62,6 +77,7 @@ export const MobileConversationView = ({
   };
 
   const handleResolve = async () => {
+    setShowResolveDialog(false);
     const { error } = await supabase
       .from('conversations')
       .update({ 
@@ -118,25 +134,25 @@ export const MobileConversationView = ({
       {/* Scrollable Content */}
       <div className="flex-1 overflow-y-auto px-5 py-5 space-y-5">
         {/* Hero Status Card */}
-        <Card className="rounded-3xl shadow-lg border-0 bg-card overflow-hidden">
+        <Card className="rounded-[22px] apple-shadow-lg border border-border/30 bg-card overflow-hidden">
           <CardHeader className="pb-4">
             <div className="flex items-start justify-between">
               <div className="flex-1">
-                <div className="flex items-center gap-2 mb-2">
-                  <Badge variant="outline" className="rounded-full text-xs font-medium">
+                <div className="flex items-center gap-2.5 mb-3">
+                  <Badge variant="outline" className="rounded-full text-xs font-semibold px-3 py-1.5 border-border/50">
                     {conversation.channel}
                   </Badge>
                   <Badge 
-                    variant={conversation.priority === 'high' ? 'destructive' : 'secondary'}
-                    className="rounded-full text-xs font-medium"
+                    variant={getPriorityVariant(conversation.priority)}
+                    className="rounded-full text-xs font-semibold px-3 py-1.5 shadow-sm"
                   >
-                    {conversation.priority}
+                    {conversation.priority || 'medium'}
                   </Badge>
                 </div>
-                <h2 className="text-xl font-semibold text-foreground mb-1">
+                <h2 className="text-xl font-bold text-foreground mb-2 leading-tight">
                   {conversation.title}
                 </h2>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-muted-foreground font-medium">
                   {conversation.created_at && formatDistanceToNow(new Date(conversation.created_at), { addSuffix: true })}
                 </p>
               </div>
@@ -146,10 +162,10 @@ export const MobileConversationView = ({
             {/* Quick Actions */}
             <div className="grid grid-cols-2 gap-3">
               <Select value={conversation.status || 'open'} onValueChange={handleStatusChange}>
-                <SelectTrigger className="h-11 rounded-2xl border-2 font-medium">
+                <SelectTrigger className="h-12 rounded-[18px] border-2 font-semibold bg-muted/30 spring-press">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="rounded-[18px]">
                   <SelectItem value="open">Open</SelectItem>
                   <SelectItem value="pending">Pending</SelectItem>
                   <SelectItem value="resolved">Resolved</SelectItem>
@@ -157,10 +173,10 @@ export const MobileConversationView = ({
               </Select>
 
               <Select value={conversation.priority || 'medium'} onValueChange={handlePriorityChange}>
-                <SelectTrigger className="h-11 rounded-2xl border-2 font-medium">
+                <SelectTrigger className="h-12 rounded-[18px] border-2 font-semibold bg-muted/30 spring-press">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="rounded-[18px]">
                   <SelectItem value="low">Low</SelectItem>
                   <SelectItem value="medium">Medium</SelectItem>
                   <SelectItem value="high">High</SelectItem>
@@ -175,7 +191,7 @@ export const MobileConversationView = ({
                 <Button 
                   variant="outline"
                   onClick={handleAssignToMe}
-                  className="flex-1 h-11 rounded-2xl font-medium border-2"
+                  className="flex-1 h-12 rounded-[18px] font-semibold border-2 spring-press"
                 >
                   <User className="h-4 w-4 mr-2" />
                   Assign to Me
@@ -183,8 +199,8 @@ export const MobileConversationView = ({
               )}
               {conversation.status !== 'resolved' && (
                 <Button 
-                  onClick={handleResolve}
-                  className="flex-1 h-11 rounded-2xl font-medium"
+                  onClick={() => setShowResolveDialog(true)}
+                  className="flex-1 h-12 rounded-[18px] font-semibold spring-press apple-shadow"
                 >
                   <CheckCircle2 className="h-4 w-4 mr-2" />
                   Resolve
@@ -196,47 +212,47 @@ export const MobileConversationView = ({
 
         {/* AI Insights Card */}
         {conversation.ai_reason_for_escalation && (
-          <Card className="rounded-3xl shadow-lg border-0 bg-gradient-to-br from-primary/5 to-primary/10">
+          <Card className="rounded-[22px] border-0 apple-shadow-lg bg-gradient-to-br from-blue-500/8 via-blue-400/5 to-card overflow-hidden animate-fade-in">
             <CardHeader className="pb-4">
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-2xl bg-primary/10 flex items-center justify-center">
-                  <Sparkles className="h-5 w-5 text-primary" />
+                <div className="h-11 w-11 rounded-[18px] bg-gradient-to-br from-blue-500/15 to-blue-600/10 flex items-center justify-center spring-bounce">
+                  <Sparkles className="h-5 w-5 text-blue-600 dark:text-blue-400 animate-pulse" style={{ animationDuration: '3s' }} />
                 </div>
                 <div className="flex-1">
-                  <CardTitle className="text-lg font-semibold">AI Insights</CardTitle>
-                  <p className="text-xs text-muted-foreground mt-0.5">
+                  <CardTitle className="text-lg font-semibold text-foreground">AI Insights</CardTitle>
+                  <p className="text-xs text-muted-foreground mt-1">
                     {Math.round((conversation.ai_confidence || 0) * 100)}% confidence
                   </p>
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-5">
               <div>
-                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2.5">
                   Why Escalated
                 </h3>
-                <p className="text-base text-foreground leading-relaxed">
+                <p className="text-[15px] text-foreground leading-relaxed">
                   {conversation.ai_reason_for_escalation}
                 </p>
               </div>
               
               {conversation.summary_for_human && (
                 <div>
-                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                  <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2.5">
                     Summary
                   </h3>
-                  <p className="text-base text-foreground leading-relaxed">
+                  <p className="text-[15px] text-foreground leading-relaxed">
                     {conversation.summary_for_human}
                   </p>
                 </div>
               )}
 
-              <div className="flex gap-2 flex-wrap pt-2">
-                <Badge variant="secondary" className="rounded-full text-sm font-medium px-3 py-1">
+              <div className="flex gap-2.5 flex-wrap pt-2">
+                <Badge variant="secondary" className="rounded-full text-sm font-medium px-4 py-1.5 apple-shadow-sm">
                   {getSentimentEmoji(conversation.ai_sentiment)} {conversation.ai_sentiment}
                 </Badge>
                 {conversation.category && (
-                  <Badge variant="outline" className="rounded-full text-sm font-medium px-3 py-1">
+                  <Badge variant="outline" className="rounded-full text-sm font-medium px-4 py-1.5 border-border/50">
                     {conversation.category}
                   </Badge>
                 )}
@@ -247,25 +263,25 @@ export const MobileConversationView = ({
 
         {/* Customer Info Card */}
         {conversation.customer_id && (
-          <Card className="rounded-3xl shadow-lg border-0 bg-card">
+          <Card className="rounded-[22px] apple-shadow border border-border/30 bg-card">
             <CardHeader className="pb-4">
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-2xl bg-muted flex items-center justify-center">
+                <div className="h-11 w-11 rounded-[18px] bg-muted/50 flex items-center justify-center">
                   <User className="h-5 w-5 text-foreground" />
                 </div>
                 <CardTitle className="text-lg font-semibold">Customer Details</CardTitle>
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="flex items-center justify-between py-2">
-                <span className="text-sm text-muted-foreground">Channel</span>
-                <Badge variant="outline" className="rounded-full text-sm font-medium">
+              <div className="flex items-center justify-between py-2.5 border-b border-border/30">
+                <span className="text-sm font-medium text-muted-foreground">Channel</span>
+                <Badge variant="outline" className="rounded-full text-sm font-semibold px-3 py-1.5 border-border/50">
                   {conversation.channel}
                 </Badge>
               </div>
-              <div className="flex items-center justify-between py-2">
-                <span className="text-sm text-muted-foreground">Created</span>
-                <span className="text-sm font-medium">
+              <div className="flex items-center justify-between py-2.5">
+                <span className="text-sm font-medium text-muted-foreground">Created</span>
+                <span className="text-sm font-semibold text-foreground">
                   {conversation.created_at && formatDistanceToNow(new Date(conversation.created_at), { addSuffix: true })}
                 </span>
               </div>
@@ -284,6 +300,17 @@ export const MobileConversationView = ({
         {/* Bottom spacing for safe area */}
         <div className="h-24" />
       </div>
+
+      {/* Confirmation Dialog */}
+      <ConfirmationDialog
+        open={showResolveDialog}
+        onOpenChange={setShowResolveDialog}
+        onConfirm={handleResolve}
+        title="Mark as Resolved?"
+        description="Are you sure you want to mark this conversation as resolved? This action will close the ticket."
+        confirmText="Yes, Resolve"
+        cancelText="Cancel"
+      />
     </div>
   );
 };
