@@ -109,20 +109,9 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
 
   return (
     <div className="flex flex-col h-full bg-muted/30 min-w-[300px]">
-      {/* Filter bar - tablet uses dropdowns, desktop uses badges */}
-      <div className="px-6 py-4 border-b border-border/50 bg-background/80 backdrop-blur-sm">
-        {isTablet ? (
-          <TabletFilters
-            statusFilter={statusFilter}
-            priorityFilter={priorityFilter}
-            channelFilter={channelFilter}
-            categoryFilter={categoryFilter}
-            onStatusChange={setStatusFilter}
-            onPriorityChange={setPriorityFilter}
-            onChannelChange={setChannelFilter}
-            onCategoryChange={setCategoryFilter}
-          />
-        ) : (
+      {/* Filter bar - only show on desktop, not tablet */}
+      {!isTablet && (
+        <div className="px-6 py-4 border-b border-border/50 bg-background/80 backdrop-blur-sm">
           <ConversationFilters
             statusFilter={statusFilter}
             setStatusFilter={setStatusFilter}
@@ -133,8 +122,8 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
             categoryFilter={categoryFilter}
             setCategoryFilter={setCategoryFilter}
           />
-        )}
-      </div>
+        </div>
+      )}
 
       <div className="flex-1 overflow-y-auto p-4">
         {conversations.length === 0 ? (
