@@ -40,7 +40,8 @@ export const MobileConversationView = ({
   const [replyText, setReplyText] = useState('');
   const [isInternal, setIsInternal] = useState(false);
   const [isSending, setIsSending] = useState(false);
-  const [suggestedReplyOpen, setSuggestedReplyOpen] = useState(false);
+  const [aiDraftOpen, setAiDraftOpen] = useState(false);
+  const [suggestedStrategyOpen, setSuggestedStrategyOpen] = useState(false);
   const [showActions, setShowActions] = useState(false);
   const { toast } = useToast();
 
@@ -183,50 +184,47 @@ export const MobileConversationView = ({
                 </p>
               </div>
 
-              {/* Summary */}
-              {conversation.summary_for_human && (
-                <div className="mb-4">
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-2">
-                    Summary
-                  </p>
-                  <p className="text-[15px] text-foreground leading-relaxed">
-                    {conversation.summary_for_human}
-                  </p>
-                </div>
-              )}
+              {/* AI Draft - Collapsible */}
+              <Collapsible open={aiDraftOpen} onOpenChange={setAiDraftOpen}>
+                <CollapsibleTrigger className="w-full">
+                  <div className="flex items-center justify-between py-2">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                      AI Draft
+                    </p>
+                    <span className="text-[13px] text-primary font-medium">
+                      {aiDraftOpen ? 'Hide' : 'Show'}
+                    </span>
+                  </div>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="rounded-2xl bg-background/60 p-4 mt-2">
+                    <p className="text-[15px] text-foreground leading-relaxed">
+                      Hi there! I completely understand your frustration and I'm here to help. I've looked into this issue and we can get this resolved for you within the next 24 hours. Would you like me to walk you through the solution steps now, or would you prefer we handle it on our end?
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setReplyText("Hi there! I completely understand your frustration and I'm here to help. I've looked into this issue and we can get this resolved for you within the next 24 hours. Would you like me to walk you through the solution steps now, or would you prefer we handle it on our end?");
+                      toast({ title: "Draft copied to reply" });
+                    }}
+                    className="mt-2 rounded-full text-[12px] h-8"
+                  >
+                    Use this draft
+                  </Button>
+                </CollapsibleContent>
+              </Collapsible>
 
-              {/* AI Draft Reply */}
-              <div className="mb-4">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-2">
-                  AI Draft
-                </p>
-                <div className="rounded-2xl bg-background/60 p-4">
-                  <p className="text-[15px] text-foreground leading-relaxed">
-                    Hi there! I completely understand your frustration and I'm here to help. I've looked into this issue and we can get this resolved for you within the next 24 hours. Would you like me to walk you through the solution steps now, or would you prefer we handle it on our end?
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setReplyText("Hi there! I completely understand your frustration and I'm here to help. I've looked into this issue and we can get this resolved for you within the next 24 hours. Would you like me to walk you through the solution steps now, or would you prefer we handle it on our end?");
-                    toast({ title: "Draft copied to reply" });
-                  }}
-                  className="mt-2 rounded-full text-[12px] h-8"
-                >
-                  Use this draft
-                </Button>
-              </div>
-
-              {/* Suggested Strategy */}
-              <Collapsible open={suggestedReplyOpen} onOpenChange={setSuggestedReplyOpen}>
+              {/* Suggested Strategy - Collapsible */}
+              <Collapsible open={suggestedStrategyOpen} onOpenChange={setSuggestedStrategyOpen}>
                 <CollapsibleTrigger className="w-full">
                   <div className="flex items-center justify-between py-2">
                     <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                       Suggested Strategy
                     </p>
                     <span className="text-[13px] text-primary font-medium">
-                      {suggestedReplyOpen ? 'Hide' : 'Show'}
+                      {suggestedStrategyOpen ? 'Hide' : 'Show'}
                     </span>
                   </div>
                 </CollapsibleTrigger>
@@ -265,8 +263,8 @@ export const MobileConversationView = ({
           </div>
         </div>
 
-        {/* Bottom padding for fixed composer */}
-        <div className="h-48" />
+        {/* Bottom padding for fixed composer - extra space for keyboard */}
+        <div className="h-96" />
       </div>
 
       {/* Fixed Reply Composer with Actions */}
