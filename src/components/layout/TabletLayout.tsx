@@ -8,7 +8,6 @@ import { Conversation } from '@/lib/types';
 import { Menu, User, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ConversationFilters } from '@/components/conversations/ConversationFilters';
 
 interface TabletLayoutProps {
@@ -19,8 +18,8 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [customerDialogOpen, setCustomerDialogOpen] = useState(false);
-  const [actionsDialogOpen, setActionsDialogOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerContent, setDrawerContent] = useState<'customer' | 'actions'>('customer');
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [priorityFilter, setPriorityFilter] = useState<string[]>([]);
   const [channelFilter, setChannelFilter] = useState<string[]>([]);
@@ -34,13 +33,41 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
     setSelectedConversation(conv);
   };
 
-  // Tablet 2-column layout: Ticket List (left) + Conversation Panel (center)
+  const openDrawer = (content: 'customer' | 'actions') => {
+    setDrawerContent(content);
+    setDrawerOpen(true);
+  };
+
+  // Tablet 2-column layout: Ticket List (left, 30-35%) + Conversation Panel (right, 65-70%)
   return (
     <div className="flex h-screen w-full bg-background overflow-hidden">
       {/* Hamburger Sidebar Drawer */}
       <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
         <SheetContent side="left" className="w-[55%] p-0 backdrop-blur-sm">
           <Sidebar />
+        </SheetContent>
+      </Sheet>
+
+      {/* Right Drawer for Customer Info / Quick Actions */}
+      <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
+        <SheetContent side="right" className="w-[350px] p-6 overflow-y-auto">
+          {drawerContent === 'customer' ? (
+            <>
+              <h2 className="text-lg font-semibold mb-4">Customer Information</h2>
+              <CustomerContext 
+                conversation={selectedConversation!} 
+                onUpdate={handleUpdate} 
+              />
+            </>
+          ) : (
+            <>
+              <h2 className="text-lg font-semibold mb-4">Quick Actions</h2>
+              <QuickActions 
+                conversation={selectedConversation!}
+                onUpdate={handleUpdate}
+              />
+            </>
+          )}
         </SheetContent>
       </Sheet>
 
@@ -68,8 +95,8 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
 
         {/* Two-Column Layout */}
         <div className="flex flex-1 overflow-hidden">
-          {/* Column A: Ticket List (38-42%) */}
-          <div className="w-[40%] border-r border-border bg-background overflow-y-auto">
+          {/* Left Column: Ticket List (30-35%) */}
+          <div className="w-[33%] border-r border-border bg-background overflow-y-auto">
             <div className="p-4">
               <ConversationList
                 selectedId={selectedConversation?.id}
@@ -80,11 +107,37 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
             </div>
           </div>
 
-          {/* Column B: Conversation Panel (center, max-width 720px) */}
-          <div className="flex-1 bg-background overflow-hidden relative">
+          {/* Right Column: Conversation Panel (65-70%) */}
+          <div className="flex-1 bg-background flex flex-col overflow-hidden">
             {selectedConversation ? (
               <>
-                <div className="h-full overflow-y-auto pb-20">
+                {/* Conversation Header with Action Buttons */}
+                <div className="border-b border-border bg-card/30 backdrop-blur-sm px-6 py-3 flex items-center justify-between flex-shrink-0">
+                  <h1 className="text-lg font-semibold truncate">{selectedConversation.title}</h1>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => openDrawer('customer')}
+                      className="rounded-full bg-background/60 backdrop-blur-sm hover:bg-background/80"
+                    >
+                      <User className="h-4 w-4 mr-2" />
+                      Customer Info
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => openDrawer('actions')}
+                      className="rounded-full bg-background/60 backdrop-blur-sm hover:bg-background/80"
+                    >
+                      <Zap className="h-4 w-4 mr-2" />
+                      Quick Actions
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Conversation Content - Scrollable */}
+                <div className="flex-1 overflow-y-auto">
                   <div className="mx-auto max-w-[720px] px-6 py-6">
                     <ConversationThread
                       conversation={selectedConversation}
@@ -92,50 +145,6 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
                     />
                   </div>
                 </div>
-
-                {/* Floating Action Buttons - Bottom Right */}
-                <div className="fixed bottom-8 right-8 flex flex-col gap-3 z-50">
-                  <Button
-                    onClick={() => setCustomerDialogOpen(true)}
-                    className="shadow-lg hover:shadow-xl transition-all rounded-full h-14 px-6 bg-primary text-primary-foreground"
-                  >
-                    <User className="h-5 w-5 mr-2" />
-                    Customer Info
-                  </Button>
-                  <Button
-                    onClick={() => setActionsDialogOpen(true)}
-                    className="shadow-lg hover:shadow-xl transition-all rounded-full h-14 px-6 bg-secondary text-secondary-foreground"
-                  >
-                    <Zap className="h-5 w-5 mr-2" />
-                    Quick Actions
-                  </Button>
-                </div>
-
-                {/* Customer Info Dialog */}
-                <Dialog open={customerDialogOpen} onOpenChange={setCustomerDialogOpen}>
-                  <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-                    <DialogHeader>
-                      <DialogTitle>Customer Information</DialogTitle>
-                    </DialogHeader>
-                    <CustomerContext 
-                      conversation={selectedConversation} 
-                      onUpdate={handleUpdate} 
-                    />
-                  </DialogContent>
-                </Dialog>
-
-                {/* Quick Actions Dialog */}
-                <Dialog open={actionsDialogOpen} onOpenChange={setActionsDialogOpen}>
-                  <DialogContent className="max-w-xl">
-                    <DialogHeader>
-                      <DialogTitle>Quick Actions</DialogTitle>
-                    </DialogHeader>
-                    <QuickActions 
-                      conversation={selectedConversation}
-                      onUpdate={handleUpdate}
-                    />
-                  </DialogContent>
-                </Dialog>
               </>
             ) : (
               <div className="h-full flex items-center justify-center text-muted-foreground">
