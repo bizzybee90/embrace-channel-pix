@@ -28,13 +28,23 @@ export const ConversationCard = ({ conversation, selected, onClick }: Conversati
 
   // Compact tablet layout
   if (isTablet) {
+    const getLeftBorderColor = () => {
+      if (conversation.sla_due_at && new Date() > new Date(conversation.sla_due_at)) {
+        return 'border-l-destructive';
+      }
+      if (conversation.priority === 'high') return 'border-l-amber-500';
+      if (conversation.priority === 'medium') return 'border-l-amber-400';
+      return 'border-l-success';
+    };
+
     return (
       <div
         onClick={onClick}
         className={cn(
-          "p-3.5 cursor-pointer transition-all duration-200 rounded-lg mb-2",
-          "bg-card border border-border/30 hover:border-primary/30 hover:shadow-md",
-          selected && "border-primary bg-primary/5 shadow-md ring-1 ring-primary/10"
+          "p-3.5 cursor-pointer transition-all duration-200 rounded-lg mb-2 border-l-4",
+          "bg-card shadow-sm hover:shadow-md",
+          getLeftBorderColor(),
+          selected && "bg-primary/5 shadow-md ring-1 ring-primary/20"
         )}
       >
         <div className="flex flex-col gap-2">
@@ -44,7 +54,7 @@ export const ConversationCard = ({ conversation, selected, onClick }: Conversati
               <ChannelIcon channel={conversation.channel} className="h-4 w-4" />
             </div>
             <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-sm leading-tight mb-1 text-foreground line-clamp-1">
+              <h3 className="font-semibold text-sm leading-tight text-foreground line-clamp-1">
                 {conversation.title || 'Untitled Conversation'}
               </h3>
             </div>
@@ -56,14 +66,14 @@ export const ConversationCard = ({ conversation, selected, onClick }: Conversati
           </p>
           
           {/* Footer: Priority + Time + SLA indicator */}
-          <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-border/20">
+          <div className="flex items-center justify-between gap-2 pt-1.5">
             <div className="flex items-center gap-1.5">
               {conversation.priority && (
                 <Badge 
                   variant={getPriorityVariant(conversation.priority)}
                   className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
                 >
-                  {conversation.priority === 'high' ? '🔴' : conversation.priority === 'medium' ? '🟡' : '🟢'} {conversation.priority}
+                  {conversation.priority}
                 </Badge>
               )}
               {conversation.sla_due_at && new Date() > new Date(conversation.sla_due_at) && (
