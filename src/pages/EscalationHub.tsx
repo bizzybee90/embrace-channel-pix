@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ThreeColumnLayout } from '@/components/layout/ThreeColumnLayout';
 import { PowerModeLayout } from '@/components/layout/PowerModeLayout';
+import { TabletLayout } from '@/components/layout/TabletLayout';
 import { Sidebar } from '@/components/sidebar/Sidebar';
 import { ConversationList } from '@/components/conversations/ConversationList';
 import { ConversationThread } from '@/components/conversations/ConversationThread';
@@ -15,6 +16,7 @@ import { useInterfaceMode } from '@/hooks/useInterfaceMode';
 import { useSLANotifications } from '@/hooks/useSLANotifications';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useIsTablet } from '@/hooks/use-tablet';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -37,9 +39,11 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
   const { interfaceMode, loading: modeLoading } = useInterfaceMode();
   const { toast } = useToast();
   const isMobile = useIsMobile();
+  const isTablet = useIsTablet();
   
   console.log('🔍 EscalationHub Debug:', { 
-    isMobile, 
+    isMobile,
+    isTablet,
     filter, 
     interfaceMode, 
     modeLoading,
@@ -174,6 +178,11 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
   // If Power Mode is selected, render the 3-column layout
   if (!modeLoading && interfaceMode === 'power') {
     return <PowerModeLayout filter={filter} />;
+  }
+
+  // Tablet view (768px-1024px) - 2-column layout
+  if (isTablet) {
+    return <TabletLayout filter={filter} />;
   }
 
   // Mobile view - show either list or conversation detail
