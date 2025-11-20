@@ -82,8 +82,8 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
 
         {/* Two-Column Layout */}
         <div className="flex flex-1 overflow-hidden">
-          {/* Left Column: Ticket List (30-35%) */}
-          <div className="w-[33%] border-r border-border bg-background overflow-y-auto">
+          {/* Left Column: Ticket List (40%) */}
+          <div className="w-[40%] border-r border-border bg-background overflow-y-auto">
             <div className="p-3">
               <ConversationList
                 selectedId={selectedConversation?.id}

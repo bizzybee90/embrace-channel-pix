@@ -32,40 +32,40 @@ export const ConversationCard = ({ conversation, selected, onClick }: Conversati
       <div
         onClick={onClick}
         className={cn(
-          "p-3 cursor-pointer transition-all duration-200 rounded-lg mb-2",
-          "bg-card border border-border/30 hover:border-primary/30 hover:bg-card/80",
-          selected && "border-primary bg-primary/5"
+          "p-4 cursor-pointer transition-all duration-200 rounded-xl mb-2.5",
+          "bg-card border border-border/30 hover:border-primary/30 hover:bg-card/80 hover:shadow-sm",
+          selected && "border-primary bg-primary/5 shadow-sm"
         )}
       >
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2.5">
           {/* Title and Channel */}
-          <div className="flex items-start gap-2">
+          <div className="flex items-start gap-2.5">
             <div className="flex-shrink-0 pt-0.5">
               <ChannelIcon channel={conversation.channel} className="h-4 w-4" />
             </div>
             <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-sm leading-tight mb-1 text-foreground truncate">
+              <h3 className="font-semibold text-[15px] leading-tight mb-1.5 text-foreground line-clamp-2">
                 {conversation.title || 'Untitled Conversation'}
               </h3>
-              <p className="text-xs text-muted-foreground line-clamp-1">
+              <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
                 {conversation.summary_for_human || 'No summary available'}
               </p>
             </div>
           </div>
           
           {/* Footer: Priority + Time */}
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-1.5">
+          <div className="flex items-center justify-between gap-2 pt-1">
+            <div className="flex items-center gap-1.5 flex-wrap">
               {conversation.priority && (
                 <Badge 
                   variant={getPriorityVariant(conversation.priority)}
-                  className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                  className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
                 >
                   {conversation.priority.charAt(0).toUpperCase() + conversation.priority.slice(1)}
                 </Badge>
               )}
             </div>
-            <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+            <div className="flex items-center gap-1 text-[11px] text-muted-foreground whitespace-nowrap">
               <Clock className="h-3 w-3" />
               <span>{formatDistanceToNow(new Date(conversation.created_at!), { addSuffix: true })}</span>
             </div>
