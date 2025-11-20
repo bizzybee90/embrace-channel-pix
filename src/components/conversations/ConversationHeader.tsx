@@ -13,8 +13,8 @@ interface ConversationHeaderProps {
 const PriorityBadge = ({ priority }: { priority: string | null }) => {
   const variants: Record<string, { emoji: string; className: string }> = {
     high: { emoji: '🔴', className: 'bg-destructive/10 text-destructive border-destructive/20' },
-    medium: { emoji: '🟡', className: 'bg-warning/10 text-warning-foreground border-warning/20' },
-    low: { emoji: '🟢', className: 'bg-success/10 text-success-foreground border-success/20' },
+    medium: { emoji: '🟡', className: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20' },
+    low: { emoji: '🟢', className: 'bg-success/10 text-success border-success/20' },
   };
 
   const variant = variants[priority || 'medium'];
