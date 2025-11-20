@@ -111,29 +111,18 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
           <div className="flex-1 bg-background flex flex-col overflow-hidden">
             {selectedConversation ? (
               <>
-                {/* Conversation Header with Action Buttons */}
+                {/* Conversation Header with Customer Info Button */}
                 <div className="border-b border-border bg-card/30 backdrop-blur-sm px-6 py-3 flex items-center justify-between flex-shrink-0">
                   <h1 className="text-lg font-semibold truncate">{selectedConversation.title}</h1>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => openDrawer('customer')}
-                      className="rounded-full bg-background/60 backdrop-blur-sm hover:bg-background/80"
-                    >
-                      <User className="h-4 w-4 mr-2" />
-                      Customer Info
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => openDrawer('actions')}
-                      className="rounded-full bg-background/60 backdrop-blur-sm hover:bg-background/80"
-                    >
-                      <Zap className="h-4 w-4 mr-2" />
-                      Quick Actions
-                    </Button>
-                  </div>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => openDrawer('customer')}
+                    className="rounded-full bg-background/60 backdrop-blur-sm hover:bg-background/80"
+                  >
+                    <User className="h-4 w-4 mr-2" />
+                    Customer Info
+                  </Button>
                 </div>
 
                 {/* Conversation Content - Scrollable with Desktop Styling */}
