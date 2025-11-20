@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, Send, CheckCircle2, AlertCircle, FileText, Sparkles, Calendar, Clock } from 'lucide-react';
+import { ArrowLeft, Send, CheckCircle2, AlertCircle, FileText, Sparkles, Calendar, Clock, User, MoreVertical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
@@ -41,6 +41,7 @@ export const MobileConversationView = ({
   const [isInternal, setIsInternal] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [suggestedReplyOpen, setSuggestedReplyOpen] = useState(false);
+  const [showActions, setShowActions] = useState(false);
   const { toast } = useToast();
 
   const handleResolve = async () => {
@@ -109,54 +110,51 @@ export const MobileConversationView = ({
               {isOverdue ? 'Overdue' : conversation.created_at && formatDistanceToNow(new Date(conversation.created_at), { addSuffix: true })}
             </p>
           </div>
+          
+          {/* Compact Customer Info */}
+          {conversation.customer_id && (
+            <button className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/50 hover:bg-muted active:scale-95 transition-all">
+              <Avatar className="h-6 w-6">
+                <AvatarFallback className="bg-primary/10 text-primary font-semibold text-[10px]">
+                  CU
+                </AvatarFallback>
+              </Avatar>
+              <span className="text-[11px] font-semibold text-foreground">VIP</span>
+            </button>
+          )}
         </div>
       </div>
 
       {/* Scrollable Content */}
       <div className="flex-1 overflow-y-auto">
         <div className="px-4 py-6 space-y-6">
-          {/* Hero Card - Title & Quick Actions */}
-          <Card className="rounded-[28px] p-6 bg-gradient-to-br from-card to-card/50 border-border/50 shadow-sm">
-            <h1 className="text-[22px] font-bold text-foreground leading-snug mb-4">
-              {conversation.title || 'Untitled Conversation'}
-            </h1>
-
-            {/* Status Pills */}
-            <div className="flex items-center gap-2 mb-6 flex-wrap">
-              <div className="flex items-center gap-2 px-3 h-8 rounded-full bg-background/80">
-                <ChannelIcon channel={conversation.channel} className="h-3.5 w-3.5" />
-                <span className="text-[12px] font-semibold capitalize">{conversation.channel}</span>
-              </div>
-
-              <Badge
-                variant={
-                  conversation.priority === 'high'
-                    ? 'destructive'
-                    : conversation.priority === 'medium'
-                    ? 'secondary'
-                    : 'outline'
-                }
-                className="rounded-full text-[11px] font-semibold h-8 px-3 uppercase"
-              >
-                {conversation.priority || 'Medium'}
-              </Badge>
-
-              {isOverdue && (
-                <Badge variant="destructive" className="rounded-full text-[11px] font-semibold h-8 px-3 uppercase">
-                  <AlertCircle className="h-3 w-3 mr-1" />
-                  Overdue
-                </Badge>
-              )}
+          {/* Status Pills */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-2 px-3 h-8 rounded-full bg-muted/50">
+              <ChannelIcon channel={conversation.channel} className="h-3.5 w-3.5" />
+              <span className="text-[12px] font-semibold capitalize">{conversation.channel}</span>
             </div>
 
-            {/* Primary Action */}
-            <Button
-              onClick={handleResolve}
-              className="w-full h-12 rounded-full text-[15px] font-semibold shadow-md hover:shadow-lg transition-all active:scale-[0.98]"
+            <Badge
+              variant={
+                conversation.priority === 'high'
+                  ? 'destructive'
+                  : conversation.priority === 'medium'
+                  ? 'secondary'
+                  : 'outline'
+              }
+              className="rounded-full text-[11px] font-semibold h-8 px-3 uppercase"
             >
-              Resolve & Close
-            </Button>
-          </Card>
+              {conversation.priority || 'Medium'}
+            </Badge>
+
+            {isOverdue && (
+              <Badge variant="destructive" className="rounded-full text-[11px] font-semibold h-8 px-3 uppercase">
+                <AlertCircle className="h-3 w-3 mr-1" />
+                Overdue
+              </Badge>
+            )}
+          </div>
 
           {/* AI Insights Card */}
           {conversation.ai_reason_for_escalation && (
@@ -197,12 +195,35 @@ export const MobileConversationView = ({
                 </div>
               )}
 
-              {/* Suggested Reply */}
+              {/* AI Draft Reply */}
+              <div className="mb-4">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-2">
+                  AI Draft
+                </p>
+                <div className="rounded-2xl bg-background/60 p-4">
+                  <p className="text-[15px] text-foreground leading-relaxed">
+                    Hi there! I completely understand your frustration and I'm here to help. I've looked into this issue and we can get this resolved for you within the next 24 hours. Would you like me to walk you through the solution steps now, or would you prefer we handle it on our end?
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setReplyText("Hi there! I completely understand your frustration and I'm here to help. I've looked into this issue and we can get this resolved for you within the next 24 hours. Would you like me to walk you through the solution steps now, or would you prefer we handle it on our end?");
+                    toast({ title: "Draft copied to reply" });
+                  }}
+                  className="mt-2 rounded-full text-[12px] h-8"
+                >
+                  Use this draft
+                </Button>
+              </div>
+
+              {/* Suggested Strategy */}
               <Collapsible open={suggestedReplyOpen} onOpenChange={setSuggestedReplyOpen}>
                 <CollapsibleTrigger className="w-full">
                   <div className="flex items-center justify-between py-2">
                     <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                      Suggested Reply
+                      Suggested Strategy
                     </p>
                     <span className="text-[13px] text-primary font-medium">
                       {suggestedReplyOpen ? 'Hide' : 'Show'}
@@ -234,39 +255,6 @@ export const MobileConversationView = ({
             </Card>
           )}
 
-          {/* Customer Details Card */}
-          {conversation.customer_id && (
-            <Card className="rounded-[28px] p-6 bg-card border-border/50 shadow-sm">
-              <div className="flex items-center gap-4 mb-4">
-                <Avatar className="h-12 w-12">
-                  <AvatarFallback className="bg-primary/10 text-primary font-semibold text-[15px]">
-                    CU
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1">
-                  <h3 className="text-[17px] font-semibold text-foreground">Customer</h3>
-                  <Badge variant="secondary" className="rounded-full text-[11px] h-6 px-2 mt-1">
-                    VIP
-                  </Badge>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex justify-between text-[13px]">
-                  <span className="text-muted-foreground">Channel</span>
-                  <span className="text-foreground font-medium capitalize">{conversation.channel}</span>
-                </div>
-                <div className="flex justify-between text-[13px]">
-                  <span className="text-muted-foreground">Customer since</span>
-                  <span className="text-foreground font-medium">2 years ago</span>
-                </div>
-                <div className="flex justify-between text-[13px]">
-                  <span className="text-muted-foreground">Last issue</span>
-                  <span className="text-foreground font-medium">3 months ago</span>
-                </div>
-              </div>
-            </Card>
-          )}
 
           {/* Conversation Timeline */}
           <div>
@@ -281,49 +269,87 @@ export const MobileConversationView = ({
         <div className="h-48" />
       </div>
 
-      {/* Fixed Reply Composer */}
-      <div className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-xl border-t border-border p-4 shadow-lg">
-        {/* Reply Type Toggle */}
-        <div className="flex gap-2 mb-3">
-          <button
-            onClick={() => setIsInternal(false)}
-            className={`flex-1 h-9 rounded-full text-[13px] font-semibold transition-all ${
-              !isInternal
-                ? 'bg-primary text-primary-foreground shadow-sm'
-                : 'bg-muted/50 text-muted-foreground'
-            }`}
-          >
-            Reply to Customer
-          </button>
-          <button
-            onClick={() => setIsInternal(true)}
-            className={`flex-1 h-9 rounded-full text-[13px] font-semibold transition-all ${
-              isInternal
-                ? 'bg-yellow-500/20 text-yellow-900 dark:text-yellow-100 border border-yellow-500/30'
-                : 'bg-muted/50 text-muted-foreground'
-            }`}
-          >
-            Internal Note
-          </button>
-        </div>
+      {/* Fixed Reply Composer with Actions */}
+      <div className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-xl border-t border-border shadow-lg">
+        {/* Action Menu */}
+        {showActions && (
+          <div className="px-4 pt-4 pb-2 border-b border-border/50 space-y-2 animate-fade-in">
+            <Button
+              onClick={handleResolve}
+              className="w-full h-12 rounded-full text-[15px] font-semibold shadow-md hover:shadow-lg transition-all active:scale-[0.98]"
+            >
+              <CheckCircle2 className="h-4 w-4 mr-2" />
+              Resolve & Close
+            </Button>
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                variant="outline"
+                className="rounded-full text-[13px] h-10"
+              >
+                Assign to me
+              </Button>
+              <Button
+                variant="outline"
+                className="rounded-full text-[13px] h-10"
+              >
+                Change status
+              </Button>
+            </div>
+          </div>
+        )}
 
-        {/* Input Field */}
-        <div className="flex gap-2">
-          <Textarea
-            value={replyText}
-            onChange={(e) => setReplyText(e.target.value)}
-            placeholder={isInternal ? 'Add an internal note...' : 'Type your reply...'}
-            className={`flex-1 min-h-[44px] max-h-24 rounded-2xl resize-none ${
-              isInternal ? 'bg-yellow-500/5 border-yellow-500/20' : ''
-            }`}
-          />
-          <Button
-            onClick={handleSendReply}
-            disabled={!replyText.trim() || isSending}
-            className="h-11 w-11 rounded-full p-0 flex-shrink-0 shadow-md active:scale-95 transition-all"
-          >
-            <Send className="h-5 w-5" />
-          </Button>
+        <div className="p-4">
+          {/* Reply Type Toggle */}
+          <div className="flex gap-2 mb-3">
+            <button
+              onClick={() => setIsInternal(false)}
+              className={`flex-1 h-9 rounded-full text-[13px] font-medium transition-all ${
+                !isInternal
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'bg-muted/50 text-muted-foreground'
+              }`}
+            >
+              Reply to Customer
+            </button>
+            <button
+              onClick={() => setIsInternal(true)}
+              className={`flex-1 h-9 rounded-full text-[13px] font-medium transition-all ${
+                isInternal
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'bg-muted/50 text-muted-foreground'
+              }`}
+            >
+              <FileText className="h-3.5 w-3.5 inline mr-1" />
+              Internal Note
+            </button>
+          </div>
+
+          {/* Message Input with Actions Button */}
+          <div className="flex items-end gap-2">
+            <button
+              onClick={() => setShowActions(!showActions)}
+              className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-95 ${
+                showActions ? 'bg-primary text-primary-foreground' : 'bg-muted hover:bg-muted/80'
+              }`}
+            >
+              <MoreVertical className="h-5 w-5" />
+            </button>
+            
+            <Textarea
+              value={replyText}
+              onChange={(e) => setReplyText(e.target.value)}
+              placeholder={isInternal ? "Add an internal note..." : "Type your reply..."}
+              className="min-h-[44px] max-h-32 rounded-[22px] resize-none text-[15px] px-4 py-3"
+            />
+
+            <button
+              onClick={handleSendReply}
+              disabled={!replyText.trim() || isSending}
+              className="flex-shrink-0 w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-40 hover:shadow-md transition-all active:scale-95"
+            >
+              <Send className="h-5 w-5" />
+            </button>
+          </div>
         </div>
       </div>
     </div>
