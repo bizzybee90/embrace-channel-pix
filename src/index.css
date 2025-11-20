@@ -38,6 +38,19 @@ All colors MUST be HSL.
 
     --radius: 0.75rem;
     
+    /* Priority colors - uniform across all views */
+    --priority-urgent: 0 84% 60%;
+    --priority-urgent-foreground: 0 0% 100%;
+    
+    --priority-high: 38 92% 50%;
+    --priority-high-foreground: 0 0% 100%;
+    
+    --priority-medium: 45 93% 47%;
+    --priority-medium-foreground: 0 0% 100%;
+    
+    --priority-low: 220 9% 46%;
+    --priority-low-foreground: 0 0% 100%;
+    
     --urgent: 25 95% 53%;
     --urgent-foreground: 0 0% 100%;
     
@@ -98,6 +111,19 @@ All colors MUST be HSL.
     --border: 220 15% 18%;
     --input: 220 15% 18%;
     --ring: 217 91% 60%;
+    
+    /* Priority colors - uniform across all views */
+    --priority-urgent: 0 84% 60%;
+    --priority-urgent-foreground: 0 0% 100%;
+    
+    --priority-high: 38 92% 50%;
+    --priority-high-foreground: 0 0% 100%;
+    
+    --priority-medium: 45 93% 47%;
+    --priority-medium-foreground: 0 0% 100%;
+    
+    --priority-low: 220 10% 65%;
+    --priority-low-foreground: 220 15% 8%;
     
     --urgent: 25 95% 53%;
     --urgent-foreground: 0 0% 100%;

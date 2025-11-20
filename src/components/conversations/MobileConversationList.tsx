@@ -35,12 +35,13 @@ export const MobileConversationList = ({
   onCategoryFilterChange,
   onRefresh
 }: MobileConversationListProps) => {
-  const getPriorityColor = (priority: string | null) => {
-    switch (priority) {
-      case 'urgent': return 'destructive';
-      case 'high': return 'destructive';
-      case 'medium': return 'secondary';
-      case 'low': return 'outline';
+  const getPriorityVariant = (priority: string | null) => {
+    if (!priority) return 'secondary';
+    switch (priority.toLowerCase()) {
+      case 'urgent': return 'priority-urgent';
+      case 'high': return 'priority-high';
+      case 'medium': return 'priority-medium';
+      case 'low': return 'priority-low';
       default: return 'secondary';
     }
   };
@@ -159,7 +160,7 @@ export const MobileConversationList = ({
                 {/* Priority, Channel */}
                 <div className="flex items-center gap-2 mb-3 flex-wrap">
                   {conversation.priority && (
-                    <Badge variant={getPriorityColor(conversation.priority)} className="text-xs rounded-full px-3 py-1 font-medium">
+                    <Badge variant={getPriorityVariant(conversation.priority)} className="text-xs rounded-full px-3 py-1 font-medium">
                       {conversation.priority.charAt(0).toUpperCase() + conversation.priority.slice(1)}
                     </Badge>
                   )}

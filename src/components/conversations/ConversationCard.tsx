@@ -12,11 +12,15 @@ interface ConversationCardProps {
 }
 
 export const ConversationCard = ({ conversation, selected, onClick }: ConversationCardProps) => {
-  const getPriorityColor = (priority: string | null) => {
+  const getPriorityVariant = (priority: string | null) => {
     if (!priority) return 'secondary';
-    if (priority === 'urgent' || priority === 'high') return 'destructive';
-    if (priority === 'medium') return 'secondary';
-    return 'outline';
+    switch (priority.toLowerCase()) {
+      case 'urgent': return 'priority-urgent';
+      case 'high': return 'priority-high';
+      case 'medium': return 'priority-medium';
+      case 'low': return 'priority-low';
+      default: return 'secondary';
+    }
   };
 
   return (
@@ -50,7 +54,7 @@ export const ConversationCard = ({ conversation, selected, onClick }: Conversati
           <div className="flex items-center gap-2">
             {conversation.priority && (
               <Badge 
-                variant={getPriorityColor(conversation.priority)}
+                variant={getPriorityVariant(conversation.priority)}
                 className="rounded-full px-3 py-1 text-xs font-medium"
               >
                 {conversation.priority.charAt(0).toUpperCase() + conversation.priority.slice(1)}

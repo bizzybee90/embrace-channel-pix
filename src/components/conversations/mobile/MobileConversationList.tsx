@@ -34,12 +34,15 @@ export const MobileConversationList = ({
 }: MobileConversationListProps) => {
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
 
-  const getPriorityColor = (priority: string | null) => {
+  const getPriorityVariant = (priority: string | null) => {
     if (!priority) return 'secondary';
-    if (priority === 'urgent') return 'destructive';
-    if (priority === 'high') return 'default';
-    if (priority === 'medium') return 'secondary';
-    return 'outline';
+    switch (priority.toLowerCase()) {
+      case 'urgent': return 'priority-urgent';
+      case 'high': return 'priority-high';
+      case 'medium': return 'priority-medium';
+      case 'low': return 'priority-low';
+      default: return 'secondary';
+    }
   };
 
   const filterCategories = [
@@ -178,15 +181,22 @@ export const MobileConversationList = ({
                 }}
               >
                 {/* Title */}
-                <h3 className="font-semibold text-[17px] leading-snug mb-3 text-foreground tracking-tight">
+                <h3 className="font-semibold text-[17px] leading-snug mb-2 text-foreground tracking-tight">
                   {conversation.title || 'Untitled Conversation'}
                 </h3>
+
+                {/* Why Escalated */}
+                {conversation.ai_reason_for_escalation && (
+                  <p className="text-[13px] text-muted-foreground leading-relaxed mb-3 line-clamp-2">
+                    {conversation.ai_reason_for_escalation}
+                  </p>
+                )}
 
                 {/* Badges Row */}
                 <div className="flex items-center gap-2 mb-3.5 flex-wrap">
                   {conversation.priority && (
                     <Badge 
-                      variant={getPriorityColor(conversation.priority)} 
+                      variant={getPriorityVariant(conversation.priority)} 
                       className="text-[11px] rounded-full px-2.5 py-0.5 font-semibold tracking-wide uppercase"
                     >
                       {conversation.priority}
