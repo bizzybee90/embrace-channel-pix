@@ -5,9 +5,10 @@ import { ConversationThread } from '@/components/conversations/ConversationThrea
 import { CustomerContext } from '@/components/context/CustomerContext';
 import { QuickActions } from '@/components/conversations/QuickActions';
 import { Conversation } from '@/lib/types';
-import { Menu, ChevronDown, X } from 'lucide-react';
+import { Menu, User, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ConversationFilters } from '@/components/conversations/ConversationFilters';
 
 interface TabletLayoutProps {
@@ -18,7 +19,8 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [customerPanelOpen, setCustomerPanelOpen] = useState(false);
+  const [customerDialogOpen, setCustomerDialogOpen] = useState(false);
+  const [actionsDialogOpen, setActionsDialogOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [priorityFilter, setPriorityFilter] = useState<string[]>([]);
   const [channelFilter, setChannelFilter] = useState<string[]>([]);
@@ -78,27 +80,12 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
             </div>
           </div>
 
-          {/* Column B: Conversation Panel (58-62%) */}
+          {/* Column B: Conversation Panel (center, max-width 720px) */}
           <div className="flex-1 bg-background overflow-hidden relative">
             {selectedConversation ? (
               <>
-                {/* Conversation Panel - centered max-width */}
-                <div className="h-full overflow-y-auto">
+                <div className="h-full overflow-y-auto pb-20">
                   <div className="mx-auto max-w-[720px] px-6 py-6">
-                    {/* Customer Info Button */}
-                    <div className="flex justify-end mb-4">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setCustomerPanelOpen(true)}
-                        className="gap-2"
-                      >
-                        Customer Info
-                        <ChevronDown className="h-4 w-4" />
-                      </Button>
-                    </div>
-
-                    {/* Conversation Thread */}
                     <ConversationThread
                       conversation={selectedConversation}
                       onUpdate={handleUpdate}
@@ -106,46 +93,49 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
                   </div>
                 </div>
 
-                {/* Column C: Customer Info Slide-Over Panel */}
-                {customerPanelOpen && (
-                  <>
-                    {/* Backdrop */}
-                    <div
-                      className="absolute inset-0 bg-black/20 backdrop-blur-sm z-40 animate-fade-in"
-                      onClick={() => setCustomerPanelOpen(false)}
-                    />
-                    
-                    {/* Slide-over Panel */}
-                    <div className="absolute top-0 right-0 h-full w-[35%] bg-card border-l border-border shadow-2xl z-50 animate-slide-in-right overflow-y-auto">
-                      {/* Panel Header */}
-                      <div className="sticky top-0 bg-card border-b border-border px-6 py-4 flex items-center justify-between z-10">
-                        <h3 className="font-semibold text-lg">Customer Info</h3>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setCustomerPanelOpen(false)}
-                        >
-                          <X className="h-5 w-5" />
-                        </Button>
-                      </div>
+                {/* Floating Action Buttons - Bottom Right */}
+                <div className="fixed bottom-8 right-8 flex flex-col gap-3 z-50">
+                  <Button
+                    onClick={() => setCustomerDialogOpen(true)}
+                    className="shadow-lg hover:shadow-xl transition-all rounded-full h-14 px-6 bg-primary text-primary-foreground"
+                  >
+                    <User className="h-5 w-5 mr-2" />
+                    Customer Info
+                  </Button>
+                  <Button
+                    onClick={() => setActionsDialogOpen(true)}
+                    className="shadow-lg hover:shadow-xl transition-all rounded-full h-14 px-6 bg-secondary text-secondary-foreground"
+                  >
+                    <Zap className="h-5 w-5 mr-2" />
+                    Quick Actions
+                  </Button>
+                </div>
 
-                      {/* Panel Content */}
-                      <div className="p-6 space-y-6">
-                        <CustomerContext 
-                          conversation={selectedConversation} 
-                          onUpdate={handleUpdate} 
-                        />
-                        
-                        <div className="pt-4 border-t border-border">
-                          <QuickActions 
-                            conversation={selectedConversation}
-                            onUpdate={handleUpdate}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </>
-                )}
+                {/* Customer Info Dialog */}
+                <Dialog open={customerDialogOpen} onOpenChange={setCustomerDialogOpen}>
+                  <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle>Customer Information</DialogTitle>
+                    </DialogHeader>
+                    <CustomerContext 
+                      conversation={selectedConversation} 
+                      onUpdate={handleUpdate} 
+                    />
+                  </DialogContent>
+                </Dialog>
+
+                {/* Quick Actions Dialog */}
+                <Dialog open={actionsDialogOpen} onOpenChange={setActionsDialogOpen}>
+                  <DialogContent className="max-w-xl">
+                    <DialogHeader>
+                      <DialogTitle>Quick Actions</DialogTitle>
+                    </DialogHeader>
+                    <QuickActions 
+                      conversation={selectedConversation}
+                      onUpdate={handleUpdate}
+                    />
+                  </DialogContent>
+                </Dialog>
               </>
             ) : (
               <div className="h-full flex items-center justify-center text-muted-foreground">
