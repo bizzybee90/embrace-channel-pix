@@ -55,18 +55,10 @@ export const ConversationCard = ({ conversation, selected, onClick }: Conversati
         {conversation.priority && (
           <div 
             className={cn(
-              "absolute top-0 left-0 right-0 h-1 overflow-hidden rounded-t-[22px]",
-            )}
-          >
-            <div className={cn(
-              "absolute inset-0 h-[4px]",
+              "absolute top-0 left-0 right-0 h-1.5 rounded-t-[22px]",
               getPriorityBarColor(conversation.priority)
             )} 
-            style={{
-              borderRadius: '22px 22px 0 0',
-            }}
-            />
-          </div>
+          />
         )}
         
         {/* Overdue Badge */}
@@ -140,18 +132,10 @@ export const ConversationCard = ({ conversation, selected, onClick }: Conversati
       {conversation.priority && (
         <div 
           className={cn(
-            "absolute top-0 left-0 right-0 h-1 overflow-hidden rounded-t-[22px]",
-          )}
-        >
-          <div className={cn(
-            "absolute inset-0 h-[4px]",
+            "absolute top-0 left-0 right-0 h-1.5 rounded-t-[22px]",
             getPriorityBarColor(conversation.priority)
           )} 
-          style={{
-            borderRadius: '22px 22px 0 0',
-          }}
-          />
-        </div>
+        />
       )}
       
       {/* Overdue Badge */}
