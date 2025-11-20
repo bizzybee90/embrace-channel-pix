@@ -1,7 +1,7 @@
 import { Conversation } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { ChannelIcon } from '@/components/shared/ChannelIcon';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Inbox } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import PullToRefresh from 'react-simple-pull-to-refresh';
@@ -33,7 +33,8 @@ export const MobileConversationList = ({
 }: MobileConversationListProps) => {
   const getPriorityColor = (priority: string | null) => {
     if (!priority) return 'secondary';
-    if (priority === 'urgent' || priority === 'high') return 'destructive';
+    if (priority === 'urgent') return 'destructive';
+    if (priority === 'high') return 'default';
     if (priority === 'medium') return 'secondary';
     return 'outline';
   };
@@ -77,83 +78,106 @@ export const MobileConversationList = ({
   ];
 
   return (
-    <div className="h-screen flex flex-col bg-muted/30">
-      {/* Large Title Header */}
-      <div className="px-6 pt-8 pb-6 bg-gradient-to-br from-background via-background to-primary/5">
-        <h1 className="text-[40px] font-bold leading-tight tracking-tight text-foreground mb-2">
-          {filterTitle}
-        </h1>
-        <p className="text-base text-muted-foreground font-medium">
-          {conversations.length} conversation{conversations.length !== 1 ? 's' : ''}
-        </p>
+    <div className="h-screen flex flex-col bg-gradient-to-b from-background to-muted/20">
+      {/* iOS Large Title Header */}
+      <div className="px-5 pt-safe pb-4 bg-background/95 backdrop-blur-xl border-b border-border/40 sticky top-0 z-50">
+        <div className="pt-3">
+          <h1 className="text-[34px] font-bold leading-[41px] tracking-tight text-foreground mb-1">
+            {filterTitle}
+          </h1>
+          <p className="text-[15px] text-muted-foreground font-normal">
+            {conversations.length} conversation{conversations.length !== 1 ? 's' : ''} need your attention
+          </p>
+        </div>
       </div>
 
-      {/* Horizontal Scrollable Filter Chips */}
-      <div className="px-6 py-4 bg-background/80 backdrop-blur-sm border-b border-border/50">
-        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+      {/* Premium Accent Bar */}
+      <div className="h-[3px] bg-gradient-to-r from-primary/60 via-primary to-primary/60 shadow-sm" />
+
+      {/* Premium Filter Chips */}
+      <div className="px-5 py-4 bg-background/50 backdrop-blur-sm">
+        <div className="flex gap-2.5 overflow-x-auto pb-2 scrollbar-hide -mx-5 px-5">
           {filters.map((filter) => (
-            <div key={filter.label} className="flex gap-1.5 flex-shrink-0">
+            <div key={filter.label} className="flex gap-2 flex-shrink-0">
               {filter.options.map((option) => (
-                <Badge
+                <button
                   key={option.value}
-                  variant={filter.value === option.value ? 'default' : 'outline'}
-                  className={cn(
-                    "rounded-full px-4 py-2 cursor-pointer transition-all duration-200 text-xs font-medium whitespace-nowrap",
-                    filter.value === option.value 
-                      ? "bg-primary text-primary-foreground shadow-sm" 
-                      : "hover:bg-accent hover:border-primary/20"
-                  )}
                   onClick={() => filter.onChange(option.value)}
+                  className={cn(
+                    "rounded-[20px] px-4 py-2 text-[13px] font-semibold whitespace-nowrap transition-all duration-300 border",
+                    filter.value === option.value 
+                      ? "bg-gradient-to-b from-primary to-primary/90 text-primary-foreground border-primary/20 shadow-lg shadow-primary/25" 
+                      : "bg-background/80 text-foreground border-border/60 hover:bg-accent/50 hover:border-primary/30 active:scale-95"
+                  )}
                 >
                   {option.label}
-                </Badge>
+                </button>
               ))}
             </div>
           ))}
         </div>
       </div>
 
-      {/* Conversation List */}
-      <PullToRefresh onRefresh={onRefresh} className="flex-1">
-        <div className="px-4 py-3 space-y-3">
+      {/* Apple-Quality Conversation List */}
+      <PullToRefresh 
+        onRefresh={onRefresh} 
+        className="flex-1 overflow-y-auto"
+        pullingContent={<div className="text-center py-4 text-muted-foreground text-sm">Pull to refresh...</div>}
+      >
+        <div className="px-5 py-4 space-y-3 pb-20">
           {conversations.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
-              <p className="text-lg font-medium">No conversations found</p>
-              <p className="text-sm mt-1">Try adjusting your filters</p>
+            <div className="flex flex-col items-center justify-center h-[60vh] text-center px-8">
+              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-4">
+                <Inbox className="w-10 h-10 text-primary/40" />
+              </div>
+              <h3 className="text-[22px] font-semibold text-foreground mb-2">All Clear</h3>
+              <p className="text-[15px] text-muted-foreground leading-relaxed">
+                No conversations match your filters.
+                <br />
+                Try adjusting them to see more.
+              </p>
             </div>
           ) : (
-            conversations.map((conversation) => (
+            conversations.map((conversation, index) => (
               <div
                 key={conversation.id}
                 onClick={() => onSelect(conversation)}
-                className="bg-background rounded-[28px] p-6 border border-border/50 hover:border-primary/20 active:scale-[0.98] transition-all duration-200 shadow-sm hover:shadow-md"
+                className="bg-gradient-to-b from-background to-background/95 rounded-[24px] p-5 border border-border/50 active:scale-[0.97] transition-all duration-200 shadow-lg shadow-black/5 hover:shadow-xl hover:shadow-black/10 active:shadow-md"
+                style={{ 
+                  animationDelay: `${index * 50}ms`,
+                }}
               >
                 {/* Title */}
-                <h3 className="font-bold text-lg leading-snug mb-3 text-foreground">
+                <h3 className="font-semibold text-[17px] leading-snug mb-3 text-foreground tracking-tight">
                   {conversation.title || 'Untitled Conversation'}
                 </h3>
 
-                {/* Priority, Channel */}
-                <div className="flex items-center gap-2 mb-3 flex-wrap">
+                {/* Badges Row */}
+                <div className="flex items-center gap-2 mb-3.5 flex-wrap">
                   {conversation.priority && (
-                    <Badge variant={getPriorityColor(conversation.priority)} className="text-xs rounded-full px-3 py-1 font-medium">
-                      {conversation.priority.charAt(0).toUpperCase() + conversation.priority.slice(1)}
+                    <Badge 
+                      variant={getPriorityColor(conversation.priority)} 
+                      className="text-[11px] rounded-full px-2.5 py-0.5 font-semibold tracking-wide uppercase"
+                    >
+                      {conversation.priority}
                     </Badge>
                   )}
-                  <Badge variant="outline" className="text-xs rounded-full px-3 py-1 font-medium">
+                  <Badge variant="outline" className="text-[11px] rounded-full px-2.5 py-0.5 font-medium border-border/60">
                     <ChannelIcon channel={conversation.channel} className="mr-1.5 h-3 w-3" />
                     {conversation.channel}
                   </Badge>
                 </div>
 
-                {/* Category and Time */}
-                <div className="flex items-center justify-between text-sm text-muted-foreground">
-                  {conversation.category && (
+                {/* Metadata Footer */}
+                <div className="flex items-center justify-between text-[13px] text-muted-foreground pt-2 border-t border-border/30">
+                  {conversation.category ? (
                     <span className="font-medium">{conversation.category}</span>
+                  ) : (
+                    <span className="font-medium text-muted-foreground/50">No category</span>
                   )}
-                  <span className="flex items-center gap-1 font-medium">
+                  <span className="flex items-center gap-1.5 font-medium">
                     {formatDistanceToNow(new Date(conversation.created_at!), { addSuffix: true })}
-                    <ChevronRight className="h-4 w-4" />
+                    <ChevronRight className="h-3.5 w-3.5 text-primary/60" />
                   </span>
                 </div>
               </div>
