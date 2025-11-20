@@ -76,8 +76,8 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend }: 
   return (
     <div className={
       useMobileStyle 
-        ? "border-t border-border/30 p-3 bg-card/95 backdrop-blur-lg max-h-[350px] overflow-y-auto sticky bottom-0 z-10 shadow-[0_-4px_12px_rgba(0,0,0,0.08)] mobile-frosted"
-        : "border-t border-border/30 p-4 bg-card/95 backdrop-blur-lg max-h-[350px] overflow-y-auto sticky bottom-0 z-10 shadow-[0_-4px_12px_rgba(0,0,0,0.08)]"
+        ? "p-4 m-3 bg-card rounded-[22px] border border-border/30 shadow-lg backdrop-blur-sm"
+        : "p-4 m-4 bg-card rounded-[22px] border border-border/30 shadow-lg backdrop-blur-sm"
     }>
       <Tabs defaultValue="reply">
         <TabsContent value="reply" className="mt-0">
@@ -94,7 +94,7 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend }: 
               className={
                 useMobileStyle
                   ? "resize-none border-border/60 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all text-sm min-h-[56px] rounded-2xl bg-background shadow-sm flex-1"
-                  : "resize-none border-border/60 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all text-base min-h-[56px] rounded-md bg-background shadow-sm flex-1"
+                  : "resize-none border-border/60 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all text-base min-h-[56px] rounded-xl bg-background shadow-sm flex-1"
               }
             />
             <Button 
@@ -103,7 +103,7 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend }: 
               className={
                 useMobileStyle
                   ? "mobile-spring-bounce h-10 w-10 rounded-xl font-medium shadow-sm flex-shrink-0 self-center"
-                  : "h-10 w-10 rounded-md font-medium shadow-sm flex-shrink-0 self-center"
+                  : "h-10 w-10 rounded-xl font-medium shadow-sm flex-shrink-0 self-center"
               }
               size="icon"
             >
@@ -127,7 +127,7 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend }: 
               className={
                 useMobileStyle
                   ? "resize-none border-border/60 focus:border-warning/50 focus:ring-2 focus:ring-warning/20 transition-all text-sm min-h-[56px] rounded-2xl bg-background shadow-sm flex-1"
-                  : "resize-none border-border/60 focus:border-warning/50 focus:ring-2 focus:ring-warning/20 transition-all text-base min-h-[56px] rounded-md bg-background shadow-sm flex-1"
+                  : "resize-none border-border/60 focus:border-warning/50 focus:ring-2 focus:ring-warning/20 transition-all text-base min-h-[56px] rounded-xl bg-background shadow-sm flex-1"
               }
             />
             <Button 
@@ -137,7 +137,7 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend }: 
               className={
                 useMobileStyle
                   ? "hover:bg-warning/10 hover:border-warning/50 transition-all h-10 w-10 rounded-xl mobile-spring-bounce font-medium flex-shrink-0 self-center"
-                  : "hover:bg-warning/10 hover:border-warning/50 transition-all h-10 w-10 rounded-md font-medium flex-shrink-0 self-center"
+                  : "hover:bg-warning/10 hover:border-warning/50 transition-all h-10 w-10 rounded-xl font-medium flex-shrink-0 self-center"
               }
               size="icon"
             >
