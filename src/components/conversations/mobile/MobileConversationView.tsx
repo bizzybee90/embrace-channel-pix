@@ -149,7 +149,7 @@ export const MobileConversationView = ({
 
           {/* AI Insights Card */}
           {conversation.ai_reason_for_escalation && (
-            <Card className="rounded-[28px] p-6 bg-primary/5 border-primary/10 shadow-sm">
+            <Card className="rounded-[28px] p-6 bg-gradient-to-br from-primary/10 via-primary/5 to-background border-primary/20 shadow-lg shadow-primary/10 animate-fade-in">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                   <Sparkles className="h-5 w-5 text-primary" />
