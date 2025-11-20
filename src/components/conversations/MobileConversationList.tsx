@@ -1,10 +1,10 @@
 import { Conversation } from '@/lib/types';
-import { Badge } from '@/components/ui/badge';
 import { ChannelIcon } from '@/components/shared/ChannelIcon';
-import { ChevronRight } from 'lucide-react';
+import { Inbox } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import PullToRefresh from 'react-simple-pull-to-refresh';
+import { useState, useEffect, useRef } from 'react';
 
 interface MobileConversationListProps {
   conversations: Conversation[];
@@ -35,156 +35,271 @@ export const MobileConversationList = ({
   onCategoryFilterChange,
   onRefresh
 }: MobileConversationListProps) => {
-  const getPriorityVariant = (priority: string | null) => {
-    if (!priority) return 'secondary';
+  const [isHeaderCompact, setIsHeaderCompact] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (scrollRef.current) {
+        setIsHeaderCompact(scrollRef.current.scrollTop > 60);
+      }
+    };
+
+    const scrollElement = scrollRef.current;
+    scrollElement?.addEventListener('scroll', handleScroll);
+    return () => scrollElement?.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const getPriorityColor = (priority: string | null) => {
+    if (!priority) return { bg: 'bg-muted', text: 'text-muted-foreground', border: 'border-border' };
     switch (priority.toLowerCase()) {
-      case 'urgent': return 'priority-urgent';
-      case 'high': return 'priority-high';
-      case 'medium': return 'priority-medium';
-      case 'low': return 'priority-low';
-      default: return 'secondary';
+      case 'urgent': 
+        return { bg: 'bg-red-500', text: 'text-white', border: 'border-red-500' };
+      case 'high': 
+        return { bg: 'bg-amber-500', text: 'text-white', border: 'border-amber-500' };
+      case 'medium': 
+        return { bg: 'bg-yellow-500', text: 'text-white', border: 'border-yellow-500' };
+      case 'low': 
+        return { bg: 'bg-slate-400', text: 'text-white', border: 'border-slate-400' };
+      default: 
+        return { bg: 'bg-muted', text: 'text-muted-foreground', border: 'border-border' };
     }
   };
 
   const isOverdue = (conversation: Conversation) => {
     if (!conversation.sla_due_at) return false;
-    return new Date() > new Date(conversation.sla_due_at);
+    return new Date(conversation.sla_due_at) < new Date();
   };
 
-  const filters = [
-    { 
-      label: 'Status', 
-      value: statusFilter, 
-      onChange: onStatusFilterChange,
-      options: [
-        { label: 'All', value: 'all' },
-        { label: 'New', value: 'new' },
-        { label: 'Open', value: 'open' },
-        { label: 'Pending', value: 'pending' },
-      ]
-    },
-    { 
-      label: 'Priority', 
-      value: priorityFilter, 
-      onChange: onPriorityFilterChange,
-      options: [
-        { label: 'All', value: 'all' },
-        { label: 'Urgent', value: 'urgent' },
-        { label: 'High', value: 'high' },
-        { label: 'Medium', value: 'medium' },
-        { label: 'Low', value: 'low' },
-      ]
-    },
-    { 
-      label: 'Channel', 
-      value: channelFilter, 
-      onChange: onChannelFilterChange,
-      options: [
-        { label: 'All', value: 'all' },
-        { label: 'SMS', value: 'sms' },
-        { label: 'Email', value: 'email' },
-        { label: 'WhatsApp', value: 'whatsapp' },
-        { label: 'Phone', value: 'phone' },
-      ]
-    },
-    { 
-      label: 'Category', 
-      value: categoryFilter, 
-      onChange: onCategoryFilterChange,
-      options: [
-        { label: 'All', value: 'all' },
-        { label: 'Billing', value: 'billing' },
-        { label: 'Technical', value: 'technical' },
-        { label: 'General', value: 'general' },
-      ]
-    },
+  const statusOptions = [
+    { label: 'All', value: 'all' },
+    { label: 'New', value: 'new' },
+    { label: 'Open', value: 'open' },
+    { label: 'Pending', value: 'pending' },
+  ];
+
+  const priorityOptions = [
+    { label: 'All', value: 'all' },
+    { label: 'Urgent', value: 'urgent' },
+    { label: 'High', value: 'high' },
+    { label: 'Medium', value: 'medium' },
+    { label: 'Low', value: 'low' },
+  ];
+
+  const channelOptions = [
+    { label: 'All', value: 'all' },
+    { label: 'SMS', value: 'sms' },
+    { label: 'Email', value: 'email' },
+    { label: 'WhatsApp', value: 'whatsapp' },
+    { label: 'Phone', value: 'phone' },
+  ];
+
+  const categoryOptions = [
+    { label: 'All', value: 'all' },
+    { label: 'Billing', value: 'billing' },
+    { label: 'Technical', value: 'technical' },
+    { label: 'General', value: 'general' },
   ];
 
   return (
-    <div className="h-screen flex flex-col bg-muted/30">
-      {/* Large Title Header */}
-      <div className="px-6 pt-8 pb-6 bg-gradient-to-br from-background via-background to-primary/5">
-        <h1 className="text-[40px] font-bold leading-tight tracking-tight text-foreground mb-2">
-          {filterTitle}
-        </h1>
-        <p className="text-base text-muted-foreground font-medium">
-          {conversations.length} conversation{conversations.length !== 1 ? 's' : ''}
-        </p>
+    <div className="h-screen flex flex-col bg-gradient-to-b from-background to-muted/10">
+      {/* iOS Large Title Header with Scroll Behavior */}
+      <div 
+        className={cn(
+          "px-5 pt-safe bg-background/95 backdrop-blur-xl border-b border-border/40 sticky top-0 z-50 transition-all duration-300",
+          isHeaderCompact ? "pb-3" : "pb-4"
+        )}
+      >
+        <div className={cn(
+          "transition-all duration-300",
+          isHeaderCompact ? "pt-2" : "pt-8"
+        )}>
+          <h1 className={cn(
+            "font-semibold tracking-tight text-foreground transition-all duration-300",
+            isHeaderCompact ? "text-[20px] leading-[24px]" : "text-[32px] leading-[38px] mb-1"
+          )}>
+            {filterTitle}
+          </h1>
+          {!isHeaderCompact && (
+            <p className="text-[15px] text-muted-foreground font-normal">
+              {conversations.length} conversation{conversations.length !== 1 ? 's' : ''} need your attention
+            </p>
+          )}
+        </div>
       </div>
 
-      {/* Horizontal Scrollable Filter Chips */}
-      <div className="px-6 py-4 bg-background/80 backdrop-blur-sm border-b border-border/50">
-        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-          {filters.map((filter) => (
-            <div key={filter.label} className="flex gap-1.5 flex-shrink-0">
-              {filter.options.map((option) => (
-                <Badge
-                  key={option.value}
-                  variant={filter.value === option.value ? 'default' : 'outline'}
-                  className={cn(
-                    "rounded-full px-4 py-2 cursor-pointer transition-all duration-200 text-xs font-medium whitespace-nowrap",
-                    filter.value === option.value 
-                      ? "bg-primary text-primary-foreground shadow-sm" 
-                      : "hover:bg-accent hover:border-primary/20"
-                  )}
-                  onClick={() => filter.onChange(option.value)}
-                >
-                  {option.label}
-                </Badge>
-              ))}
-            </div>
+      {/* Filter Chips Row */}
+      <div className="px-5 py-3 bg-background/50 backdrop-blur-sm border-b border-border/5">
+        <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-hide">
+          {/* Status Filters */}
+          {statusOptions.slice(1).map((option) => (
+            <button
+              key={option.value}
+              onClick={() => onStatusFilterChange(statusFilter === option.value ? 'all' : option.value)}
+              className={cn(
+                "flex-shrink-0 h-[36px] px-[14px] rounded-full text-[14px] font-medium transition-all duration-200",
+                "active:scale-95",
+                statusFilter === option.value
+                  ? "bg-gradient-to-r from-primary to-primary/90 text-white shadow-sm" 
+                  : "bg-muted text-muted-foreground"
+              )}
+            >
+              {option.label}
+            </button>
+          ))}
+          
+          {/* Priority Filters */}
+          {priorityOptions.slice(1).map((option) => (
+            <button
+              key={option.value}
+              onClick={() => onPriorityFilterChange(priorityFilter === option.value ? 'all' : option.value)}
+              className={cn(
+                "flex-shrink-0 h-[36px] px-[14px] rounded-full text-[14px] font-medium transition-all duration-200",
+                "active:scale-95",
+                priorityFilter === option.value
+                  ? "bg-gradient-to-r from-primary to-primary/90 text-white shadow-sm" 
+                  : "bg-muted text-muted-foreground"
+              )}
+            >
+              {option.label}
+            </button>
+          ))}
+          
+          {/* Channel Filters */}
+          {channelOptions.slice(1).map((option) => (
+            <button
+              key={option.value}
+              onClick={() => onChannelFilterChange(channelFilter === option.value ? 'all' : option.value)}
+              className={cn(
+                "flex-shrink-0 h-[36px] px-[14px] rounded-full text-[14px] font-medium transition-all duration-200",
+                "active:scale-95",
+                channelFilter === option.value
+                  ? "bg-gradient-to-r from-primary to-primary/90 text-white shadow-sm" 
+                  : "bg-muted text-muted-foreground"
+              )}
+            >
+              {option.label}
+            </button>
+          ))}
+          
+          {/* Category Filters */}
+          {categoryOptions.slice(1).map((option) => (
+            <button
+              key={option.value}
+              onClick={() => onCategoryFilterChange(categoryFilter === option.value ? 'all' : option.value)}
+              className={cn(
+                "flex-shrink-0 h-[36px] px-[14px] rounded-full text-[14px] font-medium transition-all duration-200",
+                "active:scale-95",
+                categoryFilter === option.value
+                  ? "bg-gradient-to-r from-primary to-primary/90 text-white shadow-sm" 
+                  : "bg-muted text-muted-foreground"
+              )}
+            >
+              {option.label}
+            </button>
           ))}
         </div>
       </div>
 
       {/* Conversation List */}
-      <PullToRefresh onRefresh={onRefresh} className="flex-1">
-        <div className="px-4 py-3 space-y-3">
-          {conversations.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
-              <p className="text-lg font-medium">No conversations found</p>
-              <p className="text-sm mt-1">Try adjusting your filters</p>
-            </div>
-          ) : (
-            conversations.map((conversation) => (
-              <div
-                key={conversation.id}
-                onClick={() => onSelect(conversation)}
-                className="bg-background rounded-[28px] p-6 border border-border/50 hover:border-primary/20 active:scale-[0.98] transition-all duration-200 shadow-sm hover:shadow-md"
-              >
-                {/* Title */}
-                <h3 className="font-bold text-lg leading-snug mb-3 text-foreground">
-                  {conversation.title || 'Untitled Conversation'}
-                </h3>
-
-                {/* Priority, Channel */}
-                <div className="flex items-center gap-2 mb-3 flex-wrap">
-                  {conversation.priority && (
-                    <Badge variant={getPriorityVariant(conversation.priority)} className="text-xs rounded-full px-3 py-1 font-medium">
-                      {conversation.priority.charAt(0).toUpperCase() + conversation.priority.slice(1)}
-                    </Badge>
-                  )}
-                  <Badge variant="outline" className="text-xs rounded-full px-3 py-1 font-medium">
-                    <ChannelIcon channel={conversation.channel} className="mr-1.5 h-3 w-3" />
-                    {conversation.channel}
-                  </Badge>
+      <div ref={scrollRef} className="flex-1 overflow-y-auto">
+        <PullToRefresh onRefresh={onRefresh}>
+          <div className="px-5 py-5 space-y-4 pb-8">
+            {conversations.length === 0 ? (
+              <div className="bg-white rounded-[24px] border border-black/[0.06] shadow-[0_6px_20px_rgba(0,0,0,0.04)] p-8 text-center">
+                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4 mx-auto">
+                  <Inbox className="h-8 w-8 text-primary/40" />
                 </div>
-
-                {/* Category and Time */}
-                <div className="flex items-center justify-between text-sm text-muted-foreground">
-                  {conversation.category && (
-                    <span className="font-medium">{conversation.category}</span>
-                  )}
-                  <span className="flex items-center gap-1 font-medium">
-                    {formatDistanceToNow(new Date(conversation.created_at!), { addSuffix: true })}
-                    <ChevronRight className="h-4 w-4" />
-                  </span>
-                </div>
+                <p className="text-[17px] font-semibold text-foreground mb-2">
+                  No {filterTitle.toLowerCase()}
+                </p>
+                <p className="text-[15px] text-muted-foreground max-w-[280px] mx-auto">
+                  When something needs your attention, it will appear here
+                </p>
               </div>
-            ))
-          )}
-        </div>
-      </PullToRefresh>
+            ) : (
+              conversations.map((conversation) => {
+                const priorityColors = getPriorityColor(conversation.priority);
+                const overdueStatus = isOverdue(conversation);
+                
+                return (
+                  <button
+                    key={conversation.id}
+                    onClick={() => onSelect(conversation)}
+                    className="w-full text-left group active:scale-[0.98] transition-transform duration-200"
+                  >
+                    <div className="relative bg-white rounded-[24px] border border-black/[0.06] shadow-[0_6px_20px_rgba(0,0,0,0.04)] p-5 hover:shadow-[0_8px_24px_rgba(0,0,0,0.06)] transition-shadow duration-200">
+                      {/* Priority Accent Bar */}
+                      {conversation.priority && (
+                        <div 
+                          className={cn(
+                            "absolute top-0 left-0 right-0 h-[3px] rounded-t-[24px]",
+                            priorityColors.bg
+                          )} 
+                        />
+                      )}
+                      
+                      {/* Overdue Indicator */}
+                      {overdueStatus && (
+                        <div className="absolute top-4 right-4">
+                          <div className="bg-red-500 text-white text-[11px] font-semibold uppercase tracking-wide px-2.5 py-1 rounded-full">
+                            Overdue
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Title */}
+                      <h3 className="text-[17px] font-semibold text-foreground leading-snug mb-2 line-clamp-2 pr-16">
+                        {conversation.title || 'Untitled Conversation'}
+                      </h3>
+
+                      {/* Escalation Reason / Description */}
+                      {conversation.ai_reason_for_escalation && (
+                        <p className="text-[15px] text-muted-foreground leading-relaxed mb-3 line-clamp-3">
+                          {conversation.ai_reason_for_escalation}
+                        </p>
+                      )}
+
+                      {/* Badge Row */}
+                      <div className="flex flex-wrap items-center gap-2 mb-3">
+                        {/* Priority Badge */}
+                        {conversation.priority && (
+                          <div 
+                            className={cn(
+                              "px-2.5 py-0.5 rounded-full text-[11px] font-semibold uppercase tracking-wide",
+                              priorityColors.bg,
+                              priorityColors.text
+                            )}
+                          >
+                            {conversation.priority}
+                          </div>
+                        )}
+                        
+                        {/* Channel Badge */}
+                        <div className="px-2.5 py-0.5 rounded-full text-[12px] font-medium bg-muted text-muted-foreground flex items-center gap-1.5">
+                          <ChannelIcon channel={conversation.channel} className="h-3.5 w-3.5" />
+                          {conversation.channel}
+                        </div>
+                      </div>
+
+                      {/* Meta Row */}
+                      <div className="flex items-center justify-between text-[13px] text-muted-foreground">
+                        <span className="uppercase tracking-wide font-medium">
+                          {conversation.category?.replace(/_/g, ' ') || 'General'}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <span className="text-muted-foreground/60">•</span>
+                          {formatDistanceToNow(new Date(conversation.created_at || new Date()), { addSuffix: true })}
+                        </span>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </PullToRefresh>
+      </div>
     </div>
   );
 };
