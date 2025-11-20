@@ -108,7 +108,7 @@ export const MobileFilterSheet = ({
           {/* Filter Sections */}
           <div className="flex-1 overflow-y-auto px-5 py-6 space-y-8">
             {/* Status Section */}
-            <div>
+            <div className="animate-fade-in" style={{ animationDelay: '0ms' }}>
               <h3 className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground mb-3">
                 Status
               </h3>
@@ -117,26 +117,27 @@ export const MobileFilterSheet = ({
                 <button
                   onClick={() => onStatusFilterChange([])}
                   className={cn(
-                    "h-[48px] rounded-2xl text-[15px] font-medium transition-all duration-200",
-                    "active:scale-95 border",
+                    "h-[48px] rounded-2xl text-[15px] font-medium transition-all duration-300 ease-out",
+                    "active:scale-[0.92] border",
                     statusFilter.length === 0
-                      ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                      : "bg-muted text-muted-foreground border-border/50"
+                      ? "bg-primary text-primary-foreground border-primary shadow-sm scale-[1.02]"
+                      : "bg-muted text-muted-foreground border-border/50 hover:border-primary/30 hover:bg-muted/80"
                   )}
                 >
                   All
                 </button>
-                {statusOptions.map((option) => (
+                {statusOptions.map((option, idx) => (
                   <button
                     key={option.value}
                     onClick={() => toggleFilter(statusFilter, option.value, onStatusFilterChange)}
                     className={cn(
-                      "h-[48px] rounded-2xl text-[15px] font-medium transition-all duration-200",
-                      "active:scale-95 border",
+                      "h-[48px] rounded-2xl text-[15px] font-medium transition-all duration-300 ease-out",
+                      "active:scale-[0.92] border",
                       statusFilter.includes(option.value)
-                        ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                        : "bg-muted text-muted-foreground border-border/50"
+                        ? "bg-primary text-primary-foreground border-primary shadow-sm scale-[1.02]"
+                        : "bg-muted text-muted-foreground border-border/50 hover:border-primary/30 hover:bg-muted/80"
                     )}
+                    style={{ animationDelay: `${(idx + 1) * 50}ms` }}
                   >
                     {option.label}
                   </button>
@@ -145,7 +146,7 @@ export const MobileFilterSheet = ({
             </div>
 
             {/* Priority Section */}
-            <div>
+            <div className="animate-fade-in" style={{ animationDelay: '100ms' }}>
               <h3 className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground mb-3">
                 Priority
               </h3>
@@ -154,26 +155,27 @@ export const MobileFilterSheet = ({
                 <button
                   onClick={() => onPriorityFilterChange([])}
                   className={cn(
-                    "h-[48px] rounded-2xl text-[15px] font-medium transition-all duration-200",
-                    "active:scale-95 border",
+                    "h-[48px] rounded-2xl text-[15px] font-medium transition-all duration-300 ease-out",
+                    "active:scale-[0.92] border",
                     priorityFilter.length === 0
-                      ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                      : "bg-muted text-muted-foreground border-border/50"
+                      ? "bg-primary text-primary-foreground border-primary shadow-sm scale-[1.02]"
+                      : "bg-muted text-muted-foreground border-border/50 hover:border-primary/30 hover:bg-muted/80"
                   )}
                 >
                   All
                 </button>
-                {priorityOptions.map((option) => (
+                {priorityOptions.map((option, idx) => (
                   <button
                     key={option.value}
                     onClick={() => toggleFilter(priorityFilter, option.value, onPriorityFilterChange)}
                     className={cn(
-                      "h-[48px] rounded-2xl text-[15px] font-medium transition-all duration-200",
-                      "active:scale-95 border",
+                      "h-[48px] rounded-2xl text-[15px] font-medium transition-all duration-300 ease-out",
+                      "active:scale-[0.92] border",
                       priorityFilter.includes(option.value)
-                        ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                        : "bg-muted text-muted-foreground border-border/50"
+                        ? "bg-primary text-primary-foreground border-primary shadow-sm scale-[1.02]"
+                        : "bg-muted text-muted-foreground border-border/50 hover:border-primary/30 hover:bg-muted/80"
                     )}
+                    style={{ animationDelay: `${100 + (idx + 1) * 50}ms` }}
                   >
                     {option.label}
                   </button>
@@ -182,7 +184,7 @@ export const MobileFilterSheet = ({
             </div>
 
             {/* Channel Section */}
-            <div>
+            <div className="animate-fade-in" style={{ animationDelay: '200ms' }}>
               <h3 className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground mb-3">
                 Channel
               </h3>
@@ -191,26 +193,27 @@ export const MobileFilterSheet = ({
                 <button
                   onClick={() => onChannelFilterChange([])}
                   className={cn(
-                    "h-[48px] rounded-2xl text-[15px] font-medium transition-all duration-200",
-                    "active:scale-95 border",
+                    "h-[48px] rounded-2xl text-[15px] font-medium transition-all duration-300 ease-out",
+                    "active:scale-[0.92] border",
                     channelFilter.length === 0
-                      ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                      : "bg-muted text-muted-foreground border-border/50"
+                      ? "bg-primary text-primary-foreground border-primary shadow-sm scale-[1.02]"
+                      : "bg-muted text-muted-foreground border-border/50 hover:border-primary/30 hover:bg-muted/80"
                   )}
                 >
                   All
                 </button>
-                {channelOptions.map((option) => (
+                {channelOptions.map((option, idx) => (
                   <button
                     key={option.value}
                     onClick={() => toggleFilter(channelFilter, option.value, onChannelFilterChange)}
                     className={cn(
-                      "h-[48px] rounded-2xl text-[15px] font-medium transition-all duration-200",
-                      "active:scale-95 border",
+                      "h-[48px] rounded-2xl text-[15px] font-medium transition-all duration-300 ease-out",
+                      "active:scale-[0.92] border",
                       channelFilter.includes(option.value)
-                        ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                        : "bg-muted text-muted-foreground border-border/50"
+                        ? "bg-primary text-primary-foreground border-primary shadow-sm scale-[1.02]"
+                        : "bg-muted text-muted-foreground border-border/50 hover:border-primary/30 hover:bg-muted/80"
                     )}
+                    style={{ animationDelay: `${200 + (idx + 1) * 50}ms` }}
                   >
                     {option.label}
                   </button>
@@ -219,7 +222,7 @@ export const MobileFilterSheet = ({
             </div>
 
             {/* Category Section */}
-            <div>
+            <div className="animate-fade-in" style={{ animationDelay: '300ms' }}>
               <h3 className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground mb-3">
                 Category
               </h3>
@@ -228,26 +231,27 @@ export const MobileFilterSheet = ({
                 <button
                   onClick={() => onCategoryFilterChange([])}
                   className={cn(
-                    "h-[48px] rounded-2xl text-[15px] font-medium transition-all duration-200",
-                    "active:scale-95 border",
+                    "h-[48px] rounded-2xl text-[15px] font-medium transition-all duration-300 ease-out",
+                    "active:scale-[0.92] border",
                     categoryFilter.length === 0
-                      ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                      : "bg-muted text-muted-foreground border-border/50"
+                      ? "bg-primary text-primary-foreground border-primary shadow-sm scale-[1.02]"
+                      : "bg-muted text-muted-foreground border-border/50 hover:border-primary/30 hover:bg-muted/80"
                   )}
                 >
                   All
                 </button>
-                {categoryOptions.map((option) => (
+                {categoryOptions.map((option, idx) => (
                   <button
                     key={option.value}
                     onClick={() => toggleFilter(categoryFilter, option.value, onCategoryFilterChange)}
                     className={cn(
-                      "h-[48px] rounded-2xl text-[15px] font-medium transition-all duration-200",
-                      "active:scale-95 border",
+                      "h-[48px] rounded-2xl text-[15px] font-medium transition-all duration-300 ease-out",
+                      "active:scale-[0.92] border",
                       categoryFilter.includes(option.value)
-                        ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                        : "bg-muted text-muted-foreground border-border/50"
+                        ? "bg-primary text-primary-foreground border-primary shadow-sm scale-[1.02]"
+                        : "bg-muted text-muted-foreground border-border/50 hover:border-primary/30 hover:bg-muted/80"
                     )}
+                    style={{ animationDelay: `${300 + (idx + 1) * 50}ms` }}
                   >
                     {option.label}
                   </button>

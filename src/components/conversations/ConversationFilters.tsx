@@ -104,10 +104,11 @@ export const ConversationFilters = ({
                 key={option.value}
                 variant={isSelected ? 'default' : 'outline'}
                 className={cn(
-                  "rounded-full px-4 py-2 cursor-pointer transition-all duration-200 text-xs font-medium whitespace-nowrap",
+                  "rounded-full px-4 py-2 cursor-pointer transition-all duration-300 ease-out text-xs font-medium whitespace-nowrap",
+                  "active:scale-95",
                   isSelected
-                    ? "bg-primary text-primary-foreground shadow-sm" 
-                    : "hover:bg-accent hover:border-primary/20"
+                    ? "bg-primary text-primary-foreground shadow-sm scale-[1.02]" 
+                    : "hover:bg-accent hover:border-primary/30 hover:scale-[1.02]"
                 )}
                 onClick={handleClick}
               >
