@@ -105,7 +105,7 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
   }
 
   return (
-    <div className="flex flex-col h-full bg-muted/30 min-w-[350px]">
+    <div className="flex flex-col h-full bg-muted/30 min-w-[420px]">
       {/* Modern filter design */}
       <div className="px-6 py-4 border-b border-border/50 bg-background/80 backdrop-blur-sm">
         <ConversationFilters

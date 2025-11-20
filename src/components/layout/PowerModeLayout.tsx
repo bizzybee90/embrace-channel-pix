@@ -30,11 +30,11 @@ export const PowerModeLayout = ({ filter = 'all-open' }: PowerModeLayoutProps) =
       <ResizablePanelGroup direction="horizontal" className="flex-1">
         {/* Conversation List Panel (hidden on mobile when conversation selected) */}
         <ResizablePanel 
-          defaultSize={20} 
-          minSize={18}
-          maxSize={30}
+          defaultSize={22} 
+          minSize={20}
+          maxSize={32}
           collapsible={false}
-          className={selectedConversation ? "hidden md:flex" : "flex"}
+          className={selectedConversation ? "hidden md:flex min-w-[420px]" : "flex min-w-[420px]"}
         >
           <div className="h-full flex flex-col border-r border-border/30 bg-card w-full">
             <ConversationList
@@ -77,11 +77,11 @@ export const PowerModeLayout = ({ filter = 'all-open' }: PowerModeLayoutProps) =
 
         {/* Customer Context Panel (hidden on mobile) */}
         <ResizablePanel 
-          defaultSize={28} 
-          minSize={20}
-          maxSize={35}
+          defaultSize={22} 
+          minSize={18}
+          maxSize={28}
           collapsible={false}
-          className="hidden md:flex"
+          className="hidden md:flex min-w-[280px]"
         >
           <div className="h-full overflow-y-auto bg-card/50 p-4 hidden md:block">
             {selectedConversation ? (

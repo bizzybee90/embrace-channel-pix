@@ -298,7 +298,7 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
             </div>
             
             {/* Right Sidebar - Customer Context & Quick Actions (hidden on mobile) */}
-            <div className="hidden md:flex w-80 min-w-[320px] border-l border-border bg-card/50 flex-col overflow-hidden">
+            <div className="hidden md:flex w-72 min-w-[280px] border-l border-border bg-card/50 flex-col overflow-hidden">
               <div className="flex-1 overflow-y-auto p-4 space-y-6">
                 {selectedConversation && (
                   <>
