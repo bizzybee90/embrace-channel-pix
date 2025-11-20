@@ -113,7 +113,7 @@ export const MobileConversationList = ({
 
       {/* Horizontal Scrollable Filter Chips */}
       <div className="px-6 py-4 bg-background/80 backdrop-blur-sm border-b border-border/50">
-        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
           {filters.map((filter) => (
             <div key={filter.label} className="flex gap-1.5 flex-shrink-0">
               {filter.options.map((option) => (
@@ -152,7 +152,7 @@ export const MobileConversationList = ({
                 className="bg-background rounded-[28px] p-6 border border-border/50 hover:border-primary/20 active:scale-[0.98] transition-all duration-200 shadow-sm hover:shadow-md"
               >
                 {/* Title */}
-                <h3 className="font-semibold text-lg leading-snug mb-3 text-foreground">
+                <h3 className="font-bold text-lg leading-snug mb-3 text-foreground">
                   {conversation.title || 'Untitled Conversation'}
                 </h3>
 
@@ -163,7 +163,7 @@ export const MobileConversationList = ({
                       {conversation.priority.charAt(0).toUpperCase() + conversation.priority.slice(1)}
                     </Badge>
                   )}
-                  <Badge variant="outline" className="text-xs rounded-full px-3 py-1">
+                  <Badge variant="outline" className="text-xs rounded-full px-3 py-1 font-medium">
                     <ChannelIcon channel={conversation.channel} className="mr-1.5 h-3 w-3" />
                     {conversation.channel}
                   </Badge>
@@ -174,7 +174,7 @@ export const MobileConversationList = ({
                   {conversation.category && (
                     <span className="font-medium">{conversation.category}</span>
                   )}
-                  <span className="flex items-center gap-1">
+                  <span className="flex items-center gap-1 font-medium">
                     {formatDistanceToNow(new Date(conversation.created_at!), { addSuffix: true })}
                     <ChevronRight className="h-4 w-4" />
                   </span>

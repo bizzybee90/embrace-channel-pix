@@ -106,7 +106,7 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
 
   return (
     <div className="flex flex-col h-full bg-muted/30">
-      <div className="p-5 border-b border-border/50 bg-background">
+      <div className="px-6 py-4 border-b border-border/50 bg-background/80 backdrop-blur-sm">
         <ConversationFilters
           statusFilter={statusFilter}
           setStatusFilter={setStatusFilter}
@@ -121,8 +121,9 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
 
       <div className="flex-1 overflow-y-auto p-4">
         {conversations.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-muted-foreground">
-            No conversations found
+          <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
+            <p className="text-lg font-medium">No conversations found</p>
+            <p className="text-sm mt-1">Try adjusting your filters</p>
           </div>
         ) : (
           conversations.map((conversation) => (

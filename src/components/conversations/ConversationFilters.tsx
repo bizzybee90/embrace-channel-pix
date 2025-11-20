@@ -75,7 +75,7 @@ export const ConversationFilters = ({
   ];
 
   return (
-    <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+    <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
       {filters.map((filter) => (
         <div key={filter.label} className="flex gap-1.5 flex-shrink-0">
           {filter.options.map((option) => (
@@ -83,7 +83,7 @@ export const ConversationFilters = ({
               key={option.value}
               variant={filter.value === option.value ? 'default' : 'outline'}
               className={cn(
-                "rounded-full px-4 py-1.5 cursor-pointer transition-all duration-200 text-xs font-medium",
+                "rounded-full px-4 py-2 cursor-pointer transition-all duration-200 text-xs font-medium whitespace-nowrap",
                 filter.value === option.value 
                   ? "bg-primary text-primary-foreground shadow-sm" 
                   : "hover:bg-accent hover:border-primary/20"
