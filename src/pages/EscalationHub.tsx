@@ -175,14 +175,14 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
     }
   };
 
+  // Tablet view (768px-1024px) - 2-column layout (takes precedence)
+  if (!modeLoading && isTablet) {
+    return <TabletLayout filter={filter} />;
+  }
+
   // If Power Mode is selected, render the 3-column layout
   if (!modeLoading && interfaceMode === 'power') {
     return <PowerModeLayout filter={filter} />;
-  }
-
-  // Tablet view (768px-1024px) - 2-column layout
-  if (isTablet) {
-    return <TabletLayout filter={filter} />;
   }
 
   // Mobile view - show either list or conversation detail
