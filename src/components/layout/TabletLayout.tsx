@@ -82,9 +82,17 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
 
         {/* Two-Column Layout */}
         <div className="flex flex-1 overflow-hidden">
-          {/* Left Column: Ticket List (38%) */}
-          <div className="w-[38%] border-r border-border bg-background overflow-y-auto">
-            <div className="p-3">
+          {/* Left Column: Ticket List (38%) - Fixed width, no movement */}
+          <div className="w-[38%] min-w-[38%] max-w-[38%] border-r border-border bg-background flex flex-col">
+            {/* Sticky Header */}
+            <div className="sticky top-0 z-10 bg-card/95 backdrop-blur-sm border-b border-border/30 px-4 py-3 shadow-sm">
+              <h2 className="font-semibold text-sm text-muted-foreground">
+                {filter === 'my-tickets' ? 'My Tickets' : filter === 'unassigned' ? 'Unassigned' : filter === 'sla-risk' ? 'SLA Risk' : 'All Open Tickets'}
+              </h2>
+            </div>
+            
+            {/* Scrollable List */}
+            <div className="flex-1 overflow-y-auto p-3">
               <ConversationList
                 selectedId={selectedConversation?.id}
                 onSelect={handleSelectConversation}
