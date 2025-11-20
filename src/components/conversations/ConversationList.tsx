@@ -6,6 +6,7 @@ import { ConversationFilters } from './ConversationFilters';
 import { TabletFilters } from './TabletFilters';
 import { useIsTablet } from '@/hooks/use-tablet';
 import { Loader2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface ConversationListProps {
   selectedId?: string;
@@ -108,7 +109,10 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
   }
 
   return (
-    <div className="flex flex-col h-full bg-muted/30 min-w-[300px]">
+    <div className={cn(
+      "flex flex-col h-full min-w-[300px]",
+      isTablet ? "bg-transparent" : "bg-muted/30"
+    )}>
       {/* Filter bar - only show on desktop, not tablet */}
       {!isTablet && (
         <div className="px-6 py-4 border-b border-border/50 bg-background/80 backdrop-blur-sm">
@@ -125,11 +129,17 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className={cn(
+        "flex-1 overflow-y-auto",
+        isTablet ? "p-2" : "p-4"
+      )}>
         {conversations.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
-            <p className="text-lg font-medium">No conversations found</p>
-            <p className="text-sm mt-1">Try adjusting your filters</p>
+            <p className={cn(
+              "font-medium",
+              isTablet ? "text-sm" : "text-lg"
+            )}>No conversations found</p>
+            <p className="text-xs mt-1">Try adjusting your filters</p>
           </div>
         ) : (
           conversations.map((conversation) => (

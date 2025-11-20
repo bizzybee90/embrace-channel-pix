@@ -4,6 +4,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { Clock } from 'lucide-react';
 import { ChannelIcon } from '../shared/ChannelIcon';
 import { cn } from '@/lib/utils';
+import { useIsTablet } from '@/hooks/use-tablet';
 
 interface ConversationCardProps {
   conversation: Conversation;
@@ -12,6 +13,8 @@ interface ConversationCardProps {
 }
 
 export const ConversationCard = ({ conversation, selected, onClick }: ConversationCardProps) => {
+  const isTablet = useIsTablet();
+  
   const getPriorityVariant = (priority: string | null) => {
     if (!priority) return 'secondary';
     switch (priority.toLowerCase()) {
@@ -23,6 +26,56 @@ export const ConversationCard = ({ conversation, selected, onClick }: Conversati
     }
   };
 
+  // Compact tablet layout
+  if (isTablet) {
+    return (
+      <div
+        onClick={onClick}
+        className={cn(
+          "p-3 cursor-pointer transition-all duration-200 rounded-lg mb-2",
+          "bg-card border border-border/30 hover:border-primary/30 hover:bg-card/80",
+          selected && "border-primary bg-primary/5"
+        )}
+      >
+        <div className="flex flex-col gap-2">
+          {/* Title and Channel */}
+          <div className="flex items-start gap-2">
+            <div className="flex-shrink-0 pt-0.5">
+              <ChannelIcon channel={conversation.channel} className="h-4 w-4" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="font-semibold text-sm leading-tight mb-1 text-foreground truncate">
+                {conversation.title || 'Untitled Conversation'}
+              </h3>
+              <p className="text-xs text-muted-foreground line-clamp-1">
+                {conversation.summary_for_human || 'No summary available'}
+              </p>
+            </div>
+          </div>
+          
+          {/* Footer: Priority + Time */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5">
+              {conversation.priority && (
+                <Badge 
+                  variant={getPriorityVariant(conversation.priority)}
+                  className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                >
+                  {conversation.priority.charAt(0).toUpperCase() + conversation.priority.slice(1)}
+                </Badge>
+              )}
+            </div>
+            <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+              <Clock className="h-3 w-3" />
+              <span>{formatDistanceToNow(new Date(conversation.created_at!), { addSuffix: true })}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Desktop layout (unchanged)
   return (
     <div
       onClick={onClick}
