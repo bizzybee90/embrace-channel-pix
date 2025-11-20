@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Plus, Smile, Meh, Frown } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ChannelIcon } from '@/components/shared/ChannelIcon';
 import { Conversation } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
@@ -23,6 +23,7 @@ interface MobileConversationListProps {
 const statusOptions = ['all', 'new', 'open', 'pending', 'resolved'];
 const priorityOptions = ['all', 'urgent', 'high', 'medium', 'low'];
 const channelOptions = ['all', 'email', 'sms', 'whatsapp', 'phone', 'webchat'];
+const categoryOptions = ['all', 'billing', 'technical', 'general', 'support'];
 
 export const MobileConversationList = ({
   conversations,
@@ -36,6 +37,27 @@ export const MobileConversationList = ({
   onChannelFilterChange,
   onRefresh,
 }: MobileConversationListProps) => {
+  const [categoryFilter, setCategoryFilter] = useState('all');
+
+  const getSentimentEmoji = (sentiment: string | null) => {
+    if (!sentiment) return null;
+    switch (sentiment.toLowerCase()) {
+      case 'positive': return <Smile className="h-4 w-4 text-green-500" />;
+      case 'negative': return <Frown className="h-4 w-4 text-red-500" />;
+      case 'neutral': return <Meh className="h-4 w-4 text-gray-400" />;
+      default: return null;
+    }
+  };
+
+  const getCustomerInitials = (conversation: Conversation) => {
+    // Extract initials from title or use default
+    const words = conversation.title?.split(' ') || ['U', 'N'];
+    return words.slice(0, 2).map(w => w[0]).join('').toUpperCase() || 'UN';
+  };
+
+  const getMessagePreview = (conversation: Conversation) => {
+    return conversation.summary_for_human || 'No preview available';
+  };
   const getPriorityColor = (priority: string | null): "default" | "secondary" | "destructive" | "outline" => {
     switch (priority) {
       case 'urgent': return 'destructive';
@@ -74,56 +96,69 @@ export const MobileConversationList = ({
   };
 
   return (
-    <div className="flex flex-col h-screen bg-background">
-      {/* Large Title Header with Gradient */}
-      <div className="bg-gradient-to-b from-muted/30 to-transparent pt-16 pb-6 px-6">
-        <h1 className="text-[34px] font-bold text-foreground leading-tight mb-2">
-          {filterTitle}
-        </h1>
-        <p className="text-[15px] text-muted-foreground">
-          {conversations.length} {conversations.length === 1 ? 'conversation' : 'conversations'} {conversations.length === 1 ? 'needs' : 'need'} review
-        </p>
-      </div>
+    <div className="flex flex-col h-screen bg-gradient-to-b from-muted/20 via-background to-background relative">
+      {/* iOS Large Title Header */}
+      <div className="pt-safe bg-background/95 backdrop-blur-xl border-b border-border/40 shadow-sm">
+        <div className="pt-12 pb-4 px-6">
+          <h1 className="text-[34px] font-bold text-foreground leading-[1.2] tracking-tight mb-1">
+            {filterTitle}
+          </h1>
+          <p className="text-[15px] text-muted-foreground font-medium">
+            {conversations.length} {conversations.length === 1 ? 'conversation' : 'conversations'} {conversations.length === 1 ? 'needs' : 'need'} review
+          </p>
+        </div>
 
-      {/* Filter Chips - Horizontal Scrollable */}
-      <div className="px-6 pb-4">
-        <div className="flex gap-2 overflow-x-auto scrollbar-hide">
-          <button
-            onClick={() => cycleFilter(statusFilter, statusOptions, onStatusFilterChange)}
-            className={`flex items-center gap-2 h-9 px-4 rounded-full flex-shrink-0 font-medium text-[13px] transition-all active:scale-95 ${
-              statusFilter === 'all'
-                ? 'bg-muted text-muted-foreground'
-                : 'bg-primary text-primary-foreground shadow-sm'
-            }`}
-          >
-            Status: {statusFilter}
-          </button>
+        {/* iOS Segmented Filter Bar - Sticky */}
+        <div className="px-6 pb-3">
+          <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+            <button
+              onClick={() => cycleFilter(statusFilter, statusOptions, onStatusFilterChange)}
+              className={`flex items-center gap-1.5 h-8 px-3.5 rounded-full flex-shrink-0 font-semibold text-[12px] transition-all active:scale-95 ${
+                statusFilter === 'all'
+                  ? 'bg-muted/80 text-muted-foreground backdrop-blur-sm'
+                  : 'bg-primary text-primary-foreground shadow-[0_2px_8px_rgba(0,0,0,0.12)]'
+              }`}
+            >
+              Status
+            </button>
 
-          <button
-            onClick={() => cycleFilter(priorityFilter, priorityOptions, onPriorityFilterChange)}
-            className={`flex items-center gap-2 h-9 px-4 rounded-full flex-shrink-0 font-medium text-[13px] transition-all active:scale-95 ${
-              priorityFilter === 'all'
-                ? 'bg-muted text-muted-foreground'
-                : 'bg-primary text-primary-foreground shadow-sm'
-            }`}
-          >
-            Priority: {priorityFilter}
-          </button>
+            <button
+              onClick={() => cycleFilter(priorityFilter, priorityOptions, onPriorityFilterChange)}
+              className={`flex items-center gap-1.5 h-8 px-3.5 rounded-full flex-shrink-0 font-semibold text-[12px] transition-all active:scale-95 ${
+                priorityFilter === 'all'
+                  ? 'bg-muted/80 text-muted-foreground backdrop-blur-sm'
+                  : 'bg-primary text-primary-foreground shadow-[0_2px_8px_rgba(0,0,0,0.12)]'
+              }`}
+            >
+              Priority
+            </button>
 
-          <button
-            onClick={() => cycleFilter(channelFilter, channelOptions, onChannelFilterChange)}
-            className={`flex items-center gap-2 h-9 px-4 rounded-full flex-shrink-0 font-medium text-[13px] transition-all active:scale-95 ${
-              channelFilter === 'all'
-                ? 'bg-muted text-muted-foreground'
-                : 'bg-primary text-primary-foreground shadow-sm'
-            }`}
-          >
-            Channel: {channelFilter}
-          </button>
+            <button
+              onClick={() => cycleFilter(channelFilter, channelOptions, onChannelFilterChange)}
+              className={`flex items-center gap-1.5 h-8 px-3.5 rounded-full flex-shrink-0 font-semibold text-[12px] transition-all active:scale-95 ${
+                channelFilter === 'all'
+                  ? 'bg-muted/80 text-muted-foreground backdrop-blur-sm'
+                  : 'bg-primary text-primary-foreground shadow-[0_2px_8px_rgba(0,0,0,0.12)]'
+              }`}
+            >
+              Channel
+            </button>
+
+            <button
+              onClick={() => cycleFilter(categoryFilter, categoryOptions, setCategoryFilter)}
+              className={`flex items-center gap-1.5 h-8 px-3.5 rounded-full flex-shrink-0 font-semibold text-[12px] transition-all active:scale-95 ${
+                categoryFilter === 'all'
+                  ? 'bg-muted/80 text-muted-foreground backdrop-blur-sm'
+                  : 'bg-primary text-primary-foreground shadow-[0_2px_8px_rgba(0,0,0,0.12)]'
+              }`}
+            >
+              Category
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Conversation Cards with Pull-to-Refresh */}
+      {/* Premium Conversation Cards with Pull-to-Refresh */}
       <div className="flex-1 overflow-hidden">
         <PullToRefresh
           onRefresh={onRefresh}
@@ -134,82 +169,137 @@ export const MobileConversationList = ({
             </div>
           }
         >
-          <div className="h-full overflow-y-auto">
-            <div className="px-6 pb-6 space-y-3">
+          <div className="h-full overflow-y-auto overscroll-contain">
+            <div className="pt-6 px-6 pb-[140px] space-y-[18px]">
               {conversations.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-24 px-6 text-center">
-                  <div className="w-24 h-24 rounded-full bg-muted/50 flex items-center justify-center mb-6">
-                    <ChevronRight className="h-12 w-12 text-muted-foreground/50" />
+                <div className="flex flex-col items-center justify-center py-32 px-6 text-center">
+                  <div className="w-20 h-20 rounded-full bg-gradient-to-br from-muted/50 to-muted/30 flex items-center justify-center mb-6 shadow-inner">
+                    <ChevronRight className="h-10 w-10 text-muted-foreground/40" />
                   </div>
-                  <p className="text-[20px] font-semibold text-foreground mb-2">
+                  <p className="text-[22px] font-bold text-foreground mb-2">
                     All Clear
                   </p>
-                  <p className="text-[15px] text-muted-foreground max-w-[280px]">
+                  <p className="text-[15px] text-muted-foreground max-w-[280px] leading-relaxed">
                     No conversations match your filters. Take a break or adjust your view.
                   </p>
                 </div>
               ) : (
-                conversations.map((conversation) => (
-                  <button
-                    key={conversation.id}
-                    onClick={() => onSelect(conversation)}
-                    className="w-full text-left bg-card rounded-[28px] p-5 shadow-sm border border-border/50 hover:shadow-md transition-all active:scale-[0.98]"
-                  >
-                    {/* Title Row */}
-                    <div className="flex items-start justify-between gap-3 mb-3">
-                      <h3 className="text-[17px] font-semibold text-foreground leading-snug line-clamp-2 flex-1">
-                        {conversation.title || 'Untitled Conversation'}
-                      </h3>
-                      <ChevronRight className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
-                    </div>
+                conversations.map((conversation) => {
+                  const isOverdueTicket = isOverdue(conversation);
+                  const priorityColor = conversation.priority === 'high' 
+                    ? 'from-red-50/80 to-red-50/40' 
+                    : conversation.priority === 'medium'
+                    ? 'from-yellow-50/80 to-yellow-50/40'
+                    : 'from-background to-background';
 
-                    {/* Status Badges */}
-                    <div className="flex items-center gap-2 mb-3 flex-wrap">
-                      <Badge
-                        variant={getPriorityColor(conversation.priority)}
-                        className="rounded-full text-[11px] font-semibold h-7 px-3 uppercase tracking-wide"
-                      >
-                        {conversation.priority || 'medium'}
-                      </Badge>
+                  return (
+                    <button
+                      key={conversation.id}
+                      onClick={() => onSelect(conversation)}
+                      className="w-full text-left bg-gradient-to-b from-card to-card/95 rounded-[24px] p-5 
+                        shadow-[0_2px_8px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.06),0_0_0_1px_rgba(0,0,0,0.04)]
+                        hover:shadow-[0_4px_16px_rgba(0,0,0,0.08),0_2px_4px_rgba(0,0,0,0.08)]
+                        transition-all duration-200 active:scale-[0.97] border border-border/40
+                        relative overflow-hidden"
+                    >
+                      {/* Subtle gradient overlay */}
+                      <div className={`absolute inset-0 bg-gradient-to-br ${priorityColor} opacity-30 pointer-events-none`} />
 
-                      <div className="flex items-center gap-2 px-3 h-7 rounded-full bg-muted/50">
-                        <ChannelIcon channel={conversation.channel} className="h-3.5 w-3.5" />
-                        <span className="text-[11px] font-semibold text-foreground capitalize tracking-wide">
-                          {conversation.channel}
-                        </span>
+                      {/* Content */}
+                      <div className="relative">
+                        {/* Top Row: Avatar + Title + Channel Icon */}
+                        <div className="flex items-start gap-3 mb-3">
+                          <Avatar className="h-11 w-11 ring-2 ring-border/20 flex-shrink-0">
+                            <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/10 text-primary font-bold text-[13px]">
+                              {getCustomerInitials(conversation)}
+                            </AvatarFallback>
+                          </Avatar>
+
+                          <div className="flex-1 min-w-0">
+                            <h3 className="text-[17px] font-bold text-foreground leading-tight line-clamp-2 mb-1">
+                              {conversation.title || 'Untitled Conversation'}
+                            </h3>
+                            <p className="text-[13px] text-muted-foreground line-clamp-1 leading-relaxed">
+                              {getMessagePreview(conversation)}
+                            </p>
+                          </div>
+
+                          <div className="flex-shrink-0 flex flex-col items-end gap-1.5">
+                            <ChannelIcon 
+                              channel={conversation.channel} 
+                              className="h-5 w-5 text-primary/70" 
+                            />
+                            {getSentimentEmoji(conversation.ai_sentiment)}
+                          </div>
+                        </div>
+
+                        {/* Badges Row */}
+                        <div className="flex items-center gap-2 mb-3 flex-wrap">
+                          {conversation.priority === 'high' && (
+                            <Badge
+                              variant="destructive"
+                              className="rounded-full text-[10px] font-bold h-6 px-2.5 uppercase tracking-wider"
+                            >
+                              {conversation.priority}
+                            </Badge>
+                          )}
+
+                          {isOverdueTicket && (
+                            <Badge
+                              variant="destructive"
+                              className="rounded-full text-[10px] font-bold h-6 px-2.5 uppercase tracking-wider animate-pulse"
+                            >
+                              Overdue
+                            </Badge>
+                          )}
+
+                          {conversation.category && (
+                            <Badge
+                              variant="outline"
+                              className="rounded-full text-[10px] font-semibold h-6 px-2.5 capitalize bg-muted/50"
+                            >
+                              {conversation.category}
+                            </Badge>
+                          )}
+                        </div>
+
+                        {/* Bottom Meta Row */}
+                        <div className="flex items-center justify-between text-[12px] text-muted-foreground">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">
+                              {conversation.created_at &&
+                                formatDistanceToNow(new Date(conversation.created_at), {
+                                  addSuffix: true,
+                                })}
+                            </span>
+                            {conversation.sla_due_at && (
+                              <>
+                                <span>•</span>
+                                <span className={isOverdueTicket ? 'text-destructive font-semibold' : 'font-medium'}>
+                                  SLA: {formatDistanceToNow(new Date(conversation.sla_due_at))}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground/50" />
+                        </div>
                       </div>
-
-                      {isOverdue(conversation) && (
-                        <Badge
-                          variant="destructive"
-                          className="rounded-full text-[11px] font-semibold h-7 px-3 uppercase tracking-wide"
-                        >
-                          Overdue
-                        </Badge>
-                      )}
-                    </div>
-
-                    {/* Meta Row */}
-                    <div className="flex items-center gap-2 text-[13px] text-muted-foreground">
-                      {conversation.category && (
-                        <>
-                          <span className="capitalize font-medium">{conversation.category}</span>
-                          <span>•</span>
-                        </>
-                      )}
-                      <span>
-                        {conversation.created_at &&
-                          formatDistanceToNow(new Date(conversation.created_at), {
-                            addSuffix: true,
-                          })}
-                      </span>
-                    </div>
-                  </button>
-                ))
+                    </button>
+                  );
+                })
               )}
             </div>
           </div>
         </PullToRefresh>
+      </div>
+
+      {/* Floating Bottom Bar - iOS Blur */}
+      <div className="absolute bottom-0 left-0 right-0 h-24 bg-background/80 backdrop-blur-2xl border-t border-border/40 shadow-[0_-4px_16px_rgba(0,0,0,0.08)] pointer-events-none">
+        <div className="flex items-center justify-center h-full pointer-events-auto px-6">
+          <button className="h-14 w-14 rounded-full bg-primary text-primary-foreground shadow-[0_4px_16px_rgba(0,0,0,0.16)] flex items-center justify-center transition-all active:scale-95 hover:shadow-[0_6px_20px_rgba(0,0,0,0.2)]">
+            <Plus className="h-6 w-6" />
+          </button>
+        </div>
       </div>
     </div>
   );
