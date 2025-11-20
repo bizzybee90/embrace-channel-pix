@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronRight, Plus, Smile, Meh, Frown } from 'lucide-react';
+import { Plus, Smile, Meh, Frown } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ChannelIcon } from '@/components/shared/ChannelIcon';
@@ -96,138 +96,142 @@ export const MobileConversationList = ({
   };
 
   return (
-    <div className="flex flex-col h-screen bg-gradient-to-b from-muted/20 via-background to-background relative">
-      {/* iOS Large Title Header */}
-      <div className="pt-safe bg-background/95 backdrop-blur-xl border-b border-border/40 shadow-sm">
-        <div className="pt-12 pb-4 px-6">
-          <h1 className="text-[34px] font-bold text-foreground leading-[1.2] tracking-tight mb-1">
+    <div className="flex flex-col h-screen bg-gradient-to-br from-background via-muted/5 to-background relative overflow-hidden">
+      {/* Subtle ambient background */}
+      <div className="absolute inset-0 bg-gradient-radial from-primary/3 via-transparent to-transparent opacity-40 pointer-events-none" />
+      
+      {/* iOS Large Title Header with Sticky Filter Bar */}
+      <div className="sticky top-0 z-20 bg-background/80 backdrop-blur-xl border-b border-border/30 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+        {/* Large Title Section */}
+        <div className="pt-14 pb-3 px-6">
+          <h1 className="text-[34px] font-bold text-foreground leading-[1.15] tracking-tight mb-1">
             {filterTitle}
           </h1>
-          <p className="text-[15px] text-muted-foreground font-medium">
-            {conversations.length} {conversations.length === 1 ? 'conversation' : 'conversations'} {conversations.length === 1 ? 'needs' : 'need'} review
+          <p className="text-[15px] text-muted-foreground/80 font-medium">
+            {conversations.length} conversation{conversations.length !== 1 ? 's' : ''} need{conversations.length === 1 ? 's' : ''} review
           </p>
         </div>
 
-        {/* iOS Segmented Filter Bar - Sticky */}
-        <div className="px-6 pb-3">
-          <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+        {/* Pinned iOS Segmented Filter Bar */}
+        <div className="px-6 pb-4">
+          <div className="flex gap-2 overflow-x-auto scrollbar-hide">
             <button
               onClick={() => cycleFilter(statusFilter, statusOptions, onStatusFilterChange)}
-              className={`flex items-center gap-1.5 h-8 px-3.5 rounded-full flex-shrink-0 font-semibold text-[12px] transition-all active:scale-95 ${
+              className={`flex items-center gap-1.5 h-[30px] px-4 rounded-full flex-shrink-0 font-semibold text-[13px] transition-all duration-200 active:scale-95 ${
                 statusFilter === 'all'
-                  ? 'bg-muted/80 text-muted-foreground backdrop-blur-sm'
-                  : 'bg-primary text-primary-foreground shadow-[0_2px_8px_rgba(0,0,0,0.12)]'
+                  ? 'bg-muted/60 text-muted-foreground/70'
+                  : 'bg-primary text-primary-foreground shadow-[0_2px_12px_rgba(0,0,0,0.15),0_1px_3px_rgba(0,0,0,0.1)]'
               }`}
             >
-              Status
+              {statusFilter === 'all' ? 'Status' : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)}
             </button>
 
             <button
               onClick={() => cycleFilter(priorityFilter, priorityOptions, onPriorityFilterChange)}
-              className={`flex items-center gap-1.5 h-8 px-3.5 rounded-full flex-shrink-0 font-semibold text-[12px] transition-all active:scale-95 ${
+              className={`flex items-center gap-1.5 h-[30px] px-4 rounded-full flex-shrink-0 font-semibold text-[13px] transition-all duration-200 active:scale-95 ${
                 priorityFilter === 'all'
-                  ? 'bg-muted/80 text-muted-foreground backdrop-blur-sm'
-                  : 'bg-primary text-primary-foreground shadow-[0_2px_8px_rgba(0,0,0,0.12)]'
+                  ? 'bg-muted/60 text-muted-foreground/70'
+                  : 'bg-primary text-primary-foreground shadow-[0_2px_12px_rgba(0,0,0,0.15),0_1px_3px_rgba(0,0,0,0.1)]'
               }`}
             >
-              Priority
+              {priorityFilter === 'all' ? 'Priority' : priorityFilter.charAt(0).toUpperCase() + priorityFilter.slice(1)}
             </button>
 
             <button
               onClick={() => cycleFilter(channelFilter, channelOptions, onChannelFilterChange)}
-              className={`flex items-center gap-1.5 h-8 px-3.5 rounded-full flex-shrink-0 font-semibold text-[12px] transition-all active:scale-95 ${
+              className={`flex items-center gap-1.5 h-[30px] px-4 rounded-full flex-shrink-0 font-semibold text-[13px] transition-all duration-200 active:scale-95 ${
                 channelFilter === 'all'
-                  ? 'bg-muted/80 text-muted-foreground backdrop-blur-sm'
-                  : 'bg-primary text-primary-foreground shadow-[0_2px_8px_rgba(0,0,0,0.12)]'
+                  ? 'bg-muted/60 text-muted-foreground/70'
+                  : 'bg-primary text-primary-foreground shadow-[0_2px_12px_rgba(0,0,0,0.15),0_1px_3px_rgba(0,0,0,0.1)]'
               }`}
             >
-              Channel
+              {channelFilter === 'all' ? 'Channel' : channelFilter.charAt(0).toUpperCase() + channelFilter.slice(1)}
             </button>
 
             <button
               onClick={() => cycleFilter(categoryFilter, categoryOptions, setCategoryFilter)}
-              className={`flex items-center gap-1.5 h-8 px-3.5 rounded-full flex-shrink-0 font-semibold text-[12px] transition-all active:scale-95 ${
+              className={`flex items-center gap-1.5 h-[30px] px-4 rounded-full flex-shrink-0 font-semibold text-[13px] transition-all duration-200 active:scale-95 ${
                 categoryFilter === 'all'
-                  ? 'bg-muted/80 text-muted-foreground backdrop-blur-sm'
-                  : 'bg-primary text-primary-foreground shadow-[0_2px_8px_rgba(0,0,0,0.12)]'
+                  ? 'bg-muted/60 text-muted-foreground/70'
+                  : 'bg-primary text-primary-foreground shadow-[0_2px_12px_rgba(0,0,0,0.15),0_1px_3px_rgba(0,0,0,0.1)]'
               }`}
             >
-              Category
+              {categoryFilter === 'all' ? 'Category' : categoryFilter.charAt(0).toUpperCase() + categoryFilter.slice(1)}
             </button>
           </div>
         </div>
       </div>
 
       {/* Premium Conversation Cards with Pull-to-Refresh */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-hidden relative">
         <PullToRefresh
           onRefresh={onRefresh}
           pullingContent=""
           refreshingContent={
-            <div className="flex justify-center py-4">
-              <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+            <div className="flex justify-center py-6">
+              <div className="h-8 w-8 border-[3px] border-primary/30 border-t-primary rounded-full animate-spin" />
             </div>
           }
+          className="h-full"
         >
           <div className="h-full overflow-y-auto overscroll-contain">
-            <div className="pt-6 px-6 pb-[140px] space-y-[18px]">
+            <div className="pt-6 px-5 pb-[140px] space-y-[18px]">
               {conversations.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-32 px-6 text-center">
-                  <div className="w-20 h-20 rounded-full bg-gradient-to-br from-muted/50 to-muted/30 flex items-center justify-center mb-6 shadow-inner">
-                    <ChevronRight className="h-10 w-10 text-muted-foreground/40" />
+                  <div className="w-20 h-20 rounded-full bg-gradient-to-br from-muted/40 to-muted/20 flex items-center justify-center mb-6 shadow-inner">
+                    <div className="w-12 h-12 rounded-full bg-muted/30" />
                   </div>
-                  <p className="text-[22px] font-bold text-foreground mb-2">
+                  <p className="text-[20px] font-semibold text-foreground mb-2">
                     All Clear
                   </p>
-                  <p className="text-[15px] text-muted-foreground max-w-[280px] leading-relaxed">
-                    No conversations match your filters. Take a break or adjust your view.
+                  <p className="text-[15px] text-muted-foreground/70 max-w-[260px] leading-relaxed">
+                    No conversations match your filters. Adjust your view or take a break.
                   </p>
                 </div>
               ) : (
                 conversations.map((conversation) => {
                   const isOverdueTicket = isOverdue(conversation);
-                  const priorityColor = conversation.priority === 'high' 
-                    ? 'from-red-50/80 to-red-50/40' 
-                    : conversation.priority === 'medium'
-                    ? 'from-yellow-50/80 to-yellow-50/40'
-                    : 'from-background to-background';
+                  const accentColor = getAccentBarColor(conversation);
 
                   return (
                     <button
                       key={conversation.id}
                       onClick={() => onSelect(conversation)}
-                      className="w-full text-left bg-gradient-to-b from-card to-card/95 rounded-[24px] p-5 
-                        shadow-[0_2px_8px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.06),0_0_0_1px_rgba(0,0,0,0.04)]
-                        hover:shadow-[0_4px_16px_rgba(0,0,0,0.08),0_2px_4px_rgba(0,0,0,0.08)]
-                        transition-all duration-200 active:scale-[0.97] border border-border/40
-                        relative overflow-hidden"
+                      className="w-full text-left bg-card rounded-[24px] p-5 
+                        shadow-[0_1px_3px_rgba(0,0,0,0.05),0_4px_12px_rgba(0,0,0,0.04),0_8px_24px_rgba(0,0,0,0.03)]
+                        hover:shadow-[0_2px_6px_rgba(0,0,0,0.08),0_8px_20px_rgba(0,0,0,0.06)]
+                        transition-all duration-300 ease-out
+                        active:scale-[0.97]
+                        border border-border/40
+                        relative overflow-hidden
+                        bg-gradient-to-b from-card via-card to-card/95"
                     >
-                      {/* Subtle gradient overlay */}
-                      <div className={`absolute inset-0 bg-gradient-to-br ${priorityColor} opacity-30 pointer-events-none`} />
+                      {/* Left Accent Bar */}
+                      <div className={`absolute left-0 top-0 bottom-0 w-1 ${accentColor} ${isOverdueTicket ? 'animate-pulse' : ''}`} />
 
-                      {/* Content */}
-                      <div className="relative">
+                      {/* Card Content */}
+                      <div className="relative pl-1">
                         {/* Top Row: Avatar + Title + Channel Icon */}
                         <div className="flex items-start gap-3 mb-3">
-                          <Avatar className="h-11 w-11 ring-2 ring-border/20 flex-shrink-0">
-                            <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/10 text-primary font-bold text-[13px]">
+                          <Avatar className="h-12 w-12 ring-2 ring-border/30 flex-shrink-0 shadow-sm">
+                            <AvatarFallback className="bg-gradient-to-br from-primary/15 to-primary/5 text-primary font-bold text-[14px]">
                               {getCustomerInitials(conversation)}
                             </AvatarFallback>
                           </Avatar>
 
                           <div className="flex-1 min-w-0">
-                            <h3 className="text-[17px] font-bold text-foreground leading-tight line-clamp-2 mb-1">
+                            <h3 className="text-[18px] font-semibold text-foreground leading-tight mb-1 line-clamp-1">
                               {conversation.title || 'Untitled Conversation'}
                             </h3>
-                            <p className="text-[13px] text-muted-foreground line-clamp-1 leading-relaxed">
+                            <p className="text-[14px] text-muted-foreground/80 line-clamp-2 leading-[1.4]">
                               {getMessagePreview(conversation)}
                             </p>
                           </div>
 
-                          <div className="flex-shrink-0 flex flex-col items-end gap-1.5">
+                          <div className="flex-shrink-0 flex flex-col items-end gap-2">
                             <ChannelIcon 
                               channel={conversation.channel} 
-                              className="h-5 w-5 text-primary/70" 
+                              className="h-5 w-5 text-primary/60" 
                             />
                             {getSentimentEmoji(conversation.ai_sentiment)}
                           </div>
@@ -238,7 +242,7 @@ export const MobileConversationList = ({
                           {conversation.priority === 'high' && (
                             <Badge
                               variant="destructive"
-                              className="rounded-full text-[10px] font-bold h-6 px-2.5 uppercase tracking-wider"
+                              className="rounded-full text-[11px] font-bold h-5 px-2.5 uppercase tracking-wide shadow-sm"
                             >
                               {conversation.priority}
                             </Badge>
@@ -247,7 +251,7 @@ export const MobileConversationList = ({
                           {isOverdueTicket && (
                             <Badge
                               variant="destructive"
-                              className="rounded-full text-[10px] font-bold h-6 px-2.5 uppercase tracking-wider animate-pulse"
+                              className="rounded-full text-[11px] font-bold h-5 px-2.5 uppercase tracking-wide animate-pulse shadow-sm"
                             >
                               Overdue
                             </Badge>
@@ -256,15 +260,15 @@ export const MobileConversationList = ({
                           {conversation.category && (
                             <Badge
                               variant="outline"
-                              className="rounded-full text-[10px] font-semibold h-6 px-2.5 capitalize bg-muted/50"
+                              className="rounded-full text-[11px] font-semibold h-5 px-2.5 capitalize bg-muted/40 border-border/60"
                             >
                               {conversation.category}
                             </Badge>
                           )}
                         </div>
 
-                        {/* Bottom Meta Row */}
-                        <div className="flex items-center justify-between text-[12px] text-muted-foreground">
+                        {/* Bottom Metadata Row */}
+                        <div className="flex items-center justify-between text-[12px] text-muted-foreground/60">
                           <div className="flex items-center gap-2">
                             <span className="font-medium">
                               {conversation.created_at &&
@@ -281,7 +285,6 @@ export const MobileConversationList = ({
                               </>
                             )}
                           </div>
-                          <ChevronRight className="h-4 w-4 text-muted-foreground/50" />
                         </div>
                       </div>
                     </button>
@@ -293,11 +296,18 @@ export const MobileConversationList = ({
         </PullToRefresh>
       </div>
 
-      {/* Floating Bottom Bar - iOS Blur */}
-      <div className="absolute bottom-0 left-0 right-0 h-24 bg-background/80 backdrop-blur-2xl border-t border-border/40 shadow-[0_-4px_16px_rgba(0,0,0,0.08)] pointer-events-none">
+      {/* Translucent Blurred Floating Bottom Bar */}
+      <div className="absolute bottom-0 left-0 right-0 h-28 bg-background/70 backdrop-blur-2xl border-t border-border/30 shadow-[0_-2px_16px_rgba(0,0,0,0.06)] pointer-events-none">
         <div className="flex items-center justify-center h-full pointer-events-auto px-6">
-          <button className="h-14 w-14 rounded-full bg-primary text-primary-foreground shadow-[0_4px_16px_rgba(0,0,0,0.16)] flex items-center justify-center transition-all active:scale-95 hover:shadow-[0_6px_20px_rgba(0,0,0,0.2)]">
-            <Plus className="h-6 w-6" />
+          <button 
+            className="h-14 w-14 rounded-full bg-primary text-primary-foreground 
+              shadow-[0_4px_20px_rgba(0,0,0,0.15),0_2px_8px_rgba(0,0,0,0.1)] 
+              flex items-center justify-center 
+              transition-all duration-200 
+              active:scale-95 
+              hover:shadow-[0_6px_24px_rgba(0,0,0,0.2),0_4px_12px_rgba(0,0,0,0.15)]"
+          >
+            <Plus className="h-6 w-6" strokeWidth={2.5} />
           </button>
         </div>
       </div>
