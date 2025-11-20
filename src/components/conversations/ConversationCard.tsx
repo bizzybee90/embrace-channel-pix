@@ -41,7 +41,7 @@ export const ConversationCard = ({ conversation, selected, onClick }: Conversati
       <div
         onClick={onClick}
         className={cn(
-          "p-3.5 cursor-pointer transition-all duration-200 rounded-lg mb-2 border-l-[6px] border-r-[6px] border-r-border/20",
+          "p-3.5 cursor-pointer transition-all duration-200 rounded-lg mb-2 border-l-4 border-r-4 border-r-border/20",
           "bg-card shadow-sm hover:shadow-md",
           getLeftBorderColor(),
           selected && "bg-primary/5 shadow-md ring-1 ring-primary/20"

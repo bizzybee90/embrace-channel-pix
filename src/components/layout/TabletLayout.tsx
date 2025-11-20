@@ -82,8 +82,8 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
 
         {/* Two-Column Layout */}
         <div className="flex flex-1 overflow-hidden">
-          {/* Left Column: Ticket List (38%) - Fixed width, no movement */}
-          <div className="w-[38%] min-w-[38%] max-w-[38%] border-r border-border bg-background flex flex-col">
+          {/* Left Column: Ticket List (42%) - Fixed width with padding */}
+          <div className="w-[42%] min-w-[42%] max-w-[42%] border-r border-border bg-background flex flex-col">
             {/* Sticky Header */}
             <div className="sticky top-0 z-10 bg-card/95 backdrop-blur-sm border-b border-border/30 px-4 py-3 shadow-sm">
               <h2 className="font-semibold text-sm text-muted-foreground">
