@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Smile, Meh, Frown } from 'lucide-react';
+import { Plus, Smile, Meh, Frown, SlidersHorizontal, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ChannelIcon } from '@/components/shared/ChannelIcon';
@@ -38,6 +38,7 @@ export const MobileConversationList = ({
   onRefresh,
 }: MobileConversationListProps) => {
   const [categoryFilter, setCategoryFilter] = useState('all');
+  const [showFilters, setShowFilters] = useState(false);
 
   const getSentimentEmoji = (sentiment: string | null) => {
     if (!sentiment) return null;
@@ -95,70 +96,111 @@ export const MobileConversationList = ({
     onChange(options[nextIndex]);
   };
 
+  const hasActiveFilters = statusFilter !== 'all' || priorityFilter !== 'all' || channelFilter !== 'all' || categoryFilter !== 'all';
+
   return (
     <div className="flex flex-col h-screen bg-gradient-to-br from-background via-muted/5 to-background relative overflow-hidden">
       {/* Subtle ambient background */}
       <div className="absolute inset-0 bg-gradient-radial from-primary/3 via-transparent to-transparent opacity-40 pointer-events-none" />
       
-      {/* iOS Large Title Header with Sticky Filter Bar */}
-      <div className="sticky top-0 z-20 bg-background/80 backdrop-blur-xl border-b border-border/30 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-        {/* Large Title Section */}
-        <div className="pt-14 pb-3 px-6">
-          <h1 className="text-[34px] font-bold text-foreground leading-[1.15] tracking-tight mb-1">
-            {filterTitle}
-          </h1>
-          <p className="text-[15px] text-muted-foreground/80 font-medium">
-            {conversations.length} conversation{conversations.length !== 1 ? 's' : ''} need{conversations.length === 1 ? 's' : ''} review
-          </p>
-        </div>
-
-        {/* Pinned iOS Segmented Filter Bar */}
-        <div className="px-6 pb-4">
-          <div className="flex gap-2 overflow-x-auto scrollbar-hide">
+      {/* iOS Large Title Header */}
+      <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-xl border-b border-border/20 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+        <div className="pt-16 pb-4 px-6">
+          <div className="flex items-start justify-between mb-2">
+            <div className="flex-1">
+              <h1 className="text-[36px] font-bold text-foreground leading-[1.1] tracking-tight mb-1.5 
+                bg-gradient-to-b from-foreground to-foreground/80 bg-clip-text">
+                {filterTitle}
+              </h1>
+              <p className="text-[14px] text-muted-foreground/70 font-medium tracking-wide">
+                {conversations.length} {conversations.length === 1 ? 'conversation' : 'conversations'}
+              </p>
+            </div>
+            
+            {/* Filter Button */}
             <button
-              onClick={() => cycleFilter(statusFilter, statusOptions, onStatusFilterChange)}
-              className={`flex items-center gap-1.5 h-[30px] px-4 rounded-full flex-shrink-0 font-semibold text-[13px] transition-all duration-200 active:scale-95 ${
-                statusFilter === 'all'
-                  ? 'bg-muted/60 text-muted-foreground/70'
-                  : 'bg-primary text-primary-foreground shadow-[0_2px_12px_rgba(0,0,0,0.15),0_1px_3px_rgba(0,0,0,0.1)]'
+              onClick={() => setShowFilters(!showFilters)}
+              className={`h-9 px-4 rounded-full flex items-center gap-2 font-semibold text-[13px] 
+                transition-all duration-200 active:scale-95 mt-1 ${
+                hasActiveFilters 
+                  ? 'bg-primary text-primary-foreground shadow-[0_2px_12px_rgba(0,0,0,0.15)]' 
+                  : 'bg-muted/60 text-muted-foreground/80'
               }`}
             >
-              {statusFilter === 'all' ? 'Status' : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)}
-            </button>
-
-            <button
-              onClick={() => cycleFilter(priorityFilter, priorityOptions, onPriorityFilterChange)}
-              className={`flex items-center gap-1.5 h-[30px] px-4 rounded-full flex-shrink-0 font-semibold text-[13px] transition-all duration-200 active:scale-95 ${
-                priorityFilter === 'all'
-                  ? 'bg-muted/60 text-muted-foreground/70'
-                  : 'bg-primary text-primary-foreground shadow-[0_2px_12px_rgba(0,0,0,0.15),0_1px_3px_rgba(0,0,0,0.1)]'
-              }`}
-            >
-              {priorityFilter === 'all' ? 'Priority' : priorityFilter.charAt(0).toUpperCase() + priorityFilter.slice(1)}
-            </button>
-
-            <button
-              onClick={() => cycleFilter(channelFilter, channelOptions, onChannelFilterChange)}
-              className={`flex items-center gap-1.5 h-[30px] px-4 rounded-full flex-shrink-0 font-semibold text-[13px] transition-all duration-200 active:scale-95 ${
-                channelFilter === 'all'
-                  ? 'bg-muted/60 text-muted-foreground/70'
-                  : 'bg-primary text-primary-foreground shadow-[0_2px_12px_rgba(0,0,0,0.15),0_1px_3px_rgba(0,0,0,0.1)]'
-              }`}
-            >
-              {channelFilter === 'all' ? 'Channel' : channelFilter.charAt(0).toUpperCase() + channelFilter.slice(1)}
-            </button>
-
-            <button
-              onClick={() => cycleFilter(categoryFilter, categoryOptions, setCategoryFilter)}
-              className={`flex items-center gap-1.5 h-[30px] px-4 rounded-full flex-shrink-0 font-semibold text-[13px] transition-all duration-200 active:scale-95 ${
-                categoryFilter === 'all'
-                  ? 'bg-muted/60 text-muted-foreground/70'
-                  : 'bg-primary text-primary-foreground shadow-[0_2px_12px_rgba(0,0,0,0.15),0_1px_3px_rgba(0,0,0,0.1)]'
-              }`}
-            >
-              {categoryFilter === 'all' ? 'Category' : categoryFilter.charAt(0).toUpperCase() + categoryFilter.slice(1)}
+              <SlidersHorizontal className="h-4 w-4" />
+              Filter
+              {hasActiveFilters && (
+                <div className="h-1.5 w-1.5 rounded-full bg-primary-foreground" />
+              )}
             </button>
           </div>
+
+          {/* Collapsible Filter Panel */}
+          {showFilters && (
+            <div className="mt-4 pt-4 border-t border-border/20 animate-in slide-in-from-top-2 duration-200">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[13px] font-semibold text-foreground/60 uppercase tracking-wider">Filters</span>
+                {hasActiveFilters && (
+                  <button
+                    onClick={() => {
+                      onStatusFilterChange('all');
+                      onPriorityFilterChange('all');
+                      onChannelFilterChange('all');
+                      setCategoryFilter('all');
+                    }}
+                    className="text-[13px] font-semibold text-primary active:scale-95 transition-transform"
+                  >
+                    Clear All
+                  </button>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => cycleFilter(statusFilter, statusOptions, onStatusFilterChange)}
+                  className={`flex items-center gap-1.5 h-8 px-3.5 rounded-full flex-shrink-0 font-semibold text-[12px] transition-all duration-200 active:scale-95 ${
+                    statusFilter === 'all'
+                      ? 'bg-muted/50 text-muted-foreground/60 border border-border/30'
+                      : 'bg-primary text-primary-foreground shadow-[0_2px_8px_rgba(0,0,0,0.12)]'
+                  }`}
+                >
+                  {statusFilter === 'all' ? 'Status' : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)}
+                </button>
+
+                <button
+                  onClick={() => cycleFilter(priorityFilter, priorityOptions, onPriorityFilterChange)}
+                  className={`flex items-center gap-1.5 h-8 px-3.5 rounded-full flex-shrink-0 font-semibold text-[12px] transition-all duration-200 active:scale-95 ${
+                    priorityFilter === 'all'
+                      ? 'bg-muted/50 text-muted-foreground/60 border border-border/30'
+                      : 'bg-primary text-primary-foreground shadow-[0_2px_8px_rgba(0,0,0,0.12)]'
+                  }`}
+                >
+                  {priorityFilter === 'all' ? 'Priority' : priorityFilter.charAt(0).toUpperCase() + priorityFilter.slice(1)}
+                </button>
+
+                <button
+                  onClick={() => cycleFilter(channelFilter, channelOptions, onChannelFilterChange)}
+                  className={`flex items-center gap-1.5 h-8 px-3.5 rounded-full flex-shrink-0 font-semibold text-[12px] transition-all duration-200 active:scale-95 ${
+                    channelFilter === 'all'
+                      ? 'bg-muted/50 text-muted-foreground/60 border border-border/30'
+                      : 'bg-primary text-primary-foreground shadow-[0_2px_8px_rgba(0,0,0,0.12)]'
+                  }`}
+                >
+                  {channelFilter === 'all' ? 'Channel' : channelFilter.charAt(0).toUpperCase() + channelFilter.slice(1)}
+                </button>
+
+                <button
+                  onClick={() => cycleFilter(categoryFilter, categoryOptions, setCategoryFilter)}
+                  className={`flex items-center gap-1.5 h-8 px-3.5 rounded-full flex-shrink-0 font-semibold text-[12px] transition-all duration-200 active:scale-95 ${
+                    categoryFilter === 'all'
+                      ? 'bg-muted/50 text-muted-foreground/60 border border-border/30'
+                      : 'bg-primary text-primary-foreground shadow-[0_2px_8px_rgba(0,0,0,0.12)]'
+                  }`}
+                >
+                  {categoryFilter === 'all' ? 'Category' : categoryFilter.charAt(0).toUpperCase() + categoryFilter.slice(1)}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
