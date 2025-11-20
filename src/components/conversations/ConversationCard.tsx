@@ -26,132 +26,167 @@ export const ConversationCard = ({ conversation, selected, onClick }: Conversati
     }
   };
 
+  const getPriorityBarColor = (priority: string | null) => {
+    if (!priority) return 'bg-muted';
+    switch (priority.toLowerCase()) {
+      case 'urgent': return 'bg-priority-urgent';
+      case 'high': return 'bg-priority-high';
+      case 'medium': return 'bg-priority-medium';
+      case 'low': return 'bg-priority-low';
+      default: return 'bg-muted';
+    }
+  };
+
+  const isOverdue = conversation.sla_due_at && new Date() > new Date(conversation.sla_due_at);
+
   // Compact tablet layout
   if (isTablet) {
-    const getLeftBorderColor = () => {
-      if (conversation.sla_due_at && new Date() > new Date(conversation.sla_due_at)) {
-        return 'border-l-destructive';
-      }
-      if (conversation.priority === 'high') return 'border-l-amber-500';
-      if (conversation.priority === 'medium') return 'border-l-amber-400';
-      return 'border-l-success';
-    };
-
     return (
       <div
         onClick={onClick}
         className={cn(
-          "p-3.5 cursor-pointer transition-all duration-200 rounded-lg mb-2 border-l-4 border-r-4 border-r-border/20",
-          "bg-card shadow-sm hover:shadow-md",
-          getLeftBorderColor(),
-          selected && "bg-primary/5 shadow-md ring-1 ring-primary/20"
+          "relative cursor-pointer transition-all duration-300 rounded-[22px] mb-3",
+          "bg-card border border-border/30 hover:border-primary/30",
+          "apple-shadow hover:apple-shadow-lg spring-press",
+          selected && "border-primary/50 apple-shadow-lg bg-gradient-to-br from-primary/8 via-primary/4 to-card"
         )}
       >
-        <div className="flex flex-col gap-2">
-          {/* Header Row: Channel + Title */}
-          <div className="flex items-start gap-2.5">
-            <div className="flex-shrink-0 mt-0.5">
-              <ChannelIcon channel={conversation.channel} className="h-4 w-4" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-sm leading-tight text-foreground line-clamp-1">
-                {conversation.title || 'Untitled Conversation'}
-              </h3>
-            </div>
+        {/* Priority Accent Bar */}
+        {conversation.priority && (
+          <div 
+            className={cn(
+              "absolute top-0 left-0 right-0 h-[3px] rounded-t-[22px]",
+              getPriorityBarColor(conversation.priority)
+            )} 
+          />
+        )}
+        
+        {/* Overdue Badge */}
+        {isOverdue && (
+          <Badge variant="priority-urgent" className="absolute top-4 right-4 text-[11px] font-bold uppercase tracking-wide px-3 py-1.5 rounded-full shadow-sm">
+            Overdue
+          </Badge>
+        )}
+
+        <div className="p-5">
+          {/* Title */}
+          <h3 className={cn(
+            "font-semibold text-base leading-snug mb-2.5 line-clamp-2 text-foreground",
+            isOverdue && "pr-20"
+          )}>
+            {conversation.title || 'Untitled Conversation'}
+          </h3>
+
+          {/* Description */}
+          {(conversation.summary_for_human || conversation.ai_reason_for_escalation) && (
+            <p className="text-sm text-muted-foreground leading-relaxed mb-3.5 line-clamp-2">
+              {conversation.summary_for_human || conversation.ai_reason_for_escalation}
+            </p>
+          )}
+
+          {/* Badge Row */}
+          <div className="flex flex-wrap items-center gap-2 mb-3.5">
+            {conversation.priority && (
+              <Badge 
+                variant={getPriorityVariant(conversation.priority)}
+                className="rounded-full text-xs font-bold uppercase tracking-wide px-3 py-1.5 shadow-sm"
+              >
+                {conversation.priority}
+              </Badge>
+            )}
+            
+            <Badge variant="outline" className="rounded-full text-xs font-semibold px-3 py-1.5 border-border/50 flex items-center gap-1.5">
+              <ChannelIcon channel={conversation.channel} className="h-3.5 w-3.5" />
+              {conversation.channel}
+            </Badge>
           </div>
-          
-          {/* Summary */}
-          <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed pl-6">
-            {conversation.summary_for_human || conversation.ai_reason_for_escalation || 'No details available'}
-          </p>
-          
-          {/* Footer: Priority + Time + SLA indicator */}
-          <div className="flex items-center justify-between gap-2 pt-1.5">
-            <div className="flex items-center gap-1.5">
-              {conversation.priority && (
-                <Badge 
-                  variant={getPriorityVariant(conversation.priority)}
-                  className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
-                >
-                  {conversation.priority}
-                </Badge>
-              )}
-              {conversation.sla_due_at && new Date() > new Date(conversation.sla_due_at) && (
-                <Badge variant="destructive" className="rounded-full px-2 py-0.5 text-[10px] font-semibold">
-                  Overdue
-                </Badge>
-              )}
-            </div>
-            <div className="flex items-center gap-1 text-[10px] text-muted-foreground whitespace-nowrap">
+
+          {/* Meta Row */}
+          <div className="flex items-center justify-between text-xs text-muted-foreground font-medium">
+            <span className="uppercase tracking-wide">
+              {conversation.category?.replace(/_/g, ' ') || 'General'}
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="opacity-40">•</span>
               <Clock className="h-3 w-3" />
-              <span>{formatDistanceToNow(new Date(conversation.created_at!), { addSuffix: true })}</span>
-            </div>
+              {formatDistanceToNow(new Date(conversation.created_at!), { addSuffix: true })}
+            </span>
           </div>
         </div>
       </div>
     );
   }
 
-  // Desktop layout (unchanged)
+  // Desktop layout
   return (
     <div
       onClick={onClick}
       className={cn(
-        "p-6 cursor-pointer transition-all duration-300 ease-out rounded-[22px] mb-3",
+        "relative cursor-pointer transition-all duration-300 ease-out rounded-[22px] mb-3",
         "bg-card border border-border/30 hover:border-primary/30",
         "apple-shadow hover:apple-shadow-lg spring-press",
         selected && "border-primary/50 apple-shadow-lg bg-gradient-to-br from-primary/8 via-primary/4 to-card"
       )}
     >
-      <div className="flex flex-col gap-3.5">
-        {/* Header: Channel + Title */}
-        <div className="flex items-start gap-3.5">
-          <div className="flex-shrink-0 pt-0.5">
-            <ChannelIcon channel={conversation.channel} />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-lg leading-snug mb-2 text-foreground">
-              {conversation.title || 'Untitled Conversation'}
-            </h3>
-            <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
-              {conversation.summary_for_human || 'No summary available'}
-            </p>
-          </div>
-        </div>
-        
-        {/* AI Escalation Reason */}
+      {/* Priority Accent Bar */}
+      {conversation.priority && (
+        <div 
+          className={cn(
+            "absolute top-0 left-0 right-0 h-[3px] rounded-t-[22px]",
+            getPriorityBarColor(conversation.priority)
+          )} 
+        />
+      )}
+      
+      {/* Overdue Badge */}
+      {isOverdue && (
+        <Badge variant="priority-urgent" className="absolute top-4 right-4 text-[11px] font-bold uppercase tracking-wide px-3 py-1.5 rounded-full shadow-sm">
+          Overdue
+        </Badge>
+      )}
+
+      <div className="p-6">
+        {/* Title */}
+        <h3 className={cn(
+          "font-semibold text-lg leading-snug mb-2.5 text-foreground line-clamp-2",
+          isOverdue && "pr-20"
+        )}>
+          {conversation.title || 'Untitled Conversation'}
+        </h3>
+
+        {/* Description */}
         {conversation.ai_reason_for_escalation && (
-          <div className="px-3 py-2 rounded-xl bg-muted/50 border border-border/30">
-            <p className="text-xs text-muted-foreground line-clamp-1">
-              {conversation.ai_reason_for_escalation}
-            </p>
-          </div>
+          <p className="text-[15px] text-muted-foreground leading-relaxed mb-4 line-clamp-2">
+            {conversation.ai_reason_for_escalation}
+          </p>
         )}
-        
-        {/* Footer: Badges + Time */}
-        <div className="flex items-center justify-between gap-2 flex-wrap pt-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            {conversation.priority && (
-              <Badge 
-                variant={getPriorityVariant(conversation.priority)}
-                className="rounded-full px-3 py-1.5 text-xs font-semibold shadow-sm"
-              >
-                {conversation.priority.charAt(0).toUpperCase() + conversation.priority.slice(1)}
-              </Badge>
-            )}
-            {conversation.category && (
-              <Badge 
-                variant="outline"
-                className="rounded-full px-3 py-1.5 text-xs font-medium border-border/50"
-              >
-                {conversation.category}
-              </Badge>
-            )}
-          </div>
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
-            <Clock className="h-3.5 w-3.5" />
-            <span>{formatDistanceToNow(new Date(conversation.created_at!), { addSuffix: true })}</span>
-          </div>
+
+        {/* Badge Row */}
+        <div className="flex flex-wrap items-center gap-2.5 mb-4">
+          {conversation.priority && (
+            <Badge 
+              variant={getPriorityVariant(conversation.priority)}
+              className="rounded-full text-xs font-bold uppercase tracking-wide px-3 py-1.5 shadow-sm"
+            >
+              {conversation.priority}
+            </Badge>
+          )}
+          
+          <Badge variant="outline" className="rounded-full text-xs font-semibold px-3 py-1.5 border-border/50 flex items-center gap-1.5">
+            <ChannelIcon channel={conversation.channel} className="h-3.5 w-3.5" />
+            {conversation.channel}
+          </Badge>
+        </div>
+
+        {/* Meta Row */}
+        <div className="flex items-center justify-between text-[13px] text-muted-foreground font-medium">
+          <span className="uppercase tracking-wide">
+            {conversation.category?.replace(/_/g, ' ') || 'General'}
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="opacity-40">•</span>
+            {formatDistanceToNow(new Date(conversation.created_at!), { addSuffix: true })}
+          </span>
         </div>
       </div>
     </div>
