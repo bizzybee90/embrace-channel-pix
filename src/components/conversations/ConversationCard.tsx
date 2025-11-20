@@ -51,14 +51,22 @@ export const ConversationCard = ({ conversation, selected, onClick }: Conversati
           selected && "border-primary/50 apple-shadow-lg bg-gradient-to-br from-primary/8 via-primary/4 to-card"
         )}
       >
-        {/* Priority Accent Bar */}
+        {/* Priority Accent Bar - Wraps Top Corners */}
         {conversation.priority && (
           <div 
             className={cn(
-              "absolute top-0 left-0 right-0 h-[3px] rounded-t-[22px]",
+              "absolute top-0 left-0 right-0 h-1 overflow-hidden rounded-t-[22px]",
+            )}
+          >
+            <div className={cn(
+              "absolute inset-0 h-[4px]",
               getPriorityBarColor(conversation.priority)
             )} 
-          />
+            style={{
+              borderRadius: '22px 22px 0 0',
+            }}
+            />
+          </div>
         )}
         
         {/* Overdue Badge */}
@@ -128,14 +136,22 @@ export const ConversationCard = ({ conversation, selected, onClick }: Conversati
         selected && "border-primary/50 apple-shadow-lg bg-gradient-to-br from-primary/8 via-primary/4 to-card"
       )}
     >
-      {/* Priority Accent Bar */}
+      {/* Priority Accent Bar - Wraps Top Corners */}
       {conversation.priority && (
         <div 
           className={cn(
-            "absolute top-0 left-0 right-0 h-[3px] rounded-t-[22px]",
+            "absolute top-0 left-0 right-0 h-1 overflow-hidden rounded-t-[22px]",
+          )}
+        >
+          <div className={cn(
+            "absolute inset-0 h-[4px]",
             getPriorityBarColor(conversation.priority)
           )} 
-        />
+          style={{
+            borderRadius: '22px 22px 0 0',
+          }}
+          />
+        </div>
       )}
       
       {/* Overdue Badge */}
