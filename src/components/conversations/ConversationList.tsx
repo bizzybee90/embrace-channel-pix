@@ -3,6 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { Conversation } from '@/lib/types';
 import { ConversationCard } from './ConversationCard';
 import { ConversationFilters } from './ConversationFilters';
+import { TabletFilters } from './TabletFilters';
+import { useIsTablet } from '@/hooks/use-tablet';
 import { Loader2 } from 'lucide-react';
 
 interface ConversationListProps {
@@ -15,6 +17,7 @@ interface ConversationListProps {
 export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', onConversationsChange }: ConversationListProps) => {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
+  const isTablet = useIsTablet();
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [priorityFilter, setPriorityFilter] = useState<string[]>([]);
   const [channelFilter, setChannelFilter] = useState<string[]>([]);
@@ -106,18 +109,31 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
 
   return (
     <div className="flex flex-col h-full bg-muted/30 min-w-[300px]">
-      {/* Modern filter design */}
+      {/* Filter bar - tablet uses dropdowns, desktop uses badges */}
       <div className="px-6 py-4 border-b border-border/50 bg-background/80 backdrop-blur-sm">
-        <ConversationFilters
-          statusFilter={statusFilter}
-          setStatusFilter={setStatusFilter}
-          priorityFilter={priorityFilter}
-          setPriorityFilter={setPriorityFilter}
-          channelFilter={channelFilter}
-          setChannelFilter={setChannelFilter}
-          categoryFilter={categoryFilter}
-          setCategoryFilter={setCategoryFilter}
-        />
+        {isTablet ? (
+          <TabletFilters
+            statusFilter={statusFilter}
+            priorityFilter={priorityFilter}
+            channelFilter={channelFilter}
+            categoryFilter={categoryFilter}
+            onStatusChange={setStatusFilter}
+            onPriorityChange={setPriorityFilter}
+            onChannelChange={setChannelFilter}
+            onCategoryChange={setCategoryFilter}
+          />
+        ) : (
+          <ConversationFilters
+            statusFilter={statusFilter}
+            setStatusFilter={setStatusFilter}
+            priorityFilter={priorityFilter}
+            setPriorityFilter={setPriorityFilter}
+            channelFilter={channelFilter}
+            setChannelFilter={setChannelFilter}
+            categoryFilter={categoryFilter}
+            setCategoryFilter={setCategoryFilter}
+          />
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">
