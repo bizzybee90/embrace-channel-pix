@@ -73,24 +73,11 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
 
       {/* Main Container */}
       <div className="flex flex-col w-full h-full">
-        {/* Top Header with Hamburger + Filters */}
+        {/* Top Header with Hamburger Only */}
         <header className="border-b border-border bg-card/50 backdrop-blur-sm px-6 py-4 flex items-center gap-4 flex-shrink-0">
           <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)}>
             <Menu className="h-5 w-5" />
           </Button>
-          
-          <div className="flex-1 flex items-center justify-center gap-3">
-            <ConversationFilters
-              statusFilter={statusFilter}
-              setStatusFilter={setStatusFilter}
-              priorityFilter={priorityFilter}
-              setPriorityFilter={setPriorityFilter}
-              channelFilter={channelFilter}
-              setChannelFilter={setChannelFilter}
-              categoryFilter={categoryFilter}
-              setCategoryFilter={setCategoryFilter}
-            />
-          </div>
         </header>
 
         {/* Two-Column Layout */}
@@ -111,18 +98,29 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
           <div className="flex-1 bg-background flex flex-col overflow-hidden">
             {selectedConversation ? (
               <>
-                {/* Conversation Header with Customer Info Button */}
+                {/* Conversation Header with Action Buttons */}
                 <div className="border-b border-border bg-card/30 backdrop-blur-sm px-6 py-3 flex items-center justify-between flex-shrink-0">
                   <h1 className="text-lg font-semibold truncate">{selectedConversation.title}</h1>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => openDrawer('customer')}
-                    className="rounded-full bg-background/60 backdrop-blur-sm hover:bg-background/80"
-                  >
-                    <User className="h-4 w-4 mr-2" />
-                    Customer Info
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => openDrawer('customer')}
+                      className="rounded-full bg-background/60 backdrop-blur-sm hover:bg-background/80"
+                    >
+                      <User className="h-4 w-4 mr-2" />
+                      Customer Info
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => openDrawer('actions')}
+                      className="rounded-full bg-background/60 backdrop-blur-sm hover:bg-background/80"
+                    >
+                      <Zap className="h-4 w-4 mr-2" />
+                      Quick Actions
+                    </Button>
+                  </div>
                 </div>
 
                 {/* Conversation Content - Scrollable with Desktop Styling */}
