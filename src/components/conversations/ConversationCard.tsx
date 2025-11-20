@@ -45,7 +45,7 @@ export const ConversationCard = ({ conversation, selected, onClick }: Conversati
       <div
         onClick={onClick}
         className={cn(
-          "relative cursor-pointer transition-all duration-300 rounded-[22px] mb-3",
+          "relative cursor-pointer transition-all duration-300 rounded-[22px] mb-3 overflow-hidden",
           "bg-card border border-border/30 hover:border-primary/30",
           "apple-shadow hover:apple-shadow-lg spring-press",
           selected && "border-primary/50 apple-shadow-lg bg-gradient-to-br from-primary/8 via-primary/4 to-card"
@@ -55,13 +55,9 @@ export const ConversationCard = ({ conversation, selected, onClick }: Conversati
         {conversation.priority && (
           <div 
             className={cn(
-              "absolute top-0 left-0 right-0 h-0.5",
+              "absolute top-0 left-0 right-0 h-1",
               getPriorityBarColor(conversation.priority)
             )}
-            style={{
-              borderTopLeftRadius: '22px',
-              borderTopRightRadius: '22px'
-            }}
           />
         )}
         
@@ -126,7 +122,7 @@ export const ConversationCard = ({ conversation, selected, onClick }: Conversati
     <div
       onClick={onClick}
       className={cn(
-        "relative cursor-pointer transition-all duration-300 ease-out rounded-[22px] mb-3",
+        "relative cursor-pointer transition-all duration-300 ease-out rounded-[22px] mb-3 overflow-hidden",
         "bg-card border border-border/30 hover:border-primary/30",
         "apple-shadow hover:apple-shadow-lg spring-press",
         selected && "border-primary/50 apple-shadow-lg bg-gradient-to-br from-primary/8 via-primary/4 to-card"
@@ -136,13 +132,9 @@ export const ConversationCard = ({ conversation, selected, onClick }: Conversati
       {conversation.priority && (
         <div 
           className={cn(
-            "absolute top-0 left-0 right-0 h-0.5",
+            "absolute top-0 left-0 right-0 h-1",
             getPriorityBarColor(conversation.priority)
           )}
-          style={{
-            borderTopLeftRadius: '22px',
-            borderTopRightRadius: '22px'
-          }}
         />
       )}
       
