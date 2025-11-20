@@ -113,6 +113,19 @@ export const MobileFilterSheet = ({
                 Status
               </h3>
               <div className="grid grid-cols-2 gap-3">
+                {/* All button */}
+                <button
+                  onClick={() => onStatusFilterChange([])}
+                  className={cn(
+                    "h-[48px] rounded-2xl text-[15px] font-medium transition-all duration-200",
+                    "active:scale-95 border",
+                    statusFilter.length === 0
+                      ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                      : "bg-muted text-muted-foreground border-border/50"
+                  )}
+                >
+                  All
+                </button>
                 {statusOptions.map((option) => (
                   <button
                     key={option.value}
@@ -137,6 +150,19 @@ export const MobileFilterSheet = ({
                 Priority
               </h3>
               <div className="grid grid-cols-2 gap-3">
+                {/* All button */}
+                <button
+                  onClick={() => onPriorityFilterChange([])}
+                  className={cn(
+                    "h-[48px] rounded-2xl text-[15px] font-medium transition-all duration-200",
+                    "active:scale-95 border",
+                    priorityFilter.length === 0
+                      ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                      : "bg-muted text-muted-foreground border-border/50"
+                  )}
+                >
+                  All
+                </button>
                 {priorityOptions.map((option) => (
                   <button
                     key={option.value}
@@ -161,6 +187,19 @@ export const MobileFilterSheet = ({
                 Channel
               </h3>
               <div className="grid grid-cols-2 gap-3">
+                {/* All button */}
+                <button
+                  onClick={() => onChannelFilterChange([])}
+                  className={cn(
+                    "h-[48px] rounded-2xl text-[15px] font-medium transition-all duration-200",
+                    "active:scale-95 border",
+                    channelFilter.length === 0
+                      ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                      : "bg-muted text-muted-foreground border-border/50"
+                  )}
+                >
+                  All
+                </button>
                 {channelOptions.map((option) => (
                   <button
                     key={option.value}
@@ -185,6 +224,19 @@ export const MobileFilterSheet = ({
                 Category
               </h3>
               <div className="grid grid-cols-2 gap-3">
+                {/* All button */}
+                <button
+                  onClick={() => onCategoryFilterChange([])}
+                  className={cn(
+                    "h-[48px] rounded-2xl text-[15px] font-medium transition-all duration-200",
+                    "active:scale-95 border",
+                    categoryFilter.length === 0
+                      ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                      : "bg-muted text-muted-foreground border-border/50"
+                  )}
+                >
+                  All
+                </button>
                 {categoryOptions.map((option) => (
                   <button
                     key={option.value}

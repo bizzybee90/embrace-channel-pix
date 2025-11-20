@@ -36,6 +36,7 @@ export const ConversationFilters = ({
       value: statusFilter,
       onChange: setStatusFilter,
       options: [
+        { label: 'All', value: '__all__', isAll: true },
         { label: 'New', value: 'new' },
         { label: 'Open', value: 'open' },
         { label: 'Waiting', value: 'waiting_customer' },
@@ -47,6 +48,7 @@ export const ConversationFilters = ({
       value: priorityFilter,
       onChange: setPriorityFilter,
       options: [
+        { label: 'All', value: '__all__', isAll: true },
         { label: 'High', value: 'high' },
         { label: 'Medium', value: 'medium' },
         { label: 'Low', value: 'low' },
@@ -57,6 +59,7 @@ export const ConversationFilters = ({
       value: channelFilter,
       onChange: setChannelFilter,
       options: [
+        { label: 'All', value: '__all__', isAll: true },
         { label: 'SMS', value: 'sms' },
         { label: 'WhatsApp', value: 'whatsapp' },
         { label: 'Email', value: 'email' },
@@ -68,6 +71,7 @@ export const ConversationFilters = ({
       value: categoryFilter,
       onChange: setCategoryFilter,
       options: [
+        { label: 'All', value: '__all__', isAll: true },
         { label: 'Billing', value: 'billing_payment' },
         { label: 'Technical', value: 'technical_support' },
         { label: 'Account', value: 'account_management' },
@@ -83,7 +87,18 @@ export const ConversationFilters = ({
       {filters.map((filter) => (
         <div key={filter.label} className="flex gap-1.5 flex-shrink-0">
           {filter.options.map((option) => {
-            const isSelected = filter.value.includes(option.value);
+            const isSelected = option.isAll 
+              ? filter.value.length === 0 
+              : filter.value.includes(option.value);
+            
+            const handleClick = () => {
+              if (option.isAll) {
+                filter.onChange([]);
+              } else {
+                toggleFilter(filter.value, option.value, filter.onChange);
+              }
+            };
+            
             return (
               <Badge
                 key={option.value}
@@ -94,7 +109,7 @@ export const ConversationFilters = ({
                     ? "bg-primary text-primary-foreground shadow-sm" 
                     : "hover:bg-accent hover:border-primary/20"
                 )}
-                onClick={() => toggleFilter(filter.value, option.value, filter.onChange)}
+                onClick={handleClick}
               >
                 {option.label}
               </Badge>
