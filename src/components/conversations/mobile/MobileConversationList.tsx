@@ -1,10 +1,11 @@
 import { Conversation } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { ChannelIcon } from '@/components/shared/ChannelIcon';
-import { ChevronRight, Inbox } from 'lucide-react';
+import { ChevronRight, Inbox, ChevronLeft } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import PullToRefresh from 'react-simple-pull-to-refresh';
+import { useState } from 'react';
 
 interface MobileConversationListProps {
   conversations: Conversation[];
@@ -31,6 +32,8 @@ export const MobileConversationList = ({
   onChannelFilterChange,
   onRefresh
 }: MobileConversationListProps) => {
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+
   const getPriorityColor = (priority: string | null) => {
     if (!priority) return 'secondary';
     if (priority === 'urgent') return 'destructive';
@@ -39,10 +42,11 @@ export const MobileConversationList = ({
     return 'outline';
   };
 
-  const filters = [
-    { 
-      label: 'Status', 
-      value: statusFilter, 
+  const filterCategories = [
+    {
+      id: 'status',
+      label: 'Status',
+      value: statusFilter,
       onChange: onStatusFilterChange,
       options: [
         { label: 'All', value: 'all' },
@@ -51,9 +55,10 @@ export const MobileConversationList = ({
         { label: 'Pending', value: 'pending' },
       ]
     },
-    { 
-      label: 'Priority', 
-      value: priorityFilter, 
+    {
+      id: 'priority',
+      label: 'Urgency',
+      value: priorityFilter,
       onChange: onPriorityFilterChange,
       options: [
         { label: 'All', value: 'all' },
@@ -63,9 +68,10 @@ export const MobileConversationList = ({
         { label: 'Low', value: 'low' },
       ]
     },
-    { 
-      label: 'Channel', 
-      value: channelFilter, 
+    {
+      id: 'channel',
+      label: 'Channels',
+      value: channelFilter,
       onChange: onChannelFilterChange,
       options: [
         { label: 'All', value: 'all' },
@@ -76,6 +82,8 @@ export const MobileConversationList = ({
       ]
     },
   ];
+
+  const activeFilter = filterCategories.find(f => f.id === activeCategory);
 
   return (
     <div className="h-screen flex flex-col bg-gradient-to-b from-background to-muted/20">
@@ -94,18 +102,40 @@ export const MobileConversationList = ({
       {/* Premium Accent Bar */}
       <div className="h-[3px] bg-gradient-to-r from-primary/60 via-primary to-primary/60 shadow-sm" />
 
-      {/* Premium Filter Chips */}
+      {/* Two-Level Filter System */}
       <div className="px-5 py-4 bg-background/50 backdrop-blur-sm">
         <div className="flex gap-2.5 overflow-x-auto pb-2 scrollbar-hide -mx-5 px-5">
-          {filters.map((filter) => (
-            <div key={filter.label} className="flex gap-2 flex-shrink-0">
-              {filter.options.map((option) => (
+          {!activeCategory ? (
+            // Level 1: Category selection
+            filterCategories.map((category) => (
+              <button
+                key={category.id}
+                onClick={() => setActiveCategory(category.id)}
+                className="rounded-[20px] px-5 py-2.5 text-[14px] font-semibold whitespace-nowrap transition-all duration-300 border bg-gradient-to-b from-primary to-primary/90 text-primary-foreground border-primary/20 shadow-lg shadow-primary/25 flex-shrink-0 active:scale-95"
+              >
+                {category.label}
+              </button>
+            ))
+          ) : (
+            // Level 2: Options for selected category
+            <>
+              <button
+                onClick={() => setActiveCategory(null)}
+                className="rounded-[20px] px-4 py-2.5 text-[14px] font-semibold whitespace-nowrap transition-all duration-300 border bg-background/80 text-foreground border-border/60 hover:bg-accent/50 flex-shrink-0 active:scale-95 flex items-center gap-1.5"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Back
+              </button>
+              {activeFilter?.options.map((option) => (
                 <button
                   key={option.value}
-                  onClick={() => filter.onChange(option.value)}
+                  onClick={() => {
+                    activeFilter.onChange(option.value);
+                    setActiveCategory(null);
+                  }}
                   className={cn(
-                    "rounded-[20px] px-4 py-2 text-[13px] font-semibold whitespace-nowrap transition-all duration-300 border",
-                    filter.value === option.value 
+                    "rounded-[20px] px-4 py-2.5 text-[13px] font-semibold whitespace-nowrap transition-all duration-300 border flex-shrink-0",
+                    activeFilter.value === option.value 
                       ? "bg-gradient-to-b from-primary to-primary/90 text-primary-foreground border-primary/20 shadow-lg shadow-primary/25" 
                       : "bg-background/80 text-foreground border-border/60 hover:bg-accent/50 hover:border-primary/30 active:scale-95"
                   )}
@@ -113,8 +143,8 @@ export const MobileConversationList = ({
                   {option.label}
                 </button>
               ))}
-            </div>
-          ))}
+            </>
+          )}
         </div>
       </div>
 
