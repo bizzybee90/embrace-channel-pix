@@ -191,9 +191,11 @@ export const MobileEscalationHub = ({ filter = 'all-open' }: MobileEscalationHub
       statusFilter={statusFilter}
       priorityFilter={priorityFilter}
       channelFilter={channelFilter}
+      categoryFilter={categoryFilter}
       onStatusFilterChange={setStatusFilter}
       onPriorityFilterChange={setPriorityFilter}
       onChannelFilterChange={setChannelFilter}
+      onCategoryFilterChange={setCategoryFilter}
       onRefresh={handleRefresh}
     />
   );

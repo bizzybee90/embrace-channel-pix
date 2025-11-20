@@ -1,10 +1,11 @@
 import { Conversation } from '@/lib/types';
 import { ChannelIcon } from '@/components/shared/ChannelIcon';
-import { Inbox } from 'lucide-react';
+import { Inbox, SlidersHorizontal } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import PullToRefresh from 'react-simple-pull-to-refresh';
 import { useState, useEffect, useRef } from 'react';
+import { MobileFilterSheet } from './mobile/MobileFilterSheet';
 
 interface MobileConversationListProps {
   conversations: Conversation[];
@@ -36,6 +37,7 @@ export const MobileConversationList = ({
   onRefresh
 }: MobileConversationListProps) => {
   const [isHeaderCompact, setIsHeaderCompact] = useState(false);
+  const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -94,14 +96,31 @@ export const MobileConversationList = ({
     { label: 'Phone', value: 'phone' },
   ];
 
-  const categoryOptions = [
-    { label: 'All', value: 'all' },
-    { label: 'Billing', value: 'billing' },
-    { label: 'Technical', value: 'technical' },
-    { label: 'General', value: 'general' },
-  ];
+  const getActiveFilterCount = () => {
+    let count = 0;
+    if (statusFilter !== 'all') count++;
+    if (priorityFilter !== 'all') count++;
+    if (channelFilter !== 'all') count++;
+    if (categoryFilter !== 'all') count++;
+    return count;
+  };
+
+  const activeFilterCount = getActiveFilterCount();
 
   return (
+    <>
+      <MobileFilterSheet
+        open={isFilterSheetOpen}
+        onOpenChange={setIsFilterSheetOpen}
+        statusFilter={statusFilter}
+        priorityFilter={priorityFilter}
+        channelFilter={channelFilter}
+        categoryFilter={categoryFilter}
+        onStatusFilterChange={onStatusFilterChange}
+        onPriorityFilterChange={onPriorityFilterChange}
+        onChannelFilterChange={onChannelFilterChange}
+        onCategoryFilterChange={onCategoryFilterChange}
+      />
     <div className="h-screen flex flex-col bg-gradient-to-b from-background to-muted/10">
       {/* iOS Large Title Header with Scroll Behavior */}
       <div 
@@ -128,77 +147,27 @@ export const MobileConversationList = ({
         </div>
       </div>
 
-      {/* Filter Chips Row */}
+      {/* Filter Button */}
       <div className="px-5 py-3 bg-background/50 backdrop-blur-sm border-b border-border/5">
-        <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-hide">
-          {/* Status Filters */}
-          {statusOptions.slice(1).map((option) => (
-            <button
-              key={option.value}
-              onClick={() => onStatusFilterChange(statusFilter === option.value ? 'all' : option.value)}
-              className={cn(
-                "flex-shrink-0 h-[36px] px-[14px] rounded-full text-[14px] font-medium transition-all duration-200",
-                "active:scale-95",
-                statusFilter === option.value
-                  ? "bg-gradient-to-r from-primary to-primary/90 text-white shadow-sm" 
-                  : "bg-muted text-muted-foreground"
-              )}
-            >
-              {option.label}
-            </button>
-          ))}
-          
-          {/* Priority Filters */}
-          {priorityOptions.slice(1).map((option) => (
-            <button
-              key={option.value}
-              onClick={() => onPriorityFilterChange(priorityFilter === option.value ? 'all' : option.value)}
-              className={cn(
-                "flex-shrink-0 h-[36px] px-[14px] rounded-full text-[14px] font-medium transition-all duration-200",
-                "active:scale-95",
-                priorityFilter === option.value
-                  ? "bg-gradient-to-r from-primary to-primary/90 text-white shadow-sm" 
-                  : "bg-muted text-muted-foreground"
-              )}
-            >
-              {option.label}
-            </button>
-          ))}
-          
-          {/* Channel Filters */}
-          {channelOptions.slice(1).map((option) => (
-            <button
-              key={option.value}
-              onClick={() => onChannelFilterChange(channelFilter === option.value ? 'all' : option.value)}
-              className={cn(
-                "flex-shrink-0 h-[36px] px-[14px] rounded-full text-[14px] font-medium transition-all duration-200",
-                "active:scale-95",
-                channelFilter === option.value
-                  ? "bg-gradient-to-r from-primary to-primary/90 text-white shadow-sm" 
-                  : "bg-muted text-muted-foreground"
-              )}
-            >
-              {option.label}
-            </button>
-          ))}
-          
-          {/* Category Filters */}
-          {categoryOptions.slice(1).map((option) => (
-            <button
-              key={option.value}
-              onClick={() => onCategoryFilterChange(categoryFilter === option.value ? 'all' : option.value)}
-              className={cn(
-                "flex-shrink-0 h-[36px] px-[14px] rounded-full text-[14px] font-medium transition-all duration-200",
-                "active:scale-95",
-                categoryFilter === option.value
-                  ? "bg-gradient-to-r from-primary to-primary/90 text-white shadow-sm" 
-                  : "bg-muted text-muted-foreground"
-              )}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
+        <button
+          onClick={() => setIsFilterSheetOpen(true)}
+          className={cn(
+            "w-full h-[48px] rounded-2xl text-[15px] font-medium transition-all duration-200",
+            "flex items-center justify-center gap-2 border",
+            "active:scale-95",
+            activeFilterCount > 0
+              ? "bg-primary text-primary-foreground border-primary shadow-sm"
+              : "bg-muted text-muted-foreground border-border/50"
+          )}
+        >
+          <SlidersHorizontal className="h-5 w-5" />
+          Filters
+          {activeFilterCount > 0 && (
+            <span className="ml-1 px-2 py-0.5 rounded-full bg-primary-foreground/20 text-[13px] font-semibold">
+              {activeFilterCount}
+            </span>
+          )}
+        </button>
       </div>
 
       {/* Conversation List */}
@@ -301,5 +270,6 @@ export const MobileConversationList = ({
         </PullToRefresh>
       </div>
     </div>
+    </>
   );
 };
