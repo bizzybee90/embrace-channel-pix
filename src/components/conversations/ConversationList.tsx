@@ -153,7 +153,7 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
 
       <div className={cn(
         "flex-1 overflow-y-auto",
-        isTablet ? "p-2" : "p-4"
+        isTablet ? "px-4 py-3" : "p-4"
       )}>
         {conversations.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">

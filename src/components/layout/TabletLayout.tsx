@@ -92,8 +92,8 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
         <Sidebar />
       </div>
 
-      {/* Column 2: Ticket List (32-36% width) */}
-      <div className="w-[34%] flex-shrink-0 border-r border-border/40 bg-background flex flex-col">
+      {/* Column 2: Ticket List (40% width) */}
+      <div className="w-[40%] flex-shrink-0 border-r border-border/40 bg-background flex flex-col">
         {/* Header - sticky */}
         <div className="sticky top-0 z-10 px-5 py-4 border-b border-border/30 bg-card/50 backdrop-blur-sm">
           <h2 className="text-xl font-bold text-foreground mb-1">{getFilterTitle()}</h2>
