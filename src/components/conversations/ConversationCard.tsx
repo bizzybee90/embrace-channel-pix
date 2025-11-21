@@ -5,6 +5,7 @@ import { Clock } from 'lucide-react';
 import { ChannelIcon } from '../shared/ChannelIcon';
 import { cn } from '@/lib/utils';
 import { useIsTablet } from '@/hooks/use-tablet';
+import { useHaptics } from '@/hooks/useHaptics';
 
 interface ConversationCardProps {
   conversation: Conversation;
@@ -14,6 +15,12 @@ interface ConversationCardProps {
 
 export const ConversationCard = ({ conversation, selected, onClick }: ConversationCardProps) => {
   const isTablet = useIsTablet();
+  const { trigger } = useHaptics();
+
+  const handleClick = () => {
+    trigger('light');
+    onClick();
+  };
   
   const getPriorityVariant = (priority: string | null) => {
     if (!priority) return 'secondary';
@@ -43,7 +50,7 @@ export const ConversationCard = ({ conversation, selected, onClick }: Conversati
   if (isTablet) {
     return (
       <div
-        onClick={onClick}
+        onClick={handleClick}
         className={cn(
           "relative cursor-pointer transition-all duration-300 rounded-[22px] mb-3 overflow-hidden",
           "bg-card border border-border/30 hover:border-primary/30",
@@ -120,7 +127,7 @@ export const ConversationCard = ({ conversation, selected, onClick }: Conversati
   // Desktop layout
   return (
     <div
-      onClick={onClick}
+      onClick={handleClick}
       className={cn(
         "relative cursor-pointer transition-all duration-300 ease-out rounded-[22px] mb-3 overflow-hidden",
         "bg-card border border-border/30 hover:border-primary/30",
