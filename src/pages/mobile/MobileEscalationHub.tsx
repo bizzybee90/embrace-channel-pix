@@ -6,7 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 interface MobileEscalationHubProps {
-  filter?: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open';
+  filter?: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'completed';
 }
 
 export const MobileEscalationHub = ({ filter = 'all-open' }: MobileEscalationHubProps) => {
@@ -24,7 +24,8 @@ export const MobileEscalationHub = ({ filter = 'all-open' }: MobileEscalationHub
     'my-tickets': 'My Tickets',
     'unassigned': 'Unassigned',
     'sla-risk': 'SLA Risk',
-    'all-open': 'All Open'
+    'all-open': 'All Open',
+    'completed': 'Completed'
   };
 
   useEffect(() => {
@@ -67,6 +68,9 @@ export const MobileEscalationHub = ({ filter = 'all-open' }: MobileEscalationHub
         break;
       case 'all-open':
         query = query.in('status', ['new', 'open', 'pending']);
+        break;
+      case 'completed':
+        query = query.eq('status', 'resolved');
         break;
     }
 

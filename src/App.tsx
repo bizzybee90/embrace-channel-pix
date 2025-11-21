@@ -66,6 +66,18 @@ const RouterContent = () => {
           </AuthGuard>
         } 
       />
+      <Route 
+        path="/completed" 
+        element={
+          <AuthGuard>
+            {isMobile ? (
+              <MobileEscalationHub filter="completed" />
+            ) : (
+              <EscalationHub filter="completed" />
+            )}
+          </AuthGuard>
+        } 
+      />
       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
       <Route path="*" element={<NotFound />} />
     </Routes>
