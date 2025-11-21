@@ -242,7 +242,10 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
             <div className="px-8 py-4 border-b border-border/20 bg-background/80 backdrop-blur-sm">
               <div className="flex gap-3">
                 <Button
-                  onClick={() => setDrawerMode(drawerMode === 'customer' ? null : 'customer')}
+                  onClick={() => {
+                    setDrawerMode(drawerMode === 'customer' ? null : 'customer');
+                    if (drawerMode !== 'customer') trigger('medium');
+                  }}
                   variant={drawerMode === 'customer' ? 'default' : 'outline'}
                   className="rounded-full px-5 py-2.5 h-auto font-semibold transition-all"
                 >
@@ -250,7 +253,10 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
                   Customer Info
                 </Button>
                 <Button
-                  onClick={() => setDrawerMode(drawerMode === 'actions' ? null : 'actions')}
+                  onClick={() => {
+                    setDrawerMode(drawerMode === 'actions' ? null : 'actions');
+                    if (drawerMode !== 'actions') trigger('medium');
+                  }}
                   variant={drawerMode === 'actions' ? 'default' : 'outline'}
                   className="rounded-full px-5 py-2.5 h-auto font-semibold transition-all"
                 >
@@ -261,12 +267,16 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
             </div>
 
             {/* Conversation Stack - Scrollable */}
-            <div className="flex-1 overflow-y-auto px-8 py-6">
-              <ConversationThread
-                conversation={selectedConversation}
-                onUpdate={handleUpdate}
-                onBack={handleBackToList}
-              />
+            <div ref={conversationRef} className="flex-1 overflow-y-auto px-8 py-6">
+              {isLoadingConversation ? (
+                <ConversationThreadSkeleton />
+              ) : (
+                <ConversationThread
+                  conversation={selectedConversation}
+                  onUpdate={handleUpdate}
+                  onBack={handleBackToList}
+                />
+              )}
             </div>
           </div>
         )}
@@ -428,6 +438,14 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
           open={snoozeDialogOpen}
           onOpenChange={setSnoozeDialogOpen}
           onSuccess={handleUpdate}
+        />
+      )}
+
+      {/* Floating Back to List FAB */}
+      {selectedConversation && (
+        <BackToListFAB
+          visible={isScrolled}
+          onClick={handleBackToList}
         />
       )}
     </div>
