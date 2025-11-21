@@ -2,17 +2,18 @@ import { useState } from 'react';
 import { Sidebar } from '@/components/sidebar/Sidebar';
 import { ConversationList } from '@/components/conversations/ConversationList';
 import { ConversationThread } from '@/components/conversations/ConversationThread';
-import { TabletCustomerInfoPanel } from '@/components/conversations/TabletCustomerInfoPanel';
-import { TabletQuickActionsPanel } from '@/components/conversations/TabletQuickActionsPanel';
-import { TabletFilters } from '@/components/conversations/TabletFilters';
 import { Conversation } from '@/lib/types';
-import { Menu, User, Zap, Inbox } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { User, Zap, Inbox } from 'lucide-react';
 import { SLABadge } from '@/components/sla/SLABadge';
 import { Badge } from '@/components/ui/badge';
-import { useIsTablet } from '@/hooks/use-tablet';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { CheckCircle2, Clock, UserPlus, AlertCircle, Mail, Phone, Tag } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
+import { SnoozeDialog } from '@/components/conversations/SnoozeDialog';
 
 interface TabletLayoutProps {
   filter?: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open';
@@ -21,16 +22,9 @@ interface TabletLayoutProps {
 export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<string[]>([]);
-  const [priorityFilter, setPriorityFilter] = useState<string[]>([]);
-  const [channelFilter, setChannelFilter] = useState<string[]>([]);
-  const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
-  const [activeTab, setActiveTab] = useState<'customer' | 'actions' | null>(null);
-  const isTablet = useIsTablet();
-  
-  // Determine if we're in compact (768-899) or wide (900-1199) tablet mode
-  const isWideTablet = typeof window !== 'undefined' && window.innerWidth >= 900 && window.innerWidth < 1200;
+  const [drawerMode, setDrawerMode] = useState<'customer' | 'actions' | null>(null);
+  const [snoozeDialogOpen, setSnoozeDialogOpen] = useState(false);
+  const { toast } = useToast();
 
   const handleUpdate = () => {
     setRefreshKey(prev => prev + 1);
@@ -38,10 +32,7 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
 
   const handleSelectConversation = (conv: Conversation) => {
     setSelectedConversation(conv);
-  };
-
-  const toggleTab = (tab: 'customer' | 'actions') => {
-    setActiveTab(activeTab === tab ? null : tab);
+    setDrawerMode(null);
   };
 
   const getFilterTitle = () => {
@@ -54,154 +45,296 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
     }
   };
 
-  const getCustomerPreview = (conv: Conversation) => {
-    const parts = [];
-    if (conv.metadata?.customer_name) parts.push(conv.metadata.customer_name as string);
-    if (conv.channel) parts.push(`Prefers ${conv.channel}`);
-    if (conv.metadata?.customer_tier) parts.push(`${conv.metadata.customer_tier} Customer`);
-    return parts.join(' · ') || 'No customer info';
+  const handleResolve = async () => {
+    if (!selectedConversation) return;
+    await supabase
+      .from('conversations')
+      .update({ 
+        status: 'resolved',
+        resolved_at: new Date().toISOString()
+      })
+      .eq('id', selectedConversation.id);
+    
+    toast({ title: "Conversation resolved" });
+    handleUpdate();
   };
 
-  // Tablet layout with responsive breakpoints
+  const handleAssignToMe = async () => {
+    if (!selectedConversation) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    await supabase
+      .from('conversations')
+      .update({ assigned_to: user.id })
+      .eq('id', selectedConversation.id);
+    
+    toast({ title: "Assigned to you" });
+    handleUpdate();
+  };
+
+  const handlePriorityChange = async (priority: string) => {
+    if (!selectedConversation) return;
+    await supabase
+      .from('conversations')
+      .update({ priority })
+      .eq('id', selectedConversation.id);
+    
+    toast({ title: `Priority changed to ${priority}` });
+    handleUpdate();
+  };
+
+  // Professional 3-column tablet layout
   return (
     <div className="flex h-screen w-full bg-background overflow-hidden">
-      {/* Sidebar Overlay (hamburger menu) */}
-      <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
-        <SheetContent side="left" className="w-[280px] p-0">
-          <Sidebar />
-        </SheetContent>
-      </Sheet>
+      {/* Column 1: Collapsed Sidebar (72px) */}
+      <div className="flex-shrink-0 border-r border-border/40 bg-card shadow-sm">
+        <Sidebar forceCollapsed />
+      </div>
 
-      {/* Main Container */}
-      <div className="flex w-full h-full">
-        {/* Desktop Sidebar - Always visible in tablet mode */}
-        <Sidebar />
+      {/* Column 2: Ticket List (32-36% width) */}
+      <div className="w-[34%] flex-shrink-0 border-r border-border/40 bg-background flex flex-col">
+        {/* Header */}
+        <div className="px-6 py-5 border-b border-border/30 bg-card/30">
+          <h2 className="text-2xl font-bold text-foreground mb-1">{getFilterTitle()}</h2>
+          <p className="text-sm text-muted-foreground">Support escalations</p>
+        </div>
 
-        {/* Content Wrapper */}
-        <div className="flex flex-col flex-1 min-w-0">
-          {/* Top Bar */}
-          <div className="border-b border-border/30 bg-card/50 backdrop-blur-sm flex-shrink-0 sticky top-0 z-20">
-            <div className="px-4 py-3 flex items-center gap-4">
-              <h2 className="font-semibold text-foreground">{getFilterTitle()}</h2>
-            </div>
-          </div>
+        {/* Ticket List - scrollable */}
+        <div className="flex-1 overflow-y-auto px-6 py-4">
+          <ConversationList
+            selectedId={selectedConversation?.id}
+            onSelect={handleSelectConversation}
+            filter={filter}
+            key={refreshKey}
+          />
+        </div>
+      </div>
 
-          {/* Two Column Layout */}
-          <div className="flex flex-1 overflow-hidden">
-            {/* Ticket List Column - Fixed width accounting for sidebar */}
-            <div className="w-80 border-r border-border/30 bg-background flex flex-col flex-shrink-0">
-              <div className="flex-1 overflow-y-auto px-3 py-4">
-                <ConversationList
-                  selectedId={selectedConversation?.id}
-                  onSelect={handleSelectConversation}
-                  filter={filter}
-                  key={refreshKey}
-                />
+      {/* Column 3: Conversation Panel (64-68% width) */}
+      <div className="flex-1 bg-muted/20 flex flex-col overflow-hidden">
+        {selectedConversation ? (
+          <>
+            {/* Unified Header Card */}
+            <div className="mx-6 mt-6 mb-4 rounded-2xl bg-card shadow-md border border-border/50 overflow-hidden">
+              {/* Title Row */}
+              <div className="px-6 py-5 border-b border-border/30">
+                <div className="flex items-start justify-between gap-4 mb-4">
+                  <h1 className="text-2xl font-bold leading-tight flex-1 min-w-0">
+                    {selectedConversation.title}
+                  </h1>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {selectedConversation.sla_due_at && (
+                      <SLABadge conversation={selectedConversation} />
+                    )}
+                    {selectedConversation.priority && (
+                      <Badge variant={`priority-${selectedConversation.priority}` as any} className="text-sm px-3 py-1">
+                        {selectedConversation.priority === 'high' ? '🔴' : selectedConversation.priority === 'medium' ? '🟡' : '🟢'}
+                        {selectedConversation.priority}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Pill Button Row */}
+                <div className="flex gap-3">
+                  <Button
+                    onClick={() => setDrawerMode(drawerMode === 'customer' ? null : 'customer')}
+                    variant={drawerMode === 'customer' ? 'default' : 'outline'}
+                    className="rounded-full px-5 py-2 h-auto font-semibold transition-all"
+                  >
+                    <User className="h-4 w-4 mr-2" />
+                    Customer Info
+                  </Button>
+                  <Button
+                    onClick={() => setDrawerMode(drawerMode === 'actions' ? null : 'actions')}
+                    variant={drawerMode === 'actions' ? 'default' : 'outline'}
+                    className="rounded-full px-5 py-2 h-auto font-semibold transition-all"
+                  >
+                    <Zap className="h-4 w-4 mr-2" />
+                    Quick Actions
+                  </Button>
+                </div>
               </div>
             </div>
 
-            {/* Conversation Panel - Takes remaining space */}
-            <div className="flex-1 bg-background flex flex-col overflow-hidden min-w-0">
-              {selectedConversation ? (
-                <>
-                  {/* Sticky Conversation Header */}
-                  <div className="sticky top-0 z-10 bg-gradient-to-b from-card to-card/80 backdrop-blur-md border-b border-border/30 shadow-sm flex-shrink-0">
-                    {/* Title Row */}
-                    <div className="px-6 py-4">
-                      <div className="flex items-start justify-between gap-4 mb-2">
-                        <h1 className="text-lg md:text-xl font-bold leading-tight flex-1 min-w-0">
-                          {selectedConversation.title}
-                        </h1>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          {selectedConversation.sla_due_at && (
-                            <SLABadge 
-                              conversation={selectedConversation}
-                            />
-                          )}
-                          {selectedConversation.priority && (
-                            <Badge variant={`priority-${selectedConversation.priority}` as any}>
-                              {selectedConversation.priority === 'high' ? '🔴' : selectedConversation.priority === 'medium' ? '🟡' : '🟢'}
-                              {selectedConversation.priority}
-                            </Badge>
-                          )}
+            {/* Conversation Thread - Scrollable */}
+            <div className="flex-1 overflow-y-auto px-6">
+              <ConversationThread
+                conversation={selectedConversation}
+                onUpdate={handleUpdate}
+              />
+            </div>
+          </>
+        ) : (
+          <div className="h-full flex flex-col items-center justify-center text-muted-foreground p-8">
+            <div className="h-20 w-20 rounded-3xl bg-muted/50 flex items-center justify-center mb-6 shadow-sm">
+              <Inbox className="h-10 w-10 text-muted-foreground/50" />
+            </div>
+            <p className="text-xl font-semibold">No conversation selected</p>
+            <p className="text-sm text-muted-foreground/70 mt-2">Select a ticket from the list to view details</p>
+          </div>
+        )}
+      </div>
+
+      {/* Slide-in Drawer (Customer Info / Quick Actions) */}
+      <Drawer open={drawerMode !== null} onOpenChange={(open) => !open && setDrawerMode(null)}>
+        <DrawerContent className="h-[85vh] w-[58%] ml-auto rounded-tl-3xl rounded-bl-3xl shadow-2xl">
+          {/* iOS-style drag handle */}
+          <div className="w-full flex justify-center py-4">
+            <div className="w-10 h-1.5 rounded-full bg-muted-foreground/30" />
+          </div>
+
+          <DrawerHeader className="px-8 pb-6">
+            <DrawerTitle className="text-2xl font-bold">
+              {drawerMode === 'customer' ? 'Customer Information' : 'Quick Actions'}
+            </DrawerTitle>
+          </DrawerHeader>
+
+          <div className="flex-1 overflow-y-auto px-8 pb-8">
+            {drawerMode === 'customer' && selectedConversation && (
+              <div className="space-y-6">
+                {/* Contact Info */}
+                <div className="rounded-2xl bg-card border border-border/50 p-6 shadow-sm">
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">Contact Information</h3>
+                  <div className="space-y-4">
+                    {selectedConversation.metadata?.customer_email && (
+                      <div className="flex items-center gap-4">
+                        <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                          <Mail className="h-5 w-5 text-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-muted-foreground mb-1">Email</p>
+                          <p className="text-base font-medium truncate">{selectedConversation.metadata.customer_email as string}</p>
                         </div>
                       </div>
-                      
-                      {/* Customer Preview Strip */}
-                      <p className="text-xs text-muted-foreground truncate">
-                        {getCustomerPreview(selectedConversation)}
-                      </p>
-                    </div>
-
-                    {/* Tab Bar */}
-                    <div className="px-6 pb-3">
-                      <div className="inline-flex w-full bg-gradient-to-r from-primary/5 to-accent/5 rounded-xl p-1 border border-border/50 shadow-sm">
-                        <button
-                          onClick={() => toggleTab('customer')}
-                          className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${
-                            activeTab === 'customer'
-                              ? 'bg-card shadow-md text-primary'
-                              : 'text-muted-foreground hover:text-foreground hover:bg-card/50'
-                          }`}
-                        >
-                          <User className="h-4 w-4 inline mr-2" />
-                          Customer Info
-                        </button>
-                        <button
-                          onClick={() => toggleTab('actions')}
-                          className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${
-                            activeTab === 'actions'
-                              ? 'bg-card shadow-md text-primary'
-                              : 'text-muted-foreground hover:text-foreground hover:bg-card/50'
-                          }`}
-                        >
-                          <Zap className="h-4 w-4 inline mr-2" />
-                          Quick Actions
-                        </button>
+                    )}
+                    {selectedConversation.metadata?.customer_phone && (
+                      <div className="flex items-center gap-4">
+                        <div className="h-12 w-12 rounded-xl bg-success/10 flex items-center justify-center flex-shrink-0">
+                          <Phone className="h-5 w-5 text-success" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-muted-foreground mb-1">Phone</p>
+                          <p className="text-base font-medium">{selectedConversation.metadata.customer_phone as string}</p>
+                        </div>
                       </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Recent History */}
+                <div className="rounded-2xl bg-card border border-border/50 p-6 shadow-sm">
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">Recent History</h3>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-4 p-4 rounded-xl bg-muted/40">
+                      <Clock className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                      <p className="text-sm">Created {formatDistanceToNow(new Date(selectedConversation.created_at || ''), { addSuffix: true })}</p>
+                    </div>
+                    {selectedConversation.first_response_at && (
+                      <div className="flex items-center gap-4 p-4 rounded-xl bg-muted/40">
+                        <Clock className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                        <p className="text-sm">First response {formatDistanceToNow(new Date(selectedConversation.first_response_at), { addSuffix: true })}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Category */}
+                {selectedConversation.category && (
+                  <div className="rounded-2xl bg-card border border-border/50 p-6 shadow-sm">
+                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">Category</h3>
+                    <div className="flex items-center gap-3">
+                      <div className="h-12 w-12 rounded-xl bg-accent flex items-center justify-center flex-shrink-0">
+                        <Tag className="h-5 w-5 text-accent-foreground" />
+                      </div>
+                      <span className="px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-semibold capitalize">
+                        {selectedConversation.category}
+                      </span>
                     </div>
                   </div>
+                )}
+              </div>
+            )}
 
-                  {/* Tab Content Panels */}
-                  <TabletCustomerInfoPanel 
-                    conversation={selectedConversation} 
-                    isOpen={activeTab === 'customer'}
-                  />
-                  <TabletQuickActionsPanel
-                    conversation={selectedConversation}
-                    onUpdate={handleUpdate}
-                    isOpen={activeTab === 'actions'}
-                    statusFilter={statusFilter}
-                    priorityFilter={priorityFilter}
-                    channelFilter={channelFilter}
-                    categoryFilter={categoryFilter}
-                    onStatusChange={setStatusFilter}
-                    onPriorityChange={setPriorityFilter}
-                    onChannelChange={setChannelFilter}
-                    onCategoryChange={setCategoryFilter}
-                  />
-
-                  {/* Conversation Thread - Scrollable */}
-                  <div className="flex-1 overflow-y-auto">
-                    <ConversationThread
-                      conversation={selectedConversation}
-                      onUpdate={handleUpdate}
-                    />
-                  </div>
-                </>
-              ) : (
-                <div className="h-full flex flex-col items-center justify-center text-muted-foreground p-8">
-                  <div className="h-16 w-16 rounded-2xl bg-muted/50 flex items-center justify-center mb-4">
-                    <Inbox className="h-8 w-8 text-muted-foreground/50" />
-                  </div>
-                  <p className="text-lg font-medium">No conversation selected</p>
-                  <p className="text-sm text-muted-foreground/70 mt-1">Select a ticket from the list to view</p>
+            {drawerMode === 'actions' && selectedConversation && (
+              <div className="space-y-5">
+                {/* Resolve Button */}
+                <div className="rounded-2xl bg-card border border-border/50 p-6 shadow-sm">
+                  <Button
+                    onClick={handleResolve}
+                    className="w-full h-14 bg-success hover:bg-success/90 text-success-foreground font-semibold rounded-xl text-base shadow-sm"
+                    disabled={selectedConversation.status === 'resolved'}
+                  >
+                    <CheckCircle2 className="h-5 w-5 mr-3" />
+                    {selectedConversation.status === 'resolved' ? 'Resolved' : 'Resolve & Close'}
+                  </Button>
                 </div>
-              )}
-            </div>
+
+                {/* Priority Selector */}
+                <div className="rounded-2xl bg-card border border-border/50 p-6 shadow-sm">
+                  <label className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 block">Change Priority</label>
+                  <Select value={selectedConversation.priority || 'medium'} onValueChange={handlePriorityChange}>
+                    <SelectTrigger className="h-14 rounded-xl bg-muted/50 text-base">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="high">
+                        <span className="flex items-center gap-3">
+                          <AlertCircle className="h-5 w-5 text-destructive" />
+                          High Priority
+                        </span>
+                      </SelectItem>
+                      <SelectItem value="medium">
+                        <span className="flex items-center gap-3">
+                          <AlertCircle className="h-5 w-5 text-warning" />
+                          Medium Priority
+                        </span>
+                      </SelectItem>
+                      <SelectItem value="low">
+                        <span className="flex items-center gap-3">
+                          <AlertCircle className="h-5 w-5 text-muted-foreground" />
+                          Low Priority
+                        </span>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="rounded-2xl bg-card border border-border/50 p-6 shadow-sm space-y-3">
+                  <Button
+                    onClick={() => setSnoozeDialogOpen(true)}
+                    variant="outline"
+                    className="w-full h-14 rounded-xl text-base font-semibold"
+                  >
+                    <Clock className="h-5 w-5 mr-3" />
+                    Snooze
+                  </Button>
+                  <Button
+                    onClick={handleAssignToMe}
+                    variant="outline"
+                    className="w-full h-14 rounded-xl text-base font-semibold"
+                  >
+                    <UserPlus className="h-5 w-5 mr-3" />
+                    Assign to Me
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
-        </div>
-      </div>
+        </DrawerContent>
+      </Drawer>
+
+      {/* Snooze Dialog */}
+      {selectedConversation && (
+        <SnoozeDialog
+          conversationId={selectedConversation.id}
+          open={snoozeDialogOpen}
+          onOpenChange={setSnoozeDialogOpen}
+          onSuccess={handleUpdate}
+        />
+      )}
     </div>
   );
 };

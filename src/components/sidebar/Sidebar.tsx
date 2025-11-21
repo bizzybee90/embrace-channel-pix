@@ -12,9 +12,15 @@ import { useState, useEffect } from 'react';
 import beeLogo from '@/assets/bee-logo.png';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
-export const Sidebar = () => {
+interface SidebarProps {
+  forceCollapsed?: boolean;
+}
+
+export const Sidebar = ({ forceCollapsed = false }: SidebarProps = {}) => {
   const { interfaceMode, toggleMode, loading } = useInterfaceMode();
   const [collapsed, setCollapsed] = useState(false);
+  
+  const isCollapsed = forceCollapsed || collapsed;
   const [visibleFilters, setVisibleFilters] = useState({
     myTickets: true,
     unassigned: true,
@@ -36,20 +42,22 @@ export const Sidebar = () => {
   };
   return (
     <TooltipProvider>
-      <div className={`flex flex-col h-full transition-all duration-300 relative ${collapsed ? 'w-14 p-1.5' : 'w-60 p-4'}`}>
-        {/* Collapse Toggle */}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setCollapsed(!collapsed)}
-          className={`absolute top-4 z-10 h-8 w-8 bg-background/95 backdrop-blur hover:bg-accent transition-all duration-300 ${collapsed ? 'left-1/2 -translate-x-1/2' : 'right-2'}`}
-        >
-          {collapsed ? <ChevronRight className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
-        </Button>
+      <div className={`flex flex-col h-full transition-all duration-300 relative ${isCollapsed ? 'w-[72px] p-1.5' : 'w-60 p-4'}`}>
+        {/* Collapse Toggle - hide in forced collapsed mode */}
+        {!forceCollapsed && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setCollapsed(!collapsed)}
+            className={`absolute top-4 z-10 h-8 w-8 bg-background/95 backdrop-blur hover:bg-accent transition-all duration-300 ${isCollapsed ? 'left-1/2 -translate-x-1/2' : 'right-2'}`}
+          >
+            {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+          </Button>
+        )}
 
         {/* Logo Section */}
-        <div className={`flex items-center ${collapsed ? 'justify-center mt-16 mb-4' : 'gap-3 mb-6 mt-0'}`}>
-          {collapsed ? (
+        <div className={`flex items-center ${isCollapsed ? 'justify-center mt-16 mb-4' : 'gap-3 mb-6 mt-0'}`}>
+          {isCollapsed ? (
             <Tooltip>
               <TooltipTrigger asChild>
                 <div className="flex-shrink-0 cursor-pointer">
@@ -121,7 +129,7 @@ export const Sidebar = () => {
         </div>
 
         <nav className="space-y-1 mb-6">
-          {!collapsed && (
+          {!isCollapsed && (
             <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-1">
               Views
             </h2>
@@ -132,16 +140,16 @@ export const Sidebar = () => {
                 <NavLink
                   to="/"
                   end
-                  className={`flex items-center ${collapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm hover:bg-accent/50 transition-all hover-scale`}
+                  className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm hover:bg-accent/50 transition-all hover-scale`}
                   activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
                 >
                   <div className="flex items-center justify-center w-8 h-8 rounded-md bg-primary/10">
                     <Inbox className="h-4 w-4 text-primary" />
                   </div>
-                  {!collapsed && <span>My Tickets</span>}
+                  {!isCollapsed && <span>My Tickets</span>}
                 </NavLink>
               </TooltipTrigger>
-              {collapsed && (
+              {isCollapsed && (
                 <TooltipContent side="right">
                   <p>My Tickets</p>
                 </TooltipContent>
@@ -153,16 +161,16 @@ export const Sidebar = () => {
               <TooltipTrigger asChild>
                 <NavLink
                   to="/unassigned"
-                  className={`flex items-center ${collapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm hover:bg-accent/50 transition-all hover-scale`}
+                  className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm hover:bg-accent/50 transition-all hover-scale`}
                   activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
                 >
                   <div className="flex items-center justify-center w-8 h-8 rounded-md bg-destructive/10">
                     <AlertTriangle className="h-4 w-4 text-destructive" />
                   </div>
-                  {!collapsed && <span>Unassigned</span>}
+                  {!isCollapsed && <span>Unassigned</span>}
                 </NavLink>
               </TooltipTrigger>
-              {collapsed && (
+              {isCollapsed && (
                 <TooltipContent side="right">
                   <p>Unassigned</p>
                 </TooltipContent>
@@ -174,16 +182,16 @@ export const Sidebar = () => {
               <TooltipTrigger asChild>
                 <NavLink
                   to="/sla-risk"
-                  className={`flex items-center ${collapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm hover:bg-accent/50 transition-all hover-scale`}
+                  className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm hover:bg-accent/50 transition-all hover-scale`}
                   activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
                 >
                   <div className="flex items-center justify-center w-8 h-8 rounded-md bg-orange-500/10">
                     <Clock className="h-4 w-4 text-orange-500" />
                   </div>
-                  {!collapsed && <span>SLA at Risk</span>}
+                  {!isCollapsed && <span>SLA at Risk</span>}
                 </NavLink>
               </TooltipTrigger>
-              {collapsed && (
+              {isCollapsed && (
                 <TooltipContent side="right">
                   <p>SLA at Risk</p>
                 </TooltipContent>
@@ -195,16 +203,16 @@ export const Sidebar = () => {
               <TooltipTrigger asChild>
                 <NavLink
                   to="/all-open"
-                  className={`flex items-center ${collapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm hover:bg-accent/50 transition-all hover-scale`}
+                  className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm hover:bg-accent/50 transition-all hover-scale`}
                   activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
                 >
                   <div className="flex items-center justify-center w-8 h-8 rounded-md bg-green-500/10">
                     <CheckCircle2 className="h-4 w-4 text-green-500" />
                   </div>
-                  {!collapsed && <span>All Open</span>}
+                  {!isCollapsed && <span>All Open</span>}
                 </NavLink>
               </TooltipTrigger>
-              {collapsed && (
+              {isCollapsed && (
                 <TooltipContent side="right">
                   <p>All Open</p>
                 </TooltipContent>
@@ -216,7 +224,7 @@ export const Sidebar = () => {
         <Separator className="my-4" />
 
         <div className="mb-6">
-          {!collapsed && (
+          {!isCollapsed && (
             <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-1">
               Saved Filters
             </h2>
@@ -224,14 +232,14 @@ export const Sidebar = () => {
           <div className="space-y-1">
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" className={`w-full ${collapsed ? 'justify-center p-2' : 'justify-start gap-3 px-3'} py-2.5 h-auto hover-scale`}>
+                <Button variant="ghost" className={`w-full ${isCollapsed ? 'justify-center p-2' : 'justify-start gap-3 px-3'} py-2.5 h-auto hover-scale`}>
                   <div className="flex items-center justify-center w-8 h-8 rounded-md bg-blue-500/10">
                     <Zap className="h-4 w-4 text-blue-500" />
                   </div>
-                  {!collapsed && <span className="text-sm">High Priority</span>}
+                  {!isCollapsed && <span className="text-sm">High Priority</span>}
                 </Button>
               </TooltipTrigger>
-              {collapsed && (
+              {isCollapsed && (
                 <TooltipContent side="right">
                   <p>High Priority</p>
                 </TooltipContent>
@@ -239,14 +247,14 @@ export const Sidebar = () => {
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" className={`w-full ${collapsed ? 'justify-center p-2' : 'justify-start gap-3 px-3'} py-2.5 h-auto hover-scale`}>
+                <Button variant="ghost" className={`w-full ${isCollapsed ? 'justify-center p-2' : 'justify-start gap-3 px-3'} py-2.5 h-auto hover-scale`}>
                   <div className="flex items-center justify-center w-8 h-8 rounded-md bg-purple-500/10">
                     <Filter className="h-4 w-4 text-purple-500" />
                   </div>
-                  {!collapsed && <span className="text-sm">VIP Customers</span>}
+                  {!isCollapsed && <span className="text-sm">VIP Customers</span>}
                 </Button>
               </TooltipTrigger>
-              {collapsed && (
+              {isCollapsed && (
                 <TooltipContent side="right">
                   <p>VIP Customers</p>
                 </TooltipContent>
@@ -257,7 +265,7 @@ export const Sidebar = () => {
 
         <Separator className="my-4" />
 
-        {!collapsed && (
+        {!isCollapsed && (
           <div className="flex-1 overflow-auto">
             <TeamStatus />
           </div>
@@ -267,13 +275,13 @@ export const Sidebar = () => {
 
         {/* Interface Mode Toggle */}
         {!loading && (
-          <Card className={`bg-muted/50 ${collapsed ? 'p-1.5' : 'p-3'}`}>
-            {!collapsed && (
+          <Card className={`bg-muted/50 ${isCollapsed ? 'p-1.5' : 'p-3'}`}>
+            {!isCollapsed && (
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-semibold text-muted-foreground uppercase">Interface</span>
               </div>
             )}
-            {collapsed ? (
+            {isCollapsed ? (
               <div className="flex flex-col gap-1">
                 <Tooltip>
                   <TooltipTrigger asChild>
