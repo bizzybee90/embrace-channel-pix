@@ -239,6 +239,19 @@ All colors MUST be HSL.
   .spring-press {
     @apply active:scale-[0.97] transition-transform duration-150 ease-out;
   }
+  
+  /* Tablet-specific utility classes */
+  .tablet-card-shadow {
+    @apply shadow-sm hover:shadow-md transition-shadow;
+  }
+
+  .tablet-container-padding {
+    @apply px-8 py-6;
+  }
+
+  .tablet-header-sticky {
+    @apply sticky top-0 z-10 backdrop-blur-sm bg-background/80;
+  }
 }
 }
 

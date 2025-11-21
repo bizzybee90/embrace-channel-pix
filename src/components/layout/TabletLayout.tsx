@@ -1,7 +1,26 @@
-import { useState } from 'react';
+/**
+ * TabletLayout - Two-state layout for tablet devices (760-1199px)
+ * 
+ * STATE 1 (List View):
+ * - Collapsed sidebar (72px) + Full-width ticket list
+ * - Shows when: selectedConversation === null
+ * 
+ * STATE 2 (Conversation View):
+ * - Collapsed sidebar (72px) + Full-width conversation workspace
+ * - Shows when: selectedConversation !== null
+ * 
+ * CRITICAL: Do not add third column. Customer Info/Actions use slide-over drawer.
+ * 
+ * @breakpoints 760px - 1199px
+ * @states list | conversation
+ */
+
+import { useState, useEffect, useRef } from 'react';
 import { Sidebar } from '@/components/sidebar/Sidebar';
 import { ConversationList } from '@/components/conversations/ConversationList';
 import { ConversationThread } from '@/components/conversations/ConversationThread';
+import { ConversationThreadSkeleton } from '@/components/conversations/ConversationThreadSkeleton';
+import { BackToListFAB } from '@/components/conversations/BackToListFAB';
 import { Conversation } from '@/lib/types';
 import { User, Zap, ChevronLeft, Inbox } from 'lucide-react';
 import { SLABadge } from '@/components/sla/SLABadge';
@@ -14,6 +33,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
 import { SnoozeDialog } from '@/components/conversations/SnoozeDialog';
+import { useHaptics } from '@/hooks/useHaptics';
+import { useTabletLayoutValidator } from '@/hooks/useTabletLayoutValidator';
+import { TABLET_LAYOUT_RULES } from '@/lib/constants/breakpoints';
 
 interface TabletLayoutProps {
   filter?: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open';
@@ -24,21 +46,50 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
   const [refreshKey, setRefreshKey] = useState(0);
   const [drawerMode, setDrawerMode] = useState<'customer' | 'actions' | null>(null);
   const [snoozeDialogOpen, setSnoozeDialogOpen] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [isLoadingConversation, setIsLoadingConversation] = useState(false);
+  const conversationRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+  const { trigger } = useHaptics();
+  
+  // Layout validation (dev mode only)
+  useTabletLayoutValidator();
 
   const handleUpdate = () => {
     setRefreshKey(prev => prev + 1);
   };
 
   const handleSelectConversation = (conv: Conversation) => {
+    setIsLoadingConversation(true);
     setSelectedConversation(conv);
     setDrawerMode(null);
+    setIsScrolled(false);
+    trigger('medium');
+    setTimeout(() => setIsLoadingConversation(false), 300);
   };
 
   const handleBackToList = () => {
     setSelectedConversation(null);
     setDrawerMode(null);
+    setIsScrolled(false);
+    trigger('light');
   };
+
+  // Scroll detection for FAB
+  useEffect(() => {
+    const handleScroll = () => {
+      if (conversationRef.current) {
+        const scrollY = conversationRef.current.scrollTop;
+        setIsScrolled(scrollY > TABLET_LAYOUT_RULES.FAB_SCROLL_THRESHOLD);
+      }
+    };
+
+    const ref = conversationRef.current;
+    if (ref) {
+      ref.addEventListener('scroll', handleScroll);
+      return () => ref.removeEventListener('scroll', handleScroll);
+    }
+  }, [selectedConversation]);
 
   const getFilterTitle = () => {
     switch (filter) {
@@ -50,55 +101,87 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
     }
   };
 
+  // Optimistic UI: Resolve
   const handleResolve = async () => {
     if (!selectedConversation) return;
-    await supabase
+    
+    const oldStatus = selectedConversation.status;
+    setSelectedConversation(prev => prev ? { ...prev, status: 'resolved', resolved_at: new Date().toISOString() } : null);
+    toast({ title: "Conversation resolved" });
+    trigger('success');
+    
+    const { error } = await supabase
       .from('conversations')
-      .update({ 
-        status: 'resolved',
-        resolved_at: new Date().toISOString()
-      })
+      .update({ status: 'resolved', resolved_at: new Date().toISOString() })
       .eq('id', selectedConversation.id);
     
-    toast({ title: "Conversation resolved" });
-    handleUpdate();
+    if (error) {
+      setSelectedConversation(prev => prev ? { ...prev, status: oldStatus, resolved_at: null } : null);
+      toast({ title: "Failed to resolve", description: error.message, variant: "destructive" });
+      trigger('warning');
+    } else {
+      handleUpdate();
+    }
   };
 
+  // Optimistic UI: Assign to me
   const handleAssignToMe = async () => {
     if (!selectedConversation) return;
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    await supabase
+    const oldAssignedTo = selectedConversation.assigned_to;
+    setSelectedConversation(prev => prev ? { ...prev, assigned_to: user.id } : null);
+    toast({ title: "Assigned to you" });
+    trigger('success');
+
+    const { error } = await supabase
       .from('conversations')
       .update({ assigned_to: user.id })
       .eq('id', selectedConversation.id);
     
-    toast({ title: "Assigned to you" });
-    handleUpdate();
+    if (error) {
+      setSelectedConversation(prev => prev ? { ...prev, assigned_to: oldAssignedTo } : null);
+      toast({ title: "Assignment failed", description: error.message, variant: "destructive" });
+      trigger('warning');
+    } else {
+      handleUpdate();
+    }
   };
 
+  // Optimistic UI: Priority change
   const handlePriorityChange = async (priority: string) => {
     if (!selectedConversation) return;
-    await supabase
+    
+    const oldPriority = selectedConversation.priority;
+    setSelectedConversation(prev => prev ? { ...prev, priority: priority as any } : null);
+    toast({ title: `Priority changed to ${priority}` });
+    trigger('success');
+    
+    const { error } = await supabase
       .from('conversations')
       .update({ priority })
       .eq('id', selectedConversation.id);
     
-    toast({ title: `Priority changed to ${priority}` });
-    handleUpdate();
+    if (error) {
+      setSelectedConversation(prev => prev ? { ...prev, priority: oldPriority } : null);
+      toast({ title: "Priority change failed", description: error.message, variant: "destructive" });
+      trigger('warning');
+    } else {
+      handleUpdate();
+    }
   };
 
   // Two-state tablet layout
   return (
     <div className="flex h-screen w-full bg-background overflow-hidden">
-      {/* Sidebar (collapsed by default, can expand) */}
-      <div className="flex-shrink-0 border-r border-border/40 bg-card shadow-sm">
+      {/* Sidebar - with data attribute for layout validator */}
+      <div data-sidebar className="flex-shrink-0 border-r border-border/40 bg-card shadow-sm">
         <Sidebar />
       </div>
 
-      {/* Main Content Area - switches between List and Conversation */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      {/* Main Content Area - with data attribute for layout validator */}
+      <div data-main-content className="flex-1 flex flex-col overflow-hidden relative">
         {!selectedConversation ? (
           // STATE 1: Ticket List View
           <div className="flex flex-col h-full animate-slide-in-left">

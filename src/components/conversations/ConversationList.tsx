@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Conversation } from '@/lib/types';
 import { ConversationCard } from './ConversationCard';
+import { ConversationCardSkeleton } from './ConversationCardSkeleton';
 import { ConversationFilters } from './ConversationFilters';
 import { useIsTablet } from '@/hooks/use-tablet';
 import { Loader2, SlidersHorizontal } from 'lucide-react';
@@ -9,6 +10,7 @@ import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import PullToRefresh from 'react-simple-pull-to-refresh';
 
 interface ConversationListProps {
   selectedId?: string;
@@ -104,13 +106,109 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
 
   const activeFilterCount = statusFilter.length + priorityFilter.length + channelFilter.length + categoryFilter.length;
 
+  const handleRefresh = async () => {
+    setLoading(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
+    let query = supabase
+      .from('conversations')
+      .select(`
+        *,
+        customer:customers(*),
+        assigned_user:users(*)
+      `)
+      .order('sla_due_at', { ascending: true });
+
+    if (filter === 'my-tickets') {
+      query = query.eq('assigned_to', user.id).in('status', ['new', 'open', 'waiting_customer', 'waiting_internal']);
+    } else if (filter === 'unassigned') {
+      query = query.is('assigned_to', null).in('status', ['new', 'open', 'waiting_customer', 'waiting_internal']);
+    } else if (filter === 'sla-risk') {
+      query = query.in('sla_status', ['warning', 'breached']).in('status', ['new', 'open', 'waiting_customer', 'waiting_internal']);
+    } else if (filter === 'all-open') {
+      query = query.in('status', ['new', 'open', 'waiting_customer', 'waiting_internal']);
+    }
+
+    if (statusFilter.length > 0) {
+      query = query.in('status', statusFilter);
+    }
+    if (priorityFilter.length > 0) {
+      query = query.in('priority', priorityFilter);
+    }
+    if (channelFilter.length > 0) {
+      query = query.in('channel', channelFilter);
+    }
+    if (categoryFilter.length > 0) {
+      query = query.in('category', categoryFilter);
+    }
+
+    const { data } = await query;
+    if (data) {
+      const conversationData = data as any;
+      const activeConversations = conversationData.filter((conv: any) => {
+        if (!conv.snoozed_until) return true;
+        return new Date(conv.snoozed_until) <= new Date();
+      });
+      setConversations(activeConversations);
+      onConversationsChange?.(activeConversations);
+    }
+    setLoading(false);
+  };
+
+  const isTouchDevice = () => {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia('(pointer: coarse)').matches;
+  };
+
+  const skeletonList = (
+    <div className={cn("flex-1 overflow-y-auto", isTablet ? "px-0" : "p-4")}>
+      {Array.from({ length: 6 }).map((_, i) => (
+        <ConversationCardSkeleton key={i} />
+      ))}
+    </div>
+  );
+
+  // Render skeleton while loading
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      <div className={cn(
+        "flex flex-col h-full",
+        isTablet ? "bg-transparent" : "bg-muted/30 min-w-[300px]"
+      )}>
+        {skeletonList}
       </div>
     );
   }
+
+  const conversationListContent = (
+    <div className={cn(
+      "flex-1 overflow-y-auto",
+      isTablet ? "px-0" : "p-4"
+    )}>
+      {conversations.length === 0 ? (
+        <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
+          <p className={cn(
+            "font-medium",
+            isTablet ? "text-sm" : "text-lg"
+          )}>No conversations found</p>
+          <p className="text-xs mt-1">Try adjusting your filters</p>
+        </div>
+      ) : (
+        conversations.map((conversation) => (
+          <ConversationCard
+            key={conversation.id}
+            conversation={conversation}
+            selected={selectedId === conversation.id}
+            onClick={() => onSelect(conversation)}
+          />
+        ))
+      )}
+    </div>
+  );
 
   return (
     <div className={cn(
@@ -122,61 +220,59 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
         "py-3 border-b border-border/50 bg-background/80 backdrop-blur-sm",
         isTablet ? "px-0 mb-4" : "px-4"
       )}>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button 
-                variant="outline" 
-                className="w-full justify-between h-9 text-sm font-medium"
-              >
-                <div className="flex items-center gap-2">
-                  <SlidersHorizontal className="h-4 w-4" />
-                  <span>Filters</span>
-                </div>
-                {activeFilterCount > 0 && (
-                  <Badge variant="secondary" className="ml-auto h-5 min-w-5 px-1.5 text-[10px] font-semibold">
-                    {activeFilterCount}
-                  </Badge>
-                )}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-80 p-4" align="start">
-              <ConversationFilters
-                statusFilter={statusFilter}
-                setStatusFilter={setStatusFilter}
-                priorityFilter={priorityFilter}
-                setPriorityFilter={setPriorityFilter}
-                channelFilter={channelFilter}
-                setChannelFilter={setChannelFilter}
-                categoryFilter={categoryFilter}
-                setCategoryFilter={setCategoryFilter}
-              />
-            </PopoverContent>
-          </Popover>
-        </div>
-
-      <div className={cn(
-        "flex-1 overflow-y-auto",
-        isTablet ? "px-0" : "p-4"
-      )}>
-        {conversations.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
-            <p className={cn(
-              "font-medium",
-              isTablet ? "text-sm" : "text-lg"
-            )}>No conversations found</p>
-            <p className="text-xs mt-1">Try adjusting your filters</p>
-          </div>
-        ) : (
-          conversations.map((conversation) => (
-            <ConversationCard
-              key={conversation.id}
-              conversation={conversation}
-              selected={selectedId === conversation.id}
-              onClick={() => onSelect(conversation)}
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button 
+              variant="outline" 
+              className="w-full justify-between h-9 text-sm font-medium"
+            >
+              <div className="flex items-center gap-2">
+                <SlidersHorizontal className="h-4 w-4" />
+                <span>Filters</span>
+              </div>
+              {activeFilterCount > 0 && (
+                <Badge variant="secondary" className="ml-auto h-5 min-w-5 px-1.5 text-[10px] font-semibold">
+                  {activeFilterCount}
+                </Badge>
+              )}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-80 p-4" align="start">
+            <ConversationFilters
+              statusFilter={statusFilter}
+              setStatusFilter={setStatusFilter}
+              priorityFilter={priorityFilter}
+              setPriorityFilter={setPriorityFilter}
+              channelFilter={channelFilter}
+              setChannelFilter={setChannelFilter}
+              categoryFilter={categoryFilter}
+              setCategoryFilter={setCategoryFilter}
             />
-          ))
-        )}
+          </PopoverContent>
+        </Popover>
       </div>
+
+      {/* Pull-to-refresh wrapper (only on touch devices and tablet) */}
+      {isTouchDevice() && isTablet ? (
+        <PullToRefresh
+          onRefresh={handleRefresh}
+          pullingContent={
+            <div className="text-center py-4 text-sm text-muted-foreground">
+              Pull to refresh
+            </div>
+          }
+          refreshingContent={
+            <div className="text-center py-4">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground mx-auto" />
+              <p className="text-sm text-muted-foreground mt-2">Refreshing...</p>
+            </div>
+          }
+        >
+          {conversationListContent}
+        </PullToRefresh>
+      ) : (
+        conversationListContent
+      )}
     </div>
   );
 };
