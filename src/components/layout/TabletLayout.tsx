@@ -38,7 +38,7 @@ import { useTabletLayoutValidator } from '@/hooks/useTabletLayoutValidator';
 import { TABLET_LAYOUT_RULES } from '@/lib/constants/breakpoints';
 
 interface TabletLayoutProps {
-  filter?: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'completed';
+  filter?: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'completed' | 'high-priority' | 'vip-customers';
 }
 
 export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
@@ -98,6 +98,8 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
       case 'sla-risk': return 'SLA Risk';
       case 'all-open': return 'All Open';
       case 'completed': return 'Completed';
+      case 'high-priority': return 'High Priority';
+      case 'vip-customers': return 'VIP Customers';
       default: return 'Conversations';
     }
   };

@@ -15,7 +15,7 @@ import PullToRefresh from 'react-simple-pull-to-refresh';
 interface ConversationListProps {
   selectedId?: string;
   onSelect: (conversation: Conversation) => void;
-  filter?: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'completed';
+  filter?: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'completed' | 'high-priority' | 'vip-customers';
   onConversationsChange?: (conversations: Conversation[]) => void;
 }
 
@@ -53,6 +53,10 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
         query = query.in('status', ['new', 'open', 'waiting_customer', 'waiting_internal']);
       } else if (filter === 'completed') {
         query = query.eq('status', 'resolved');
+      } else if (filter === 'high-priority') {
+        query = query.in('priority', ['high', 'urgent']).in('status', ['new', 'open', 'waiting_customer', 'waiting_internal']);
+      } else if (filter === 'vip-customers') {
+        query = query.eq('metadata->>tier', 'vip').in('status', ['new', 'open', 'waiting_customer', 'waiting_internal']);
       }
 
       // Apply additional filters
@@ -135,6 +139,10 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
       query = query.in('status', ['new', 'open', 'waiting_customer', 'waiting_internal']);
     } else if (filter === 'completed') {
       query = query.eq('status', 'resolved');
+    } else if (filter === 'high-priority') {
+      query = query.in('priority', ['high', 'urgent']).in('status', ['new', 'open', 'waiting_customer', 'waiting_internal']);
+    } else if (filter === 'vip-customers') {
+      query = query.eq('metadata->>tier', 'vip').in('status', ['new', 'open', 'waiting_customer', 'waiting_internal']);
     }
 
     if (statusFilter.length > 0) {

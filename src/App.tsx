@@ -78,6 +78,30 @@ const RouterContent = () => {
           </AuthGuard>
         } 
       />
+      <Route 
+        path="/high-priority" 
+        element={
+          <AuthGuard>
+            {isMobile ? (
+              <MobileEscalationHub filter="high-priority" />
+            ) : (
+              <EscalationHub filter="high-priority" />
+            )}
+          </AuthGuard>
+        } 
+      />
+      <Route 
+        path="/vip-customers" 
+        element={
+          <AuthGuard>
+            {isMobile ? (
+              <MobileEscalationHub filter="vip-customers" />
+            ) : (
+              <EscalationHub filter="vip-customers" />
+            )}
+          </AuthGuard>
+        } 
+      />
       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
       <Route path="*" element={<NotFound />} />
     </Routes>

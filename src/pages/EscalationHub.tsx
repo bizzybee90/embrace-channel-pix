@@ -23,7 +23,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
 interface EscalationHubProps {
-  filter?: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'completed';
+  filter?: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'completed' | 'high-priority' | 'vip-customers';
 }
 
 export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
@@ -172,6 +172,8 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
       case 'sla-risk': return 'SLA Risk';
       case 'all-open': return 'All Open';
       case 'completed': return 'Completed';
+      case 'high-priority': return 'High Priority';
+      case 'vip-customers': return 'VIP Customers';
       default: return 'Conversations';
     }
   };

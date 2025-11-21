@@ -6,7 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 interface MobileEscalationHubProps {
-  filter?: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'completed';
+  filter?: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'completed' | 'high-priority' | 'vip-customers';
 }
 
 export const MobileEscalationHub = ({ filter = 'all-open' }: MobileEscalationHubProps) => {
@@ -25,7 +25,9 @@ export const MobileEscalationHub = ({ filter = 'all-open' }: MobileEscalationHub
     'unassigned': 'Unassigned',
     'sla-risk': 'SLA Risk',
     'all-open': 'All Open',
-    'completed': 'Completed'
+    'completed': 'Completed',
+    'high-priority': 'High Priority',
+    'vip-customers': 'VIP Customers'
   };
 
   useEffect(() => {
@@ -71,6 +73,12 @@ export const MobileEscalationHub = ({ filter = 'all-open' }: MobileEscalationHub
         break;
       case 'completed':
         query = query.eq('status', 'resolved');
+        break;
+      case 'high-priority':
+        query = query.in('priority', ['high', 'urgent']).in('status', ['new', 'open', 'pending']);
+        break;
+      case 'vip-customers':
+        query = query.eq('metadata->>tier', 'vip').in('status', ['new', 'open', 'pending']);
         break;
     }
 

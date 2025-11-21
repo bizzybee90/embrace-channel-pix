@@ -31,11 +31,15 @@ export const QuickActions = ({ conversation, onUpdate, onBack }: QuickActionsPro
           .from('users')
           .select('name')
           .eq('id', conversation.assigned_to)
-          .single();
+          .maybeSingle();
         
         if (data) {
           setAssignedUserName(data.name);
+        } else {
+          setAssignedUserName(null);
         }
+      } else {
+        setAssignedUserName(null);
       }
     };
     fetchUser();
@@ -193,7 +197,7 @@ export const QuickActions = ({ conversation, onUpdate, onBack }: QuickActionsPro
                 size="default"
               >
                 <UserPlus className="h-4 w-4 mr-2" />
-                Reassign to Me {assignedUserName && `(from ${assignedUserName})`}
+                {assignedUserName ? `Assigned to ${assignedUserName}` : 'Reassign to Me'}
               </Button>
             )
           ) : (
