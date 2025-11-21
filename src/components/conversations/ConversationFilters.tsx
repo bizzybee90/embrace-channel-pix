@@ -83,10 +83,10 @@ export const ConversationFilters = ({
   ];
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2.5">
       {filters.map((filter) => (
-        <div key={filter.label} className="flex flex-col gap-2">
-          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+        <div key={filter.label} className="space-y-1">
+          <span className="text-[10px] font-semibold text-muted-foreground/80 uppercase tracking-wider pl-0.5">
             {filter.label}
           </span>
           <div className="flex gap-1.5 flex-wrap">
@@ -108,7 +108,7 @@ export const ConversationFilters = ({
                   key={option.value}
                   variant={isSelected ? 'default' : 'outline'}
                   className={cn(
-                    "rounded-full px-3 py-1 cursor-pointer transition-all duration-200 text-xs font-medium whitespace-nowrap",
+                    "rounded-md px-2.5 py-0.5 cursor-pointer transition-all duration-150 text-[11px] font-medium whitespace-nowrap",
                     "active:scale-95",
                     isSelected
                       ? "bg-primary text-primary-foreground shadow-sm" 
