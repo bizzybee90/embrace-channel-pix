@@ -121,14 +121,6 @@ export const Sidebar = ({ forceCollapsed = false }: SidebarProps = {}) => {
                     onCheckedChange={() => toggleFilter('allOpen')}
                   />
                 </div>
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="completed">Completed</Label>
-                  <Switch
-                    id="completed"
-                    checked={visibleFilters.completed}
-                    onCheckedChange={() => toggleFilter('completed')}
-                  />
-                </div>
               </div>
             </div>
               </PopoverContent>
@@ -228,27 +220,26 @@ export const Sidebar = ({ forceCollapsed = false }: SidebarProps = {}) => {
               )}
             </Tooltip>
           )}
-          {visibleFilters.completed && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <NavLink
-                  to="/completed"
-                  className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm hover:bg-accent/50 transition-all hover-scale`}
-                  activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
-                >
-                  <div className="flex items-center justify-center w-8 h-8 rounded-md bg-green-500/10">
-                    <CheckCheck className="h-4 w-4 text-green-500" />
-                  </div>
-                  {!isCollapsed && <span>Completed</span>}
-                </NavLink>
-              </TooltipTrigger>
-              {isCollapsed && (
-                <TooltipContent side="right">
-                  <p>Completed</p>
-                </TooltipContent>
-              )}
-            </Tooltip>
-          )}
+          {/* Completed - Always visible in Views */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <NavLink
+                to="/completed"
+                className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm hover:bg-accent/50 transition-all hover-scale`}
+                activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
+              >
+                <div className="flex items-center justify-center w-8 h-8 rounded-md bg-green-500/10">
+                  <CheckCheck className="h-4 w-4 text-green-500" />
+                </div>
+                {!isCollapsed && <span>Completed</span>}
+              </NavLink>
+            </TooltipTrigger>
+            {isCollapsed && (
+              <TooltipContent side="right">
+                <p>Completed</p>
+              </TooltipContent>
+            )}
+          </Tooltip>
         </nav>
 
         <Separator className="my-4" />
