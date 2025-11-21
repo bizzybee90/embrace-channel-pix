@@ -204,6 +204,7 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
             conversation={conversation}
             selected={selectedId === conversation.id}
             onClick={() => onSelect(conversation)}
+            onUpdate={handleRefresh}
           />
         ))
       )}
