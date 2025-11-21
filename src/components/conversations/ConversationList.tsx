@@ -117,9 +117,8 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
       "flex flex-col h-full min-w-[300px]",
       isTablet ? "bg-transparent" : "bg-muted/30"
     )}>
-      {/* Filter button - only show on desktop */}
-      {!isTablet && (
-        <div className="px-4 py-3 border-b border-border/50 bg-background/80 backdrop-blur-sm">
+      {/* Filter button */}
+      <div className="px-4 py-3 border-b border-border/50 bg-background/80 backdrop-blur-sm">
           <Popover>
             <PopoverTrigger asChild>
               <Button 
@@ -151,7 +150,6 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
             </PopoverContent>
           </Popover>
         </div>
-      )}
 
       <div className={cn(
         "flex-1 overflow-y-auto",
