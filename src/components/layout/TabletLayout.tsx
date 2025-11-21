@@ -92,8 +92,8 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
   // Two-state tablet layout
   return (
     <div className="flex h-screen w-full bg-background overflow-hidden">
-      {/* Collapsed Sidebar (always visible) */}
-      <div className="w-[72px] flex-shrink-0 border-r border-border/40 bg-card shadow-sm">
+      {/* Sidebar (collapsed by default, can expand) */}
+      <div className="flex-shrink-0 border-r border-border/40 bg-card shadow-sm">
         <Sidebar />
       </div>
 
