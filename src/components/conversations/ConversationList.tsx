@@ -114,11 +114,14 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
 
   return (
     <div className={cn(
-      "flex flex-col h-full min-w-[300px]",
-      isTablet ? "bg-transparent" : "bg-muted/30"
+      "flex flex-col h-full",
+      isTablet ? "bg-transparent" : "bg-muted/30 min-w-[300px]"
     )}>
       {/* Filter button */}
-      <div className="px-4 py-3 border-b border-border/50 bg-background/80 backdrop-blur-sm">
+      <div className={cn(
+        "py-3 border-b border-border/50 bg-background/80 backdrop-blur-sm",
+        isTablet ? "px-0 mb-4" : "px-4"
+      )}>
           <Popover>
             <PopoverTrigger asChild>
               <Button 
@@ -153,7 +156,7 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
 
       <div className={cn(
         "flex-1 overflow-y-auto",
-        isTablet ? "px-4 py-3" : "p-4"
+        isTablet ? "px-0" : "p-4"
       )}>
         {conversations.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">

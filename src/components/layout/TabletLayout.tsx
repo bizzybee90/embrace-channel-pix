@@ -3,7 +3,7 @@ import { Sidebar } from '@/components/sidebar/Sidebar';
 import { ConversationList } from '@/components/conversations/ConversationList';
 import { ConversationThread } from '@/components/conversations/ConversationThread';
 import { Conversation } from '@/lib/types';
-import { User, Zap, Inbox } from 'lucide-react';
+import { User, Zap, ChevronLeft, Inbox } from 'lucide-react';
 import { SLABadge } from '@/components/sla/SLABadge';
 import { Badge } from '@/components/ui/badge';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
@@ -32,6 +32,11 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
 
   const handleSelectConversation = (conv: Conversation) => {
     setSelectedConversation(conv);
+    setDrawerMode(null);
+  };
+
+  const handleBackToList = () => {
+    setSelectedConversation(null);
     setDrawerMode(null);
   };
 
@@ -84,95 +89,102 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
     handleUpdate();
   };
 
-  // Professional 3-column tablet layout
+  // Two-state tablet layout
   return (
     <div className="flex h-screen w-full bg-background overflow-hidden">
-      {/* Column 1: Sidebar (collapsible) */}
-      <div className="flex-shrink-0 border-r border-border/40 bg-card shadow-sm">
+      {/* Collapsed Sidebar (always visible) */}
+      <div className="w-[72px] flex-shrink-0 border-r border-border/40 bg-card shadow-sm">
         <Sidebar />
       </div>
 
-      {/* Column 2: Ticket List (40% width) */}
-      <div className="w-[40%] flex-shrink-0 border-r border-border/40 bg-background flex flex-col">
-        {/* Header - sticky */}
-        <div className="sticky top-0 z-10 px-5 py-4 border-b border-border/30 bg-card/50 backdrop-blur-sm">
-          <h2 className="text-xl font-bold text-foreground mb-1">{getFilterTitle()}</h2>
-          <p className="text-xs text-muted-foreground">Support escalations</p>
-        </div>
+      {/* Main Content Area - switches between List and Conversation */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {!selectedConversation ? (
+          // STATE 1: Ticket List View
+          <div className="flex flex-col h-full animate-slide-in-left">
+            {/* Header */}
+            <div className="px-8 py-6 border-b border-border/30 bg-card/50 backdrop-blur-sm">
+              <h1 className="text-2xl font-bold text-foreground mb-1">{getFilterTitle()}</h1>
+              <p className="text-sm text-muted-foreground">Support escalations</p>
+            </div>
 
-        {/* Ticket List - scrollable */}
-        <div className="flex-1 overflow-y-auto px-4 py-4">
-          <ConversationList
-            selectedId={selectedConversation?.id}
-            onSelect={handleSelectConversation}
-            filter={filter}
-            key={refreshKey}
-          />
-        </div>
-      </div>
+            {/* Ticket List - Full Width */}
+            <div className="flex-1 overflow-y-auto px-8 py-6">
+              <ConversationList
+                selectedId={selectedConversation?.id}
+                onSelect={handleSelectConversation}
+                filter={filter}
+                key={refreshKey}
+              />
+            </div>
+          </div>
+        ) : (
+          // STATE 2: Conversation View
+          <div className="flex flex-col h-full animate-slide-in-right">
+            {/* Back Button Header */}
+            <div className="px-8 py-6 border-b border-border/30 bg-card/50 backdrop-blur-sm sticky top-0 z-10">
+              <Button
+                onClick={handleBackToList}
+                variant="ghost"
+                className="mb-4 -ml-2 h-10 px-3 hover:bg-muted/50 rounded-xl"
+              >
+                <ChevronLeft className="h-5 w-5 mr-2" />
+                <span className="text-base font-semibold">Back to tickets</span>
+              </Button>
 
-      {/* Column 3: Conversation Panel (64-68% width) */}
-      <div className="flex-1 bg-muted/20 flex flex-col overflow-hidden">
-        {selectedConversation ? (
-          <>
-            {/* Unified Header Card */}
-            <div className="mx-6 mt-6 mb-4 rounded-2xl bg-card shadow-md border border-border/50 overflow-hidden">
-              {/* Title Row */}
-              <div className="px-6 py-5 border-b border-border/30">
-                <div className="flex items-start justify-between gap-4 mb-4">
-                  <h1 className="text-2xl font-bold leading-tight flex-1 min-w-0">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <h1 className="text-2xl font-bold leading-tight mb-1">
                     {selectedConversation.title}
                   </h1>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    {selectedConversation.sla_due_at && (
-                      <SLABadge conversation={selectedConversation} />
-                    )}
-                    {selectedConversation.priority && (
-                      <Badge variant={`priority-${selectedConversation.priority}` as any} className="text-sm px-3 py-1">
-                        {selectedConversation.priority === 'high' ? '🔴' : selectedConversation.priority === 'medium' ? '🟡' : '🟢'}
-                        {selectedConversation.priority}
-                      </Badge>
-                    )}
-                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {selectedConversation.channel} • Created {formatDistanceToNow(new Date(selectedConversation.created_at || ''), { addSuffix: true })}
+                  </p>
                 </div>
-                
-                {/* Pill Button Row */}
-                <div className="flex gap-3">
-                  <Button
-                    onClick={() => setDrawerMode(drawerMode === 'customer' ? null : 'customer')}
-                    variant={drawerMode === 'customer' ? 'default' : 'outline'}
-                    className="rounded-full px-5 py-2 h-auto font-semibold transition-all"
-                  >
-                    <User className="h-4 w-4 mr-2" />
-                    Customer Info
-                  </Button>
-                  <Button
-                    onClick={() => setDrawerMode(drawerMode === 'actions' ? null : 'actions')}
-                    variant={drawerMode === 'actions' ? 'default' : 'outline'}
-                    className="rounded-full px-5 py-2 h-auto font-semibold transition-all"
-                  >
-                    <Zap className="h-4 w-4 mr-2" />
-                    Quick Actions
-                  </Button>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {selectedConversation.sla_due_at && (
+                    <SLABadge conversation={selectedConversation} />
+                  )}
+                  {selectedConversation.priority && (
+                    <Badge variant={`priority-${selectedConversation.priority}` as any} className="text-sm px-3 py-1">
+                      {selectedConversation.priority === 'high' ? '🔴' : selectedConversation.priority === 'medium' ? '🟡' : '🟢'}
+                      {selectedConversation.priority}
+                    </Badge>
+                  )}
                 </div>
               </div>
             </div>
 
-            {/* Conversation Thread - Scrollable */}
-            <div className="flex-1 overflow-y-auto px-6">
+            {/* Customer Info & Quick Actions Control Bar */}
+            <div className="px-8 py-4 border-b border-border/20 bg-background/80 backdrop-blur-sm">
+              <div className="flex gap-3">
+                <Button
+                  onClick={() => setDrawerMode(drawerMode === 'customer' ? null : 'customer')}
+                  variant={drawerMode === 'customer' ? 'default' : 'outline'}
+                  className="rounded-full px-5 py-2.5 h-auto font-semibold transition-all"
+                >
+                  <User className="h-4 w-4 mr-2" />
+                  Customer Info
+                </Button>
+                <Button
+                  onClick={() => setDrawerMode(drawerMode === 'actions' ? null : 'actions')}
+                  variant={drawerMode === 'actions' ? 'default' : 'outline'}
+                  className="rounded-full px-5 py-2.5 h-auto font-semibold transition-all"
+                >
+                  <Zap className="h-4 w-4 mr-2" />
+                  Quick Actions
+                </Button>
+              </div>
+            </div>
+
+            {/* Conversation Stack - Scrollable */}
+            <div className="flex-1 overflow-y-auto px-8 py-6">
               <ConversationThread
                 conversation={selectedConversation}
                 onUpdate={handleUpdate}
+                onBack={handleBackToList}
               />
             </div>
-          </>
-        ) : (
-          <div className="h-full flex flex-col items-center justify-center text-muted-foreground p-8">
-            <div className="h-20 w-20 rounded-3xl bg-muted/50 flex items-center justify-center mb-6 shadow-sm">
-              <Inbox className="h-10 w-10 text-muted-foreground/50" />
-            </div>
-            <p className="text-xl font-semibold">No conversation selected</p>
-            <p className="text-sm text-muted-foreground/70 mt-2">Select a ticket from the list to view details</p>
           </div>
         )}
       </div>
