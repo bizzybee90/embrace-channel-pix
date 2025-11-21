@@ -1,4 +1,4 @@
-import { Inbox, AlertTriangle, CheckCircle2, Clock, Filter, Zap, Columns, Settings, ChevronRight, PanelLeftClose } from 'lucide-react';
+import { Inbox, AlertTriangle, CheckCircle2, Clock, Filter, Zap, Columns, Settings, ChevronRight, PanelLeftClose, CheckCheck } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { TeamStatus } from './TeamStatus';
 import { Button } from '@/components/ui/button';
@@ -26,6 +26,7 @@ export const Sidebar = ({ forceCollapsed = false }: SidebarProps = {}) => {
     unassigned: true,
     slaRisk: true,
     allOpen: true,
+    completed: true,
   });
 
   useEffect(() => {
@@ -118,6 +119,14 @@ export const Sidebar = ({ forceCollapsed = false }: SidebarProps = {}) => {
                     id="all-open"
                     checked={visibleFilters.allOpen}
                     onCheckedChange={() => toggleFilter('allOpen')}
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="completed">Completed</Label>
+                  <Switch
+                    id="completed"
+                    checked={visibleFilters.completed}
+                    onCheckedChange={() => toggleFilter('completed')}
                   />
                 </div>
               </div>
@@ -220,6 +229,27 @@ export const Sidebar = ({ forceCollapsed = false }: SidebarProps = {}) => {
             </Tooltip>
           )}
         </nav>
+          {visibleFilters.completed && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <NavLink
+                  to="/completed"
+                  className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm hover:bg-accent/50 transition-all hover-scale`}
+                  activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
+                >
+                  <div className="flex items-center justify-center w-8 h-8 rounded-md bg-blue-500/10">
+                    <CheckCheck className="h-4 w-4 text-blue-500" />
+                  </div>
+                  {!isCollapsed && <span>Completed</span>}
+                </NavLink>
+              </TooltipTrigger>
+              {isCollapsed && (
+                <TooltipContent side="right">
+                  <p>Completed</p>
+                </TooltipContent>
+              )}
+            </Tooltip>
+          )}
 
         <Separator className="my-4" />
 

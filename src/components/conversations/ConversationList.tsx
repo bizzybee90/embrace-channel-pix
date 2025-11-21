@@ -15,7 +15,7 @@ import PullToRefresh from 'react-simple-pull-to-refresh';
 interface ConversationListProps {
   selectedId?: string;
   onSelect: (conversation: Conversation) => void;
-  filter?: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open';
+  filter?: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'completed';
   onConversationsChange?: (conversations: Conversation[]) => void;
 }
 
@@ -51,6 +51,8 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
         query = query.in('sla_status', ['warning', 'breached']).in('status', ['new', 'open', 'waiting_customer', 'waiting_internal']);
       } else if (filter === 'all-open') {
         query = query.in('status', ['new', 'open', 'waiting_customer', 'waiting_internal']);
+      } else if (filter === 'completed') {
+        query = query.eq('status', 'resolved');
       }
 
       // Apply additional filters
@@ -131,6 +133,8 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
       query = query.in('sla_status', ['warning', 'breached']).in('status', ['new', 'open', 'waiting_customer', 'waiting_internal']);
     } else if (filter === 'all-open') {
       query = query.in('status', ['new', 'open', 'waiting_customer', 'waiting_internal']);
+    } else if (filter === 'completed') {
+      query = query.eq('status', 'resolved');
     }
 
     if (statusFilter.length > 0) {

@@ -2,10 +2,10 @@ import { Conversation } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { CheckCircle2, Clock, UserPlus } from 'lucide-react';
+import { CheckCircle2, Clock, UserPlus, UserCheck } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { SnoozeDialog } from './SnoozeDialog';
 
 interface QuickActionsProps {
@@ -17,6 +17,29 @@ interface QuickActionsProps {
 export const QuickActions = ({ conversation, onUpdate, onBack }: QuickActionsProps) => {
   const { toast } = useToast();
   const [snoozeOpen, setSnoozeOpen] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [assignedUserName, setAssignedUserName] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setCurrentUserId(user?.id || null);
+
+      // Fetch assigned user name if conversation is assigned
+      if (conversation.assigned_to) {
+        const { data } = await supabase
+          .from('users')
+          .select('name')
+          .eq('id', conversation.assigned_to)
+          .single();
+        
+        if (data) {
+          setAssignedUserName(data.name);
+        }
+      }
+    };
+    fetchUser();
+  }, [conversation.assigned_to]);
 
   const handleAssignToMe = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -151,7 +174,29 @@ export const QuickActions = ({ conversation, onUpdate, onBack }: QuickActionsPro
             Snooze
           </Button>
 
-          {!conversation.assigned_to && (
+          {conversation.assigned_to ? (
+            conversation.assigned_to === currentUserId ? (
+              <Button 
+                variant="outline"
+                disabled
+                className="w-full justify-start h-11 md:h-9 rounded-[18px] bg-success/10 border-success/20"
+                size="default"
+              >
+                <UserCheck className="h-4 w-4 mr-2 text-success" />
+                Assigned to You
+              </Button>
+            ) : (
+              <Button 
+                onClick={handleAssignToMe}
+                variant="outline"
+                className="w-full justify-start smooth-transition spring-press h-11 md:h-9 rounded-[18px]"
+                size="default"
+              >
+                <UserPlus className="h-4 w-4 mr-2" />
+                Reassign to Me {assignedUserName && `(from ${assignedUserName})`}
+              </Button>
+            )
+          ) : (
             <Button 
               onClick={handleAssignToMe}
               variant="outline"
