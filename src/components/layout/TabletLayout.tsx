@@ -102,8 +102,8 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
 
           {/* Two/Three Column Layout */}
           <div className="flex flex-1 overflow-hidden">
-            {/* Ticket List Column */}
-            <div className="w-[35%] border-r border-border/30 bg-background flex flex-col flex-shrink-0">
+            {/* Ticket List Column - 40% of remaining space */}
+            <div className="w-[40%] border-r border-border/30 bg-background flex flex-col flex-shrink-0">
             <div className="flex-1 overflow-y-auto px-3 py-4">
                 <ConversationList
                   selectedId={selectedConversation?.id}
@@ -114,8 +114,8 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
               </div>
             </div>
 
-            {/* Conversation Panel */}
-            <div className="flex-1 bg-background flex flex-col overflow-hidden min-w-0">
+            {/* Conversation Panel - 60% of remaining space */}
+            <div className="w-[60%] bg-background flex flex-col overflow-hidden min-w-0">
               {selectedConversation ? (
                 <>
                   {/* Sticky Conversation Header */}
