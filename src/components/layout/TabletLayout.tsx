@@ -74,38 +74,14 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
 
       {/* Main Container */}
       <div className="flex w-full h-full">
-        {/* Collapsed Sidebar - Only show in wide tablet mode (900px+) */}
-        {isWideTablet && (
-          <div className="w-16 border-r border-border/50 bg-sidebar-background flex-shrink-0 flex flex-col items-center py-4 gap-3">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setSidebarOpen(true)}
-              className="h-10 w-10 rounded-xl hover:bg-sidebar-accent"
-            >
-              <Menu className="h-5 w-5" />
-            </Button>
-            <div className="h-px w-8 bg-border/50" />
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-10 w-10 rounded-xl hover:bg-sidebar-accent"
-            >
-              <Inbox className="h-5 w-5" />
-            </Button>
-          </div>
-        )}
+        {/* Desktop Sidebar - Always visible in tablet mode */}
+        <Sidebar />
 
         {/* Content Wrapper */}
         <div className="flex flex-col flex-1 min-w-0">
-          {/* Top Bar with Hamburger (compact tablet only) + Filters */}
+          {/* Top Bar with Filters */}
           <div className="border-b border-border/30 bg-card/50 backdrop-blur-sm flex-shrink-0 sticky top-0 z-20">
             <div className="px-4 py-3 flex items-center gap-4">
-              {!isWideTablet && (
-                <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)}>
-                  <Menu className="h-5 w-5" />
-                </Button>
-              )}
               <h2 className="font-semibold text-foreground">{getFilterTitle()}</h2>
             </div>
             
@@ -127,11 +103,7 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
           {/* Two/Three Column Layout */}
           <div className="flex flex-1 overflow-hidden">
             {/* Ticket List Column */}
-            <div 
-              className={`border-r border-border/30 bg-background flex flex-col flex-shrink-0 ${
-                isWideTablet ? 'w-[35%]' : 'w-[40%]'
-              }`}
-            >
+            <div className="w-[35%] border-r border-border/30 bg-background flex flex-col flex-shrink-0">
             <div className="flex-1 overflow-y-auto px-3 py-4">
                 <ConversationList
                   selectedId={selectedConversation?.id}
