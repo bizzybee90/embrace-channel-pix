@@ -3,10 +3,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { Conversation } from '@/lib/types';
 import { ConversationCard } from './ConversationCard';
 import { ConversationFilters } from './ConversationFilters';
-import { TabletFilters } from './TabletFilters';
 import { useIsTablet } from '@/hooks/use-tablet';
-import { Loader2 } from 'lucide-react';
+import { Loader2, SlidersHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 
 interface ConversationListProps {
   selectedId?: string;
@@ -100,6 +102,8 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
     };
   }, [filter, statusFilter, priorityFilter, channelFilter, categoryFilter]);
 
+  const activeFilterCount = statusFilter.length + priorityFilter.length + channelFilter.length + categoryFilter.length;
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -113,19 +117,39 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
       "flex flex-col h-full min-w-[300px]",
       isTablet ? "bg-transparent" : "bg-muted/30"
     )}>
-      {/* Filter bar - only show on desktop, not tablet */}
+      {/* Filter button - only show on desktop */}
       {!isTablet && (
-        <div className="px-6 py-4 border-b border-border/50 bg-background/80 backdrop-blur-sm">
-          <ConversationFilters
-            statusFilter={statusFilter}
-            setStatusFilter={setStatusFilter}
-            priorityFilter={priorityFilter}
-            setPriorityFilter={setPriorityFilter}
-            channelFilter={channelFilter}
-            setChannelFilter={setChannelFilter}
-            categoryFilter={categoryFilter}
-            setCategoryFilter={setCategoryFilter}
-          />
+        <div className="px-4 py-3 border-b border-border/50 bg-background/80 backdrop-blur-sm">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button 
+                variant="outline" 
+                className="w-full justify-between h-9 text-sm font-medium"
+              >
+                <div className="flex items-center gap-2">
+                  <SlidersHorizontal className="h-4 w-4" />
+                  <span>Filters</span>
+                </div>
+                {activeFilterCount > 0 && (
+                  <Badge variant="secondary" className="ml-auto h-5 min-w-5 px-1.5 text-[10px] font-semibold">
+                    {activeFilterCount}
+                  </Badge>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80 p-4" align="start">
+              <ConversationFilters
+                statusFilter={statusFilter}
+                setStatusFilter={setStatusFilter}
+                priorityFilter={priorityFilter}
+                setPriorityFilter={setPriorityFilter}
+                channelFilter={channelFilter}
+                setChannelFilter={setChannelFilter}
+                categoryFilter={categoryFilter}
+                setCategoryFilter={setCategoryFilter}
+              />
+            </PopoverContent>
+          </Popover>
         </div>
       )}
 
