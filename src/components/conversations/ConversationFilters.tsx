@@ -1,8 +1,4 @@
-import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ChevronDown } from 'lucide-react';
-import { useState } from 'react';
 
 interface ConversationFiltersProps {
   statusFilter: string[];
@@ -85,87 +81,46 @@ export const ConversationFilters = ({
     },
   ];
 
-  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
-    Status: true,
-    Priority: false,
-    Channel: false,
-    Category: false,
-  });
-
-  const toggleSection = (label: string) => {
-    setOpenSections(prev => ({ ...prev, [label]: !prev[label] }));
-  };
-
-  const getActiveCount = (filter: typeof filters[0]) => {
-    return filter.value.length;
-  };
-
   return (
-    <div className="space-y-1">
-      {filters.map((filter) => {
-        const activeCount = getActiveCount(filter);
-        const isOpen = openSections[filter.label];
-        
-        return (
-          <Collapsible
-            key={filter.label}
-            open={isOpen}
-            onOpenChange={() => toggleSection(filter.label)}
-          >
-            <CollapsibleTrigger className="flex items-center justify-between w-full px-3 py-2 text-sm font-medium hover:bg-muted/50 rounded-md transition-colors group">
-              <div className="flex items-center gap-2">
-                <span className="text-foreground">{filter.label}</span>
-                {activeCount > 0 && (
-                  <Badge variant="secondary" className="h-5 min-w-5 px-1.5 text-[10px] font-semibold">
-                    {activeCount}
-                  </Badge>
-                )}
-              </div>
-              <ChevronDown 
-                className={cn(
-                  "h-4 w-4 text-muted-foreground transition-transform duration-200",
-                  isOpen && "rotate-180"
-                )} 
-              />
-            </CollapsibleTrigger>
-            
-            <CollapsibleContent className="px-3 pb-2 pt-1">
-              <div className="flex gap-1.5 flex-wrap">
-                {filter.options.map((option) => {
-                  const isSelected = option.isAll 
-                    ? filter.value.length === 0 
-                    : filter.value.includes(option.value);
-                  
-                  const handleClick = () => {
-                    if (option.isAll) {
-                      filter.onChange([]);
-                    } else {
-                      toggleFilter(filter.value, option.value, filter.onChange);
-                    }
-                  };
-                  
-                  return (
-                    <Badge
-                      key={option.value}
-                      variant={isSelected ? 'default' : 'outline'}
-                      className={cn(
-                        "rounded-md px-2.5 py-0.5 cursor-pointer transition-all duration-150 text-[11px] font-medium whitespace-nowrap",
-                        "active:scale-95",
-                        isSelected
-                          ? "bg-primary text-primary-foreground shadow-sm" 
-                          : "hover:bg-accent hover:border-primary/30"
-                      )}
-                      onClick={handleClick}
-                    >
-                      {option.label}
-                    </Badge>
-                  );
-                })}
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
-        );
-      })}
+    <div className="space-y-6">
+      {filters.map((filter) => (
+        <div key={filter.label}>
+          <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-2.5">
+            {filter.label}
+          </h3>
+          <div className="grid grid-cols-3 gap-2">
+            {filter.options.map((option) => {
+              const isSelected = option.isAll 
+                ? filter.value.length === 0 
+                : filter.value.includes(option.value);
+              
+              const handleClick = () => {
+                if (option.isAll) {
+                  filter.onChange([]);
+                } else {
+                  toggleFilter(filter.value, option.value, filter.onChange);
+                }
+              };
+              
+              return (
+                <button
+                  key={option.value}
+                  onClick={handleClick}
+                  className={cn(
+                    "h-[36px] rounded-lg text-[13px] font-medium transition-all duration-200",
+                    "active:scale-95 border",
+                    isSelected
+                      ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                      : "bg-muted/50 text-muted-foreground border-border/50 hover:border-primary/30 hover:bg-muted"
+                  )}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ))}
     </div>
   );
 };
