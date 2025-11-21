@@ -212,15 +212,17 @@ export const ConversationCard = ({ conversation, selected, onClick, onUpdate }: 
             transition: isSwiping ? 'none' : 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
           }}
         >
-        {/* Priority Accent Bar */}
-        {conversation.priority && (
-          <div 
-            className={cn(
-              "absolute top-0 left-0 right-0 h-1",
-              getPriorityBarColor(conversation.priority)
-            )}
-          />
-        )}
+        {/* Priority/Status Accent Bar */}
+        <div 
+          className={cn(
+            "absolute top-0 left-0 right-0 h-1",
+            conversation.status === 'resolved' 
+              ? "bg-green-500" 
+              : conversation.priority 
+                ? getPriorityBarColor(conversation.priority)
+                : "bg-muted"
+          )}
+        />
         
         {/* Overdue Badge */}
         {isOverdue && (
@@ -290,15 +292,17 @@ export const ConversationCard = ({ conversation, selected, onClick, onUpdate }: 
         selected && "border-primary/50 apple-shadow-lg bg-gradient-to-br from-primary/8 via-primary/4 to-card"
       )}
     >
-      {/* Priority Accent Bar */}
-      {conversation.priority && (
-        <div 
-          className={cn(
-            "absolute top-0 left-0 right-0 h-1",
-            getPriorityBarColor(conversation.priority)
-          )}
-        />
-      )}
+      {/* Priority/Status Accent Bar */}
+      <div 
+        className={cn(
+          "absolute top-0 left-0 right-0 h-1",
+          conversation.status === 'resolved' 
+            ? "bg-green-500" 
+            : conversation.priority 
+              ? getPriorityBarColor(conversation.priority)
+              : "bg-muted"
+        )}
+      />
       
       {/* Overdue Badge */}
       {isOverdue && (

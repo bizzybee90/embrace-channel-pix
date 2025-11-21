@@ -63,6 +63,12 @@ export const QuickActions = ({ conversation, onUpdate, onBack }: QuickActionsPro
   };
 
   const handleResolve = async () => {
+    // Optimistic UI update with animation
+    const button = document.activeElement as HTMLButtonElement;
+    if (button) {
+      button.classList.add('animate-scale-out');
+    }
+
     await supabase
       .from('conversations')
       .update({ 
@@ -76,8 +82,11 @@ export const QuickActions = ({ conversation, onUpdate, onBack }: QuickActionsPro
       description: "Conversation marked as resolved.",
     });
     
-    onUpdate();
-    onBack?.();
+    // Small delay for animation before updating
+    setTimeout(() => {
+      onUpdate();
+      onBack?.();
+    }, 300);
   };
 
   const handlePriorityChange = async (value: string) => {
@@ -197,7 +206,7 @@ export const QuickActions = ({ conversation, onUpdate, onBack }: QuickActionsPro
                 size="default"
               >
                 <UserPlus className="h-4 w-4 mr-2" />
-                {assignedUserName ? `Assigned to ${assignedUserName}` : 'Reassign to Me'}
+                Assigned to {assignedUserName || 'Someone'}
               </Button>
             )
           ) : (
