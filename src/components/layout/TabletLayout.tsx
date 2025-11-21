@@ -95,13 +95,13 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
       {/* Column 2: Ticket List (32-36% width) */}
       <div className="w-[34%] flex-shrink-0 border-r border-border/40 bg-background flex flex-col">
         {/* Header */}
-        <div className="px-6 py-5 border-b border-border/30 bg-card/30">
-          <h2 className="text-2xl font-bold text-foreground mb-1">{getFilterTitle()}</h2>
-          <p className="text-sm text-muted-foreground">Support escalations</p>
+        <div className="px-4 py-4 border-b border-border/30 bg-card/30">
+          <h2 className="text-xl font-bold text-foreground mb-1">{getFilterTitle()}</h2>
+          <p className="text-xs text-muted-foreground">Support escalations</p>
         </div>
 
         {/* Ticket List - scrollable */}
-        <div className="flex-1 overflow-y-auto px-6 py-4">
+        <div className="flex-1 overflow-y-auto px-3 py-3">
           <ConversationList
             selectedId={selectedConversation?.id}
             onSelect={handleSelectConversation}
