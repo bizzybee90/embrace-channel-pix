@@ -38,11 +38,13 @@ All colors MUST be HSL.
 
     --radius: 0.75rem;
     
-    /* BizzyBee tablet-specific spacing */
+    /* Tablet-specific design tokens (768px-1199px) */
     --tablet-spacing-xl: 1.75rem;
     --tablet-spacing-lg: 1.5rem;
     --tablet-spacing-md: 1.25rem;
     --tablet-card-radius: 1.5rem;
+    --tablet-header-height: 3.5rem;
+    --tablet-column-gap: 1px;
     
     /* Priority colors - uniform across all views */
     --priority-urgent: 0 84% 60%;
