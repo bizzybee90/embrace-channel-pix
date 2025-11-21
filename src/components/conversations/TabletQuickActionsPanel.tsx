@@ -6,14 +6,35 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
 import { SnoozeDialog } from './SnoozeDialog';
+import { TabletFilters } from './TabletFilters';
 
 interface TabletQuickActionsPanelProps {
   conversation: Conversation;
   onUpdate: () => void;
   isOpen: boolean;
+  statusFilter: string[];
+  priorityFilter: string[];
+  channelFilter: string[];
+  categoryFilter: string[];
+  onStatusChange: (filters: string[]) => void;
+  onPriorityChange: (filters: string[]) => void;
+  onChannelChange: (filters: string[]) => void;
+  onCategoryChange: (filters: string[]) => void;
 }
 
-export const TabletQuickActionsPanel = ({ conversation, onUpdate, isOpen }: TabletQuickActionsPanelProps) => {
+export const TabletQuickActionsPanel = ({ 
+  conversation, 
+  onUpdate, 
+  isOpen,
+  statusFilter,
+  priorityFilter,
+  channelFilter,
+  categoryFilter,
+  onStatusChange,
+  onPriorityChange,
+  onChannelChange,
+  onCategoryChange
+}: TabletQuickActionsPanelProps) => {
   const { toast } = useToast();
   const [snoozeDialogOpen, setSnoozeDialogOpen] = useState(false);
 
@@ -57,6 +78,22 @@ export const TabletQuickActionsPanel = ({ conversation, onUpdate, isOpen }: Tabl
 
   return (
     <div className="animate-in slide-in-from-top-2 duration-200">
+      {/* Filters Section */}
+      <div className="mx-6 mb-4 rounded-2xl bg-gradient-to-br from-muted/30 to-muted/10 border border-border/50 p-4">
+        <h3 className="text-sm font-semibold text-foreground mb-3">Filters</h3>
+        <TabletFilters
+          statusFilter={statusFilter}
+          priorityFilter={priorityFilter}
+          channelFilter={channelFilter}
+          categoryFilter={categoryFilter}
+          onStatusChange={onStatusChange}
+          onPriorityChange={onPriorityChange}
+          onChannelChange={onChannelChange}
+          onCategoryChange={onCategoryChange}
+        />
+      </div>
+
+      {/* Quick Actions */}
       <div className="mx-6 mb-4 rounded-2xl bg-gradient-to-br from-card to-card/50 border border-border/50 shadow-lg p-6 space-y-4">
         {/* Resolve Button */}
         <Button

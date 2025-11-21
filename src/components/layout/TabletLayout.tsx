@@ -79,24 +79,10 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
 
         {/* Content Wrapper */}
         <div className="flex flex-col flex-1 min-w-0">
-          {/* Top Bar with Filters */}
+          {/* Top Bar */}
           <div className="border-b border-border/30 bg-card/50 backdrop-blur-sm flex-shrink-0 sticky top-0 z-20">
             <div className="px-4 py-3 flex items-center gap-4">
               <h2 className="font-semibold text-foreground">{getFilterTitle()}</h2>
-            </div>
-            
-            {/* Horizontal Filter Bar - Sticky */}
-            <div className="px-4 pb-3 overflow-x-auto">
-              <TabletFilters
-                statusFilter={statusFilter}
-                priorityFilter={priorityFilter}
-                channelFilter={channelFilter}
-                categoryFilter={categoryFilter}
-                onStatusChange={setStatusFilter}
-                onPriorityChange={setPriorityFilter}
-                onChannelChange={setChannelFilter}
-                onCategoryChange={setCategoryFilter}
-              />
             </div>
           </div>
 
@@ -185,6 +171,14 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
                     conversation={selectedConversation}
                     onUpdate={handleUpdate}
                     isOpen={activeTab === 'actions'}
+                    statusFilter={statusFilter}
+                    priorityFilter={priorityFilter}
+                    channelFilter={channelFilter}
+                    categoryFilter={categoryFilter}
+                    onStatusChange={setStatusFilter}
+                    onPriorityChange={setPriorityFilter}
+                    onChannelChange={setChannelFilter}
+                    onCategoryChange={setCategoryFilter}
                   />
 
                   {/* Conversation Thread - Scrollable */}
