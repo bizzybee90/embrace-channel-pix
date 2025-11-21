@@ -138,17 +138,19 @@ export const Sidebar = ({ forceCollapsed = false }: SidebarProps = {}) => {
           {visibleFilters.myTickets && (
             <Tooltip>
               <TooltipTrigger asChild>
-                <NavLink
-                  to="/"
-                  end
-                  className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm hover:bg-accent/50 transition-all hover-scale`}
-                  activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
-                >
-                  <div className="flex items-center justify-center w-8 h-8 rounded-md bg-primary/10">
-                    <Inbox className="h-4 w-4 text-primary" />
-                  </div>
-                  {!isCollapsed && <span>My Tickets</span>}
-                </NavLink>
+                <div>
+                  <NavLink
+                    to="/"
+                    end
+                    className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm hover:bg-accent/50 transition-all hover-scale`}
+                    activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
+                  >
+                    <div className="flex items-center justify-center w-8 h-8 rounded-md bg-primary/10">
+                      <Inbox className="h-4 w-4 text-primary" />
+                    </div>
+                    {!isCollapsed && <span>My Tickets</span>}
+                  </NavLink>
+                </div>
               </TooltipTrigger>
               {isCollapsed && (
                 <TooltipContent side="right">
@@ -160,16 +162,18 @@ export const Sidebar = ({ forceCollapsed = false }: SidebarProps = {}) => {
           {visibleFilters.unassigned && (
             <Tooltip>
               <TooltipTrigger asChild>
-                <NavLink
-                  to="/unassigned"
-                  className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm hover:bg-accent/50 transition-all hover-scale`}
-                  activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
-                >
-                  <div className="flex items-center justify-center w-8 h-8 rounded-md bg-destructive/10">
-                    <AlertTriangle className="h-4 w-4 text-destructive" />
-                  </div>
-                  {!isCollapsed && <span>Unassigned</span>}
-                </NavLink>
+                <div>
+                  <NavLink
+                    to="/unassigned"
+                    className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm hover:bg-accent/50 transition-all hover-scale`}
+                    activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
+                  >
+                    <div className="flex items-center justify-center w-8 h-8 rounded-md bg-destructive/10">
+                      <AlertTriangle className="h-4 w-4 text-destructive" />
+                    </div>
+                    {!isCollapsed && <span>Unassigned</span>}
+                  </NavLink>
+                </div>
               </TooltipTrigger>
               {isCollapsed && (
                 <TooltipContent side="right">
@@ -181,16 +185,18 @@ export const Sidebar = ({ forceCollapsed = false }: SidebarProps = {}) => {
           {visibleFilters.slaRisk && (
             <Tooltip>
               <TooltipTrigger asChild>
-                <NavLink
-                  to="/sla-risk"
-                  className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm hover:bg-accent/50 transition-all hover-scale`}
-                  activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
-                >
-                  <div className="flex items-center justify-center w-8 h-8 rounded-md bg-orange-500/10">
-                    <Clock className="h-4 w-4 text-orange-500" />
-                  </div>
-                  {!isCollapsed && <span>SLA at Risk</span>}
-                </NavLink>
+                <div>
+                  <NavLink
+                    to="/sla-risk"
+                    className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm hover:bg-accent/50 transition-all hover-scale`}
+                    activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
+                  >
+                    <div className="flex items-center justify-center w-8 h-8 rounded-md bg-orange-500/10">
+                      <Clock className="h-4 w-4 text-orange-500" />
+                    </div>
+                    {!isCollapsed && <span>SLA at Risk</span>}
+                  </NavLink>
+                </div>
               </TooltipTrigger>
               {isCollapsed && (
                 <TooltipContent side="right">
@@ -202,16 +208,18 @@ export const Sidebar = ({ forceCollapsed = false }: SidebarProps = {}) => {
           {visibleFilters.allOpen && (
             <Tooltip>
               <TooltipTrigger asChild>
-                <NavLink
-                  to="/all-open"
-                  className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm hover:bg-accent/50 transition-all hover-scale`}
-                  activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
-                >
-                  <div className="flex items-center justify-center w-8 h-8 rounded-md bg-blue-500/10">
-                    <CheckCircle2 className="h-4 w-4 text-blue-500" />
-                  </div>
-                  {!isCollapsed && <span>All Open</span>}
-                </NavLink>
+                <div>
+                  <NavLink
+                    to="/all-open"
+                    className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm hover:bg-accent/50 transition-all hover-scale`}
+                    activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
+                  >
+                    <div className="flex items-center justify-center w-8 h-8 rounded-md bg-blue-500/10">
+                      <CheckCircle2 className="h-4 w-4 text-blue-500" />
+                    </div>
+                    {!isCollapsed && <span>All Open</span>}
+                  </NavLink>
+                </div>
               </TooltipTrigger>
               {isCollapsed && (
                 <TooltipContent side="right">
@@ -223,16 +231,18 @@ export const Sidebar = ({ forceCollapsed = false }: SidebarProps = {}) => {
           {/* Completed - Always visible in Views */}
           <Tooltip>
             <TooltipTrigger asChild>
-              <NavLink
-                to="/completed"
-                className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm hover:bg-accent/50 transition-all hover-scale`}
-                activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
-              >
-                <div className="flex items-center justify-center w-8 h-8 rounded-md bg-green-500/10">
-                  <CheckCheck className="h-4 w-4 text-green-500" />
-                </div>
-                {!isCollapsed && <span>Completed</span>}
-              </NavLink>
+              <div>
+                <NavLink
+                  to="/completed"
+                  className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm hover:bg-accent/50 transition-all hover-scale`}
+                  activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
+                >
+                  <div className="flex items-center justify-center w-8 h-8 rounded-md bg-green-500/10">
+                    <CheckCheck className="h-4 w-4 text-green-500" />
+                  </div>
+                  {!isCollapsed && <span>Completed</span>}
+                </NavLink>
+              </div>
             </TooltipTrigger>
             {isCollapsed && (
               <TooltipContent side="right">
@@ -253,16 +263,18 @@ export const Sidebar = ({ forceCollapsed = false }: SidebarProps = {}) => {
           <div className="space-y-1">
             <Tooltip>
               <TooltipTrigger asChild>
-                <NavLink
-                  to="/high-priority"
-                  className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm hover:bg-accent/50 transition-all hover-scale`}
-                  activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
-                >
-                  <div className="flex items-center justify-center w-8 h-8 rounded-md bg-blue-500/10">
-                    <Zap className="h-4 w-4 text-blue-500" />
-                  </div>
-                  {!isCollapsed && <span className="text-sm">High Priority</span>}
-                </NavLink>
+                <div>
+                  <NavLink
+                    to="/high-priority"
+                    className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm hover:bg-accent/50 transition-all hover-scale`}
+                    activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
+                  >
+                    <div className="flex items-center justify-center w-8 h-8 rounded-md bg-blue-500/10">
+                      <Zap className="h-4 w-4 text-blue-500" />
+                    </div>
+                    {!isCollapsed && <span className="text-sm">High Priority</span>}
+                  </NavLink>
+                </div>
               </TooltipTrigger>
               {isCollapsed && (
                 <TooltipContent side="right">
@@ -272,16 +284,18 @@ export const Sidebar = ({ forceCollapsed = false }: SidebarProps = {}) => {
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <NavLink
-                  to="/vip-customers"
-                  className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm hover:bg-accent/50 transition-all hover-scale`}
-                  activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
-                >
-                  <div className="flex items-center justify-center w-8 h-8 rounded-md bg-purple-500/10">
-                    <Filter className="h-4 w-4 text-purple-500" />
-                  </div>
-                  {!isCollapsed && <span className="text-sm">VIP Customers</span>}
-                </NavLink>
+                <div>
+                  <NavLink
+                    to="/vip-customers"
+                    className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm hover:bg-accent/50 transition-all hover-scale`}
+                    activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
+                  >
+                    <div className="flex items-center justify-center w-8 h-8 rounded-md bg-purple-500/10">
+                      <Filter className="h-4 w-4 text-purple-500" />
+                    </div>
+                    {!isCollapsed && <span className="text-sm">VIP Customers</span>}
+                  </NavLink>
+                </div>
               </TooltipTrigger>
               {isCollapsed && (
                 <TooltipContent side="right">
