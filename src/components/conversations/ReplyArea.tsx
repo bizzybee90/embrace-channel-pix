@@ -35,13 +35,15 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend, ex
     console.log('🔄 ReplyArea conversation changed:', { conversationId, externalDraftText });
     setReplyBody(externalDraftText || '');
     setDraftUsed(false);
-  }, [conversationId, externalDraftText]);
+  }, [conversationId]);  // ONLY conversationId, not externalDraftText
 
-  // Update when external draft changes within same conversation
+  // Update when external draft changes within same conversation (from AI draft button)
   useEffect(() => {
-    console.log('📝 ReplyArea external draft updated:', { externalDraftText });
-    if (externalDraftText !== undefined && externalDraftText !== replyBody) {
+    console.log('📝 ReplyArea external draft updated:', { externalDraftText, currentReplyBody: replyBody });
+    // Only update if it's different and not just from user typing
+    if (externalDraftText && externalDraftText !== replyBody && !draftUsed) {
       setReplyBody(externalDraftText);
+      setDraftUsed(true);
     }
   }, [externalDraftText]);
 
