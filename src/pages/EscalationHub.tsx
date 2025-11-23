@@ -3,6 +3,7 @@ import { ThreeColumnLayout } from '@/components/layout/ThreeColumnLayout';
 import { PowerModeLayout } from '@/components/layout/PowerModeLayout';
 import { TabletLayout } from '@/components/layout/TabletLayout';
 import { Sidebar } from '@/components/sidebar/Sidebar';
+import { MobileSidebarSheet } from '@/components/sidebar/MobileSidebarSheet';
 import { ConversationList } from '@/components/conversations/ConversationList';
 import { ConversationThread } from '@/components/conversations/ConversationThread';
 import { CustomerContext } from '@/components/context/CustomerContext';
@@ -192,40 +193,36 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
   if (isMobile) {
     if (selectedConversation) {
       return (
-        <div className="flex h-screen">
-          <Sidebar onNavigate={handleClose} />
-          <div className="flex-1">
-            <MobileConversationView
-              conversation={selectedConversation}
-              messages={messages}
-              onUpdate={handleUpdate}
-              onBack={handleClose}
-            />
-          </div>
-        </div>
+        <>
+          <MobileSidebarSheet onNavigate={handleClose} />
+          <MobileConversationView
+            conversation={selectedConversation}
+            messages={messages}
+            onUpdate={handleUpdate}
+            onBack={handleClose}
+          />
+        </>
       );
     }
 
     return (
-      <div className="flex h-screen">
-        <Sidebar onNavigate={handleClose} />
-        <div className="flex-1">
-          <MobileConversationList
-            conversations={conversations}
-            onSelect={handleSelectConversation}
-            filterTitle={getFilterTitle()}
-            statusFilter={statusFilter}
-            priorityFilter={priorityFilter}
-            channelFilter={channelFilter}
-            categoryFilter={categoryFilter}
-            onStatusFilterChange={setStatusFilter}
-            onPriorityFilterChange={setPriorityFilter}
-            onChannelFilterChange={setChannelFilter}
-            onCategoryFilterChange={setCategoryFilter}
-            onRefresh={handleRefresh}
-          />
-        </div>
-      </div>
+      <>
+        <MobileSidebarSheet />
+        <MobileConversationList
+          conversations={conversations}
+          onSelect={handleSelectConversation}
+          filterTitle={getFilterTitle()}
+          statusFilter={statusFilter}
+          priorityFilter={priorityFilter}
+          channelFilter={channelFilter}
+          categoryFilter={categoryFilter}
+          onStatusFilterChange={setStatusFilter}
+          onPriorityFilterChange={setPriorityFilter}
+          onChannelFilterChange={setChannelFilter}
+          onCategoryFilterChange={setCategoryFilter}
+          onRefresh={handleRefresh}
+        />
+      </>
     );
   }
 
