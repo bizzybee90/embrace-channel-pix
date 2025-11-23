@@ -25,7 +25,7 @@ export const AIContextPanel = ({ conversation, onUpdate, onUseDraft }: AIContext
   const aiDraftResponse = conversation.metadata?.ai_draft_response as string | undefined;
 
 // Shared header classes for consistent iOS-style rows
-const PANEL_HEADER_CLASSES = "flex items-center justify-between w-full px-4 py-3 gap-3 min-h-[56px]";
+const PANEL_HEADER_CLASSES = "flex items-center justify-between w-full px-4 py-3 gap-3 h-[56px]";
 
   const handleUseDraft = () => {
     if (!aiDraftResponse) return;
