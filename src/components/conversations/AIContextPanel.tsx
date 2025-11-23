@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { cn } from '@/lib/utils';
 
 interface AIContextPanelProps {
   conversation: Conversation;
@@ -23,8 +24,8 @@ export const AIContextPanel = ({ conversation, onUpdate, onUseDraft }: AIContext
 
   const aiDraftResponse = conversation.metadata?.ai_draft_response as string | undefined;
 
-  // Shared header classes for consistent iOS-style rows - fixed height when collapsed
-  const PANEL_HEADER_CLASSES = "flex items-center justify-between w-full px-4 h-14 gap-3";
+// Shared header classes for consistent iOS-style rows
+const PANEL_HEADER_CLASSES = "flex items-center justify-between w-full px-4 py-3 gap-3 min-h-[56px]";
 
   const handleUseDraft = () => {
     if (!aiDraftResponse) return;
@@ -48,11 +49,20 @@ export const AIContextPanel = ({ conversation, onUpdate, onUseDraft }: AIContext
       <Collapsible open={isEscalationOpen} onOpenChange={setIsEscalationOpen}>
         <Card className="card-elevation bg-destructive/5 border-destructive/20 mobile-native-card overflow-hidden">
           <CollapsibleTrigger className={PANEL_HEADER_CLASSES}>
-            <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0" />
-            <div className="flex-1 text-left">
-              <h3 className="font-semibold text-sm">Why AI Escalated</h3>
+            <div className="flex items-center gap-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+                <AlertCircle className="h-4 w-4" />
+              </div>
+              <span className="text-sm font-medium text-foreground">
+                Why AI Escalated
+              </span>
             </div>
-            <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${isEscalationOpen ? 'rotate-180' : ''}`} />
+            <ChevronDown
+              className={cn(
+                "h-4 w-4 text-muted-foreground transition-transform",
+                isEscalationOpen && "rotate-180"
+              )}
+            />
           </CollapsibleTrigger>
           <CollapsibleContent>
             <div className="px-4 pb-4">
@@ -68,11 +78,20 @@ export const AIContextPanel = ({ conversation, onUpdate, onUseDraft }: AIContext
       <Collapsible open={isSummaryOpen} onOpenChange={setIsSummaryOpen}>
         <Card className="card-elevation mobile-native-card bg-primary/5 border-primary/20 overflow-hidden">
           <CollapsibleTrigger className={PANEL_HEADER_CLASSES}>
-            <FileText className="h-5 w-5 text-primary flex-shrink-0" />
-            <div className="flex-1 text-left">
-              <h3 className="font-semibold text-sm">Summary</h3>
+            <div className="flex items-center gap-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <FileText className="h-4 w-4" />
+              </div>
+              <span className="text-sm font-medium text-foreground">
+                Summary
+              </span>
             </div>
-            <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${isSummaryOpen ? 'rotate-180' : ''}`} />
+            <ChevronDown
+              className={cn(
+                "h-4 w-4 text-muted-foreground transition-transform",
+                isSummaryOpen && "rotate-180"
+              )}
+            />
           </CollapsibleTrigger>
           <CollapsibleContent>
             <div className="px-4 pb-4">
@@ -92,13 +111,20 @@ export const AIContextPanel = ({ conversation, onUpdate, onUseDraft }: AIContext
             <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 via-transparent to-purple-500/20 blur-2xl" />
             
             <CollapsibleTrigger className={`${PANEL_HEADER_CLASSES} relative`}>
-              <div className="h-5 w-5 rounded-lg bg-gradient-to-br from-blue-500/20 to-purple-500/15 flex items-center justify-center backdrop-blur-sm border border-blue-500/20 flex-shrink-0">
-                <Sparkles className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              <div className="flex items-center gap-3">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-100 dark:bg-indigo-500/10 text-indigo-500">
+                  <Sparkles className="h-4 w-4" />
+                </div>
+                <span className="text-sm font-medium text-foreground">
+                  AI Suggested Reply
+                </span>
               </div>
-              <div className="flex-1 text-left">
-                <h3 className="font-semibold text-sm">AI Suggested Reply</h3>
-              </div>
-              <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${isDraftOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown
+                className={cn(
+                  "h-4 w-4 text-muted-foreground transition-transform",
+                  isDraftOpen && "rotate-180"
+                )}
+              />
             </CollapsibleTrigger>
             
             <CollapsibleContent>
