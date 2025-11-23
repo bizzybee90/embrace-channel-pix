@@ -117,6 +117,12 @@ export const MobileConversationView = ({
               {isOverdue ? 'Overdue' : conversation.created_at && formatDistanceToNow(new Date(conversation.created_at), { addSuffix: true })}
             </p>
           </div>
+          <button
+            onClick={() => setShowActions(!showActions)}
+            className="p-2 rounded-full hover:bg-muted/50 active:scale-95 transition-all"
+          >
+            <MoreVertical className="h-5 w-5 text-foreground" />
+          </button>
         </div>
       </div>
 
@@ -278,85 +284,63 @@ export const MobileConversationView = ({
         <div className="h-[500px]" />
       </div>
 
-      {/* Fixed Reply Composer with Actions */}
+      {/* Fixed Reply Composer */}
       <div className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-xl border-t border-border shadow-lg mb-20 pb-safe">
-        {/* Action Menu */}
+        {/* Action Menu Sheet */}
         {showActions && (
-          <div className="px-4 pt-4 pb-2 space-y-3 animate-fade-in max-h-[70vh] overflow-y-auto">
-            {/* Actions */}
-            <Button
-              onClick={() => {
-                setSnoozeDialogOpen(true);
-                setShowActions(false);
-              }}
-              variant="outline"
-              className="w-full h-12 rounded-full text-[15px] font-semibold"
-            >
-              <Clock className="h-4 w-4 mr-2" />
-              Snooze
-            </Button>
-            
-            <Button
-              onClick={handleResolve}
-              className="w-full h-12 rounded-full text-[15px] font-semibold shadow-md hover:shadow-lg transition-all active:scale-[0.98]"
-            >
-              <CheckCircle2 className="h-4 w-4 mr-2" />
-              Resolve & Close
-            </Button>
+          <div className="px-4 pt-4 pb-2 space-y-2 animate-fade-in border-b border-border">
             <div className="grid grid-cols-2 gap-2">
               <Button
+                onClick={() => {
+                  setSnoozeDialogOpen(true);
+                  setShowActions(false);
+                }}
                 variant="outline"
-                className="rounded-full text-[13px] h-10"
+                className="h-10 rounded-full text-[13px] font-medium"
               >
-                Assign to me
+                <Clock className="h-3.5 w-3.5 mr-1.5" />
+                Snooze
               </Button>
+              
               <Button
-                variant="outline"
-                className="rounded-full text-[13px] h-10"
+                onClick={handleResolve}
+                className="h-10 rounded-full text-[13px] font-medium"
               >
-                Change status
+                <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
+                Resolve
               </Button>
             </div>
           </div>
         )}
 
-        <div className="p-4">
+        <div className="p-3">
           {/* Reply Type Toggle */}
-          <div className="flex gap-2 mb-3">
+          <div className="flex gap-2 mb-2">
             <button
               onClick={() => setIsInternal(false)}
-              className={`flex-1 h-9 rounded-full text-[13px] font-medium transition-all ${
+              className={`flex-1 h-8 rounded-full text-[12px] font-medium transition-all ${
                 !isInternal
-                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  ? 'bg-primary text-primary-foreground'
                   : 'bg-muted/50 text-muted-foreground'
               }`}
             >
-              Reply to Customer
+              Reply
             </button>
             <button
               onClick={() => setIsInternal(true)}
-              className={`flex-1 h-9 rounded-full text-[13px] font-medium transition-all ${
+              className={`flex-1 h-8 rounded-full text-[12px] font-medium transition-all ${
                 isInternal
-                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  ? 'bg-primary text-primary-foreground'
                   : 'bg-muted/50 text-muted-foreground'
               }`}
             >
-              <FileText className="h-3.5 w-3.5 inline mr-1" />
-              Internal Note
+              <FileText className="h-3 w-3 inline mr-1" />
+              Note
             </button>
           </div>
 
-          {/* Message Input with Actions Button */}
+          {/* Message Input */}
           <div className="flex items-end gap-2">
-            <button
-              onClick={() => setShowActions(!showActions)}
-              className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-95 ${
-                showActions ? 'bg-primary text-primary-foreground' : 'bg-muted hover:bg-muted/80'
-              }`}
-            >
-              <MoreVertical className="h-5 w-5" />
-            </button>
-            
             <Textarea
               value={replyText}
               onChange={(e) => {
@@ -368,14 +352,14 @@ export const MobileConversationView = ({
                   localStorage.removeItem(`draft-${conversation.id}`);
                 }
               }}
-              placeholder={isInternal ? "Add an internal note..." : "Type your reply..."}
-              className="min-h-[44px] max-h-32 rounded-[22px] resize-none text-[15px] px-4 py-3"
+              placeholder={isInternal ? "Add a note..." : "Type your reply..."}
+              className="flex-1 min-h-[44px] max-h-32 rounded-[22px] resize-none text-[15px] px-4 py-3"
             />
 
             <button
               onClick={handleSendReply}
               disabled={!replyText.trim() || isSending}
-              className="flex-shrink-0 w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-40 hover:shadow-md transition-all active:scale-95"
+              className="flex-shrink-0 w-11 h-11 rounded-full bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-40 hover:shadow-md transition-all active:scale-95"
             >
               <Send className="h-5 w-5" />
             </button>
