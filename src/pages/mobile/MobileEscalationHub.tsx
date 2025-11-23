@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { MobileConversationList } from '@/components/conversations/mobile/MobileConversationList';
 import { MobileConversationView } from '@/components/conversations/mobile/MobileConversationView';
-import { MobileSidebarSheet } from '@/components/sidebar/MobileSidebarSheet';
+import { Sidebar } from '@/components/sidebar/Sidebar';
 import { Conversation, Message } from '@/lib/types';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -19,7 +19,16 @@ export const MobileEscalationHub = ({ filter = 'all-open' }: MobileEscalationHub
   const [priorityFilter, setPriorityFilter] = useState<string[]>([]);
   const [channelFilter, setChannelFilter] = useState<string[]>([]);
   const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
+  const [isScrolled, setIsScrolled] = useState(false);
   const { toast } = useToast();
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 50);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   const filterTitles = {
     'my-tickets': 'My Tickets',
@@ -187,35 +196,43 @@ export const MobileEscalationHub = ({ filter = 'all-open' }: MobileEscalationHub
 
   if (selectedConversation) {
     return (
-      <>
-        <MobileSidebarSheet onNavigate={handleBack} />
-        <MobileConversationView
-          conversation={selectedConversation}
-          messages={messages}
-          onBack={handleBack}
-          onUpdate={handleUpdate}
-        />
-      </>
+      <div className="flex h-screen overflow-hidden">
+        <aside className={`fixed left-0 top-0 h-full transition-transform duration-300 z-50 ${isScrolled ? '-translate-x-full' : 'translate-x-0'}`}>
+          <Sidebar forceCollapsed onNavigate={handleBack} />
+        </aside>
+        <main className="flex-1 overflow-auto">
+          <MobileConversationView
+            conversation={selectedConversation}
+            messages={messages}
+            onBack={handleBack}
+            onUpdate={handleUpdate}
+          />
+        </main>
+      </div>
     );
   }
 
   return (
-    <>
-      <MobileSidebarSheet />
-      <MobileConversationList
-        conversations={conversations}
-        onSelect={handleSelectConversation}
-        filterTitle={filterTitles[filter]}
-        statusFilter={statusFilter}
-        priorityFilter={priorityFilter}
-        channelFilter={channelFilter}
-        categoryFilter={categoryFilter}
-        onStatusFilterChange={setStatusFilter}
-        onPriorityFilterChange={setPriorityFilter}
-        onChannelFilterChange={setChannelFilter}
-        onCategoryFilterChange={setCategoryFilter}
-        onRefresh={handleRefresh}
-      />
-    </>
+    <div className="flex h-screen overflow-hidden">
+      <aside className={`fixed left-0 top-0 h-full transition-transform duration-300 z-50 ${isScrolled ? '-translate-x-full' : 'translate-x-0'}`}>
+        <Sidebar forceCollapsed />
+      </aside>
+      <main className="flex-1 overflow-auto">
+        <MobileConversationList
+          conversations={conversations}
+          onSelect={handleSelectConversation}
+          filterTitle={filterTitles[filter]}
+          statusFilter={statusFilter}
+          priorityFilter={priorityFilter}
+          channelFilter={channelFilter}
+          categoryFilter={categoryFilter}
+          onStatusFilterChange={setStatusFilter}
+          onPriorityFilterChange={setPriorityFilter}
+          onChannelFilterChange={setChannelFilter}
+          onCategoryFilterChange={setCategoryFilter}
+          onRefresh={handleRefresh}
+        />
+      </main>
+    </div>
   );
 };
