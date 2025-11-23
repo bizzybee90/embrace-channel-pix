@@ -11,7 +11,7 @@ export const ThreeColumnLayout = ({ sidebar, main }: ThreeColumnLayoutProps) => 
   return (
     <div className="flex h-screen w-full bg-background overflow-hidden">
       {/* Sidebar - width controlled by sidebar component itself */}
-      <aside className="border-r border-border bg-card flex-shrink-0 overflow-y-auto">
+      <aside className="border-r border-border bg-card flex-shrink-0 overflow-y-auto relative z-50">
         {sidebar}
       </aside>
 
