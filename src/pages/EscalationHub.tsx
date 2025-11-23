@@ -4,6 +4,7 @@ import { PowerModeLayout } from '@/components/layout/PowerModeLayout';
 import { TabletLayout } from '@/components/layout/TabletLayout';
 import { Sidebar } from '@/components/sidebar/Sidebar';
 import { MobileSidebarSheet } from '@/components/sidebar/MobileSidebarSheet';
+import { MobileHeader } from '@/components/sidebar/MobileHeader';
 import { ConversationList } from '@/components/conversations/ConversationList';
 import { ConversationThread } from '@/components/conversations/ConversationThread';
 import { CustomerContext } from '@/components/context/CustomerContext';
@@ -37,6 +38,7 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
   const [priorityFilter, setPriorityFilter] = useState<string[]>([]);
   const [channelFilter, setChannelFilter] = useState<string[]>([]);
   const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const { interfaceMode, loading: modeLoading } = useInterfaceMode();
   const { toast } = useToast();
   const isMobile = useIsMobile();
@@ -193,21 +195,36 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
   if (isMobile) {
     if (selectedConversation) {
       return (
-        <>
-          <MobileSidebarSheet onNavigate={handleClose} />
+        <div className="min-h-screen bg-background">
+          <MobileHeader
+            onMenuClick={() => setSidebarOpen(true)}
+            showBackButton
+            onBackClick={handleClose}
+          />
+          <MobileSidebarSheet
+            open={sidebarOpen}
+            onOpenChange={setSidebarOpen}
+            onNavigate={handleClose}
+          />
           <MobileConversationView
             conversation={selectedConversation}
             messages={messages}
             onUpdate={handleUpdate}
             onBack={handleClose}
           />
-        </>
+        </div>
       );
     }
 
     return (
-      <>
-        <MobileSidebarSheet />
+      <div className="min-h-screen bg-background">
+        <MobileHeader
+          onMenuClick={() => setSidebarOpen(true)}
+        />
+        <MobileSidebarSheet
+          open={sidebarOpen}
+          onOpenChange={setSidebarOpen}
+        />
         <MobileConversationList
           conversations={conversations}
           onSelect={handleSelectConversation}
@@ -222,7 +239,7 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
           onCategoryFilterChange={setCategoryFilter}
           onRefresh={handleRefresh}
         />
-      </>
+      </div>
     );
   }
 

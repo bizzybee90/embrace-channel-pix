@@ -1,62 +1,42 @@
-import { useState } from 'react';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { Sidebar } from './Sidebar';
-import beeLogo from '@/assets/bee-logo.png';
-import { Menu } from 'lucide-react';
+import { X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface MobileSidebarSheetProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   onNavigate?: () => void;
 }
 
-export const MobileSidebarSheet = ({ onNavigate }: MobileSidebarSheetProps) => {
-  const [open, setOpen] = useState(false);
-
+export const MobileSidebarSheet = ({ open, onOpenChange, onNavigate }: MobileSidebarSheetProps) => {
   const handleNavigate = () => {
-    setOpen(false);
+    onOpenChange(false);
     onNavigate?.();
   };
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>
-        <button 
-          className="fixed top-4 left-4 z-[9999] group"
-          aria-label="Open menu"
-        >
-          <div className="relative flex items-center justify-center">
-            {/* Animated background gradient */}
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-primary/10 to-transparent rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-all duration-500 scale-150" />
-            
-            {/* Main button container */}
-            <div className="relative flex items-center gap-2 px-3 py-2 bg-background/95 backdrop-blur-md border border-border/50 rounded-xl shadow-lg group-hover:shadow-xl group-hover:border-primary/30 transition-all duration-300">
-              {/* Logo */}
-              <div className="relative">
-                <img 
-                  src={beeLogo} 
-                  alt="Menu" 
-                  className="h-8 w-8 transition-transform duration-300 group-hover:scale-110 group-active:scale-95" 
-                />
-                {/* Subtle glow */}
-                <div className="absolute inset-0 rounded-full bg-primary/20 blur-md opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              </div>
-              
-              {/* Menu icon */}
-              <Menu className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors duration-300" />
-            </div>
-          </div>
-        </button>
-      </SheetTrigger>
+    <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent 
         side="left" 
-        className="w-[280px] p-0 border-r border-border/50 bg-background/98 backdrop-blur-xl"
+        className="w-[80vw] max-w-sm p-0 border-r border-border shadow-2xl rounded-r-3xl bg-background"
       >
-        <div className="h-full relative">
-          {/* Subtle gradient overlay */}
-          <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-transparent pointer-events-none" />
-          
-          {/* Content */}
-          <div className="relative h-full">
-            <Sidebar onNavigate={handleNavigate} />
+        <div className="h-full flex flex-col">
+          {/* Close button */}
+          <div className="flex items-center justify-end p-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => onOpenChange(false)}
+              className="h-8 w-8 rounded-full hover:bg-accent"
+            >
+              <X className="h-4 w-4 text-foreground/80" />
+            </Button>
+          </div>
+
+          {/* Sidebar content */}
+          <div className="flex-1 overflow-y-auto">
+            <Sidebar onNavigate={handleNavigate} forceCollapsed={false} />
           </div>
         </div>
       </SheetContent>

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { MobileConversationList } from '@/components/conversations/mobile/MobileConversationList';
 import { MobileConversationView } from '@/components/conversations/mobile/MobileConversationView';
 import { MobileSidebarSheet } from '@/components/sidebar/MobileSidebarSheet';
+import { MobileHeader } from '@/components/sidebar/MobileHeader';
 import { Conversation, Message } from '@/lib/types';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -19,6 +20,7 @@ export const MobileEscalationHub = ({ filter = 'all-open' }: MobileEscalationHub
   const [priorityFilter, setPriorityFilter] = useState<string[]>([]);
   const [channelFilter, setChannelFilter] = useState<string[]>([]);
   const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const { toast } = useToast();
 
   const filterTitles = {
@@ -185,23 +187,40 @@ export const MobileEscalationHub = ({ filter = 'all-open' }: MobileEscalationHub
     }
   };
 
+  // Screen B: Ticket Detail View
   if (selectedConversation) {
     return (
-      <>
-        <MobileSidebarSheet onNavigate={handleBack} />
+      <div className="min-h-screen bg-background">
+        <MobileHeader
+          onMenuClick={() => setSidebarOpen(true)}
+          showBackButton
+          onBackClick={handleBack}
+        />
+        <MobileSidebarSheet
+          open={sidebarOpen}
+          onOpenChange={setSidebarOpen}
+          onNavigate={handleBack}
+        />
         <MobileConversationView
           conversation={selectedConversation}
           messages={messages}
           onBack={handleBack}
           onUpdate={handleUpdate}
         />
-      </>
+      </div>
     );
   }
 
+  // Screen A: Ticket List View
   return (
-    <>
-      <MobileSidebarSheet />
+    <div className="min-h-screen bg-background">
+      <MobileHeader
+        onMenuClick={() => setSidebarOpen(true)}
+      />
+      <MobileSidebarSheet
+        open={sidebarOpen}
+        onOpenChange={setSidebarOpen}
+      />
       <MobileConversationList
         conversations={conversations}
         onSelect={handleSelectConversation}
@@ -216,6 +235,6 @@ export const MobileEscalationHub = ({ filter = 'all-open' }: MobileEscalationHub
         onCategoryFilterChange={setCategoryFilter}
         onRefresh={handleRefresh}
       />
-    </>
+    </div>
   );
 };
