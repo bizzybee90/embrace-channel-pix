@@ -166,16 +166,17 @@ export const ConversationThread = ({ conversation, onUpdate, onBack }: Conversat
           onBack={onBack || (() => {})}
         />
 
-        {!isCompleted && (
-          <ReplyArea
-            conversationId={conversation.id}
-            channel={conversation.channel}
-            aiDraftResponse={conversation.metadata?.ai_draft_response as string}
-            onSend={handleReply}
-            externalDraftText={replyText}
-            onDraftTextCleared={() => setReplyText('')}
-          />
-        )}
+      {!isCompleted && (
+        <ReplyArea
+          conversationId={conversation.id}
+          channel={conversation.channel}
+          aiDraftResponse={conversation.metadata?.ai_draft_response as string}
+          onSend={handleReply}
+          externalDraftText={replyText}
+          onDraftTextCleared={() => setReplyText('')}
+          onDraftChange={setReplyText}
+        />
+      )}
 
         {isCompleted && (
           <div className="border-t border-border p-4 bg-muted/30">
@@ -213,6 +214,7 @@ export const ConversationThread = ({ conversation, onUpdate, onBack }: Conversat
             setDraftText('');
             setReplyText('');
           }}
+          onDraftChange={setReplyText}
         />
       )}
 

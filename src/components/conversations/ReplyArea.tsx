@@ -16,9 +16,10 @@ interface ReplyAreaProps {
   onSend: (body: string, isInternal: boolean) => Promise<void>;
   externalDraftText?: string;
   onDraftTextCleared?: () => void;
+  onDraftChange?: (text: string) => void;
 }
 
-export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend, externalDraftText, onDraftTextCleared }: ReplyAreaProps) => {
+export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend, externalDraftText, onDraftTextCleared, onDraftChange }: ReplyAreaProps) => {
   const [replyBody, setReplyBody] = useState('');
   const [noteBody, setNoteBody] = useState('');
   const [selectedChannel, setSelectedChannel] = useState(channel);
@@ -101,7 +102,10 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend, ex
             <Textarea
               placeholder="Type your reply..."
               value={replyBody}
-              onChange={(e) => setReplyBody(e.target.value)}
+              onChange={(e) => {
+                setReplyBody(e.target.value);
+                onDraftChange?.(e.target.value);
+              }}
               rows={2}
               className={
                 useMobileStyle
