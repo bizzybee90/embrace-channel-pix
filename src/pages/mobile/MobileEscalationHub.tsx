@@ -43,15 +43,59 @@ export const MobileEscalationHub = ({ filter = 'all-open' }: MobileEscalationHub
 
   useEffect(() => {
     loadConversations();
+
+    // Real-time subscription
+    const channel = supabase
+      .channel('mobile-conversations-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'conversations'
+        },
+        () => {
+          loadConversations();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [currentFilter, refreshKey, statusFilter, priorityFilter, channelFilter, categoryFilter]);
 
   const loadConversations = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
     let query = supabase
       .from('conversations')
-      .select('*')
-      .order('created_at', { ascending: false });
+      .select(`
+        *,
+        customer:customers(*),
+        assigned_user:users(*)
+      `)
+      .order('sla_due_at', { ascending: true });
 
-    // Apply filters
+    // Apply view filter (matching desktop logic exactly)
+    if (currentFilter === 'my-tickets') {
+      query = query.eq('assigned_to', user.id).in('status', ['new', 'open', 'waiting_customer', 'waiting_internal']);
+    } else if (currentFilter === 'unassigned') {
+      query = query.is('assigned_to', null).in('status', ['new', 'open', 'waiting_customer', 'waiting_internal']);
+    } else if (currentFilter === 'sla-risk') {
+      query = query.in('sla_status', ['warning', 'breached']).in('status', ['new', 'open', 'waiting_customer', 'waiting_internal']);
+    } else if (currentFilter === 'all-open') {
+      query = query.in('status', ['new', 'open', 'waiting_customer', 'waiting_internal']);
+    } else if (currentFilter === 'completed') {
+      query = query.eq('status', 'resolved');
+    } else if (currentFilter === 'high-priority') {
+      query = query.in('priority', ['high', 'urgent']).in('status', ['new', 'open', 'waiting_customer', 'waiting_internal']);
+    } else if (currentFilter === 'vip-customers') {
+      query = query.eq('metadata->>tier', 'vip').in('status', ['new', 'open', 'waiting_customer', 'waiting_internal']);
+    }
+
+    // Apply additional filters
     if (statusFilter.length > 0) {
       query = query.in('status', statusFilter);
     }
@@ -65,34 +109,6 @@ export const MobileEscalationHub = ({ filter = 'all-open' }: MobileEscalationHub
       query = query.in('category', categoryFilter);
     }
 
-    // Apply main filter
-    switch (currentFilter) {
-      case 'my-tickets':
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          query = query.eq('assigned_to', user.id);
-        }
-        break;
-      case 'unassigned':
-        query = query.is('assigned_to', null);
-        break;
-      case 'sla-risk':
-        query = query.not('sla_due_at', 'is', null);
-        break;
-      case 'all-open':
-        query = query.in('status', ['new', 'open', 'pending']);
-        break;
-      case 'completed':
-        query = query.eq('status', 'resolved');
-        break;
-      case 'high-priority':
-        query = query.in('priority', ['high', 'urgent']).in('status', ['new', 'open', 'pending']);
-        break;
-      case 'vip-customers':
-        query = query.eq('metadata->>tier', 'vip').in('status', ['new', 'open', 'pending']);
-        break;
-    }
-
     const { data, error } = await query;
 
     if (error) {
@@ -104,7 +120,15 @@ export const MobileEscalationHub = ({ filter = 'all-open' }: MobileEscalationHub
       return;
     }
 
-    setConversations((data || []) as Conversation[]);
+    if (data) {
+      const conversationData = data as any;
+      // Filter out snoozed conversations (matching desktop)
+      const activeConversations = conversationData.filter((conv: any) => {
+        if (!conv.snoozed_until) return true;
+        return new Date(conv.snoozed_until) <= new Date();
+      });
+      setConversations(activeConversations);
+    }
   };
 
   const handleSelectConversation = async (conversation: Conversation) => {
