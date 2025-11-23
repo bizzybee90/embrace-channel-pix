@@ -14,7 +14,8 @@ export const useScrollDirection = (threshold: number = 120) => {
   });
   const lastScrollY = useRef(0);
   const ticking = useRef(false);
-  const scrollTimeout = useRef<NodeJS.Timeout>();
+  const scrollTimeout = useRef<NodeJS.Timeout | null>(null);
+  const isScrolling = useRef(false);
 
   useEffect(() => {
     const updateScrollState = () => {
@@ -27,29 +28,33 @@ export const useScrollDirection = (threshold: number = 120) => {
       }
 
       const direction = scrollY > lastScrollY.current ? 'down' : 'up';
-      const isHidden = direction === 'down' && scrollY > threshold && !isAtTop;
+      
+      // Only hide when scrolling down and past threshold
+      const shouldHide = direction === 'down' && scrollY > threshold && !isAtTop;
 
       setScrollState({
         direction,
         isAtTop,
-        isHidden,
+        isHidden: shouldHide,
       });
 
       lastScrollY.current = scrollY;
       ticking.current = false;
+      isScrolling.current = true;
 
       // Clear existing timeout
       if (scrollTimeout.current) {
         clearTimeout(scrollTimeout.current);
       }
 
-      // Show nav after scrolling stops (300ms)
+      // Show nav 200ms after scrolling stops
       scrollTimeout.current = setTimeout(() => {
+        isScrolling.current = false;
         setScrollState(prev => ({
           ...prev,
           isHidden: false,
         }));
-      }, 300);
+      }, 200);
     };
 
     const onScroll = () => {

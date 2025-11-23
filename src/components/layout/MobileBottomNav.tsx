@@ -75,15 +75,15 @@ export const MobileBottomNav = ({ activeFilter, onNavigate, onMenuClick }: Mobil
                 )}
               >
                 <div className={cn(
-                  'flex items-center justify-center w-7 h-7 rounded-md transition-all',
-                  isActive ? item.badgeBg : 'bg-transparent'
+                  'flex items-center justify-center w-8 h-8 rounded-md transition-all',
+                  item.badgeBg
                 )}>
                   <Icon
                     className={cn(
-                      'h-[18px] w-[18px] transition-colors',
-                      isActive ? item.iconColor : 'text-sidebar-foreground/60'
+                      'h-4 w-4 transition-colors',
+                      item.iconColor
                     )}
-                    strokeWidth={isActive ? 2.5 : 2}
+                    strokeWidth={2}
                   />
                 </div>
                 <span
