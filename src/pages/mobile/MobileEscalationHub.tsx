@@ -4,6 +4,7 @@ import { MobileConversationView } from '@/components/conversations/mobile/Mobile
 import { MobileSidebarSheet } from '@/components/sidebar/MobileSidebarSheet';
 import { MobileHeader } from '@/components/sidebar/MobileHeader';
 import { MobileBottomNav } from '@/components/layout/MobileBottomNav';
+import { MobileFilterSheet } from '@/components/conversations/mobile/MobileFilterSheet';
 import { Conversation, Message } from '@/lib/types';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -23,6 +24,7 @@ export const MobileEscalationHub = ({ filter = 'all-open' }: MobileEscalationHub
   const [channelFilter, setChannelFilter] = useState<string[]>([]);
   const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
   const { toast } = useToast();
 
   const filterTitles = {
@@ -207,6 +209,10 @@ export const MobileEscalationHub = ({ filter = 'all-open' }: MobileEscalationHub
           open={sidebarOpen}
           onOpenChange={setSidebarOpen}
           onNavigate={handleBack}
+          onFiltersClick={() => {
+            setSidebarOpen(false);
+            setFilterSheetOpen(true);
+          }}
         />
         <MobileConversationView
           conversation={selectedConversation}
@@ -214,12 +220,25 @@ export const MobileEscalationHub = ({ filter = 'all-open' }: MobileEscalationHub
           onBack={handleBack}
           onUpdate={handleUpdate}
         />
+        <MobileFilterSheet
+          open={filterSheetOpen}
+          onOpenChange={setFilterSheetOpen}
+          statusFilter={statusFilter}
+          priorityFilter={priorityFilter}
+          channelFilter={channelFilter}
+          categoryFilter={categoryFilter}
+          onStatusFilterChange={setStatusFilter}
+          onPriorityFilterChange={setPriorityFilter}
+          onChannelFilterChange={setChannelFilter}
+          onCategoryFilterChange={setCategoryFilter}
+        />
         <MobileBottomNav
           activeFilter={currentFilter}
           onNavigate={(newFilter) => {
             setCurrentFilter(newFilter);
             handleBack();
           }}
+          onMenuClick={() => setSidebarOpen(true)}
         />
       </div>
     );
@@ -234,6 +253,10 @@ export const MobileEscalationHub = ({ filter = 'all-open' }: MobileEscalationHub
       <MobileSidebarSheet
         open={sidebarOpen}
         onOpenChange={setSidebarOpen}
+        onFiltersClick={() => {
+          setSidebarOpen(false);
+          setFilterSheetOpen(true);
+        }}
       />
       <MobileConversationList
         conversations={conversations}
@@ -249,9 +272,22 @@ export const MobileEscalationHub = ({ filter = 'all-open' }: MobileEscalationHub
         onCategoryFilterChange={setCategoryFilter}
         onRefresh={handleRefresh}
       />
+      <MobileFilterSheet
+        open={filterSheetOpen}
+        onOpenChange={setFilterSheetOpen}
+        statusFilter={statusFilter}
+        priorityFilter={priorityFilter}
+        channelFilter={channelFilter}
+        categoryFilter={categoryFilter}
+        onStatusFilterChange={setStatusFilter}
+        onPriorityFilterChange={setPriorityFilter}
+        onChannelFilterChange={setChannelFilter}
+        onCategoryFilterChange={setCategoryFilter}
+      />
       <MobileBottomNav
         activeFilter={currentFilter}
         onNavigate={setCurrentFilter}
+        onMenuClick={() => setSidebarOpen(true)}
       />
     </div>
   );
