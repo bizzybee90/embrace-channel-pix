@@ -38,7 +38,10 @@ export const MobileConversationView = ({
   onBack,
   onUpdate,
 }: MobileConversationViewProps) => {
-  const [replyText, setReplyText] = useState('');
+  const [replyText, setReplyText] = useState(() => {
+    const saved = localStorage.getItem(`draft-${conversation.id}`);
+    return saved || '';
+  });
   const [isInternal, setIsInternal] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [aiDraftOpen, setAiDraftOpen] = useState(false);
@@ -82,6 +85,7 @@ export const MobileConversationView = ({
       });
 
     if (!error) {
+      localStorage.removeItem(`draft-${conversation.id}`);
       setReplyText('');
       toast({ 
         title: isInternal ? "Internal note added" : "Reply sent",
@@ -369,7 +373,15 @@ export const MobileConversationView = ({
             
             <Textarea
               value={replyText}
-              onChange={(e) => setReplyText(e.target.value)}
+              onChange={(e) => {
+                const newValue = e.target.value;
+                setReplyText(newValue);
+                if (newValue) {
+                  localStorage.setItem(`draft-${conversation.id}`, newValue);
+                } else {
+                  localStorage.removeItem(`draft-${conversation.id}`);
+                }
+              }}
               placeholder={isInternal ? "Add an internal note..." : "Type your reply..."}
               className="min-h-[44px] max-h-32 rounded-[22px] resize-none text-[15px] px-4 py-3"
             />

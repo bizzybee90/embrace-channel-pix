@@ -192,30 +192,40 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
   if (isMobile) {
     if (selectedConversation) {
       return (
-        <MobileConversationView
-          conversation={selectedConversation}
-          messages={messages}
-          onUpdate={handleUpdate}
-          onBack={handleClose}
-        />
+        <div className="flex h-screen">
+          <Sidebar onNavigate={handleClose} />
+          <div className="flex-1">
+            <MobileConversationView
+              conversation={selectedConversation}
+              messages={messages}
+              onUpdate={handleUpdate}
+              onBack={handleClose}
+            />
+          </div>
+        </div>
       );
     }
 
     return (
-      <MobileConversationList
-        conversations={conversations}
-        onSelect={handleSelectConversation}
-        filterTitle={getFilterTitle()}
-        statusFilter={statusFilter}
-        priorityFilter={priorityFilter}
-        channelFilter={channelFilter}
-        categoryFilter={categoryFilter}
-        onStatusFilterChange={setStatusFilter}
-        onPriorityFilterChange={setPriorityFilter}
-        onChannelFilterChange={setChannelFilter}
-        onCategoryFilterChange={setCategoryFilter}
-        onRefresh={handleRefresh}
-      />
+      <div className="flex h-screen">
+        <Sidebar onNavigate={handleClose} />
+        <div className="flex-1">
+          <MobileConversationList
+            conversations={conversations}
+            onSelect={handleSelectConversation}
+            filterTitle={getFilterTitle()}
+            statusFilter={statusFilter}
+            priorityFilter={priorityFilter}
+            channelFilter={channelFilter}
+            categoryFilter={categoryFilter}
+            onStatusFilterChange={setStatusFilter}
+            onPriorityFilterChange={setPriorityFilter}
+            onChannelFilterChange={setChannelFilter}
+            onCategoryFilterChange={setCategoryFilter}
+            onRefresh={handleRefresh}
+          />
+        </div>
+      </div>
     );
   }
 
