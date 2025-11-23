@@ -1,6 +1,5 @@
 import { Inbox, UserCircle, FolderOpen, Menu, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useScrollDirection } from '@/hooks/useScrollDirection';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 interface MobileBottomNavProps {
@@ -34,7 +33,6 @@ const navItems = [
 ];
 
 export const MobileBottomNav = ({ activeFilter, onNavigate, onMenuClick }: MobileBottomNavProps) => {
-  const { isHidden } = useScrollDirection(120);
   const isMobile = useIsMobile();
 
   if (!isMobile) return null;
@@ -50,14 +48,10 @@ export const MobileBottomNav = ({ activeFilter, onNavigate, onMenuClick }: Mobil
 
   return (
     <nav
-      className={cn(
-        'fixed bottom-0 inset-x-0 z-40 px-4',
-        'transition-all duration-200 ease-out will-change-transform',
-        isHidden ? 'translate-y-full opacity-0 pointer-events-none' : 'translate-y-0 opacity-100'
-      )}
+      className="fixed bottom-0 inset-x-0 z-40 px-4"
       style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 0.75rem)' }}
     >
-      <div className="max-w-xl mx-auto bg-sidebar backdrop-blur-lg border border-sidebar-border rounded-2xl shadow-[0_-8px_32px_rgba(0,0,0,0.4)]">
+      <div className="max-w-xl mx-auto bg-sidebar/80 backdrop-blur-xl border border-sidebar-border rounded-2xl shadow-[0_-8px_32px_rgba(0,0,0,0.4)]">
         <div className="flex items-center justify-around px-1 py-1.5">
           {navItems.map((item) => {
             const isActive = item.id === activeFilter;

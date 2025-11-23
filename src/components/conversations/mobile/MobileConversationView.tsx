@@ -257,12 +257,12 @@ export const MobileConversationView = ({
           </div>
         </div>
 
-        {/* Bottom padding for fixed composer - extra space for keyboard */}
-        <div className="h-96" />
+        {/* Bottom padding for fixed composer AND bottom nav */}
+        <div className="h-[500px]" />
       </div>
 
       {/* Fixed Reply Composer with Actions */}
-      <div className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-xl border-t border-border shadow-lg">
+      <div className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-xl border-t border-border shadow-lg mb-20 pb-safe">
         {/* Action Menu */}
         {showActions && (
           <div className="px-4 pt-4 pb-2 border-b border-border/50 space-y-3 animate-fade-in max-h-[70vh] overflow-y-auto">
