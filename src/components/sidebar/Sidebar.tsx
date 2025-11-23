@@ -16,9 +16,10 @@ interface SidebarProps {
   forceCollapsed?: boolean;
   onNavigate?: () => void;
   onFiltersClick?: () => void;
+  isMobileDrawer?: boolean;
 }
 
-export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick }: SidebarProps = {}) => {
+export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, isMobileDrawer = false }: SidebarProps = {}) => {
   const { interfaceMode, toggleMode, loading } = useInterfaceMode();
   const [collapsed, setCollapsed] = useState(false);
   
@@ -45,9 +46,9 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick }: 
   };
   return (
     <TooltipProvider>
-      <div className={`flex flex-col h-full transition-all duration-300 relative ${isCollapsed ? 'w-[72px] p-1.5' : 'w-60 p-4'}`}>
-        {/* Collapse Toggle - hide in forced collapsed mode */}
-        {!forceCollapsed && (
+      <div className={`flex flex-col h-full transition-all duration-300 relative ${isCollapsed ? 'w-[72px] p-1.5' : isMobileDrawer ? '' : 'w-60 p-4'}`}>
+        {/* Collapse Toggle - hide in forced collapsed mode and mobile drawer */}
+        {!forceCollapsed && !isMobileDrawer && (
           <Button
             variant="ghost"
             size="icon"
@@ -59,7 +60,7 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick }: 
         )}
 
         {/* Logo Section */}
-        <div className={`flex items-center ${isCollapsed ? 'justify-center mt-16 mb-4' : 'gap-3 mb-6 mt-0'}`}>
+        <div className={`flex items-center ${isCollapsed ? 'justify-center mt-16 mb-4' : isMobileDrawer ? 'gap-3 mb-6' : 'gap-3 mb-6 mt-0'}`}>
           {isCollapsed ? (
             <Tooltip>
               <TooltipTrigger asChild>
