@@ -92,12 +92,11 @@ export const AIContextPanel = ({ conversation, onUpdate, onUseDraft }: AIContext
             <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 via-transparent to-purple-500/20 blur-2xl" />
             
             <CollapsibleTrigger className={`${PANEL_HEADER_CLASSES} relative`}>
-              <div className="h-9 w-9 rounded-[16px] bg-gradient-to-br from-blue-500/20 to-purple-500/15 flex items-center justify-center spring-bounce backdrop-blur-sm border border-blue-500/20 flex-shrink-0">
-                <Sparkles className="h-5 w-5 text-blue-600 dark:text-blue-400 animate-pulse" style={{ animationDuration: '2s' }} />
+              <div className="h-5 w-5 rounded-lg bg-gradient-to-br from-blue-500/20 to-purple-500/15 flex items-center justify-center backdrop-blur-sm border border-blue-500/20 flex-shrink-0">
+                <Sparkles className="h-4 w-4 text-blue-600 dark:text-blue-400" />
               </div>
               <div className="flex-1 text-left">
-                <h3 className="font-bold text-sm text-foreground">AI Suggested Reply</h3>
-                <p className="text-xs text-muted-foreground">Ready to send</p>
+                <h3 className="font-semibold text-sm">AI Suggested Reply</h3>
               </div>
               <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${isDraftOpen ? 'rotate-180' : ''}`} />
             </CollapsibleTrigger>
