@@ -103,87 +103,85 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend, ex
         ? "p-4 m-3 bg-card rounded-[22px] border border-border/30 shadow-lg backdrop-blur-sm"
         : "p-4 m-4 bg-card rounded-[22px] border border-border/30 shadow-lg backdrop-blur-sm"
     }>
-      <Tabs defaultValue="reply">
-        <TabsContent value="reply" className="mt-0">
-          <div className="flex items-center gap-2">
-            <TabsList className="h-10 bg-muted/50 flex-shrink-0 self-center">
-              <TabsTrigger value="reply" className="text-sm rounded-lg data-[state=active]:bg-card data-[state=active]:shadow-sm transition-all duration-150">Reply</TabsTrigger>
-              <TabsTrigger value="note" className="text-sm rounded-lg data-[state=active]:bg-card data-[state=active]:shadow-sm transition-all duration-150">Note</TabsTrigger>
-            </TabsList>
-            <Textarea
-              placeholder="Type your reply..."
-              value={replyBody}
-              onChange={(e) => {
-                console.log('⌨️ Textarea onChange:', { value: e.target.value, length: e.target.value.length });
-                const newValue = e.target.value;
-                setReplyBody(newValue);
-                
-                // Auto-save to localStorage
-                if (newValue.trim()) {
-                  localStorage.setItem(`draft-${conversationId}`, newValue);
-                  console.log('✅ Draft saved to localStorage');
-                } else {
-                  localStorage.removeItem(`draft-${conversationId}`);
-                  console.log('🗑️ Draft removed from localStorage');
+      <Tabs defaultValue="reply" orientation={isMobile ? "vertical" : "horizontal"}>
+        <div className={isMobile ? "flex flex-col gap-2" : ""}>
+          <TabsList className={isMobile ? "w-full h-auto grid grid-cols-2 bg-muted/50" : "h-10 bg-muted/50"}>
+            <TabsTrigger value="reply" className="text-sm rounded-lg data-[state=active]:bg-card data-[state=active]:shadow-sm transition-all duration-150">Reply</TabsTrigger>
+            <TabsTrigger value="note" className="text-sm rounded-lg data-[state=active]:bg-card data-[state=active]:shadow-sm transition-all duration-150">Note</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="reply" className="mt-0">
+            <div className="flex items-center gap-2">
+              <Textarea
+                placeholder="Type your reply..."
+                value={replyBody}
+                onChange={(e) => {
+                  console.log('⌨️ Textarea onChange:', { value: e.target.value, length: e.target.value.length });
+                  const newValue = e.target.value;
+                  setReplyBody(newValue);
+                  
+                  // Auto-save to localStorage
+                  if (newValue.trim()) {
+                    localStorage.setItem(`draft-${conversationId}`, newValue);
+                    console.log('✅ Draft saved to localStorage');
+                  } else {
+                    localStorage.removeItem(`draft-${conversationId}`);
+                    console.log('🗑️ Draft removed from localStorage');
+                  }
+                  
+                  onDraftChange?.(newValue);
+                }}
+                rows={isMobile ? 3 : 2}
+                className={
+                  useMobileStyle
+                    ? "resize-none border-border/60 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all text-sm min-h-[80px] rounded-2xl bg-background shadow-sm flex-1"
+                    : "resize-none border-border/60 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all text-base min-h-[56px] rounded-xl bg-background shadow-sm flex-1"
                 }
-                
-                onDraftChange?.(newValue);
-              }}
-              rows={2}
-              className={
-                useMobileStyle
-                  ? "resize-none border-border/60 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all text-sm min-h-[56px] rounded-2xl bg-background shadow-sm flex-1"
-                  : "resize-none border-border/60 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all text-base min-h-[56px] rounded-xl bg-background shadow-sm flex-1"
-              }
-            />
-            <Button 
-              onClick={handleSendReply} 
-              disabled={sending || !replyBody.trim()} 
-              className={
-                useMobileStyle
-                  ? "mobile-spring-bounce h-10 w-10 rounded-xl font-medium shadow-sm flex-shrink-0 self-center"
-                  : "h-10 w-10 rounded-xl font-medium shadow-sm flex-shrink-0 self-center"
-              }
-              size="icon"
-            >
-              <Send className="h-4 w-4" />
-            </Button>
-          </div>
-        </TabsContent>
+              />
+              <Button 
+                onClick={handleSendReply} 
+                disabled={sending || !replyBody.trim()} 
+                className={
+                  useMobileStyle
+                    ? "mobile-spring-bounce h-10 w-10 rounded-xl font-medium shadow-sm flex-shrink-0 self-end"
+                    : "h-10 w-10 rounded-xl font-medium shadow-sm flex-shrink-0 self-center"
+                }
+                size="icon"
+              >
+                <Send className="h-4 w-4" />
+              </Button>
+            </div>
+          </TabsContent>
 
-
-        <TabsContent value="note" className="mt-0">
-          <div className="flex items-center gap-2">
-            <TabsList className="h-10 bg-muted/50 flex-shrink-0 self-center">
-              <TabsTrigger value="reply" className="text-sm rounded-lg data-[state=active]:bg-card data-[state=active]:shadow-sm transition-all duration-150">Reply</TabsTrigger>
-              <TabsTrigger value="note" className="text-sm rounded-lg data-[state=active]:bg-card data-[state=active]:shadow-sm transition-all duration-150">Note</TabsTrigger>
-            </TabsList>
-            <Textarea
-              placeholder="Add an internal note..."
-              value={noteBody}
-              onChange={(e) => setNoteBody(e.target.value)}
-              rows={2}
-              className={
-                useMobileStyle
-                  ? "resize-none border-border/60 focus:border-warning/50 focus:ring-2 focus:ring-warning/20 transition-all text-sm min-h-[56px] rounded-2xl bg-background shadow-sm flex-1"
-                  : "resize-none border-border/60 focus:border-warning/50 focus:ring-2 focus:ring-warning/20 transition-all text-base min-h-[56px] rounded-xl bg-background shadow-sm flex-1"
-              }
-            />
-            <Button 
-              onClick={handleSendNote} 
-              disabled={sending || !noteBody.trim()} 
-              variant="outline" 
-              className={
-                useMobileStyle
-                  ? "hover:bg-warning/10 hover:border-warning/50 transition-all h-10 w-10 rounded-xl mobile-spring-bounce font-medium flex-shrink-0 self-center"
-                  : "hover:bg-warning/10 hover:border-warning/50 transition-all h-10 w-10 rounded-xl font-medium flex-shrink-0 self-center"
-              }
-              size="icon"
-            >
-              <Send className="h-4 w-4" />
-            </Button>
-          </div>
-        </TabsContent>
+          <TabsContent value="note" className="mt-0">
+            <div className="flex items-center gap-2">
+              <Textarea
+                placeholder="Add an internal note..."
+                value={noteBody}
+                onChange={(e) => setNoteBody(e.target.value)}
+                rows={isMobile ? 3 : 2}
+                className={
+                  useMobileStyle
+                    ? "resize-none border-border/60 focus:border-warning/50 focus:ring-2 focus:ring-warning/20 transition-all text-sm min-h-[80px] rounded-2xl bg-background shadow-sm flex-1"
+                    : "resize-none border-border/60 focus:border-warning/50 focus:ring-2 focus:ring-warning/20 transition-all text-base min-h-[56px] rounded-xl bg-background shadow-sm flex-1"
+                }
+              />
+              <Button 
+                onClick={handleSendNote} 
+                disabled={sending || !noteBody.trim()} 
+                variant="outline" 
+                className={
+                  useMobileStyle
+                    ? "hover:bg-warning/10 hover:border-warning/50 transition-all h-10 w-10 rounded-xl mobile-spring-bounce font-medium flex-shrink-0 self-end"
+                    : "hover:bg-warning/10 hover:border-warning/50 transition-all h-10 w-10 rounded-xl font-medium flex-shrink-0 self-center"
+                }
+                size="icon"
+              >
+                <Send className="h-4 w-4" />
+              </Button>
+            </div>
+          </TabsContent>
+        </div>
       </Tabs>
     </div>
   );

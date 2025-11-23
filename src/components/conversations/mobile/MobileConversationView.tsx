@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ChevronLeft, MoreVertical } from 'lucide-react';
+import { MoreVertical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Conversation, Message } from '@/lib/types';
@@ -98,22 +98,21 @@ export const MobileConversationView = ({
   };
 
   const isOverdue = conversation.sla_due_at && new Date(conversation.sla_due_at) < new Date();
+  const getSentimentEmoji = (sentiment: string | null) => {
+    switch (sentiment) {
+      case 'positive': return '😊';
+      case 'negative': return '😟';
+      case 'neutral': return '😐';
+      default: return '❓';
+    }
+  };
 
   return (
     <div className="flex flex-col h-screen bg-background">
-      {/* iOS-Style Header - Simple back arrow */}
+      {/* iOS-Style Header */}
       <div className="flex-shrink-0 bg-background/95 backdrop-blur-sm border-b border-border/40 sticky top-0 z-30 animate-fade-in">
         <div className="flex items-center justify-between px-4 h-14">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onBack}
-            className="p-0 h-auto hover:bg-transparent -ml-2"
-          >
-            <ChevronLeft className="h-7 w-7 text-primary" />
-          </Button>
-          
-          <h1 className="flex-1 text-center font-medium text-base truncate px-4">
+          <h1 className="flex-1 font-medium text-base truncate">
             {conversation.title || 'Conversation'}
           </h1>
 
@@ -166,6 +165,15 @@ export const MobileConversationView = ({
               VIP
             </Badge>
           )}
+          <Badge variant="outline" className="text-[10px] h-5 px-2">
+            {Math.round((conversation.ai_confidence || 0) * 100)}%
+          </Badge>
+          <Badge variant="outline" className="text-[10px] h-5 px-2">
+            {getSentimentEmoji(conversation.ai_sentiment)} {conversation.ai_sentiment || 'Unknown'}
+          </Badge>
+          <Badge variant="outline" className="capitalize text-[10px] h-5 px-2">
+            📂 {conversation.category || 'General'}
+          </Badge>
         </div>
       </div>
 
