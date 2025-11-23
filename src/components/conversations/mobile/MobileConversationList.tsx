@@ -120,7 +120,7 @@ export const MobileConversationList = ({
           )}
         >
           <div className={cn(
-            "transition-all duration-300",
+            "transition-all duration-300 text-center",
             isHeaderCompact ? "pt-2" : "pt-8"
           )}>
             <h1 className={cn(
