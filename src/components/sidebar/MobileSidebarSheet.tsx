@@ -20,18 +20,28 @@ export const MobileSidebarSheet = ({ onNavigate }: MobileSidebarSheetProps) => {
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
         <button 
-          className="fixed top-4 left-4 z-[9999] p-2 group"
+          className="fixed top-4 left-4 z-[9999] flex flex-col items-center gap-1 group"
           aria-label="Open menu"
         >
           <div className="relative">
+            {/* Subtle background circle */}
+            <div className="absolute inset-0 bg-background/80 backdrop-blur-sm rounded-full scale-125 border border-border/50 group-hover:border-primary/50 transition-all duration-300" />
+            
+            {/* Logo */}
             <img 
               src={beeLogo} 
               alt="Menu" 
-              className="h-10 w-10 transition-all duration-300 group-hover:scale-110 group-active:scale-95 drop-shadow-md" 
+              className="h-10 w-10 relative z-10 transition-all duration-300 group-hover:scale-110 group-active:scale-95" 
             />
-            {/* Subtle pulse ring to indicate interactivity */}
-            <div className="absolute inset-0 rounded-full bg-primary/20 animate-pulse opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10 blur-md" />
+            
+            {/* Pulse effect on hover */}
+            <div className="absolute inset-0 rounded-full bg-primary/10 opacity-0 group-hover:opacity-100 animate-pulse transition-opacity duration-300 blur-sm" />
           </div>
+          
+          {/* Menu label */}
+          <span className="text-[10px] font-medium text-muted-foreground group-hover:text-foreground transition-colors duration-200">
+            Menu
+          </span>
         </button>
       </SheetTrigger>
       <SheetContent side="left" className="w-[280px] p-0">
