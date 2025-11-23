@@ -45,8 +45,8 @@ export const AIContextPanel = ({ conversation, onUpdate, onUseDraft }: AIContext
       <Collapsible open={isEscalationOpen} onOpenChange={setIsEscalationOpen}>
         <Card className="card-elevation bg-destructive/5 border-destructive/20 mobile-native-card">
           <CollapsibleTrigger className="w-full">
-            <div className="p-2.5 md:p-4">
-              <div className="flex items-start gap-2">
+            <div className="p-3 md:p-4">
+              <div className="flex items-start gap-2.5 md:gap-2">
                 <AlertCircle className="h-4 w-4 md:h-5 md:w-5 text-destructive mt-0.5 flex-shrink-0" />
                 <div className="flex-1 text-left">
                   <h3 className="font-semibold text-sm md:text-sm">Why AI Escalated</h3>
@@ -56,7 +56,7 @@ export const AIContextPanel = ({ conversation, onUpdate, onUseDraft }: AIContext
             </div>
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <div className="px-2.5 pb-2.5 md:px-4 md:pb-4 pt-0">
+            <div className="px-3 pb-3 md:px-4 md:pb-4 pt-0">
               <p className="text-sm text-muted-foreground leading-relaxed pl-6 md:pl-7">
                 {conversation.ai_reason_for_escalation || 'No escalation reason provided'}
               </p>
@@ -69,8 +69,8 @@ export const AIContextPanel = ({ conversation, onUpdate, onUseDraft }: AIContext
       <Collapsible open={isSummaryOpen} onOpenChange={setIsSummaryOpen}>
         <Card className="card-elevation mobile-native-card bg-primary/5 border-primary/20">
           <CollapsibleTrigger className="w-full">
-            <div className="p-2.5 md:p-4">
-              <div className="flex items-start gap-2">
+            <div className="p-3 md:p-4">
+              <div className="flex items-start gap-2.5 md:gap-2">
                 <FileText className="h-4 w-4 md:h-5 md:w-5 text-primary mt-0.5 flex-shrink-0" />
                 <div className="flex-1 text-left">
                   <h3 className="font-semibold text-sm md:text-sm">Summary</h3>
@@ -80,7 +80,7 @@ export const AIContextPanel = ({ conversation, onUpdate, onUseDraft }: AIContext
             </div>
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <div className="px-2.5 pb-2.5 md:px-4 md:pb-4 pt-0">
+            <div className="px-3 pb-3 md:px-4 md:pb-4 pt-0">
               <p className="text-sm text-foreground/80 leading-relaxed pl-6 md:pl-7">
                 {conversation.summary_for_human || 'No summary available'}
               </p>
