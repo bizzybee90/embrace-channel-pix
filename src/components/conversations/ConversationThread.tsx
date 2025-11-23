@@ -26,29 +26,14 @@ export const ConversationThread = ({ conversation, onUpdate, onBack }: Conversat
   const { toast } = useToast();
   const draftSaveTimeoutRef = useRef<NodeJS.Timeout>();
 
-  // Auto-save draft with debounce
+  // Auto-save draft instantly (no debounce, no notification)
   useEffect(() => {
-    if (draftSaveTimeoutRef.current) {
-      clearTimeout(draftSaveTimeoutRef.current);
-    }
-
     if (replyText.trim()) {
-      draftSaveTimeoutRef.current = setTimeout(() => {
-        localStorage.setItem(`draft-${conversation.id}`, replyText);
-        toast({
-          title: "Draft saved",
-          description: "Your reply has been auto-saved",
-          duration: 2000,
-        });
-      }, 1500); // Save after 1.5 seconds of inactivity
+      localStorage.setItem(`draft-${conversation.id}`, replyText);
+    } else {
+      localStorage.removeItem(`draft-${conversation.id}`);
     }
-
-    return () => {
-      if (draftSaveTimeoutRef.current) {
-        clearTimeout(draftSaveTimeoutRef.current);
-      }
-    };
-  }, [replyText, conversation.id, toast]);
+  }, [replyText, conversation.id]);
 
   // Load draft on mount
   useEffect(() => {

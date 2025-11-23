@@ -1,12 +1,12 @@
 import { Conversation } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow } from 'date-fns';
-import { Clock, CheckCircle2, UserPlus } from 'lucide-react';
+import { Clock, CheckCircle2, UserPlus, FileEdit } from 'lucide-react';
 import { ChannelIcon } from '../shared/ChannelIcon';
 import { cn } from '@/lib/utils';
 import { useIsTablet } from '@/hooks/use-tablet';
 import { useHaptics } from '@/hooks/useHaptics';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -21,6 +21,16 @@ export const ConversationCard = ({ conversation, selected, onClick, onUpdate }: 
   const isTablet = useIsTablet();
   const { trigger } = useHaptics();
   const { toast } = useToast();
+
+  // Draft detection state
+  const [hasDraft, setHasDraft] = useState(false);
+
+  // Check for draft on mount and when conversation changes
+  useEffect(() => {
+    const draftKey = `draft-${conversation.id}`;
+    const draft = localStorage.getItem(draftKey);
+    setHasDraft(!!draft && draft.trim().length > 0);
+  }, [conversation.id]);
 
   // Swipe gesture state
   const [swipeDistance, setSwipeDistance] = useState(0);
@@ -262,6 +272,13 @@ export const ConversationCard = ({ conversation, selected, onClick, onUpdate }: 
               <ChannelIcon channel={conversation.channel} className="h-3.5 w-3.5" />
               {conversation.channel}
             </Badge>
+
+            {hasDraft && (
+              <Badge variant="secondary" className="rounded-full text-xs font-semibold px-3 py-1.5 bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 flex items-center gap-1.5">
+                <FileEdit className="h-3 w-3" />
+                Draft
+              </Badge>
+            )}
           </div>
 
           {/* Meta Row */}
@@ -342,6 +359,13 @@ export const ConversationCard = ({ conversation, selected, onClick, onUpdate }: 
             <ChannelIcon channel={conversation.channel} className="h-3.5 w-3.5" />
             {conversation.channel}
           </Badge>
+
+          {hasDraft && (
+            <Badge variant="secondary" className="rounded-full text-xs font-semibold px-3 py-1.5 bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 flex items-center gap-1.5">
+              <FileEdit className="h-3 w-3" />
+              Draft
+            </Badge>
+          )}
         </div>
 
         {/* Meta Row */}
