@@ -29,15 +29,15 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend, ex
   const isTablet = useIsTablet();
   const isMobile = useIsMobile();
 
-  // Handle external draft text from AIContextPanel or saved drafts
-  // Reset when conversation changes (conversationId changes)
+  // Load saved draft when conversation changes
   useEffect(() => {
-    console.log('🔄 ReplyArea conversation changed:', { conversationId, externalDraftText });
-    setReplyBody(externalDraftText || '');
+    const savedDraft = localStorage.getItem(`draft-${conversationId}`);
+    console.log('📖 Loading draft for conversation:', { conversationId, savedDraft });
+    setReplyBody(savedDraft || '');
     setDraftUsed(false);
-  }, [conversationId]);  // ONLY conversationId, not externalDraftText
+  }, [conversationId]);
 
-  // Update when external draft changes within same conversation (from AI draft button)
+  // Handle AI-generated draft from "Use Draft" button
   useEffect(() => {
     console.log('📝 ReplyArea external draft updated:', { externalDraftText, currentReplyBody: replyBody });
     // Only update if it's different and not just from user typing
@@ -76,6 +76,7 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend, ex
       await onSend(replyBody, false);
       setReplyBody('');
       setDraftUsed(false);
+      localStorage.removeItem(`draft-${conversationId}`);  // Clear draft on send
       onDraftTextCleared?.();
       toast({ title: "Reply sent" });
     } catch (error) {
@@ -114,8 +115,19 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend, ex
               value={replyBody}
               onChange={(e) => {
                 console.log('⌨️ Textarea onChange:', { value: e.target.value, length: e.target.value.length });
-                setReplyBody(e.target.value);
-                onDraftChange?.(e.target.value);
+                const newValue = e.target.value;
+                setReplyBody(newValue);
+                
+                // Auto-save to localStorage
+                if (newValue.trim()) {
+                  localStorage.setItem(`draft-${conversationId}`, newValue);
+                  console.log('✅ Draft saved to localStorage');
+                } else {
+                  localStorage.removeItem(`draft-${conversationId}`);
+                  console.log('🗑️ Draft removed from localStorage');
+                }
+                
+                onDraftChange?.(newValue);
               }}
               rows={2}
               className={

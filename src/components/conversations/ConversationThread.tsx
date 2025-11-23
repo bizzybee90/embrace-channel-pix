@@ -20,29 +20,13 @@ interface ConversationThreadProps {
 export const ConversationThread = ({ conversation, onUpdate, onBack }: ConversationThreadProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
-  const [draftText, setDraftText] = useState<string>('');
-  const [replyText, setReplyText] = useState<string>('');
+  const [draftText, setDraftText] = useState<string>('');  // Only for AI-generated drafts
   const isMobile = useIsMobile();
   const { toast } = useToast();
   const draftSaveTimeoutRef = useRef<NodeJS.Timeout>();
 
-  // Auto-save draft instantly (no debounce, no notification)
+  // Reset AI draft when conversation changes
   useEffect(() => {
-    console.log('💾 Draft auto-save:', { conversationId: conversation.id, replyText, length: replyText.length });
-    if (replyText.trim()) {
-      localStorage.setItem(`draft-${conversation.id}`, replyText);
-      console.log('✅ Draft saved to localStorage');
-    } else {
-      localStorage.removeItem(`draft-${conversation.id}`);
-      console.log('🗑️ Draft removed from localStorage');
-    }
-  }, [replyText, conversation.id]);
-
-  // Load draft and reset state when conversation changes
-  useEffect(() => {
-    const savedDraft = localStorage.getItem(`draft-${conversation.id}`);
-    console.log('📖 Loading draft for conversation:', { conversationId: conversation.id, savedDraft });
-    setReplyText(savedDraft || '');
     setDraftText('');
   }, [conversation.id]);
 
@@ -114,9 +98,6 @@ export const ConversationThread = ({ conversation, onUpdate, onBack }: Conversat
 
     // Clear draft after successful send
     localStorage.removeItem(`draft-${conversation.id}`);
-    setReplyText('');
-
-    onUpdate();
   };
 
   const handleReopen = async () => {
@@ -160,9 +141,14 @@ export const ConversationThread = ({ conversation, onUpdate, onBack }: Conversat
           channel={conversation.channel}
           aiDraftResponse={conversation.metadata?.ai_draft_response as string}
           onSend={handleReply}
-          externalDraftText={replyText}
-          onDraftTextCleared={() => setReplyText('')}
-          onDraftChange={setReplyText}
+          externalDraftText={draftText}  // Only pass draftText from AI, not replyText
+          onDraftTextCleared={() => setDraftText('')}
+          onDraftChange={(text) => {
+            // Only save when text is being typed, not when cleared
+            if (text) {
+              localStorage.setItem(`draft-${conversation.id}`, text);
+            }
+          }}
         />
       )}
 
@@ -197,12 +183,16 @@ export const ConversationThread = ({ conversation, onUpdate, onBack }: Conversat
           channel={conversation.channel}
           aiDraftResponse={conversation.metadata?.ai_draft_response as string}
           onSend={handleReply}
-          externalDraftText={draftText || replyText}
+          externalDraftText={draftText}  // Only pass draftText from AI, not replyText
           onDraftTextCleared={() => {
             setDraftText('');
-            setReplyText('');
           }}
-          onDraftChange={setReplyText}
+          onDraftChange={(text) => {
+            // Only save when text is being typed, not when cleared
+            if (text) {
+              localStorage.setItem(`draft-${conversation.id}`, text);
+            }
+          }}
         />
       )}
 
