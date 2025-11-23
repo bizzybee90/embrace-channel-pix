@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Conversation, Message } from '@/lib/types';
 import { ConversationHeader } from './ConversationHeader';
@@ -8,6 +8,7 @@ import { ReplyArea } from './ReplyArea';
 import { MobileConversationView } from './MobileConversationView';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Loader2 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 
 interface ConversationThreadProps {
@@ -22,15 +23,32 @@ export const ConversationThread = ({ conversation, onUpdate, onBack }: Conversat
   const [draftText, setDraftText] = useState<string>('');
   const [replyText, setReplyText] = useState<string>('');
   const isMobile = useIsMobile();
+  const { toast } = useToast();
+  const draftSaveTimeoutRef = useRef<NodeJS.Timeout>();
 
-  // Save draft when component unmounts or conversation changes
+  // Auto-save draft with debounce
   useEffect(() => {
-    return () => {
-      if (replyText.trim()) {
+    if (draftSaveTimeoutRef.current) {
+      clearTimeout(draftSaveTimeoutRef.current);
+    }
+
+    if (replyText.trim()) {
+      draftSaveTimeoutRef.current = setTimeout(() => {
         localStorage.setItem(`draft-${conversation.id}`, replyText);
+        toast({
+          title: "Draft saved",
+          description: "Your reply has been auto-saved",
+          duration: 2000,
+        });
+      }, 1500); // Save after 1.5 seconds of inactivity
+    }
+
+    return () => {
+      if (draftSaveTimeoutRef.current) {
+        clearTimeout(draftSaveTimeoutRef.current);
       }
     };
-  }, [replyText, conversation.id]);
+  }, [replyText, conversation.id, toast]);
 
   // Load draft on mount
   useEffect(() => {
