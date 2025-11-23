@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, Send, CheckCircle2, AlertCircle, FileText, Sparkles, Calendar, Clock, User, MoreVertical } from 'lucide-react';
+import { ArrowLeft, Send, CheckCircle2, AlertCircle, FileText, Sparkles, Calendar, Clock, User, MoreVertical, Crown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
@@ -123,31 +123,48 @@ export const MobileConversationView = ({
       {/* Scrollable Content */}
       <div className="flex-1 overflow-y-auto">
         <div className="px-4 py-6 space-y-6">
-          {/* Status Pills */}
-          <div className="flex items-center justify-center gap-2 flex-wrap">
-            <div className="flex items-center gap-2 px-3 h-8 rounded-full bg-muted/50">
-              <ChannelIcon channel={conversation.channel} className="h-3.5 w-3.5" />
-              <span className="text-[12px] font-semibold capitalize">{conversation.channel}</span>
-            </div>
+          {/* Status Pills with Customer Info */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-center gap-2 flex-wrap">
+              <div className="flex items-center gap-2 px-3 h-8 rounded-full bg-muted/50">
+                <ChannelIcon channel={conversation.channel} className="h-3.5 w-3.5" />
+                <span className="text-[12px] font-semibold capitalize">{conversation.channel}</span>
+              </div>
 
-            <Badge
-              variant={
-                conversation.priority === 'high'
-                  ? 'destructive'
-                  : conversation.priority === 'medium'
-                  ? 'secondary'
-                  : 'outline'
-              }
-              className="rounded-full text-[11px] font-semibold h-8 px-3 uppercase"
-            >
-              {conversation.priority || 'Medium'}
-            </Badge>
-
-            {isOverdue && (
-              <Badge variant="destructive" className="rounded-full text-[11px] font-semibold h-8 px-3 uppercase">
-                <AlertCircle className="h-3 w-3 mr-1" />
-                Overdue
+              <Badge
+                variant={
+                  conversation.priority === 'high'
+                    ? 'destructive'
+                    : conversation.priority === 'medium'
+                    ? 'secondary'
+                    : 'outline'
+                }
+                className="rounded-full text-[11px] font-semibold h-8 px-3 uppercase"
+              >
+                {conversation.priority || 'Medium'}
               </Badge>
+
+              {isOverdue && (
+                <Badge variant="destructive" className="rounded-full text-[11px] font-semibold h-8 px-3 uppercase">
+                  <AlertCircle className="h-3 w-3 mr-1" />
+                  Overdue
+                </Badge>
+              )}
+              
+              {/* Customer VIP Badge */}
+              {conversation.customer_id && (
+                <Badge variant="secondary" className="rounded-full text-[11px] font-semibold h-8 px-3">
+                  <Crown className="h-3 w-3 mr-1" />
+                  VIP
+                </Badge>
+              )}
+            </div>
+            
+            {/* Customer Name */}
+            {conversation.customer_id && (
+              <p className="text-center text-[13px] text-muted-foreground">
+                Customer Name
+              </p>
             )}
           </div>
 
@@ -265,38 +282,7 @@ export const MobileConversationView = ({
       <div className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-xl border-t border-border shadow-lg mb-20 pb-safe">
         {/* Action Menu */}
         {showActions && (
-          <div className="px-4 pt-4 pb-2 border-b border-border/50 space-y-3 animate-fade-in max-h-[70vh] overflow-y-auto">
-            {/* Customer Details Section */}
-            {conversation.customer_id && (
-              <div className="rounded-2xl bg-muted/30 p-4 space-y-3">
-                <div className="flex items-center gap-2">
-                  <User className="h-4 w-4 text-muted-foreground" />
-                  <h4 className="text-[13px] font-bold uppercase tracking-wider text-muted-foreground">
-                    Customer Details
-                  </h4>
-                </div>
-                <div className="space-y-2">
-                  <div>
-                    <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-1">Name</p>
-                    <p className="text-[15px] font-medium">Customer Name</p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-1">Tier</p>
-                      <Badge variant="secondary" className="rounded-full text-[11px]">VIP</Badge>
-                    </div>
-                    <div>
-                      <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-1">Channel</p>
-                      <div className="flex items-center gap-1.5">
-                        <ChannelIcon channel={conversation.channel} className="h-3.5 w-3.5" />
-                        <span className="text-[13px] capitalize">{conversation.channel}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-            
+          <div className="px-4 pt-4 pb-2 space-y-3 animate-fade-in max-h-[70vh] overflow-y-auto">
             {/* Actions */}
             <Button
               onClick={() => {
