@@ -14,6 +14,7 @@ export const useScrollDirection = (threshold: number = 120) => {
   });
   const lastScrollY = useRef(0);
   const ticking = useRef(false);
+  const scrollTimeout = useRef<NodeJS.Timeout>();
 
   useEffect(() => {
     const updateScrollState = () => {
@@ -36,6 +37,19 @@ export const useScrollDirection = (threshold: number = 120) => {
 
       lastScrollY.current = scrollY;
       ticking.current = false;
+
+      // Clear existing timeout
+      if (scrollTimeout.current) {
+        clearTimeout(scrollTimeout.current);
+      }
+
+      // Show nav after scrolling stops (300ms)
+      scrollTimeout.current = setTimeout(() => {
+        setScrollState(prev => ({
+          ...prev,
+          isHidden: false,
+        }));
+      }, 300);
     };
 
     const onScroll = () => {
@@ -46,7 +60,12 @@ export const useScrollDirection = (threshold: number = 120) => {
     };
 
     window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      if (scrollTimeout.current) {
+        clearTimeout(scrollTimeout.current);
+      }
+    };
   }, [threshold]);
 
   return scrollState;

@@ -31,16 +31,8 @@ export const MobileHeader = ({ onMenuClick, showBackButton, onBackClick, backToT
           </div>
         )}
 
-        {/* Right: Hamburger Menu */}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onMenuClick}
-          className="h-9 w-9 hover:bg-accent"
-          aria-label="Open menu"
-        >
-          <Menu className="h-5 w-5 text-foreground" />
-        </Button>
+        {/* Right side is now empty - menu is in bottom nav */}
+        <div className="w-9" />
       </div>
     </header>
   );
