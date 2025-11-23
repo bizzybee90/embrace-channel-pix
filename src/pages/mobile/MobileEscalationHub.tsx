@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { MobileConversationList } from '@/components/conversations/mobile/MobileConversationList';
 import { MobileConversationView } from '@/components/conversations/mobile/MobileConversationView';
+import { MobileSidebarSheet } from '@/components/sidebar/MobileSidebarSheet';
 import { Conversation, Message } from '@/lib/types';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -186,29 +187,35 @@ export const MobileEscalationHub = ({ filter = 'all-open' }: MobileEscalationHub
 
   if (selectedConversation) {
     return (
-      <MobileConversationView
-        conversation={selectedConversation}
-        messages={messages}
-        onBack={handleBack}
-        onUpdate={handleUpdate}
-      />
+      <>
+        <MobileSidebarSheet onNavigate={handleBack} />
+        <MobileConversationView
+          conversation={selectedConversation}
+          messages={messages}
+          onBack={handleBack}
+          onUpdate={handleUpdate}
+        />
+      </>
     );
   }
 
   return (
-    <MobileConversationList
-      conversations={conversations}
-      onSelect={handleSelectConversation}
-      filterTitle={filterTitles[filter]}
-      statusFilter={statusFilter}
-      priorityFilter={priorityFilter}
-      channelFilter={channelFilter}
-      categoryFilter={categoryFilter}
-      onStatusFilterChange={setStatusFilter}
-      onPriorityFilterChange={setPriorityFilter}
-      onChannelFilterChange={setChannelFilter}
-      onCategoryFilterChange={setCategoryFilter}
-      onRefresh={handleRefresh}
-    />
+    <>
+      <MobileSidebarSheet />
+      <MobileConversationList
+        conversations={conversations}
+        onSelect={handleSelectConversation}
+        filterTitle={filterTitles[filter]}
+        statusFilter={statusFilter}
+        priorityFilter={priorityFilter}
+        channelFilter={channelFilter}
+        categoryFilter={categoryFilter}
+        onStatusFilterChange={setStatusFilter}
+        onPriorityFilterChange={setPriorityFilter}
+        onChannelFilterChange={setChannelFilter}
+        onCategoryFilterChange={setCategoryFilter}
+        onRefresh={handleRefresh}
+      />
+    </>
   );
 };
