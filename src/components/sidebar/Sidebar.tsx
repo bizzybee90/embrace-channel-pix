@@ -1,4 +1,4 @@
-import { Inbox, AlertTriangle, CheckCircle2, Clock, Filter, Zap, Columns, Settings, ChevronRight, PanelLeftClose, CheckCheck } from 'lucide-react';
+import { Inbox, AlertTriangle, CheckCircle2, Clock, Filter, Zap, Columns, Settings, ChevronRight, PanelLeftClose, CheckCheck, SlidersHorizontal } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { TeamStatus } from './TeamStatus';
 import { Button } from '@/components/ui/button';
@@ -15,9 +15,10 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 interface SidebarProps {
   forceCollapsed?: boolean;
   onNavigate?: () => void;
+  onFiltersClick?: () => void;
 }
 
-export const Sidebar = ({ forceCollapsed = false, onNavigate }: SidebarProps = {}) => {
+export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick }: SidebarProps = {}) => {
   const { interfaceMode, toggleMode, loading } = useInterfaceMode();
   const [collapsed, setCollapsed] = useState(false);
   
@@ -313,6 +314,21 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate }: SidebarProps = {
             </Tooltip>
           </div>
         </div>
+
+        {/* Filters Button - Mobile Only */}
+        {onFiltersClick && !isCollapsed && (
+          <>
+            <Separator className="my-4" />
+            <Button
+              onClick={onFiltersClick}
+              variant="outline"
+              className="w-full flex items-center justify-center gap-2"
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+              <span>Filters</span>
+            </Button>
+          </>
+        )}
 
         <Separator className="my-4" />
 
