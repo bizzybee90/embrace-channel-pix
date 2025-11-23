@@ -132,7 +132,7 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate }: SidebarProps = {
 
         <nav className="space-y-1 mb-6">
           {!isCollapsed && (
-            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-1">
+            <h2 className="text-xs font-semibold text-foreground/60 uppercase tracking-wider mb-3 px-1">
               Views
             </h2>
           )}
@@ -144,7 +144,7 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate }: SidebarProps = {
                     to="/"
                     end
                     onClick={onNavigate}
-                    className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm hover:bg-accent/50 transition-all hover-scale`}
+                    className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all hover-scale`}
                     activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
                   >
                     <div className="flex items-center justify-center w-8 h-8 rounded-md bg-primary/10">
@@ -168,7 +168,7 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate }: SidebarProps = {
                   <NavLink
                     to="/unassigned"
                     onClick={onNavigate}
-                    className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm hover:bg-accent/50 transition-all hover-scale`}
+                    className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all hover-scale`}
                     activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
                   >
                     <div className="flex items-center justify-center w-8 h-8 rounded-md bg-destructive/10">
@@ -192,7 +192,7 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate }: SidebarProps = {
                   <NavLink
                     to="/sla-risk"
                     onClick={onNavigate}
-                    className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm hover:bg-accent/50 transition-all hover-scale`}
+                    className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all hover-scale`}
                     activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
                   >
                     <div className="flex items-center justify-center w-8 h-8 rounded-md bg-orange-500/10">
@@ -216,7 +216,7 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate }: SidebarProps = {
                   <NavLink
                     to="/all-open"
                     onClick={onNavigate}
-                    className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm hover:bg-accent/50 transition-all hover-scale`}
+                    className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all hover-scale`}
                     activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
                   >
                     <div className="flex items-center justify-center w-8 h-8 rounded-md bg-blue-500/10">
@@ -240,7 +240,7 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate }: SidebarProps = {
                 <NavLink
                   to="/completed"
                   onClick={onNavigate}
-                  className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm hover:bg-accent/50 transition-all hover-scale`}
+                  className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all hover-scale`}
                   activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
                 >
                   <div className="flex items-center justify-center w-8 h-8 rounded-md bg-green-500/10">
@@ -262,7 +262,7 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate }: SidebarProps = {
 
         <div className="mb-6">
           {!isCollapsed && (
-            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-1">
+            <h2 className="text-xs font-semibold text-foreground/60 uppercase tracking-wider mb-3 px-1">
               Saved Filters
             </h2>
           )}
@@ -273,7 +273,7 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate }: SidebarProps = {
                   <NavLink
                     to="/high-priority"
                     onClick={onNavigate}
-                    className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm hover:bg-accent/50 transition-all hover-scale`}
+                    className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all hover-scale`}
                     activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
                   >
                     <div className="flex items-center justify-center w-8 h-8 rounded-md bg-blue-500/10">
@@ -295,7 +295,7 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate }: SidebarProps = {
                   <NavLink
                     to="/vip-customers"
                     onClick={onNavigate}
-                    className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm hover:bg-accent/50 transition-all hover-scale`}
+                    className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all hover-scale`}
                     activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
                   >
                     <div className="flex items-center justify-center w-8 h-8 rounded-md bg-purple-500/10">
@@ -329,7 +329,7 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate }: SidebarProps = {
           <Card className={`bg-muted/50 ${isCollapsed ? 'p-1.5' : 'p-3'}`}>
             {!isCollapsed && (
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold text-muted-foreground uppercase">Interface</span>
+                <span className="text-xs font-semibold text-foreground/60 uppercase">Interface</span>
               </div>
             )}
             {isCollapsed ? (
