@@ -1,6 +1,7 @@
 import { Inbox, UserCircle, FolderOpen, Menu, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useState, useEffect } from 'react';
 
 interface MobileBottomNavProps {
   activeFilter: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'completed' | 'high-priority' | 'vip-customers';
@@ -34,6 +35,19 @@ const navItems = [
 
 export const MobileBottomNav = ({ activeFilter, onNavigate, onMenuClick }: MobileBottomNavProps) => {
   const isMobile = useIsMobile();
+  const [isHidden, setIsHidden] = useState(false);
+
+  useEffect(() => {
+    const handleVisibilityChange = (e: Event) => {
+      const customEvent = e as CustomEvent<{ hidden: boolean }>;
+      setIsHidden(customEvent.detail.hidden);
+    };
+
+    window.addEventListener('mobile-nav-visibility', handleVisibilityChange);
+    return () => {
+      window.removeEventListener('mobile-nav-visibility', handleVisibilityChange);
+    };
+  }, []);
 
   if (!isMobile) return null;
 
@@ -48,7 +62,10 @@ export const MobileBottomNav = ({ activeFilter, onNavigate, onMenuClick }: Mobil
 
   return (
     <nav
-      className="fixed bottom-0 inset-x-0 z-40 px-4"
+      className={cn(
+        "fixed bottom-0 inset-x-0 z-40 px-4 transition-all duration-300",
+        isHidden ? 'translate-y-full opacity-0' : 'translate-y-0 opacity-100'
+      )}
       style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 0.75rem)' }}
     >
       <div className="max-w-xl mx-auto bg-sidebar/80 backdrop-blur-xl border border-sidebar-border rounded-2xl shadow-[0_-8px_32px_rgba(0,0,0,0.4)]">
