@@ -44,6 +44,7 @@ export const MobileBottomNav = ({ activeFilter, onNavigate, onMenuClick }: Mobil
     };
 
     window.addEventListener('mobile-nav-visibility', handleVisibilityChange);
+    
     return () => {
       window.removeEventListener('mobile-nav-visibility', handleVisibilityChange);
     };
