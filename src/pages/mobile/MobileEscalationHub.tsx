@@ -3,6 +3,7 @@ import { MobileConversationList } from '@/components/conversations/mobile/Mobile
 import { MobileConversationView } from '@/components/conversations/mobile/MobileConversationView';
 import { MobileSidebarSheet } from '@/components/sidebar/MobileSidebarSheet';
 import { MobileHeader } from '@/components/sidebar/MobileHeader';
+import { MobileBottomNav } from '@/components/layout/MobileBottomNav';
 import { Conversation, Message } from '@/lib/types';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -12,6 +13,7 @@ interface MobileEscalationHubProps {
 }
 
 export const MobileEscalationHub = ({ filter = 'all-open' }: MobileEscalationHubProps) => {
+  const [currentFilter, setCurrentFilter] = useState<typeof filter>(filter);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -34,8 +36,12 @@ export const MobileEscalationHub = ({ filter = 'all-open' }: MobileEscalationHub
   };
 
   useEffect(() => {
+    setCurrentFilter(filter);
+  }, [filter]);
+
+  useEffect(() => {
     loadConversations();
-  }, [filter, refreshKey, statusFilter, priorityFilter, channelFilter, categoryFilter]);
+  }, [currentFilter, refreshKey, statusFilter, priorityFilter, channelFilter, categoryFilter]);
 
   const loadConversations = async () => {
     let query = supabase
@@ -58,7 +64,7 @@ export const MobileEscalationHub = ({ filter = 'all-open' }: MobileEscalationHub
     }
 
     // Apply main filter
-    switch (filter) {
+    switch (currentFilter) {
       case 'my-tickets':
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
@@ -190,11 +196,12 @@ export const MobileEscalationHub = ({ filter = 'all-open' }: MobileEscalationHub
   // Screen B: Ticket Detail View
   if (selectedConversation) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-background pb-20">
         <MobileHeader
           onMenuClick={() => setSidebarOpen(true)}
           showBackButton
           onBackClick={handleBack}
+          backToText={`Back to ${filterTitles[currentFilter]}`}
         />
         <MobileSidebarSheet
           open={sidebarOpen}
@@ -207,13 +214,20 @@ export const MobileEscalationHub = ({ filter = 'all-open' }: MobileEscalationHub
           onBack={handleBack}
           onUpdate={handleUpdate}
         />
+        <MobileBottomNav
+          activeFilter={currentFilter}
+          onNavigate={(newFilter) => {
+            setCurrentFilter(newFilter);
+            handleBack();
+          }}
+        />
       </div>
     );
   }
 
   // Screen A: Ticket List View
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-20">
       <MobileHeader
         onMenuClick={() => setSidebarOpen(true)}
       />
@@ -224,7 +238,7 @@ export const MobileEscalationHub = ({ filter = 'all-open' }: MobileEscalationHub
       <MobileConversationList
         conversations={conversations}
         onSelect={handleSelectConversation}
-        filterTitle={filterTitles[filter]}
+        filterTitle={filterTitles[currentFilter]}
         statusFilter={statusFilter}
         priorityFilter={priorityFilter}
         channelFilter={channelFilter}
@@ -234,6 +248,10 @@ export const MobileEscalationHub = ({ filter = 'all-open' }: MobileEscalationHub
         onChannelFilterChange={setChannelFilter}
         onCategoryFilterChange={setCategoryFilter}
         onRefresh={handleRefresh}
+      />
+      <MobileBottomNav
+        activeFilter={currentFilter}
+        onNavigate={setCurrentFilter}
       />
     </div>
   );

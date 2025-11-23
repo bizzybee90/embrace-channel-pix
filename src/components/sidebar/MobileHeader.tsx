@@ -6,9 +6,10 @@ interface MobileHeaderProps {
   onMenuClick: () => void;
   showBackButton?: boolean;
   onBackClick?: () => void;
+  backToText?: string;
 }
 
-export const MobileHeader = ({ onMenuClick, showBackButton, onBackClick }: MobileHeaderProps) => {
+export const MobileHeader = ({ onMenuClick, showBackButton, onBackClick, backToText = 'Back' }: MobileHeaderProps) => {
   return (
     <header className="sticky top-0 z-50 bg-background border-b border-border/50 shadow-sm">
       <div className="flex items-center justify-between px-4 h-14">
@@ -21,7 +22,7 @@ export const MobileHeader = ({ onMenuClick, showBackButton, onBackClick }: Mobil
             className="gap-1 text-foreground hover:bg-accent"
           >
             <ChevronLeft className="h-4 w-4" />
-            <span className="text-sm font-medium">Back</span>
+            <span className="text-sm font-medium">{backToText}</span>
           </Button>
         ) : (
           <div className="flex items-center gap-2 bg-background/95 backdrop-blur-sm px-3 py-1.5 rounded-full border border-border/50 shadow-sm">
