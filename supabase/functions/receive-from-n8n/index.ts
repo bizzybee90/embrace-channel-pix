@@ -11,6 +11,9 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const startTime = Date.now();
+  let webhookLogId: string | null = null;
+
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -39,6 +42,20 @@ serve(async (req) => {
       );
     }
 
+    // Log webhook reception
+    const { data: logData } = await supabase
+      .from('webhook_logs')
+      .insert({
+        direction: 'inbound',
+        webhook_url: req.url,
+        payload,
+        status_code: null,
+      })
+      .select()
+      .single();
+
+    webhookLogId = logData?.id || null;
+
     // Insert escalated message into database
     const { data, error } = await supabase
       .from('escalated_messages')
@@ -58,6 +75,19 @@ serve(async (req) => {
 
     if (error) {
       console.error('Error inserting message:', error);
+      
+      // Update webhook log with error
+      if (webhookLogId) {
+        await supabase
+          .from('webhook_logs')
+          .update({
+            status_code: 500,
+            error_message: error.message,
+            response_payload: { error: error.message }
+          })
+          .eq('id', webhookLogId);
+      }
+
       return new Response(
         JSON.stringify({ error: error.message }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -65,6 +95,18 @@ serve(async (req) => {
     }
 
     console.log('Message escalated successfully:', data);
+
+    // Update webhook log with success
+    if (webhookLogId) {
+      await supabase
+        .from('webhook_logs')
+        .update({
+          conversation_id: null,
+          status_code: 200,
+          response_payload: { success: true, message_id: data.id }
+        })
+        .eq('id', webhookLogId);
+    }
 
     return new Response(
       JSON.stringify({ 
@@ -77,6 +119,26 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Error processing webhook:', error);
+    
+    // Update webhook log with error if we have the ID
+    if (webhookLogId) {
+      try {
+        const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+        const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+        const supabase = createClient(supabaseUrl, supabaseKey);
+        
+        await supabase
+          .from('webhook_logs')
+          .update({
+            status_code: 500,
+            error_message: error instanceof Error ? error.message : 'Unknown error',
+          })
+          .eq('id', webhookLogId);
+      } catch (logError) {
+        console.error('Failed to update webhook log:', logError);
+      }
+    }
+
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

@@ -11,6 +11,8 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  let webhookLogId: string | null = null;
+
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -50,45 +52,140 @@ serve(async (req) => {
     // Send to N8n webhook if configured
     if (n8nWebhookUrl) {
       console.log('Sending to N8n webhook:', n8nWebhookUrl);
-      
-      const n8nResponse = await fetch(n8nWebhookUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(n8nPayload),
-      });
 
-      if (!n8nResponse.ok) {
-        const errorText = await n8nResponse.text();
-        console.error('N8n webhook error:', errorText);
-        return new Response(
-          JSON.stringify({ 
-            error: 'Failed to send to N8n webhook',
-            details: errorText 
-          }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+      // Create initial webhook log
+      const { data: logData } = await supabase
+        .from('webhook_logs')
+        .insert({
+          direction: 'outbound',
+          webhook_url: n8nWebhookUrl,
+          payload: n8nPayload,
+          status_code: null,
+        })
+        .select()
+        .single();
+
+      webhookLogId = logData?.id || null;
+      
+      // Attempt to send to N8n with retry logic
+      let lastError: string | null = null;
+      let retryCount = 0;
+      const maxRetries = 3;
+
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+          const n8nResponse = await fetch(n8nWebhookUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(n8nPayload),
+          });
+
+          const responseText = await n8nResponse.text();
+          let responsePayload: any;
+          try {
+            responsePayload = JSON.parse(responseText);
+          } catch {
+            responsePayload = { raw: responseText };
+          }
+
+          if (!n8nResponse.ok) {
+            console.error('N8n webhook error:', responseText);
+            lastError = responseText;
+            
+            // Update log with error
+            if (webhookLogId) {
+              await supabase
+                .from('webhook_logs')
+                .update({
+                  status_code: n8nResponse.status,
+                  error_message: responseText,
+                  response_payload: responsePayload,
+                  retry_count: retryCount,
+                })
+                .eq('id', webhookLogId);
+            }
+
+            // Exponential backoff before retry
+            if (attempt < maxRetries - 1) {
+              await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+              retryCount++;
+              continue;
+            }
+
+            return new Response(
+              JSON.stringify({ 
+                error: 'Failed to send to N8n webhook after retries',
+                details: responseText 
+              }),
+              { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+
+          // Success! Update log
+          if (webhookLogId) {
+            await supabase
+              .from('webhook_logs')
+              .update({
+                status_code: n8nResponse.status,
+                response_payload: responsePayload,
+                retry_count: retryCount,
+              })
+              .eq('id', webhookLogId);
+          }
+
+          // Update the response record to mark as sent
+          const { error: updateError } = await supabase
+            .from('message_responses')
+            .update({ sent_to_n8n: true })
+            .eq('message_id', messageId);
+
+          if (updateError) {
+            console.error('Error updating response status:', updateError);
+          }
+
+          console.log('Successfully sent to N8n');
+          
+          return new Response(
+            JSON.stringify({ 
+              success: true,
+              message: 'Response sent to N8n successfully',
+              retries: retryCount
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+
+        } catch (fetchError: any) {
+          console.error('Fetch error:', fetchError);
+          lastError = fetchError.message;
+          
+          if (attempt < maxRetries - 1) {
+            await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+            retryCount++;
+            continue;
+          }
+        }
       }
 
-      // Update the response record to mark as sent
-      const { error: updateError } = await supabase
-        .from('message_responses')
-        .update({ sent_to_n8n: true })
-        .eq('message_id', messageId);
-
-      if (updateError) {
-        console.error('Error updating response status:', updateError);
+      // Max retries reached
+      if (webhookLogId) {
+        await supabase
+          .from('webhook_logs')
+          .update({
+            status_code: 500,
+            error_message: lastError,
+            retry_count: retryCount,
+          })
+          .eq('id', webhookLogId);
       }
 
-      console.log('Successfully sent to N8n');
-      
       return new Response(
         JSON.stringify({ 
-          success: true,
-          message: 'Response sent to N8n successfully' 
+          error: 'Failed to send to N8n webhook after retries',
+          details: lastError 
         }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     } else {
       console.warn('N8N_WEBHOOK_URL not configured, skipping webhook call');

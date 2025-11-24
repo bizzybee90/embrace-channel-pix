@@ -42,6 +42,17 @@ export const ConversationThread = ({ conversation, onUpdate, onBack }: Conversat
         setMessages(data as Message[]);
       }
       setLoading(false);
+
+      // Log conversation view for GDPR audit trail
+      if (conversation.customer_id) {
+        supabase.from('data_access_logs').insert({
+          customer_id: conversation.customer_id,
+          conversation_id: conversation.id,
+          action: 'view',
+        }).then(({ error }) => {
+          if (error) console.error('Failed to log access:', error);
+        });
+      }
     };
 
     fetchMessages();

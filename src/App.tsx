@@ -5,6 +5,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
+import Settings from "./pages/Settings";
+import WebhookLogs from "./pages/WebhookLogs";
 import { EscalationHub } from "./pages/EscalationHub";
 import { MobileEscalationHub } from "./pages/mobile/MobileEscalationHub";
 import { AuthGuard } from "./components/AuthGuard";
@@ -99,6 +101,22 @@ const RouterContent = () => {
             ) : (
               <EscalationHub filter="vip-customers" />
             )}
+          </AuthGuard>
+        } 
+      />
+      <Route 
+        path="/settings" 
+        element={
+          <AuthGuard>
+            <Settings />
+          </AuthGuard>
+        } 
+      />
+      <Route 
+        path="/webhooks" 
+        element={
+          <AuthGuard>
+            <WebhookLogs />
           </AuthGuard>
         } 
       />

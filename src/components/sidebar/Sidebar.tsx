@@ -1,4 +1,4 @@
-import { Inbox, AlertTriangle, CheckCircle2, Clock, Filter, Zap, Columns, Settings, ChevronRight, PanelLeftClose, CheckCheck, SlidersHorizontal } from 'lucide-react';
+import { Inbox, AlertTriangle, CheckCircle2, Clock, Filter, Zap, Columns, Settings, ChevronRight, PanelLeftClose, CheckCheck, SlidersHorizontal, Webhook } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { TeamStatus } from './TeamStatus';
 import { Button } from '@/components/ui/button';
@@ -83,11 +83,11 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
                 <p className="text-sm text-muted-foreground">Escalation Hub</p>
               </div>
               <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0">
-                    <Settings className="h-4 w-4" />
-                  </Button>
-                </PopoverTrigger>
+               <PopoverTrigger asChild>
+                 <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0">
+                   <SlidersHorizontal className="h-4 w-4" />
+                 </Button>
+               </PopoverTrigger>
           <PopoverContent className="w-64" align="end">
             <div className="space-y-4">
               <h3 className="font-semibold">Filter Visibility</h3>
@@ -333,11 +333,61 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
 
         <Separator className="my-4" />
 
-        {!isCollapsed && (
-          <div className="flex-1 overflow-auto">
-            <TeamStatus />
+        {/* Developer Section */}
+        <div className="mb-6">
+          {!isCollapsed && (
+            <h2 className="text-xs font-semibold text-foreground/60 uppercase tracking-wider mb-3 px-1">
+              Developer
+            </h2>
+          )}
+          <div className="space-y-1">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div>
+                  <NavLink
+                    to="/webhooks"
+                    onClick={onNavigate}
+                    className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all hover-scale`}
+                    activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
+                  >
+                    <div className="flex items-center justify-center w-8 h-8 rounded-md bg-purple-500/10">
+                      <Webhook className="h-4 w-4 text-purple-500" />
+                    </div>
+                    {!isCollapsed && <span>Webhook Logs</span>}
+                  </NavLink>
+                </div>
+              </TooltipTrigger>
+              {isCollapsed && (
+                <TooltipContent side="right">
+                  <p>Webhook Logs</p>
+                </TooltipContent>
+              )}
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div>
+                  <NavLink
+                    to="/settings"
+                    onClick={onNavigate}
+                    className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all hover-scale`}
+                    activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
+                  >
+                    <div className="flex items-center justify-center w-8 h-8 rounded-md bg-gray-500/10">
+                      <Settings className="h-4 w-4 text-gray-500" />
+                    </div>
+                    {!isCollapsed && <span>Settings</span>}
+                  </NavLink>
+                </div>
+              </TooltipTrigger>
+              {isCollapsed && (
+                <TooltipContent side="right">
+                  <p>Settings</p>
+                </TooltipContent>
+              )}
+            </Tooltip>
           </div>
-        )}
+        </div>
 
         <Separator className="my-4" />
 

@@ -14,6 +14,41 @@ export type Database = {
   }
   public: {
     Tables: {
+      allowed_webhook_ips: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          enabled: boolean | null
+          id: string
+          ip_address: string
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          enabled?: boolean | null
+          id?: string
+          ip_address: string
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          enabled?: boolean | null
+          id?: string
+          ip_address?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "allowed_webhook_ips_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversations: {
         Row: {
           ai_confidence: number | null
@@ -114,6 +149,53 @@ export type Database = {
           },
         ]
       }
+      customer_consents: {
+        Row: {
+          channel: string
+          consent_date: string | null
+          consent_given: boolean | null
+          consent_method: string | null
+          created_at: string | null
+          customer_id: string | null
+          id: string
+          notes: string | null
+          updated_at: string | null
+          withdrawn_date: string | null
+        }
+        Insert: {
+          channel: string
+          consent_date?: string | null
+          consent_given?: boolean | null
+          consent_method?: string | null
+          created_at?: string | null
+          customer_id?: string | null
+          id?: string
+          notes?: string | null
+          updated_at?: string | null
+          withdrawn_date?: string | null
+        }
+        Update: {
+          channel?: string
+          consent_date?: string | null
+          consent_given?: boolean | null
+          consent_method?: string | null
+          created_at?: string | null
+          customer_id?: string | null
+          id?: string
+          notes?: string | null
+          updated_at?: string | null
+          withdrawn_date?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_consents_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customers: {
         Row: {
           created_at: string | null
@@ -159,6 +241,159 @@ export type Database = {
             foreignKeyName: "customers_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      data_access_logs: {
+        Row: {
+          action: string
+          conversation_id: string | null
+          created_at: string | null
+          customer_id: string | null
+          id: string
+          ip_address: string | null
+          metadata: Json | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          conversation_id?: string | null
+          created_at?: string | null
+          customer_id?: string | null
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          conversation_id?: string | null
+          created_at?: string | null
+          customer_id?: string | null
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "data_access_logs_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "data_access_logs_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "data_access_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      data_deletion_requests: {
+        Row: {
+          completed_at: string | null
+          customer_id: string | null
+          deletion_type: string | null
+          id: string
+          notes: string | null
+          reason: string | null
+          requested_at: string | null
+          requested_by: string | null
+          reviewed_at: string | null
+          status: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          customer_id?: string | null
+          deletion_type?: string | null
+          id?: string
+          notes?: string | null
+          reason?: string | null
+          requested_at?: string | null
+          requested_by?: string | null
+          reviewed_at?: string | null
+          status?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          customer_id?: string | null
+          deletion_type?: string | null
+          id?: string
+          notes?: string | null
+          reason?: string | null
+          requested_at?: string | null
+          requested_by?: string | null
+          reviewed_at?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "data_deletion_requests_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "data_deletion_requests_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      data_retention_policies: {
+        Row: {
+          anonymize_instead_of_delete: boolean | null
+          auto_delete_enabled: boolean | null
+          created_at: string | null
+          exclude_vip_customers: boolean | null
+          id: string
+          retention_days: number
+          updated_at: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          anonymize_instead_of_delete?: boolean | null
+          auto_delete_enabled?: boolean | null
+          created_at?: string | null
+          exclude_vip_customers?: boolean | null
+          id?: string
+          retention_days?: number
+          updated_at?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          anonymize_instead_of_delete?: boolean | null
+          auto_delete_enabled?: boolean | null
+          created_at?: string | null
+          exclude_vip_customers?: boolean | null
+          id?: string
+          retention_days?: number
+          updated_at?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "data_retention_policies_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
             referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
@@ -438,6 +673,53 @@ export type Database = {
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      webhook_logs: {
+        Row: {
+          conversation_id: string | null
+          created_at: string | null
+          direction: string
+          error_message: string | null
+          id: string
+          payload: Json | null
+          response_payload: Json | null
+          retry_count: number | null
+          status_code: number | null
+          webhook_url: string | null
+        }
+        Insert: {
+          conversation_id?: string | null
+          created_at?: string | null
+          direction: string
+          error_message?: string | null
+          id?: string
+          payload?: Json | null
+          response_payload?: Json | null
+          retry_count?: number | null
+          status_code?: number | null
+          webhook_url?: string | null
+        }
+        Update: {
+          conversation_id?: string | null
+          created_at?: string | null
+          direction?: string
+          error_message?: string | null
+          id?: string
+          payload?: Json | null
+          response_payload?: Json | null
+          retry_count?: number | null
+          status_code?: number | null
+          webhook_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhook_logs_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
             referencedColumns: ["id"]
           },
         ]
