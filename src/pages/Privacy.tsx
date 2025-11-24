@@ -75,7 +75,7 @@ export default function Privacy() {
             <ul className="list-disc list-inside space-y-1">
               <li>Texting <strong>"MY DATA"</strong> to request a data export</li>
               <li>Texting <strong>"FORGET"</strong> or <strong>"DELETE"</strong> to request data deletion</li>
-              <li>Emailing us at <a href="mailto:privacy@example.com" className="text-primary hover:underline">privacy@example.com</a></li>
+              <li>Emailing us at <a href="mailto:hello@maccleaning.uk" className="text-primary hover:underline">hello@maccleaning.uk</a></li>
               <li>Contacting your customer service representative</li>
             </ul>
             <p className="mt-3">
@@ -96,9 +96,9 @@ export default function Privacy() {
         <section>
           <h2 className="text-2xl font-semibold mb-3">8. Contact Information</h2>
           <div className="text-muted-foreground space-y-1">
-            <p><strong>Data Protection Officer:</strong> privacy@example.com</p>
-            <p><strong>Company Address:</strong> [Your Company Address]</p>
-            <p><strong>Supervisory Authority:</strong> [Your local data protection authority]</p>
+            <p><strong>Data Protection Officer:</strong> hello@maccleaning.uk</p>
+            <p><strong>Company Address:</strong> 18 Quantock Crescent, Emerson Valley</p>
+            <p><strong>Supervisory Authority:</strong> Information Commissioner's Office (ICO), United Kingdom</p>
           </div>
         </section>
 
