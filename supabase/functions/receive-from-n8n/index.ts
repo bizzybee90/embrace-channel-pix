@@ -69,9 +69,19 @@ serve(async (req) => {
       channel,
       customer_name,
       customer_identifier,
+      customer_email,
+      customer_phone,
+      customer_tier,
       message_content,
       conversation_context,
+      title,
       priority = 'medium',
+      category = 'other',
+      ai_reason_for_escalation,
+      summary_for_human,
+      ai_confidence,
+      ai_sentiment,
+      ai_draft_response,
       n8n_workflow_id,
       metadata
     } = payload;
@@ -83,6 +93,23 @@ serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    // Get workspace_id (using first workspace for now - could be enhanced)
+    const { data: workspaceData } = await supabase
+      .from('workspaces')
+      .select('id')
+      .limit(1)
+      .single();
+
+    if (!workspaceData) {
+      console.error('No workspace found');
+      return new Response(
+        JSON.stringify({ error: 'No workspace configured' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const workspace_id = workspaceData.id;
 
     // Log webhook reception
     const { data: logData } = await supabase
@@ -98,8 +125,146 @@ serve(async (req) => {
 
     webhookLogId = logData?.id || null;
 
-    // Insert escalated message into database
-    const { data, error } = await supabase
+    // Step 1: Create or update customer
+    let customerId: string;
+    const { data: existingCustomer } = await supabase
+      .from('customers')
+      .select('id')
+      .eq('workspace_id', workspace_id)
+      .or(`email.eq.${customer_email || ''},phone.eq.${customer_phone || ''}`)
+      .maybeSingle();
+
+    if (existingCustomer) {
+      customerId = existingCustomer.id;
+      // Update customer if new info provided
+      await supabase
+        .from('customers')
+        .update({
+          name: customer_name || undefined,
+          email: customer_email || undefined,
+          phone: customer_phone || undefined,
+          tier: customer_tier || undefined,
+        })
+        .eq('id', customerId);
+    } else {
+      // Create new customer
+      const { data: newCustomer, error: customerError } = await supabase
+        .from('customers')
+        .insert({
+          workspace_id,
+          name: customer_name,
+          email: customer_email,
+          phone: customer_phone,
+          tier: customer_tier || 'regular',
+        })
+        .select('id')
+        .single();
+
+      if (customerError) {
+        console.error('Error creating customer:', customerError);
+        throw customerError;
+      }
+      customerId = newCustomer.id;
+    }
+
+    // Step 2: Create conversation with AI fields
+    const conversationMetadata: any = { ...metadata };
+    if (ai_draft_response) {
+      conversationMetadata.ai_draft_response = ai_draft_response;
+    }
+
+    const { data: conversation, error: conversationError } = await supabase
+      .from('conversations')
+      .insert({
+        workspace_id,
+        customer_id: customerId,
+        channel,
+        title: title || `${channel} - ${customer_name || customer_identifier}`,
+        priority,
+        category,
+        status: 'new',
+        ai_reason_for_escalation,
+        summary_for_human,
+        ai_confidence: ai_confidence ? parseFloat(ai_confidence) : null,
+        ai_sentiment,
+        metadata: conversationMetadata,
+      })
+      .select()
+      .single();
+
+    if (conversationError) {
+      console.error('Error creating conversation:', conversationError);
+      
+      if (webhookLogId) {
+        await supabase
+          .from('webhook_logs')
+          .update({
+            status_code: 500,
+            error_message: conversationError.message,
+            response_payload: { error: conversationError.message }
+          })
+          .eq('id', webhookLogId);
+      }
+
+      return new Response(
+        JSON.stringify({ error: conversationError.message }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log('Conversation created:', conversation.id);
+
+    // Step 3: Create messages from conversation_context
+    if (conversation_context && Array.isArray(conversation_context)) {
+      const messages = conversation_context.map((msg: any) => {
+        let actor_type = 'customer';
+        if (msg.role === 'assistant' || msg.role === 'ai') {
+          actor_type = 'ai_agent';
+        } else if (msg.role === 'agent' || msg.role === 'human') {
+          actor_type = 'human_agent';
+        }
+
+        return {
+          conversation_id: conversation.id,
+          actor_type,
+          actor_name: msg.role === 'customer' ? customer_name : msg.role,
+          body: msg.content || msg.message || '',
+          channel,
+          direction: actor_type === 'customer' ? 'inbound' : 'outbound',
+          is_internal: false,
+        };
+      });
+
+      const { error: messagesError } = await supabase
+        .from('messages')
+        .insert(messages);
+
+      if (messagesError) {
+        console.error('Error creating messages:', messagesError);
+      } else {
+        console.log(`Created ${messages.length} messages`);
+      }
+    }
+
+    // Step 4: Create initial escalation message
+    const { error: messageError } = await supabase
+      .from('messages')
+      .insert({
+        conversation_id: conversation.id,
+        actor_type: 'customer',
+        actor_name: customer_name,
+        body: message_content,
+        channel,
+        direction: 'inbound',
+        is_internal: false,
+      });
+
+    if (messageError) {
+      console.error('Error creating initial message:', messageError);
+    }
+
+    // Step 5: Keep backward compatibility - insert into escalated_messages
+    const { data: escalatedMsg, error: escalatedError } = await supabase
       .from('escalated_messages')
       .insert({
         channel,
@@ -110,42 +275,29 @@ serve(async (req) => {
         priority,
         status: 'pending',
         n8n_workflow_id,
-        metadata
+        metadata,
       })
       .select()
       .single();
 
-    if (error) {
-      console.error('Error inserting message:', error);
-      
-      // Update webhook log with error
-      if (webhookLogId) {
-        await supabase
-          .from('webhook_logs')
-          .update({
-            status_code: 500,
-            error_message: error.message,
-            response_payload: { error: error.message }
-          })
-          .eq('id', webhookLogId);
-      }
-
-      return new Response(
-        JSON.stringify({ error: error.message }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    if (escalatedError) {
+      console.error('Error creating escalated message:', escalatedError);
     }
 
-    console.log('Message escalated successfully:', data);
+    console.log('Escalation processed successfully');
 
     // Update webhook log with success
     if (webhookLogId) {
       await supabase
         .from('webhook_logs')
         .update({
-          conversation_id: null,
+          conversation_id: conversation.id,
           status_code: 200,
-          response_payload: { success: true, message_id: data.id }
+          response_payload: { 
+            success: true, 
+            conversation_id: conversation.id,
+            escalated_message_id: escalatedMsg?.id 
+          }
         })
         .eq('id', webhookLogId);
     }
@@ -153,8 +305,10 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message_id: data.id,
-        message: 'Message escalated successfully' 
+        conversation_id: conversation.id,
+        escalated_message_id: escalatedMsg?.id,
+        customer_id: customerId,
+        message: 'Escalation processed successfully' 
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
