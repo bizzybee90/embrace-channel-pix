@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
 import { SnoozeDialog } from '@/components/conversations/SnoozeDialog';
+import { CustomerConversationHistory } from '@/components/conversations/CustomerConversationHistory';
 
 interface CustomerContextProps {
   conversation: Conversation;
@@ -89,8 +90,13 @@ export const CustomerContext = ({ conversation, onUpdate }: CustomerContextProps
       <Separator className="md:block" />
 
       <div className="mobile-native-card md:p-0 md:border-0 md:shadow-none md:rounded-none space-y-3">
-        <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Recent History</h4>
-        <p className="text-sm text-muted-foreground">No previous conversations</p>
+        <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Conversation History</h4>
+        {customer?.id && (
+          <CustomerConversationHistory 
+            customerId={customer.id} 
+            currentConversationId={conversation.id}
+          />
+        )}
       </div>
 
       {customer?.notes && (
