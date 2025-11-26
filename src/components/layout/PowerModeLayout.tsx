@@ -8,7 +8,7 @@ import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/componen
 import { MessageSquare } from 'lucide-react';
 
 interface PowerModeLayoutProps {
-  filter?: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'completed' | 'high-priority' | 'vip-customers';
+  filter?: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'completed' | 'sent' | 'high-priority' | 'vip-customers';
 }
 
 export const PowerModeLayout = ({ filter = 'all-open' }: PowerModeLayoutProps) => {

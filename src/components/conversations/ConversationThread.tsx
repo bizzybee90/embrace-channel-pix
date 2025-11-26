@@ -147,6 +147,9 @@ export const ConversationThread = ({ conversation, onUpdate, onBack }: Conversat
 
     // Clear draft after successful send
     localStorage.removeItem(`draft-${conversation.id}`);
+    
+    // Trigger update to refresh conversation list
+    onUpdate();
   };
 
   const handleReopen = async () => {
