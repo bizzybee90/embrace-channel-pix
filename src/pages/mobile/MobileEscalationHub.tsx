@@ -23,10 +23,17 @@ export const MobileEscalationHub = ({ filter = 'all-open' }: MobileEscalationHub
   const [priorityFilter, setPriorityFilter] = useState<string[]>([]);
   const [channelFilter, setChannelFilter] = useState<string[]>([]);
   const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
-  const [sortBy, setSortBy] = useState<string>('sla_urgent');
+  const [sortBy, setSortBy] = useState<string>(() => {
+    return localStorage.getItem('conversation-sort') || 'sla_urgent';
+  });
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
   const { toast } = useToast();
+
+  // Persist sort preference
+  useEffect(() => {
+    localStorage.setItem('conversation-sort', sortBy);
+  }, [sortBy]);
 
   const filterTitles = {
     'my-tickets': 'My Tickets',

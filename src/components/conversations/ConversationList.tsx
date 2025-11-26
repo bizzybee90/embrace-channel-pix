@@ -28,7 +28,14 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
   const [priorityFilter, setPriorityFilter] = useState<string[]>([]);
   const [channelFilter, setChannelFilter] = useState<string[]>([]);
   const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
-  const [sortBy, setSortBy] = useState<string>('sla_urgent');
+  const [sortBy, setSortBy] = useState<string>(() => {
+    return localStorage.getItem('conversation-sort') || 'sla_urgent';
+  });
+
+  // Persist sort preference
+  useEffect(() => {
+    localStorage.setItem('conversation-sort', sortBy);
+  }, [sortBy]);
 
   useEffect(() => {
     const fetchConversations = async () => {

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ThreeColumnLayout } from '@/components/layout/ThreeColumnLayout';
 import { PowerModeLayout } from '@/components/layout/PowerModeLayout';
 import { TabletLayout } from '@/components/layout/TabletLayout';
@@ -38,12 +38,19 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
   const [priorityFilter, setPriorityFilter] = useState<string[]>([]);
   const [channelFilter, setChannelFilter] = useState<string[]>([]);
   const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
-  const [sortBy, setSortBy] = useState<string>('sla_urgent');
+  const [sortBy, setSortBy] = useState<string>(() => {
+    return localStorage.getItem('conversation-sort') || 'sla_urgent';
+  });
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { interfaceMode, loading: modeLoading } = useInterfaceMode();
   const { toast } = useToast();
   const isMobile = useIsMobile();
   const isTablet = useIsTablet();
+
+  // Persist sort preference
+  useEffect(() => {
+    localStorage.setItem('conversation-sort', sortBy);
+  }, [sortBy]);
   
   console.log('🔍 EscalationHub Debug:', { 
     isMobile,
