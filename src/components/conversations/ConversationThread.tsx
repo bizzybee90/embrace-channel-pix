@@ -89,22 +89,60 @@ export const ConversationThread = ({ conversation, onUpdate, onBack }: Conversat
       .eq('id', user.id)
       .single();
 
-    await supabase.from('messages').insert({
-      conversation_id: conversation.id,
-      actor_type: isInternal ? 'system' : 'human_agent',
-      actor_id: user.id,
-      actor_name: userData?.name || 'Agent',
-      direction: 'outbound',
-      channel: conversation.channel,
-      body,
-      is_internal: isInternal
-    });
+    const { data: newMessage, error: insertError } = await supabase
+      .from('messages')
+      .insert({
+        conversation_id: conversation.id,
+        actor_type: isInternal ? 'system' : 'human_agent',
+        actor_id: user.id,
+        actor_name: userData?.name || 'Agent',
+        direction: 'outbound',
+        channel: conversation.channel,
+        body,
+        is_internal: isInternal
+      })
+      .select()
+      .single();
+
+    if (insertError) {
+      console.error('Error sending message:', insertError);
+      toast({
+        title: "Error sending message",
+        description: insertError.message,
+        variant: "destructive"
+      });
+      return;
+    }
 
     if (!isInternal && !conversation.first_response_at) {
       await supabase
         .from('conversations')
         .update({ first_response_at: new Date().toISOString() })
         .eq('id', conversation.id);
+    }
+
+    // Send to n8n if not internal
+    if (!isInternal && newMessage) {
+      try {
+        const { error: webhookError } = await supabase.functions.invoke('send-to-n8n', {
+          body: {
+            conversationId: conversation.id,
+            messageId: newMessage.id,
+            response: body
+          }
+        });
+
+        if (webhookError) {
+          console.error('Error sending to n8n:', webhookError);
+          toast({
+            title: "Warning",
+            description: "Message saved but failed to send to n8n",
+            variant: "destructive"
+          });
+        }
+      } catch (err) {
+        console.error('Error invoking send-to-n8n:', err);
+      }
     }
 
     // Clear draft after successful send

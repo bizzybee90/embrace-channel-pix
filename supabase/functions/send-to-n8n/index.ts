@@ -20,12 +20,27 @@ serve(async (req) => {
     
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { messageId, response } = await req.json();
-    console.log('Sending response to N8n for message:', messageId);
+    const { conversationId, messageId, response } = await req.json();
+    console.log('Sending response to N8n for conversation:', conversationId, 'message:', messageId);
 
-    // Get the original message details
+    // Get the conversation details
+    const { data: conversation, error: convError } = await supabase
+      .from('conversations')
+      .select('*, customers(*)')
+      .eq('id', conversationId)
+      .single();
+
+    if (convError) {
+      console.error('Error fetching conversation:', convError);
+      return new Response(
+        JSON.stringify({ error: convError.message }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Get the message details
     const { data: message, error: messageError } = await supabase
-      .from('escalated_messages')
+      .from('messages')
       .select('*')
       .eq('id', messageId)
       .single();
@@ -38,14 +53,20 @@ serve(async (req) => {
       );
     }
 
+    // Extract n8n_workflow_id from conversation metadata
+    const metadata = conversation.metadata as Record<string, any> || {};
+    const n8nWorkflowId = metadata.n8n_workflow_id || null;
+
     // Prepare payload for N8n
     const n8nPayload = {
+      conversation_id: conversationId,
       message_id: messageId,
-      channel: message.channel,
-      customer_identifier: message.customer_identifier,
-      customer_name: message.customer_name,
+      channel: conversation.channel,
+      customer_identifier: conversation.customers?.email || conversation.customers?.phone || 'unknown',
+      customer_name: conversation.customers?.name || 'Unknown Customer',
       agent_response: response,
-      n8n_workflow_id: message.n8n_workflow_id,
+      agent_name: message.actor_name,
+      n8n_workflow_id: n8nWorkflowId,
       timestamp: new Date().toISOString()
     };
 
@@ -135,15 +156,11 @@ serve(async (req) => {
               .eq('id', webhookLogId);
           }
 
-          // Update the response record to mark as sent
-          const { error: updateError } = await supabase
-            .from('message_responses')
-            .update({ sent_to_n8n: true })
-            .eq('message_id', messageId);
-
-          if (updateError) {
-            console.error('Error updating response status:', updateError);
-          }
+          // Mark conversation as updated
+          await supabase
+            .from('conversations')
+            .update({ updated_at: new Date().toISOString() })
+            .eq('id', conversationId);
 
           console.log('Successfully sent to N8n');
           
