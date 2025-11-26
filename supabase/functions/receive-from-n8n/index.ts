@@ -227,24 +227,26 @@ serve(async (req) => {
     // Step 2: Find existing open conversation or create new one
     let conversation;
     
-    console.log('Looking for existing conversation for customer:', customerId, 'channel:', channel);
+    console.log('🔍 Looking for existing open conversation for customer:', customerId, 'channel:', channel);
     
     // Look for existing open conversation for this customer and channel
-    const { data: existingConversation } = await supabase
+    // Use limit(1) instead of maybeSingle() to handle potential duplicates
+    const { data: existingConversations } = await supabase
       .from('conversations')
       .select('*')
       .eq('customer_id', customerId)
       .eq('channel', channel)
       .in('status', ['new', 'open', 'pending'])
       .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .limit(1);
+
+    const existingConversation = existingConversations?.[0];
 
     if (existingConversation) {
-      console.log('Found existing open conversation:', existingConversation.id, 'status:', existingConversation.status);
+      console.log('✅ REUSING existing open conversation:', existingConversation.id, 'status:', existingConversation.status, '(Duplicate prevention: blocking new conversation creation)');
       conversation = existingConversation;
     } else {
-      console.log('No existing open conversation found, creating new conversation');
+      console.log('➕ No existing open conversation found, creating NEW conversation for customer:', customerId, 'channel:', channel);
       const conversationMetadata: any = { ...metadata };
       if (ai_draft_response) {
         conversationMetadata.ai_draft_response = ai_draft_response;
