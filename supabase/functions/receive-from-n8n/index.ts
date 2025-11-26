@@ -183,11 +183,15 @@ serve(async (req) => {
       customerQuery = customerQuery.or(orConditions.join(','));
     }
     
-    const { data: existingCustomer } = await customerQuery.maybeSingle();
+    const { data: matchingCustomers } = await customerQuery
+      .order('created_at', { ascending: true })
+      .limit(1);
 
+    const existingCustomer = matchingCustomers?.[0];
+    
     if (existingCustomer) {
       customerId = existingCustomer.id;
-      console.log('Found existing customer:', customerId);
+      console.log(`Found and reusing existing customer: ${customerId} (${matchingCustomers?.length || 0} match(es) found)`);
       // Update customer if new info provided
       await supabase
         .from('customers')
