@@ -172,6 +172,11 @@ serve(async (req) => {
     if (ai_draft_response) {
       conversationMetadata.ai_draft_response = ai_draft_response;
     }
+    // Store customer contact info in metadata as fallback
+    if (customer_name) conversationMetadata.customer_name = customer_name;
+    if (customer_email) conversationMetadata.customer_email = customer_email;
+    if (customer_phone) conversationMetadata.customer_phone = customer_phone;
+    if (customer_identifier) conversationMetadata.customer_identifier = customer_identifier;
 
     const { data: conversation, error: conversationError } = await supabase
       .from('conversations')

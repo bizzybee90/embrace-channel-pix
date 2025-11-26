@@ -20,7 +20,14 @@ export const CustomerContext = ({ conversation, onUpdate }: CustomerContextProps
   const { toast } = useToast();
   const [snoozeOpen, setSnoozeOpen] = useState(false);
 
-  if (!customer) {
+  // Fallback to metadata if customer record is incomplete
+  const metadata = conversation.metadata as any || {};
+  const customerName = customer?.name || metadata.customer_name || metadata.customer_identifier || 'Unknown';
+  const customerEmail = customer?.email || metadata.customer_email;
+  const customerPhone = customer?.phone || metadata.customer_phone;
+  const customerTier = customer?.tier || 'regular';
+
+  if (!customer && !metadata.customer_identifier) {
     return (
       <div className="p-4">
         <p className="text-muted-foreground">No customer data available</p>
@@ -46,9 +53,9 @@ export const CustomerContext = ({ conversation, onUpdate }: CustomerContextProps
       <div className="mobile-native-card md:p-0 md:border-0 md:shadow-none md:rounded-none">
         <div className="flex items-center justify-between mb-3">
           <div className="flex-1">
-            <h3 className="text-2xl md:text-xl font-bold leading-tight">{customer.name || 'Unknown'}</h3>
+            <h3 className="text-2xl md:text-xl font-bold leading-tight">{customerName}</h3>
           </div>
-          {getTierBadge(customer.tier)}
+          {getTierBadge(customerTier)}
         </div>
       </div>
 
@@ -57,21 +64,21 @@ export const CustomerContext = ({ conversation, onUpdate }: CustomerContextProps
       <div className="mobile-native-card md:p-0 md:border-0 md:shadow-none md:rounded-none space-y-3">
         <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Contact Info</h4>
         
-        {customer.email && (
+        {customerEmail && (
           <div className="flex items-center gap-3 text-sm mobile-touch-target">
             <Mail className="h-4 w-4 text-primary flex-shrink-0" />
-            <span className="break-all">{customer.email}</span>
+            <span className="break-all">{customerEmail}</span>
           </div>
         )}
         
-        {customer.phone && (
+        {customerPhone && (
           <div className="flex items-center gap-3 text-sm mobile-touch-target">
             <Phone className="h-4 w-4 text-primary flex-shrink-0" />
-            <span>{customer.phone}</span>
+            <span>{customerPhone}</span>
           </div>
         )}
 
-        {customer.preferred_channel && (
+        {customer?.preferred_channel && (
           <div className="flex items-center gap-3 text-sm mobile-touch-target">
             <MessageSquare className="h-4 w-4 text-primary flex-shrink-0" />
             <span>Prefers: {customer.preferred_channel}</span>
@@ -86,7 +93,7 @@ export const CustomerContext = ({ conversation, onUpdate }: CustomerContextProps
         <p className="text-sm text-muted-foreground">No previous conversations</p>
       </div>
 
-      {customer.notes && (
+      {customer?.notes && (
         <>
           <Separator className="md:block" />
           <div className="mobile-native-card md:p-0 md:border-0 md:shadow-none md:rounded-none space-y-2">
