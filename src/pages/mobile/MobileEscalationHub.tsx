@@ -10,7 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 interface MobileEscalationHubProps {
-  filter?: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'completed' | 'high-priority' | 'vip-customers';
+  filter?: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'completed' | 'sent' | 'high-priority' | 'vip-customers';
 }
 
 export const MobileEscalationHub = ({ filter = 'all-open' }: MobileEscalationHubProps) => {
@@ -41,6 +41,7 @@ export const MobileEscalationHub = ({ filter = 'all-open' }: MobileEscalationHub
     'sla-risk': 'SLA Risk',
     'all-open': 'All Open',
     'completed': 'Completed',
+    'sent': 'Sent',
     'high-priority': 'High Priority',
     'vip-customers': 'VIP Customers'
   };
@@ -116,6 +117,22 @@ export const MobileEscalationHub = ({ filter = 'all-open' }: MobileEscalationHub
       query = query.in('status', ['new', 'open', 'waiting_customer', 'waiting_internal']);
     } else if (currentFilter === 'completed') {
       query = query.eq('status', 'resolved');
+    } else if (currentFilter === 'sent') {
+      // Show conversations where current user has sent outbound messages
+      const { data: sentConvIds } = await supabase
+        .from('messages')
+        .select('conversation_id')
+        .eq('actor_id', user.id)
+        .eq('direction', 'outbound')
+        .eq('is_internal', false);
+      
+      if (sentConvIds && sentConvIds.length > 0) {
+        const convIds = [...new Set(sentConvIds.map(m => m.conversation_id))];
+        query = query.in('id', convIds);
+      } else {
+        setConversations([]);
+        return;
+      }
     } else if (currentFilter === 'high-priority') {
       query = query.in('priority', ['high', 'urgent']).in('status', ['new', 'open', 'waiting_customer', 'waiting_internal']);
     } else if (currentFilter === 'vip-customers') {

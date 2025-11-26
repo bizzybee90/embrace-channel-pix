@@ -16,7 +16,7 @@ import PullToRefresh from 'react-simple-pull-to-refresh';
 interface ConversationListProps {
   selectedId?: string;
   onSelect: (conversation: Conversation) => void;
-  filter?: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'completed' | 'high-priority' | 'vip-customers';
+  filter?: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'completed' | 'sent' | 'high-priority' | 'vip-customers';
   onConversationsChange?: (conversations: Conversation[]) => void;
 }
 
@@ -81,6 +81,25 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
         query = query.in('status', ['new', 'open', 'waiting_customer', 'waiting_internal']);
       } else if (filter === 'completed') {
         query = query.eq('status', 'resolved');
+      } else if (filter === 'sent') {
+        // Show conversations where current user has sent outbound messages
+        const { data: sentConvIds } = await supabase
+          .from('messages')
+          .select('conversation_id')
+          .eq('actor_id', user.id)
+          .eq('direction', 'outbound')
+          .eq('is_internal', false);
+        
+        if (sentConvIds && sentConvIds.length > 0) {
+          const convIds = [...new Set(sentConvIds.map(m => m.conversation_id))];
+          query = query.in('id', convIds);
+        } else {
+          // No sent messages, return empty result
+          setConversations([]);
+          onConversationsChange?.([]);
+          setLoading(false);
+          return;
+        }
       } else if (filter === 'high-priority') {
         query = query.in('priority', ['high', 'urgent']).in('status', ['new', 'open', 'waiting_customer', 'waiting_internal']);
       } else if (filter === 'vip-customers') {
@@ -186,6 +205,23 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
       query = query.in('status', ['new', 'open', 'waiting_customer', 'waiting_internal']);
     } else if (filter === 'completed') {
       query = query.eq('status', 'resolved');
+    } else if (filter === 'sent') {
+      const { data: sentConvIds } = await supabase
+        .from('messages')
+        .select('conversation_id')
+        .eq('actor_id', user.id)
+        .eq('direction', 'outbound')
+        .eq('is_internal', false);
+      
+      if (sentConvIds && sentConvIds.length > 0) {
+        const convIds = [...new Set(sentConvIds.map(m => m.conversation_id))];
+        query = query.in('id', convIds);
+      } else {
+        setConversations([]);
+        onConversationsChange?.([]);
+        setLoading(false);
+        return;
+      }
     } else if (filter === 'high-priority') {
       query = query.in('priority', ['high', 'urgent']).in('status', ['new', 'open', 'waiting_customer', 'waiting_internal']);
     } else if (filter === 'vip-customers') {

@@ -82,6 +82,18 @@ const RouterContent = () => {
         } 
       />
       <Route 
+        path="/sent" 
+        element={
+          <AuthGuard>
+            {isMobile ? (
+              <MobileEscalationHub filter="sent" />
+            ) : (
+              <EscalationHub filter="sent" />
+            )}
+          </AuthGuard>
+        } 
+      />
+      <Route 
         path="/high-priority" 
         element={
           <AuthGuard>
