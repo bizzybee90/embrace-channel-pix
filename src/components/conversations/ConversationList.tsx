@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import PullToRefresh from 'react-simple-pull-to-refresh';
 
 interface ConversationListProps {
@@ -27,6 +28,7 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
   const [priorityFilter, setPriorityFilter] = useState<string[]>([]);
   const [channelFilter, setChannelFilter] = useState<string[]>([]);
   const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
+  const [sortBy, setSortBy] = useState<string>('sla_urgent');
 
   useEffect(() => {
     const fetchConversations = async () => {
@@ -39,8 +41,27 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
           *,
           customer:customers(*),
           assigned_user:users(*)
-        `)
-        .order('sla_due_at', { ascending: true });
+        `);
+
+      // Apply sorting
+      switch (sortBy) {
+        case 'newest':
+          query = query.order('created_at', { ascending: false });
+          break;
+        case 'oldest':
+          query = query.order('created_at', { ascending: true });
+          break;
+        case 'priority_high':
+          query = query.order('priority', { ascending: false }).order('created_at', { ascending: false });
+          break;
+        case 'priority_low':
+          query = query.order('priority', { ascending: true }).order('created_at', { ascending: false });
+          break;
+        case 'sla_urgent':
+        default:
+          query = query.order('sla_due_at', { ascending: true, nullsFirst: false });
+          break;
+      }
 
       // Apply view filter
       if (filter === 'my-tickets') {
@@ -108,7 +129,7 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [filter, statusFilter, priorityFilter, channelFilter, categoryFilter]);
+  }, [filter, statusFilter, priorityFilter, channelFilter, categoryFilter, sortBy]);
 
   const activeFilterCount = statusFilter.length + priorityFilter.length + channelFilter.length + categoryFilter.length;
 
@@ -126,8 +147,27 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
         *,
         customer:customers(*),
         assigned_user:users(*)
-      `)
-      .order('sla_due_at', { ascending: true });
+      `);
+
+    // Apply sorting
+    switch (sortBy) {
+      case 'newest':
+        query = query.order('created_at', { ascending: false });
+        break;
+      case 'oldest':
+        query = query.order('created_at', { ascending: true });
+        break;
+      case 'priority_high':
+        query = query.order('priority', { ascending: false }).order('created_at', { ascending: false });
+        break;
+      case 'priority_low':
+        query = query.order('priority', { ascending: true }).order('created_at', { ascending: false });
+        break;
+      case 'sla_urgent':
+      default:
+        query = query.order('sla_due_at', { ascending: true, nullsFirst: false });
+        break;
+    }
 
     if (filter === 'my-tickets') {
       query = query.eq('assigned_to', user.id).in('status', ['new', 'open', 'waiting_customer', 'waiting_internal']);
@@ -228,41 +268,56 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
       "flex flex-col h-full",
       isTablet ? "bg-transparent" : "bg-muted/30 min-w-[300px]"
     )}>
-      {/* Filter button */}
+      {/* Filter and Sort Controls */}
       <div className={cn(
-        "py-3 border-b border-border/50 bg-background/80 backdrop-blur-sm",
+        "py-3 border-b border-border/50 bg-background/80 backdrop-blur-sm space-y-2",
         isTablet ? "px-0 mb-4" : "px-4"
       )}>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button 
-              variant="outline" 
-              className="w-full justify-between h-9 text-sm font-medium"
-            >
-              <div className="flex items-center gap-2">
-                <SlidersHorizontal className="h-4 w-4" />
-                <span>Filters</span>
-              </div>
-              {activeFilterCount > 0 && (
-                <Badge variant="secondary" className="ml-auto h-5 min-w-5 px-1.5 text-[10px] font-semibold">
-                  {activeFilterCount}
-                </Badge>
-              )}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-80 p-4" align="start">
-            <ConversationFilters
-              statusFilter={statusFilter}
-              setStatusFilter={setStatusFilter}
-              priorityFilter={priorityFilter}
-              setPriorityFilter={setPriorityFilter}
-              channelFilter={channelFilter}
-              setChannelFilter={setChannelFilter}
-              categoryFilter={categoryFilter}
-              setCategoryFilter={setCategoryFilter}
-            />
-          </PopoverContent>
-        </Popover>
+        <div className="flex gap-2">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button 
+                variant="outline" 
+                className="flex-1 justify-between h-9 text-sm font-medium"
+              >
+                <div className="flex items-center gap-2">
+                  <SlidersHorizontal className="h-4 w-4" />
+                  <span>Filters</span>
+                </div>
+                {activeFilterCount > 0 && (
+                  <Badge variant="secondary" className="ml-auto h-5 min-w-5 px-1.5 text-[10px] font-semibold">
+                    {activeFilterCount}
+                  </Badge>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80 p-4" align="start">
+              <ConversationFilters
+                statusFilter={statusFilter}
+                setStatusFilter={setStatusFilter}
+                priorityFilter={priorityFilter}
+                setPriorityFilter={setPriorityFilter}
+                channelFilter={channelFilter}
+                setChannelFilter={setChannelFilter}
+                categoryFilter={categoryFilter}
+                setCategoryFilter={setCategoryFilter}
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
+        
+        <Select value={sortBy} onValueChange={setSortBy}>
+          <SelectTrigger className="w-full h-9 text-sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="sla_urgent">🚨 SLA Urgent First</SelectItem>
+            <SelectItem value="newest">🆕 Newest First</SelectItem>
+            <SelectItem value="oldest">⏰ Oldest First</SelectItem>
+            <SelectItem value="priority_high">🔴 High Priority First</SelectItem>
+            <SelectItem value="priority_low">🟢 Low Priority First</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Pull-to-refresh wrapper (only on touch devices and tablet) */}

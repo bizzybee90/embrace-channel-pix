@@ -23,6 +23,7 @@ export const MobileEscalationHub = ({ filter = 'all-open' }: MobileEscalationHub
   const [priorityFilter, setPriorityFilter] = useState<string[]>([]);
   const [channelFilter, setChannelFilter] = useState<string[]>([]);
   const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
+  const [sortBy, setSortBy] = useState<string>('sla_urgent');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
   const { toast } = useToast();
@@ -63,7 +64,7 @@ export const MobileEscalationHub = ({ filter = 'all-open' }: MobileEscalationHub
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [currentFilter, refreshKey, statusFilter, priorityFilter, channelFilter, categoryFilter]);
+  }, [currentFilter, refreshKey, statusFilter, priorityFilter, channelFilter, categoryFilter, sortBy]);
 
   const loadConversations = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -75,8 +76,27 @@ export const MobileEscalationHub = ({ filter = 'all-open' }: MobileEscalationHub
         *,
         customer:customers(*),
         assigned_user:users(*)
-      `)
-      .order('sla_due_at', { ascending: true });
+      `);
+
+    // Apply sorting
+    switch (sortBy) {
+      case 'newest':
+        query = query.order('created_at', { ascending: false });
+        break;
+      case 'oldest':
+        query = query.order('created_at', { ascending: true });
+        break;
+      case 'priority_high':
+        query = query.order('priority', { ascending: false }).order('created_at', { ascending: false });
+        break;
+      case 'priority_low':
+        query = query.order('priority', { ascending: true }).order('created_at', { ascending: false });
+        break;
+      case 'sla_urgent':
+      default:
+        query = query.order('sla_due_at', { ascending: true, nullsFirst: false });
+        break;
+    }
 
     // Apply view filter (matching desktop logic exactly)
     if (currentFilter === 'my-tickets') {
@@ -251,10 +271,12 @@ export const MobileEscalationHub = ({ filter = 'all-open' }: MobileEscalationHub
           priorityFilter={priorityFilter}
           channelFilter={channelFilter}
           categoryFilter={categoryFilter}
+          sortBy={sortBy}
           onStatusFilterChange={setStatusFilter}
           onPriorityFilterChange={setPriorityFilter}
           onChannelFilterChange={setChannelFilter}
           onCategoryFilterChange={setCategoryFilter}
+          onSortByChange={setSortBy}
         />
         <MobileBottomNav
           activeFilter={currentFilter}
@@ -290,10 +312,12 @@ export const MobileEscalationHub = ({ filter = 'all-open' }: MobileEscalationHub
         priorityFilter={priorityFilter}
         channelFilter={channelFilter}
         categoryFilter={categoryFilter}
+        sortBy={sortBy}
         onStatusFilterChange={setStatusFilter}
         onPriorityFilterChange={setPriorityFilter}
         onChannelFilterChange={setChannelFilter}
         onCategoryFilterChange={setCategoryFilter}
+        onSortByChange={setSortBy}
         onRefresh={handleRefresh}
       />
       <MobileFilterSheet
@@ -303,10 +327,12 @@ export const MobileEscalationHub = ({ filter = 'all-open' }: MobileEscalationHub
         priorityFilter={priorityFilter}
         channelFilter={channelFilter}
         categoryFilter={categoryFilter}
+        sortBy={sortBy}
         onStatusFilterChange={setStatusFilter}
         onPriorityFilterChange={setPriorityFilter}
         onChannelFilterChange={setChannelFilter}
         onCategoryFilterChange={setCategoryFilter}
+        onSortByChange={setSortBy}
       />
       <MobileBottomNav
         activeFilter={currentFilter}

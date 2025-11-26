@@ -10,10 +10,12 @@ interface MobileFilterSheetProps {
   priorityFilter: string[];
   channelFilter: string[];
   categoryFilter: string[];
+  sortBy: string;
   onStatusFilterChange: (value: string[]) => void;
   onPriorityFilterChange: (value: string[]) => void;
   onChannelFilterChange: (value: string[]) => void;
   onCategoryFilterChange: (value: string[]) => void;
+  onSortByChange: (value: string) => void;
 }
 
 export const MobileFilterSheet = ({
@@ -23,10 +25,12 @@ export const MobileFilterSheet = ({
   priorityFilter,
   channelFilter,
   categoryFilter,
+  sortBy,
   onStatusFilterChange,
   onPriorityFilterChange,
   onChannelFilterChange,
   onCategoryFilterChange,
+  onSortByChange,
 }: MobileFilterSheetProps) => {
   const statusOptions = [
     { label: 'New', value: 'new' },
@@ -52,6 +56,14 @@ export const MobileFilterSheet = ({
     { label: 'Billing', value: 'billing' },
     { label: 'Technical', value: 'technical' },
     { label: 'General', value: 'general' },
+  ];
+
+  const sortOptions = [
+    { label: '🚨 SLA Urgent First', value: 'sla_urgent' },
+    { label: '🆕 Newest First', value: 'newest' },
+    { label: '⏰ Oldest First', value: 'oldest' },
+    { label: '🔴 High Priority First', value: 'priority_high' },
+    { label: '🟢 Low Priority First', value: 'priority_low' },
   ];
 
   const hasActiveFilters = 
@@ -107,8 +119,33 @@ export const MobileFilterSheet = ({
 
           {/* Filter Sections */}
           <div className="flex-1 overflow-y-auto px-5 py-6 space-y-8">
-            {/* Status Section */}
+            {/* Sort By Section */}
             <div className="animate-fade-in" style={{ animationDelay: '0ms' }}>
+              <h3 className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+                Sort By
+              </h3>
+              <div className="grid grid-cols-1 gap-3">
+                {sortOptions.map((option, idx) => (
+                  <button
+                    key={option.value}
+                    onClick={() => onSortByChange(option.value)}
+                    className={cn(
+                      "h-[48px] rounded-2xl text-[15px] font-medium transition-all duration-300 ease-out",
+                      "active:scale-[0.92] border",
+                      sortBy === option.value
+                        ? "bg-primary text-primary-foreground border-primary shadow-sm scale-[1.02]"
+                        : "bg-muted text-muted-foreground border-border/50 hover:border-primary/30 hover:bg-muted/80"
+                    )}
+                    style={{ animationDelay: `${idx * 50}ms` }}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Status Section */}
+            <div className="animate-fade-in" style={{ animationDelay: '50ms' }}>
               <h3 className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground mb-3">
                 Status
               </h3>
@@ -146,7 +183,7 @@ export const MobileFilterSheet = ({
             </div>
 
             {/* Priority Section */}
-            <div className="animate-fade-in" style={{ animationDelay: '100ms' }}>
+            <div className="animate-fade-in" style={{ animationDelay: '150ms' }}>
               <h3 className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground mb-3">
                 Priority
               </h3>
@@ -184,7 +221,7 @@ export const MobileFilterSheet = ({
             </div>
 
             {/* Channel Section */}
-            <div className="animate-fade-in" style={{ animationDelay: '200ms' }}>
+            <div className="animate-fade-in" style={{ animationDelay: '250ms' }}>
               <h3 className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground mb-3">
                 Channel
               </h3>
@@ -222,7 +259,7 @@ export const MobileFilterSheet = ({
             </div>
 
             {/* Category Section */}
-            <div className="animate-fade-in" style={{ animationDelay: '300ms' }}>
+            <div className="animate-fade-in" style={{ animationDelay: '350ms' }}>
               <h3 className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground mb-3">
                 Category
               </h3>
