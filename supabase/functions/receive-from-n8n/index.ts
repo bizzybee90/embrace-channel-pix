@@ -125,6 +125,46 @@ serve(async (req) => {
 
     webhookLogId = logData?.id || null;
 
+    // Check for duplicate message using message_id from metadata
+    if (metadata?.message_id) {
+      const { data: existingLog } = await supabase
+        .from('webhook_logs')
+        .select('id, conversation_id')
+        .eq('direction', 'inbound')
+        .contains('payload', { metadata: { message_id: metadata.message_id } })
+        .neq('id', webhookLogId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (existingLog?.conversation_id) {
+        console.log('Duplicate message detected, returning existing conversation:', existingLog.conversation_id);
+        
+        await supabase
+          .from('webhook_logs')
+          .update({
+            conversation_id: existingLog.conversation_id,
+            status_code: 200,
+            response_payload: { 
+              success: true, 
+              conversation_id: existingLog.conversation_id,
+              duplicate: true
+            }
+          })
+          .eq('id', webhookLogId);
+
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            conversation_id: existingLog.conversation_id,
+            duplicate: true,
+            message: 'Duplicate message ignored' 
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
     // Step 1: Create or update customer
     let customerId: string;
     const { data: existingCustomer } = await supabase
@@ -167,57 +207,78 @@ serve(async (req) => {
       customerId = newCustomer.id;
     }
 
-    // Step 2: Create conversation with AI fields
-    const conversationMetadata: any = { ...metadata };
-    if (ai_draft_response) {
-      conversationMetadata.ai_draft_response = ai_draft_response;
-    }
-    // Store customer contact info in metadata as fallback
-    if (customer_name) conversationMetadata.customer_name = customer_name;
-    if (customer_email) conversationMetadata.customer_email = customer_email;
-    if (customer_phone) conversationMetadata.customer_phone = customer_phone;
-    if (customer_identifier) conversationMetadata.customer_identifier = customer_identifier;
-
-    const { data: conversation, error: conversationError } = await supabase
+    // Step 2: Find existing open conversation or create new one
+    let conversation;
+    
+    // Look for existing open conversation for this customer and channel
+    const { data: existingConversation } = await supabase
       .from('conversations')
-      .insert({
-        workspace_id,
-        customer_id: customerId,
-        channel,
-        title: title || `${channel} - ${customer_name || customer_identifier}`,
-        priority,
-        category,
-        status: 'new',
-        ai_reason_for_escalation,
-        summary_for_human,
-        ai_confidence: ai_confidence ? parseFloat(ai_confidence) : null,
-        ai_sentiment,
-        metadata: conversationMetadata,
-      })
-      .select()
-      .single();
+      .select('*')
+      .eq('customer_id', customerId)
+      .eq('channel', channel)
+      .in('status', ['new', 'open', 'pending'])
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-    if (conversationError) {
-      console.error('Error creating conversation:', conversationError);
-      
-      if (webhookLogId) {
-        await supabase
-          .from('webhook_logs')
-          .update({
-            status_code: 500,
-            error_message: conversationError.message,
-            response_payload: { error: conversationError.message }
-          })
-          .eq('id', webhookLogId);
+    if (existingConversation) {
+      console.log('Found existing open conversation:', existingConversation.id);
+      conversation = existingConversation;
+    } else {
+      console.log('Creating new conversation');
+      const conversationMetadata: any = { ...metadata };
+      if (ai_draft_response) {
+        conversationMetadata.ai_draft_response = ai_draft_response;
       }
+      // Store customer contact info in metadata as fallback
+      if (customer_name) conversationMetadata.customer_name = customer_name;
+      if (customer_email) conversationMetadata.customer_email = customer_email;
+      if (customer_phone) conversationMetadata.customer_phone = customer_phone;
+      if (customer_identifier) conversationMetadata.customer_identifier = customer_identifier;
 
-      return new Response(
-        JSON.stringify({ error: conversationError.message }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      const { data: newConversation, error: conversationError } = await supabase
+        .from('conversations')
+        .insert({
+          workspace_id,
+          customer_id: customerId,
+          channel,
+          title: title || `${channel} - ${customer_name || customer_identifier}`,
+          priority,
+          category,
+          status: 'new',
+          ai_reason_for_escalation,
+          summary_for_human,
+          ai_confidence: ai_confidence ? parseFloat(ai_confidence) : null,
+          ai_sentiment,
+          metadata: conversationMetadata,
+        })
+        .select()
+        .single();
+
+      if (conversationError) {
+        console.error('Error creating conversation:', conversationError);
+        
+        if (webhookLogId) {
+          await supabase
+            .from('webhook_logs')
+            .update({
+              status_code: 500,
+              error_message: conversationError.message,
+              response_payload: { error: conversationError.message }
+            })
+            .eq('id', webhookLogId);
+        }
+
+        return new Response(
+          JSON.stringify({ error: conversationError.message }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      conversation = newConversation;
     }
 
-    console.log('Conversation created:', conversation.id);
+    console.log('Using conversation:', conversation.id);
 
     // Step 3: Create messages from conversation_context
     if (conversation_context && Array.isArray(conversation_context)) {
