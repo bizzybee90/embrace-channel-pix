@@ -38,6 +38,7 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
   const [priorityFilter, setPriorityFilter] = useState<string[]>([]);
   const [channelFilter, setChannelFilter] = useState<string[]>([]);
   const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
+  const [sortBy, setSortBy] = useState<string>('sla_urgent');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { interfaceMode, loading: modeLoading } = useInterfaceMode();
   const { toast } = useToast();
@@ -233,10 +234,12 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
           priorityFilter={priorityFilter}
           channelFilter={channelFilter}
           categoryFilter={categoryFilter}
+          sortBy={sortBy}
           onStatusFilterChange={setStatusFilter}
           onPriorityFilterChange={setPriorityFilter}
           onChannelFilterChange={setChannelFilter}
           onCategoryFilterChange={setCategoryFilter}
+          onSortByChange={setSortBy}
           onRefresh={handleRefresh}
         />
       </div>

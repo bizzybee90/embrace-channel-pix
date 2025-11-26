@@ -16,10 +16,12 @@ interface MobileConversationListProps {
   priorityFilter: string[];
   channelFilter: string[];
   categoryFilter: string[];
+  sortBy: string;
   onStatusFilterChange: (value: string[]) => void;
   onPriorityFilterChange: (value: string[]) => void;
   onChannelFilterChange: (value: string[]) => void;
   onCategoryFilterChange: (value: string[]) => void;
+  onSortByChange: (value: string) => void;
   onRefresh: () => Promise<void>;
 }
 
@@ -31,10 +33,12 @@ export const MobileConversationList = ({
   priorityFilter,
   channelFilter,
   categoryFilter,
+  sortBy,
   onStatusFilterChange,
   onPriorityFilterChange,
   onChannelFilterChange,
   onCategoryFilterChange,
+  onSortByChange,
   onRefresh
 }: MobileConversationListProps) => {
   const [isHeaderCompact, setIsHeaderCompact] = useState(false);
@@ -106,10 +110,12 @@ export const MobileConversationList = ({
         priorityFilter={priorityFilter}
         channelFilter={channelFilter}
         categoryFilter={categoryFilter}
+        sortBy={sortBy}
         onStatusFilterChange={onStatusFilterChange}
         onPriorityFilterChange={onPriorityFilterChange}
         onChannelFilterChange={onChannelFilterChange}
         onCategoryFilterChange={onCategoryFilterChange}
+        onSortByChange={onSortByChange}
       />
       <div className="h-screen flex flex-col bg-gradient-to-b from-background to-muted/10">
         {/* iOS Large Title Header with Scroll Behavior */}
