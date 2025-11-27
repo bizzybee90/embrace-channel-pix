@@ -49,26 +49,77 @@ export type Database = {
           },
         ]
       }
+      business_facts: {
+        Row: {
+          category: string
+          created_at: string | null
+          fact_key: string
+          fact_value: string
+          id: string
+          metadata: Json | null
+          updated_at: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          category: string
+          created_at?: string | null
+          fact_key: string
+          fact_value: string
+          id?: string
+          metadata?: Json | null
+          updated_at?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          fact_key?: string
+          fact_value?: string
+          id?: string
+          metadata?: Json | null
+          updated_at?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_facts_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversations: {
         Row: {
           ai_confidence: number | null
+          ai_draft_response: string | null
           ai_message_count: number | null
           ai_reason_for_escalation: string | null
           ai_resolution_summary: string | null
           ai_sentiment: string | null
           assigned_to: string | null
+          auto_responded: boolean | null
           category: string | null
           channel: string
+          confidence: number | null
           conversation_type: string | null
           created_at: string | null
           customer_id: string | null
+          customer_satisfaction: number | null
+          embedding: string | null
           escalated_at: string | null
           external_conversation_id: string | null
+          final_response: string | null
           first_response_at: string | null
+          human_edited: boolean | null
           id: string
           is_escalated: boolean | null
+          led_to_booking: boolean | null
           message_count: number | null
           metadata: Json | null
+          mode: string | null
+          needs_embedding: boolean | null
           priority: string | null
           resolved_at: string | null
           sla_due_at: string | null
@@ -83,23 +134,33 @@ export type Database = {
         }
         Insert: {
           ai_confidence?: number | null
+          ai_draft_response?: string | null
           ai_message_count?: number | null
           ai_reason_for_escalation?: string | null
           ai_resolution_summary?: string | null
           ai_sentiment?: string | null
           assigned_to?: string | null
+          auto_responded?: boolean | null
           category?: string | null
           channel: string
+          confidence?: number | null
           conversation_type?: string | null
           created_at?: string | null
           customer_id?: string | null
+          customer_satisfaction?: number | null
+          embedding?: string | null
           escalated_at?: string | null
           external_conversation_id?: string | null
+          final_response?: string | null
           first_response_at?: string | null
+          human_edited?: boolean | null
           id?: string
           is_escalated?: boolean | null
+          led_to_booking?: boolean | null
           message_count?: number | null
           metadata?: Json | null
+          mode?: string | null
+          needs_embedding?: boolean | null
           priority?: string | null
           resolved_at?: string | null
           sla_due_at?: string | null
@@ -114,23 +175,33 @@ export type Database = {
         }
         Update: {
           ai_confidence?: number | null
+          ai_draft_response?: string | null
           ai_message_count?: number | null
           ai_reason_for_escalation?: string | null
           ai_resolution_summary?: string | null
           ai_sentiment?: string | null
           assigned_to?: string | null
+          auto_responded?: boolean | null
           category?: string | null
           channel?: string
+          confidence?: number | null
           conversation_type?: string | null
           created_at?: string | null
           customer_id?: string | null
+          customer_satisfaction?: number | null
+          embedding?: string | null
           escalated_at?: string | null
           external_conversation_id?: string | null
+          final_response?: string | null
           first_response_at?: string | null
+          human_edited?: boolean | null
           id?: string
           is_escalated?: boolean | null
+          led_to_booking?: boolean | null
           message_count?: number | null
           metadata?: Json | null
+          mode?: string | null
+          needs_embedding?: boolean | null
           priority?: string | null
           resolved_at?: string | null
           sla_due_at?: string | null
@@ -468,7 +539,7 @@ export type Database = {
         }
         Relationships: []
       }
-      faqs: {
+      faq_database: {
         Row: {
           answer: string
           category: string
@@ -504,7 +575,7 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "faqs_workspace_id_fkey"
+            foreignKeyName: "faq_database_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -603,6 +674,56 @@ export type Database = {
             columns: ["conversation_id"]
             isOneToOne: false
             referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      price_list: {
+        Row: {
+          base_price: number | null
+          created_at: string | null
+          currency: string | null
+          description: string | null
+          id: string
+          metadata: Json | null
+          price_range: string | null
+          service_name: string
+          unit: string | null
+          updated_at: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          base_price?: number | null
+          created_at?: string | null
+          currency?: string | null
+          description?: string | null
+          id?: string
+          metadata?: Json | null
+          price_range?: string | null
+          service_name: string
+          unit?: string | null
+          updated_at?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          base_price?: number | null
+          created_at?: string | null
+          currency?: string | null
+          description?: string | null
+          id?: string
+          metadata?: Json | null
+          price_range?: string | null
+          service_name?: string
+          unit?: string | null
+          updated_at?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "price_list_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
         ]

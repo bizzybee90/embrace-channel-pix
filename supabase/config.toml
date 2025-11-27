@@ -18,6 +18,12 @@ verify_jwt = true
 [functions.claude-ai-agent]
 verify_jwt = false
 
+[functions.claude-ai-agent-tools]
+verify_jwt = false
+
+[functions.generate-embedding]
+verify_jwt = false
+
 [functions.receive-message]
 verify_jwt = false
 
