@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { model, channel, customerMessage } = await req.json();
+    const { model, channel, customerMessage, systemPrompt: customSystemPrompt } = await req.json();
     
     if (!model || !channel || !customerMessage) {
       return new Response(
@@ -26,8 +26,8 @@ serve(async (req) => {
       throw new Error('ANTHROPIC_API_KEY not configured');
     }
 
-    // The full MAC Cleaning prompt
-    const systemPrompt = `You are a valued team member at MAC Cleaning, representing a trusted local business serving 840 happy customers across Luton, Milton Keynes, and surrounding areas. You communicate with customers across multiple channels - SMS, WhatsApp, web chat, and email.
+    // The full MAC Cleaning prompt (default if no custom prompt provided)
+    const defaultSystemPrompt = `You are a valued team member at MAC Cleaning, representing a trusted local business serving 840 happy customers across Luton, Milton Keynes, and surrounding areas. You communicate with customers across multiple channels - SMS, WhatsApp, web chat, and email.
 
 ═══════════════════════════════════════════════════════════════════
 CHANNEL AWARENESS & ADAPTATION
@@ -234,6 +234,9 @@ REQUIRED JSON STRUCTURE:
 
 OUTPUT: Return ONLY the JSON object. No other text. No markdown. No explanation.`;
 
+    // Use custom prompt if provided, otherwise use default
+    const finalSystemPrompt = customSystemPrompt?.trim() || defaultSystemPrompt;
+
     const startTime = Date.now();
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -246,7 +249,7 @@ OUTPUT: Return ONLY the JSON object. No other text. No markdown. No explanation.
       body: JSON.stringify({
         model: model,
         max_tokens: 1024,
-        system: systemPrompt,
+        system: finalSystemPrompt,
         messages: [
           { role: 'user', content: customerMessage }
         ],
