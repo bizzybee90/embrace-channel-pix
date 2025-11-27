@@ -195,7 +195,7 @@ serve(async (req) => {
         direction: 'outbound',
       });
 
-    // Step 8: Update conversation with AI metadata
+    // Step 8: Update conversation with AI metadata and tracking
     const updateData: any = {
       ai_confidence: aiOutput.confidence,
       ai_sentiment: aiOutput.sentiment,
@@ -203,6 +203,13 @@ serve(async (req) => {
       title: aiOutput.ai_title,
       summary_for_human: aiOutput.ai_summary,
       updated_at: new Date().toISOString(),
+      // AI/Human tracking
+      ai_draft_response: aiOutput.response,
+      final_response: aiOutput.response,
+      auto_responded: !aiOutput.escalate,
+      mode: 'ai',
+      confidence: aiOutput.confidence,
+      human_edited: false,
     };
 
     if (aiOutput.escalate) {
@@ -211,6 +218,7 @@ serve(async (req) => {
       updateData.ai_reason_for_escalation = aiOutput.escalation_reason;
       updateData.status = 'escalated';
       updateData.conversation_type = 'escalated';
+      updateData.auto_responded = false;
       
       console.log('Escalating conversation:', conversationId);
     } else {
@@ -223,6 +231,23 @@ serve(async (req) => {
       .from('conversations')
       .update(updateData)
       .eq('id', conversationId);
+
+    // Step 8b: Generate embedding for the conversation (background task)
+    const conversationText = `${normalised.message_content} ${aiOutput.response}`;
+    
+    // Start embedding generation in background (don't await)
+    supabase.functions.invoke('generate-embedding', {
+      body: {
+        text: conversationText,
+        conversationId: conversationId
+      }
+    }).then(result => {
+      if (result.error) {
+        console.error('Failed to generate embedding:', result.error);
+      } else {
+        console.log('Embedding generated successfully for conversation:', conversationId);
+      }
+    });
 
     // Step 9: Send response if not escalated
     if (!aiOutput.escalate) {
