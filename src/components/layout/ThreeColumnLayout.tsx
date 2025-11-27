@@ -16,7 +16,7 @@ export const ThreeColumnLayout = ({ sidebar, main }: ThreeColumnLayoutProps) => 
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col overflow-hidden">
+      <main className="flex-1 flex flex-col overflow-y-auto">
         {main}
       </main>
     </div>
