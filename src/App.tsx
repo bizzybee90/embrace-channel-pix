@@ -3,6 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import React from "react";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import Settings from "./pages/Settings";
@@ -134,6 +135,14 @@ const RouterContent = () => {
         } 
       />
       <Route path="/privacy" element={<Privacy />} />
+      <Route 
+        path="/ai-test" 
+        element={
+          <AuthGuard>
+            {React.createElement(React.lazy(() => import('@/pages/AIComparisonTest')))}
+          </AuthGuard>
+        } 
+      />
       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
       <Route path="*" element={<NotFound />} />
     </Routes>
