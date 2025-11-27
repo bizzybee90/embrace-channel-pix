@@ -28,16 +28,23 @@ Deno.serve(async (req) => {
 
     console.log('Starting sync:', { tables, fullSync });
 
+    // Get external credentials
+    const externalUrl = Deno.env.get('EXTERNAL_SUPABASE_URL');
+    const externalKey = Deno.env.get('EXTERNAL_SUPABASE_SERVICE_KEY');
+
+    if (!externalUrl || !externalKey) {
+      throw new Error('External Supabase credentials not configured. Please add EXTERNAL_SUPABASE_URL and EXTERNAL_SUPABASE_SERVICE_KEY secrets.');
+    }
+
+    console.log('External Supabase URL:', externalUrl);
+
     // Create Supabase clients
     const localSupabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const externalSupabase = createClient(
-      Deno.env.get('EXTERNAL_SUPABASE_URL') ?? '',
-      Deno.env.get('EXTERNAL_SUPABASE_SERVICE_KEY') ?? ''
-    );
+    const externalSupabase = createClient(externalUrl, externalKey);
 
     // Get workspace ID
     const { data: workspace } = await localSupabase
@@ -186,9 +193,13 @@ async function syncFAQDatabase(
       query = query.gte('updated_at', oneDayAgo);
     }
 
+    console.log('Fetching FAQs with fullSync:', fullSync);
     const { data: externalFAQs, error } = await query;
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error fetching external FAQs:', error);
+      throw error;
+    }
 
     stats.fetched = externalFAQs?.length || 0;
     console.log(`Fetched ${stats.fetched} FAQs from external database`);

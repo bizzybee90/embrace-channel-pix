@@ -70,14 +70,17 @@ export function DataSyncPanel() {
     setSyncing(true);
     try {
       const tablesToSync = tables || ['faq_database', 'price_list', 'business_facts', 'conversations'];
+      
+      // Build URL with query parameters
       const params = new URLSearchParams({
         tables: tablesToSync.join(','),
         full: 'true',
       });
 
-      const { data, error } = await supabase.functions.invoke('sync-external-data', {
-        body: { tables: tablesToSync, full: true },
-      });
+      const { data, error } = await supabase.functions.invoke(
+        `sync-external-data?${params.toString()}`,
+        { method: 'POST' }
+      );
 
       if (error) throw error;
 
