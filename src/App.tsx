@@ -28,6 +28,14 @@ const RouterContent = () => {
         path="/" 
         element={
           <AuthGuard>
+            <LiveActivityDashboard />
+          </AuthGuard>
+        } 
+      />
+      <Route 
+        path="/my-tickets" 
+        element={
+          <AuthGuard>
             {isMobile ? (
               <MobileEscalationHub filter="my-tickets" />
             ) : (
@@ -125,14 +133,6 @@ const RouterContent = () => {
         element={
           <AuthGuard>
             <Escalations />
-          </AuthGuard>
-        } 
-      />
-      <Route 
-        path="/dashboard" 
-        element={
-          <AuthGuard>
-            <LiveActivityDashboard />
           </AuthGuard>
         } 
       />

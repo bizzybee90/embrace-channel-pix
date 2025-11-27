@@ -38,6 +38,9 @@ interface RecentConversation {
   updated_at: string;
 }
 
+import { ThreeColumnLayout } from '@/components/layout/ThreeColumnLayout';
+import { Sidebar } from '@/components/sidebar/Sidebar';
+
 export const LiveActivityDashboard = () => {
   const { workspace } = useWorkspace();
   const [stats, setStats] = useState<ConversationStats>({
@@ -154,12 +157,19 @@ export const LiveActivityDashboard = () => {
     }
   };
 
-  if (loading) {
-    return <div className="p-8">Loading dashboard...</div>;
-  }
-
   return (
-    <div className="p-8 space-y-6">
+    <ThreeColumnLayout
+      sidebar={<Sidebar />}
+      main={
+        loading ? (
+          <div className="flex items-center justify-center min-h-screen">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+              <p className="text-muted-foreground">Loading dashboard...</p>
+            </div>
+          </div>
+        ) : (
+          <div className="p-8 space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Live Activity Dashboard</h1>
         <p className="text-muted-foreground">Real-time AI performance metrics for today</p>
@@ -294,6 +304,9 @@ export const LiveActivityDashboard = () => {
           </div>
         </ScrollArea>
       </Card>
-    </div>
+          </div>
+        )
+      }
+    />
   );
 };

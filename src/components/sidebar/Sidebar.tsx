@@ -144,8 +144,7 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
               <TooltipTrigger asChild>
                 <div>
                   <NavLink
-                    to="/"
-                    end
+                    to="/my-tickets"
                     onClick={onNavigate}
                     className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all hover-scale`}
                     activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
@@ -299,6 +298,29 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
               <TooltipTrigger asChild>
                 <div>
                   <NavLink
+                    to="/"
+                    end
+                    onClick={onNavigate}
+                    className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all hover-scale`}
+                    activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
+                  >
+                    <div className="flex items-center justify-center w-8 h-8 rounded-md bg-blue-500/10">
+                      <Columns className="h-4 w-4 text-blue-500" />
+                    </div>
+                    {!isCollapsed && <span>Dashboard</span>}
+                  </NavLink>
+                </div>
+              </TooltipTrigger>
+              {isCollapsed && (
+                <TooltipContent side="right">
+                  <p>Dashboard</p>
+                </TooltipContent>
+              )}
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div>
+                  <NavLink
                     to="/escalations"
                     onClick={onNavigate}
                     className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all hover-scale`}
@@ -314,28 +336,6 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
               {isCollapsed && (
                 <TooltipContent side="right">
                   <p>Escalations</p>
-                </TooltipContent>
-              )}
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div>
-                  <NavLink
-                    to="/dashboard"
-                    onClick={onNavigate}
-                    className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all hover-scale`}
-                    activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
-                  >
-                    <div className="flex items-center justify-center w-8 h-8 rounded-md bg-blue-500/10">
-                      <Columns className="h-4 w-4 text-blue-500" />
-                    </div>
-                    {!isCollapsed && <span>Live Dashboard</span>}
-                  </NavLink>
-                </div>
-              </TooltipTrigger>
-              {isCollapsed && (
-                <TooltipContent side="right">
-                  <p>Live Dashboard</p>
                 </TooltipContent>
               )}
             </Tooltip>
