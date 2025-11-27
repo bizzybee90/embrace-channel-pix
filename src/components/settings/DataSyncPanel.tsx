@@ -255,9 +255,14 @@ export function DataSyncPanel() {
             </p>
           </div>
           <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded">
-            <p className="text-sm text-blue-700 dark:text-blue-400">
-              <strong>Troubleshooting:</strong> If conversations sync returns 0 records, check that the external database 
-              has RLS policies disabled or configured to allow anonymous access on the conversations table.
+            <p className="text-sm text-blue-700 dark:text-blue-400 space-y-1">
+              <strong>Conversations Sync Issue?</strong>
+              <br />
+              If conversations sync returns 0 records, check your external database RLS policies:
+              <br />
+              • The conversations table needs a policy allowing service_role access
+              <br />
+              • Or disable RLS entirely on the conversations table in the external database
             </p>
           </div>
         </div>

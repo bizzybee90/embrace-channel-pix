@@ -44,7 +44,15 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const externalSupabase = createClient(externalUrl, externalKey);
+    const externalSupabase = createClient(externalUrl, externalKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+        detectSessionInUrl: false
+      }
+    });
+    
+    console.log('External client configured with service key');
 
     // Get workspace ID
     const { data: workspace } = await localSupabase
@@ -551,6 +559,20 @@ async function syncConversations(
   };
 
   try {
+    // First, test if we can access the conversations table
+    console.log('Testing external database access to conversations table...');
+    const { count, error: countError } = await externalSupabase
+      .from('conversations')
+      .select('*', { count: 'exact', head: true });
+    
+    if (countError) {
+      console.error('Error accessing conversations table:', countError);
+      stats.errors.push(`Cannot access conversations table: ${countError.message}`);
+      return stats;
+    }
+    
+    console.log(`External conversations table has ${count} total records`);
+    
     // Fetch ALL external conversations using pagination
     let allConvs: any[] = [];
     let from = 0;
@@ -573,6 +595,7 @@ async function syncConversations(
       
       if (error) {
         console.error('Error fetching conversations from external DB:', error);
+        stats.errors.push(`Batch fetch error: ${error.message}`);
         throw error;
       }
 
