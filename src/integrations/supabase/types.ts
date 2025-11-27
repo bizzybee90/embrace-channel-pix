@@ -994,6 +994,25 @@ export type Database = {
         }
         Returns: boolean
       }
+      match_conversations: {
+        Args: {
+          match_count?: number
+          match_threshold?: number
+          query_embedding: string
+        }
+        Returns: {
+          ai_response: string
+          confidence: number
+          customer_satisfaction: number
+          final_response: string
+          human_edited: boolean
+          id: string
+          led_to_booking: boolean
+          mode: string
+          similarity: number
+          text: string
+        }[]
+      }
       user_has_workspace_access: {
         Args: { _workspace_id: string }
         Returns: boolean
