@@ -17,6 +17,7 @@ import { useIsMobile } from "./hooks/use-mobile";
 import { LiveActivityDashboard } from "./components/dashboard/LiveActivityDashboard";
 import ChannelsDashboard from "./pages/ChannelsDashboard";
 import ChannelConversations from "./pages/ChannelConversations";
+import ChannelAnalytics from "./pages/ChannelAnalytics";
 
 const queryClient = new QueryClient();
 
@@ -151,6 +152,14 @@ const RouterContent = () => {
         element={
           <AuthGuard>
             <ChannelConversations />
+          </AuthGuard>
+        } 
+      />
+      <Route 
+        path="/analytics" 
+        element={
+          <AuthGuard>
+            <ChannelAnalytics />
           </AuthGuard>
         } 
       />
