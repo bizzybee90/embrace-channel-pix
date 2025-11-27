@@ -87,6 +87,12 @@ export interface Message {
   channel: Channel;
   body: string;
   is_internal: boolean;
+  attachments?: Array<{
+    name: string;
+    path: string;
+    type: string;
+    size: number;
+  }>;
   raw_payload: Record<string, any> | null;
   created_at: string;
 }

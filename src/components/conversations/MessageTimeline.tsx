@@ -1,10 +1,12 @@
 import { Message } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
-import { Bot, User, StickyNote } from 'lucide-react';
+import { Bot, User, StickyNote, Paperclip } from 'lucide-react';
 import { ChannelIcon } from '@/components/shared/ChannelIcon';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
+import { useState } from 'react';
 
 const getInitials = (name: string | null) => {
   if (!name) return '?';
@@ -16,6 +18,32 @@ interface MessageTimelineProps {
 }
 
 export const MessageTimeline = ({ messages }: MessageTimelineProps) => {
+  const [downloadingFile, setDownloadingFile] = useState<string | null>(null);
+
+  const handleDownloadAttachment = async (path: string, name: string) => {
+    try {
+      setDownloadingFile(path);
+      const { data, error } = await supabase.storage
+        .from('message-attachments')
+        .download(path);
+
+      if (error) throw error;
+
+      const url = URL.createObjectURL(data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error downloading file:', error);
+    } finally {
+      setDownloadingFile(null);
+    }
+  };
+
   if (!messages || messages.length === 0) {
     return (
       <div className="flex items-center justify-center h-64 text-muted-foreground p-4">
@@ -45,6 +73,27 @@ export const MessageTimeline = ({ messages }: MessageTimelineProps) => {
                   </span>
                 </div>
                 <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.body}</p>
+                
+                {message.attachments && Array.isArray(message.attachments) && message.attachments.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    {message.attachments.map((attachment: any, idx: number) => (
+                      <button
+                        key={idx}
+                        onClick={() => handleDownloadAttachment(attachment.path, attachment.name)}
+                        disabled={downloadingFile === attachment.path}
+                        className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+                      >
+                        {downloadingFile === attachment.path ? (
+                          <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
+                        ) : (
+                          <Paperclip className="h-4 w-4" />
+                        )}
+                        <span className="truncate">{attachment.name}</span>
+                        <span className="text-xs">({Math.round((attachment.size || 0) / 1024)}KB)</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           );
@@ -95,6 +144,27 @@ export const MessageTimeline = ({ messages }: MessageTimelineProps) => {
                 </span>
               </div>
               <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.body}</p>
+              
+              {message.attachments && Array.isArray(message.attachments) && message.attachments.length > 0 && (
+                <div className="mt-2 space-y-1">
+                  {message.attachments.map((attachment: any, idx: number) => (
+                    <button
+                      key={idx}
+                      onClick={() => handleDownloadAttachment(attachment.path, attachment.name)}
+                      disabled={downloadingFile === attachment.path}
+                      className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+                    >
+                      {downloadingFile === attachment.path ? (
+                        <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
+                      ) : (
+                        <Paperclip className="h-4 w-4" />
+                      )}
+                      <span className="truncate">{attachment.name}</span>
+                      <span className="text-xs">({Math.round((attachment.size || 0) / 1024)}KB)</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {isHuman && (

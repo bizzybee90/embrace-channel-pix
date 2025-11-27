@@ -12,6 +12,11 @@ interface SendRequest {
   to: string;
   message: string;
   metadata?: Record<string, any>;
+  attachments?: Array<{
+    name: string;
+    path: string;
+    type: string;
+  }>;
 }
 
 serve(async (req) => {
@@ -53,7 +58,54 @@ serve(async (req) => {
         throw new Error('Postmark API key not configured');
       }
 
+      // Prepare attachments for Postmark
+      const postmarkAttachments = [];
+      if (sendRequest.attachments && sendRequest.attachments.length > 0) {
+        for (const attachment of sendRequest.attachments) {
+          try {
+            // Download file from storage
+            const { data: fileData, error: downloadError } = await supabase.storage
+              .from('message-attachments')
+              .download(attachment.path);
+
+            if (downloadError) {
+              console.error('Error downloading attachment:', downloadError);
+              continue;
+            }
+
+            // Convert to base64
+            const arrayBuffer = await fileData.arrayBuffer();
+            const bytes = new Uint8Array(arrayBuffer);
+            let binary = '';
+            for (let i = 0; i < bytes.length; i++) {
+              binary += String.fromCharCode(bytes[i]);
+            }
+            const base64 = btoa(binary);
+
+            postmarkAttachments.push({
+              Name: attachment.name,
+              Content: base64,
+              ContentType: attachment.type
+            });
+          } catch (error) {
+            console.error('Error processing attachment for email:', error);
+          }
+        }
+      }
+
       console.log('Sending email via Postmark...');
+      const emailBody: any = {
+        From: 'support@bizzybee.io',
+        To: sendRequest.to,
+        Subject: sendRequest.metadata?.subject || 'Re: Your inquiry',
+        TextBody: sendRequest.message,
+        MessageStream: 'outbound',
+      };
+
+      if (postmarkAttachments.length > 0) {
+        emailBody.Attachments = postmarkAttachments;
+      }
+
       const emailRes = await fetch('https://api.postmarkapp.com/email', {
         method: 'POST',
         headers: {
@@ -61,13 +113,7 @@ serve(async (req) => {
           'Content-Type': 'application/json',
           'X-Postmark-Server-Token': postmarkApiKey,
         },
-        body: JSON.stringify({
-          From: 'support@bizzybee.io',
-          To: sendRequest.to,
-          Subject: sendRequest.metadata?.subject || 'Re: Your inquiry',
-          TextBody: sendRequest.message,
-          MessageStream: 'outbound',
-        }),
+        body: JSON.stringify(emailBody),
       });
 
       if (!emailRes.ok) {
@@ -145,6 +191,7 @@ serve(async (req) => {
         actor_type: 'ai_agent',
         actor_name: 'MAC Cleaning AI',
         body: sendRequest.message,
+        attachments: sendRequest.attachments || [],
         raw_payload: {
           ...sendRequest.metadata,
           messageId: messageId,

@@ -17,6 +17,12 @@ interface PostmarkInboundEmail {
   HtmlBody: string;
   MessageID: string;
   Date: string;
+  Attachments?: Array<{
+    Name: string;
+    Content: string;
+    ContentType: string;
+    ContentLength: number;
+  }>;
 }
 
 serve(async (req) => {
@@ -130,6 +136,43 @@ serve(async (req) => {
       conversationId = newConversation.id;
     }
 
+    // Handle attachments if present
+    const attachments = [];
+    if (inboundEmail.Attachments && inboundEmail.Attachments.length > 0) {
+      for (const attachment of inboundEmail.Attachments) {
+        try {
+          // Decode base64 content
+          const binaryString = atob(attachment.Content);
+          const bytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+
+          // Upload to storage
+          const fileName = `${conversationId}/${Date.now()}-${attachment.Name}`;
+          const { error: uploadError } = await supabase.storage
+            .from('message-attachments')
+            .upload(fileName, bytes, {
+              contentType: attachment.ContentType,
+              upsert: false
+            });
+
+          if (uploadError) {
+            console.error('Error uploading attachment:', uploadError);
+          } else {
+            attachments.push({
+              name: attachment.Name,
+              type: attachment.ContentType,
+              size: attachment.ContentLength,
+              path: fileName
+            });
+          }
+        } catch (error) {
+          console.error('Error processing attachment:', error);
+        }
+      }
+    }
+
     // Insert the message
     const { error: messageError } = await supabase
       .from('messages')
@@ -140,6 +183,7 @@ serve(async (req) => {
         actor_type: 'customer',
         actor_name: inboundEmail.FromFull.Name || inboundEmail.FromFull.Email,
         body: inboundEmail.TextBody || inboundEmail.HtmlBody,
+        attachments: attachments,
         raw_payload: {
           subject: inboundEmail.Subject,
           from: inboundEmail.FromFull.Email,
