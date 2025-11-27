@@ -57,10 +57,11 @@ const TEST_SCENARIOS = [
 ];
 
 const MODELS = [
-  { value: 'google/gemini-2.5-flash', label: 'Gemini 2.5 Flash (Recommended)', description: 'Balanced: fast, cheap, good quality' },
-  { value: 'google/gemini-2.5-pro', label: 'Gemini 2.5 Pro', description: 'Most powerful Gemini' },
-  { value: 'openai/gpt-5-mini', label: 'GPT-5 Mini', description: 'OpenAI mid-tier' },
-  { value: 'openai/gpt-5', label: 'GPT-5', description: 'OpenAI flagship (expensive)' },
+  { value: 'claude-sonnet-4-5', label: 'Claude Sonnet 4.5 (Recommended)', description: 'Most capable and intelligent' },
+  { value: 'claude-opus-4-1-20250805', label: 'Claude Opus 4.1', description: 'Highly intelligent (expensive)' },
+  { value: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4', description: 'High-performance with exceptional reasoning' },
+  { value: 'claude-3-7-sonnet-20250219', label: 'Claude 3.7 Sonnet', description: 'Extended thinking capabilities' },
+  { value: 'claude-3-5-haiku-20241022', label: 'Claude 3.5 Haiku', description: 'Fastest for quick responses' },
 ];
 
 const CHANNELS = [
@@ -71,7 +72,7 @@ const CHANNELS = [
 ];
 
 export default function AIComparisonTest() {
-  const [model, setModel] = useState('google/gemini-2.5-flash');
+  const [model, setModel] = useState('claude-sonnet-4-5');
   const [channel, setChannel] = useState('whatsapp');
   const [customerMessage, setCustomerMessage] = useState('');
   const [results, setResults] = useState<TestResult[]>([]);
@@ -187,7 +188,7 @@ export default function AIComparisonTest() {
         <div>
           <h1 className="text-3xl font-bold mb-2">AI Model Comparison Test</h1>
           <p className="text-muted-foreground">
-            Test different Lovable AI models with your MAC Cleaning customer service prompt
+            Test different Claude AI models with your MAC Cleaning customer service prompt
           </p>
         </div>
 
@@ -377,7 +378,7 @@ export default function AIComparisonTest() {
                 {/* Token Usage */}
                 {result.tokenUsage && (
                   <div className="text-xs text-muted-foreground">
-                    Tokens: {result.tokenUsage.prompt_tokens} prompt + {result.tokenUsage.completion_tokens} completion = {result.tokenUsage.total_tokens} total
+                    Tokens: {result.tokenUsage.input_tokens} input + {result.tokenUsage.output_tokens} output
                   </div>
                 )}
               </div>

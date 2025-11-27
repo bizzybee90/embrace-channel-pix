@@ -21,9 +21,9 @@ serve(async (req) => {
       );
     }
 
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY not configured');
+    const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
+    if (!ANTHROPIC_API_KEY) {
+      throw new Error('ANTHROPIC_API_KEY not configured');
     }
 
     // The full MAC Cleaning prompt
@@ -236,16 +236,18 @@ OUTPUT: Return ONLY the JSON object. No other text. No markdown. No explanation.
 
     const startTime = Date.now();
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         model: model,
+        max_tokens: 1024,
+        system: systemPrompt,
         messages: [
-          { role: 'system', content: systemPrompt },
           { role: 'user', content: customerMessage }
         ],
       }),
@@ -255,7 +257,7 @@ OUTPUT: Return ONLY the JSON object. No other text. No markdown. No explanation.
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('AI Gateway error:', response.status, errorText);
+      console.error('Anthropic API error:', response.status, errorText);
       
       if (response.status === 429) {
         return new Response(
@@ -264,21 +266,14 @@ OUTPUT: Return ONLY the JSON object. No other text. No markdown. No explanation.
         );
       }
       
-      if (response.status === 402) {
-        return new Response(
-          JSON.stringify({ error: 'Payment required. Please add credits to your Lovable AI workspace.' }),
-          { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      
       return new Response(
-        JSON.stringify({ error: 'AI Gateway error', details: errorText }),
+        JSON.stringify({ error: 'Anthropic API error', details: errorText }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     const data = await response.json();
-    let aiResponse = data.choices[0].message.content;
+    let aiResponse = data.content[0].text;
     const tokenUsage = data.usage;
 
     // Strip markdown code blocks if present (common AI model behavior)
