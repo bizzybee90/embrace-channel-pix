@@ -278,8 +278,16 @@ OUTPUT: Return ONLY the JSON object. No other text. No markdown. No explanation.
     }
 
     const data = await response.json();
-    const aiResponse = data.choices[0].message.content;
+    let aiResponse = data.choices[0].message.content;
     const tokenUsage = data.usage;
+
+    // Strip markdown code blocks if present (common AI model behavior)
+    aiResponse = aiResponse.trim();
+    if (aiResponse.startsWith('```json')) {
+      aiResponse = aiResponse.replace(/^```json\s*\n?/, '').replace(/\n?```\s*$/, '');
+    } else if (aiResponse.startsWith('```')) {
+      aiResponse = aiResponse.replace(/^```\s*\n?/, '').replace(/\n?```\s*$/, '');
+    }
 
     // Try to parse as JSON
     let parsedResponse;
