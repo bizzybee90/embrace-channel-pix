@@ -4,11 +4,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Mail, MessageCircle, Phone, Smartphone, Monitor } from 'lucide-react';
+import { Mail, MessageCircle, Phone, Smartphone, Monitor, Settings, Eye, EyeOff } from 'lucide-react';
 import { format } from 'date-fns';
 import { useWorkspace } from '@/hooks/useWorkspace';
 import { ThreeColumnLayout } from '@/components/layout/ThreeColumnLayout';
 import { Sidebar } from '@/components/sidebar/Sidebar';
+import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 
 interface ChannelStats {
   channel: string;
@@ -66,6 +69,9 @@ export default function ChannelsDashboard() {
   const navigate = useNavigate();
   const [channelStats, setChannelStats] = useState<ChannelStats[]>([]);
   const [loading, setLoading] = useState(true);
+  const [enabledChannels, setEnabledChannels] = useState<Record<string, boolean>>({});
+  const [hiddenChannels, setHiddenChannels] = useState<Record<string, boolean>>({});
+  const [showSettings, setShowSettings] = useState(false);
 
   const fetchChannelStats = async () => {
     if (!workspace?.id) return;
@@ -127,7 +133,16 @@ export default function ChannelsDashboard() {
   };
 
   useEffect(() => {
+    if (!workspace?.id) return;
+
+    // Load hidden channels from localStorage
+    const saved = localStorage.getItem('hiddenChannels');
+    if (saved) {
+      setHiddenChannels(JSON.parse(saved));
+    }
+
     fetchChannelStats();
+    fetchEnabledChannels();
 
     // Set up realtime subscription
     const channel = supabase
@@ -151,6 +166,29 @@ export default function ChannelsDashboard() {
     };
   }, [workspace?.id]);
 
+  const fetchEnabledChannels = async () => {
+    if (!workspace?.id) return;
+
+    const { data } = await supabase
+      .from('workspace_channels')
+      .select('channel, enabled')
+      .eq('workspace_id', workspace.id);
+
+    if (data) {
+      const enabled: Record<string, boolean> = {};
+      data.forEach(ch => {
+        enabled[ch.channel] = ch.enabled || false;
+      });
+      setEnabledChannels(enabled);
+    }
+  };
+
+  const toggleChannelVisibility = (channel: string) => {
+    const updated = { ...hiddenChannels, [channel]: !hiddenChannels[channel] };
+    setHiddenChannels(updated);
+    localStorage.setItem('hiddenChannels', JSON.stringify(updated));
+  };
+
   const formatResponseTime = (minutes: number | null) => {
     if (minutes === null) return 'N/A';
     if (minutes < 60) return `${Math.round(minutes)}m`;
@@ -168,6 +206,10 @@ export default function ChannelsDashboard() {
     }
   };
 
+  const visibleChannelStats = channelStats.filter(stat => 
+    enabledChannels[stat.channel] !== false && !hiddenChannels[stat.channel]
+  );
+
   return (
     <ThreeColumnLayout
       sidebar={<Sidebar />}
@@ -181,13 +223,71 @@ export default function ChannelsDashboard() {
           </div>
         ) : (
           <div className="p-8 space-y-6">
-            <div>
-              <h1 className="text-3xl font-bold">Channels Dashboard</h1>
-              <p className="text-muted-foreground">Monitor activity across all communication channels</p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-3xl font-bold">Channels Dashboard</h1>
+                <p className="text-muted-foreground">Monitor activity across all communication channels</p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowSettings(!showSettings)}
+              >
+                <Settings className="h-4 w-4 mr-2" />
+                {showSettings ? 'Hide' : 'Show'} Settings
+              </Button>
             </div>
 
+            {showSettings && (
+              <Card className="p-6">
+                <h3 className="text-lg font-semibold mb-4">Channel Visibility</h3>
+                <div className="space-y-3">
+                  {channelStats.map(stat => {
+                    const config = channelConfig[stat.channel as keyof typeof channelConfig];
+                    const Icon = config.icon;
+                    return (
+                      <div key={stat.channel} className="flex items-center justify-between py-2 border-b last:border-0">
+                        <div className="flex items-center gap-3">
+                          <Icon className={`h-5 w-5 ${config.color}`} />
+                          <Label htmlFor={`toggle-${stat.channel}`} className="cursor-pointer font-medium">
+                            {config.label}
+                          </Label>
+                          {enabledChannels[stat.channel] === false && (
+                            <Badge variant="outline" className="text-xs">Disabled in workspace</Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            id={`toggle-${stat.channel}`}
+                            checked={!hiddenChannels[stat.channel] && enabledChannels[stat.channel] !== false}
+                            onCheckedChange={() => toggleChannelVisibility(stat.channel)}
+                            disabled={enabledChannels[stat.channel] === false}
+                          />
+                          {hiddenChannels[stat.channel] ? (
+                            <EyeOff className="h-4 w-4 text-muted-foreground" />
+                          ) : (
+                            <Eye className="h-4 w-4 text-muted-foreground" />
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="mt-4 pt-4 border-t">
+                  <Button
+                    variant="link"
+                    size="sm"
+                    onClick={() => navigate('/settings')}
+                    className="text-xs p-0"
+                  >
+                    Manage workspace channel settings →
+                  </Button>
+                </div>
+              </Card>
+            )}
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {channelStats.map((stat) => {
+              {visibleChannelStats.map((stat) => {
                 const config = channelConfig[stat.channel as keyof typeof channelConfig];
                 const Icon = config.icon;
 
@@ -267,6 +367,21 @@ export default function ChannelsDashboard() {
                   </Card>
                 );
               })}
+              
+              {visibleChannelStats.length === 0 && (
+                <Card className="col-span-2 p-12">
+                  <div className="text-center">
+                    <p className="text-muted-foreground mb-4">No channels are currently visible.</p>
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowSettings(true)}
+                    >
+                      <Settings className="h-4 w-4 mr-2" />
+                      Show channel settings
+                    </Button>
+                  </div>
+                </Card>
+              )}
             </div>
           </div>
         )

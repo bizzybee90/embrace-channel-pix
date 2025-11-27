@@ -132,6 +132,7 @@ export const ChannelManagementPanel = () => {
                   checked={channel.enabled}
                   onCheckedChange={() => toggleChannel(channel.id, channel.enabled)}
                   disabled={channel.channel === 'email' || channel.channel === 'webchat'}
+                  aria-label={`Toggle ${channelLabels[channel.channel]} channel`}
                 />
               </div>
             </Card>
