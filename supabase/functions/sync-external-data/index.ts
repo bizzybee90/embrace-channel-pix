@@ -23,7 +23,7 @@ Deno.serve(async (req) => {
   try {
     // Get query parameters
     const url = new URL(req.url);
-    const tables = url.searchParams.get('tables')?.split(',') || ['faq_database', 'price_list', 'business_facts'];
+    const tables = url.searchParams.get('tables')?.split(',') || ['faq_database', 'price_list', 'business_facts', 'conversations'];
     const fullSync = url.searchParams.get('full') === 'true';
 
     console.log('Starting sync:', { tables, fullSync });
@@ -100,6 +100,16 @@ Deno.serve(async (req) => {
       totalInserted += factsStats.inserted;
       totalUpdated += factsStats.updated;
       totalUnchanged += factsStats.unchanged;
+    }
+
+    // Sync Conversations
+    if (tables.includes('conversations')) {
+      const convStats = await syncConversations(externalSupabase, localSupabase, workspace.id, fullSync);
+      stats.push(convStats);
+      totalFetched += convStats.fetched;
+      totalInserted += convStats.inserted;
+      totalUpdated += convStats.updated;
+      totalUnchanged += convStats.unchanged;
     }
 
     // Update sync log
@@ -438,6 +448,139 @@ async function syncBusinessFacts(
     }
   } catch (error) {
     console.error('Error syncing business facts:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    stats.errors.push(errorMessage);
+  }
+
+  return stats;
+}
+
+async function syncConversations(
+  externalSupabase: any,
+  localSupabase: any,
+  workspaceId: string,
+  fullSync: boolean
+): Promise<SyncStats> {
+  const stats: SyncStats = {
+    table: 'conversations',
+    fetched: 0,
+    inserted: 0,
+    updated: 0,
+    unchanged: 0,
+    errors: [],
+  };
+
+  try {
+    // Fetch external conversations
+    let query = externalSupabase.from('conversations').select('*');
+    
+    if (!fullSync) {
+      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      query = query.gte('created_at', oneDayAgo);
+    }
+
+    const { data: externalConvs, error } = await query;
+
+    if (error) throw error;
+
+    stats.fetched = externalConvs?.length || 0;
+    console.log(`Fetched ${stats.fetched} conversations from external database`);
+
+    // Process each conversation
+    for (const externalConv of externalConvs || []) {
+      try {
+        // Check if conversation exists
+        const { data: existing } = await localSupabase
+          .from('conversations')
+          .select('id, updated_at')
+          .eq('external_conversation_id', String(externalConv.id))
+          .eq('workspace_id', workspaceId)
+          .maybeSingle();
+
+        // Map source to channel
+        const channelMap: Record<string, string> = {
+          'whatsapp': 'whatsapp',
+          'sms': 'sms',
+          'email': 'email',
+          'phone': 'phone',
+          'web': 'webchat',
+        };
+        const channel = channelMap[externalConv.source?.toLowerCase()] || 'webchat';
+
+        // Try to find customer by phone or email
+        let customerId = null;
+        if (externalConv.customer_phone || externalConv.customer_email) {
+          const customerQuery = localSupabase
+            .from('customers')
+            .select('id')
+            .eq('workspace_id', workspaceId);
+
+          if (externalConv.customer_phone) {
+            customerQuery.eq('phone', externalConv.customer_phone);
+          } else if (externalConv.customer_email) {
+            customerQuery.eq('email', externalConv.customer_email);
+          }
+
+          const { data: customer } = await customerQuery.maybeSingle();
+          customerId = customer?.id || null;
+        }
+
+        const convData = {
+          workspace_id: workspaceId,
+          external_conversation_id: String(externalConv.id),
+          customer_id: customerId,
+          channel: channel,
+          title: externalConv.text?.substring(0, 100) || 'Imported conversation',
+          summary_for_human: externalConv.text || null,
+          category: externalConv.intent || 'other',
+          mode: externalConv.mode || 'ai',
+          status: externalConv.escalation_handled ? 'resolved' : (externalConv.escalated ? 'escalated' : 'new'),
+          is_escalated: externalConv.escalated ?? false,
+          confidence: externalConv.confidence || null,
+          ai_draft_response: externalConv.ai_draft_response || externalConv.ai_response || null,
+          final_response: externalConv.final_response || null,
+          human_edited: externalConv.human_edited ?? false,
+          auto_responded: externalConv.auto_responded ?? false,
+          customer_satisfaction: externalConv.customer_satisfaction || null,
+          led_to_booking: externalConv.led_to_booking ?? false,
+          embedding: externalConv.embedding || null,
+          needs_embedding: !externalConv.embedding,
+          first_response_at: externalConv.sent_at || null,
+          metadata: externalConv.metadata || {},
+          created_at: externalConv.created_at || new Date().toISOString(),
+          updated_at: externalConv.created_at || new Date().toISOString(),
+        };
+
+        if (existing) {
+          // Check if update needed
+          if (new Date(externalConv.created_at) > new Date(existing.updated_at)) {
+            const { error: updateError } = await localSupabase
+              .from('conversations')
+              .update(convData)
+              .eq('id', existing.id);
+
+            if (updateError) throw updateError;
+            stats.updated++;
+          } else {
+            stats.unchanged++;
+          }
+        } else {
+          // Insert new conversation
+          const { error: insertError } = await localSupabase
+            .from('conversations')
+            .insert(convData);
+
+          if (insertError) throw insertError;
+          stats.inserted++;
+        }
+      } catch (error) {
+        console.error('Error processing conversation:', error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        stats.errors.push(`Conversation ${externalConv.id}: ${errorMessage}`);
+      }
+    }
+  } catch (error) {
+    console.error('Error syncing conversations:', error);
     const errorMessage = error instanceof Error ? error.message : String(error);
     stats.errors.push(errorMessage);
   }
