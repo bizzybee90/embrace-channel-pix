@@ -10,6 +10,7 @@ import { ChannelManagementPanel } from '@/components/settings/ChannelManagementP
 import { AIActivityWidget } from '@/components/dashboard/AIActivityWidget';
 import { AIAgentPanel } from '@/components/settings/AIAgentPanel';
 import { ConversationOrderingPanel } from '@/components/settings/ConversationOrderingPanel';
+import { KnowledgeBasePanel } from '@/components/settings/KnowledgeBasePanel';
 import { Card } from '@/components/ui/card';
 
 export default function Settings() {
@@ -27,6 +28,7 @@ export default function Settings() {
             <TabsTrigger value="interface">Interface</TabsTrigger>
             <TabsTrigger value="ordering">Ordering</TabsTrigger>
             <TabsTrigger value="ai-agent">AI Agent</TabsTrigger>
+            <TabsTrigger value="knowledge-base">Knowledge Base</TabsTrigger>
             <TabsTrigger value="channels">Channels</TabsTrigger>
             <TabsTrigger value="gdpr">GDPR</TabsTrigger>
             <TabsTrigger value="cleanup">Cleanup</TabsTrigger>
@@ -53,6 +55,10 @@ export default function Settings() {
 
         <TabsContent value="ai-agent">
           <AIAgentPanel />
+        </TabsContent>
+
+        <TabsContent value="knowledge-base">
+          <KnowledgeBasePanel />
         </TabsContent>
 
         <TabsContent value="channels">
