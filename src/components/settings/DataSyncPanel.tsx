@@ -69,7 +69,8 @@ export function DataSyncPanel() {
   const handleSync = async (tables?: string[]) => {
     setSyncing(true);
     try {
-      const tablesToSync = tables || ['faq_database', 'price_list', 'business_facts', 'conversations'];
+      // Default to knowledge base only (no conversations)
+      const tablesToSync = tables || ['faq_database', 'price_list', 'business_facts'];
       
       // Build URL with query parameters
       const params = new URLSearchParams({
@@ -164,7 +165,25 @@ export function DataSyncPanel() {
               ) : (
                 <>
                   <RefreshCw className="mr-2 h-4 w-4" />
-                  Sync All Tables
+                  Sync Knowledge Base (No Conversations)
+                </>
+              )}
+            </Button>
+            <Button 
+              onClick={() => handleSync(['faq_database', 'price_list', 'business_facts', 'conversations'])}
+              disabled={syncing}
+              variant="outline"
+              className="w-full"
+            >
+              {syncing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Syncing...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Sync All (Including 10k+ Conversations)
                 </>
               )}
             </Button>
@@ -226,6 +245,13 @@ export function DataSyncPanel() {
           <Button variant="outline" size="icon" onClick={copyWebhookUrl}>
             <Copy className="h-4 w-4" />
           </Button>
+        </div>
+        
+        <div className="mt-4 p-3 bg-amber-500/10 border border-amber-500/20 rounded">
+          <p className="text-sm text-amber-700 dark:text-amber-400">
+            <strong>Note:</strong> Conversations table has 10k+ records. Use "Sync All" button only if needed - 
+            it will take several minutes. The default "Knowledge Base" sync excludes conversations.
+          </p>
         </div>
       </Card>
 
