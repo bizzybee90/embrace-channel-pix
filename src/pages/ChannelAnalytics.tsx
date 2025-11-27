@@ -8,8 +8,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { Badge } from '@/components/ui/badge';
-import { TrendingUp, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import { TrendingUp, Clock, CheckCircle, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { format, subDays, startOfDay, endOfDay, parseISO } from 'date-fns';
+import { Button } from '@/components/ui/button';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
@@ -36,6 +37,10 @@ export default function ChannelAnalytics() {
   const [timeRange, setTimeRange] = useState('7');
   const [loading, setLoading] = useState(true);
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
+  const [hiddenChannels, setHiddenChannels] = useState<string[]>(() => {
+    const saved = localStorage.getItem('hiddenAnalyticsChannels');
+    return saved ? JSON.parse(saved) : [];
+  });
 
   useEffect(() => {
     if (workspace?.id) {
@@ -164,6 +169,32 @@ export default function ChannelAnalytics() {
     return `${hours}h ${mins}m`;
   };
 
+  const toggleChannelVisibility = (channel: string) => {
+    const newHidden = hiddenChannels.includes(channel)
+      ? hiddenChannels.filter(c => c !== channel)
+      : [...hiddenChannels, channel];
+    setHiddenChannels(newHidden);
+    localStorage.setItem('hiddenAnalyticsChannels', JSON.stringify(newHidden));
+  };
+
+  // Filter analytics data based on hidden channels
+  const filteredAnalytics = analytics ? {
+    ...analytics,
+    channelDistribution: analytics.channelDistribution.filter(
+      ch => !hiddenChannels.includes(ch.channel)
+    ),
+    volumeByDay: analytics.volumeByDay.map(day => {
+      const filtered: any = { date: day.date, total: 0 };
+      Object.keys(day).forEach(key => {
+        if (key !== 'date' && key !== 'total' && !hiddenChannels.includes(key)) {
+          filtered[key] = day[key];
+          filtered.total += day[key] || 0;
+        }
+      });
+      return filtered;
+    })
+  } : null;
+
   return (
     <ThreeColumnLayout
       sidebar={<Sidebar />}
@@ -186,6 +217,36 @@ export default function ChannelAnalytics() {
               </SelectContent>
             </Select>
           </div>
+
+          {/* Channel visibility toggles */}
+          {analytics && analytics.channelDistribution.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Channel Filters</CardTitle>
+                <CardDescription>Toggle channels to show/hide from analytics</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap gap-2">
+                  {analytics.channelDistribution.map(ch => (
+                    <Button
+                      key={ch.channel}
+                      variant={hiddenChannels.includes(ch.channel) ? "outline" : "default"}
+                      size="sm"
+                      onClick={() => toggleChannelVisibility(ch.channel)}
+                      className="gap-2"
+                    >
+                      {hiddenChannels.includes(ch.channel) ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                      <span className="capitalize">{ch.channel}</span>
+                    </Button>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {loading ? (
             <div className="flex items-center justify-center min-h-[400px]">
@@ -211,7 +272,7 @@ export default function ChannelAnalytics() {
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold">
-                      {analytics.volumeByDay.reduce((sum, day) => sum + day.total, 0)}
+                      {filteredAnalytics?.volumeByDay.reduce((sum, day) => sum + day.total, 0) || 0}
                     </div>
                   </CardContent>
                 </Card>
@@ -278,14 +339,14 @@ export default function ChannelAnalytics() {
                     </CardHeader>
                     <CardContent>
                       <ResponsiveContainer width="100%" height={300}>
-                        <LineChart data={analytics.volumeByDay}>
+                        <LineChart data={filteredAnalytics?.volumeByDay || []}>
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis dataKey="date" />
                           <YAxis />
                           <Tooltip />
                           <Legend />
                           <Line type="monotone" dataKey="total" stroke="#8884d8" strokeWidth={2} name="Total" />
-                          {analytics.channelDistribution.map(ch => (
+                          {filteredAnalytics?.channelDistribution.map(ch => (
                             <Line 
                               key={ch.channel}
                               type="monotone" 
@@ -336,7 +397,7 @@ export default function ChannelAnalytics() {
                         <ResponsiveContainer width="100%" height={300}>
                           <PieChart>
                             <Pie
-                              data={analytics.channelDistribution}
+                              data={filteredAnalytics?.channelDistribution || []}
                               dataKey="count"
                               nameKey="channel"
                               cx="50%"
@@ -344,7 +405,7 @@ export default function ChannelAnalytics() {
                               outerRadius={100}
                               label={(entry) => `${entry.channel}: ${entry.percentage.toFixed(1)}%`}
                             >
-                              {analytics.channelDistribution.map((entry, index) => (
+                              {filteredAnalytics?.channelDistribution.map((entry, index) => (
                                 <Cell key={entry.channel} fill={channelColors[entry.channel] || COLORS[index % COLORS.length]} />
                               ))}
                             </Pie>
@@ -380,7 +441,7 @@ export default function ChannelAnalytics() {
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-3">
-                        {analytics.channelDistribution
+                        {filteredAnalytics?.channelDistribution
                           .sort((a, b) => b.count - a.count)
                           .map(channel => (
                             <div key={channel.channel} className="flex items-center justify-between p-3 border rounded-lg">
