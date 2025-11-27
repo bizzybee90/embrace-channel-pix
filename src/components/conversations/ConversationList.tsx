@@ -18,15 +18,19 @@ interface ConversationListProps {
   onSelect: (conversation: Conversation) => void;
   filter?: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'completed' | 'sent' | 'high-priority' | 'vip-customers' | 'escalations';
   onConversationsChange?: (conversations: Conversation[]) => void;
+  channelFilter?: string;
 }
 
-export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', onConversationsChange }: ConversationListProps) => {
+export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', onConversationsChange, channelFilter: initialChannelFilter }: ConversationListProps) => {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const isTablet = useIsTablet();
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [priorityFilter, setPriorityFilter] = useState<string[]>([]);
-  const [channelFilter, setChannelFilter] = useState<string[]>([]);
+  const [channelFilter, setChannelFilter] = useState<string[]>(() => {
+    // Initialize with the channel filter from props if provided
+    return initialChannelFilter ? [initialChannelFilter] : [];
+  });
   const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState<string>(() => {
     return localStorage.getItem('conversation-sort') || 'sla_urgent';

@@ -9,9 +9,10 @@ import { MessageSquare } from 'lucide-react';
 
 interface PowerModeLayoutProps {
   filter?: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'completed' | 'sent' | 'high-priority' | 'vip-customers' | 'escalations';
+  channelFilter?: string;
 }
 
-export const PowerModeLayout = ({ filter = 'all-open' }: PowerModeLayoutProps) => {
+export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerModeLayoutProps) => {
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -39,6 +40,7 @@ export const PowerModeLayout = ({ filter = 'all-open' }: PowerModeLayoutProps) =
           <div className="h-full flex flex-col border-r border-border/30 bg-card w-full">
             <ConversationList
               filter={filter}
+              channelFilter={channelFilter}
               selectedId={selectedConversation?.id}
               onSelect={setSelectedConversation}
             />

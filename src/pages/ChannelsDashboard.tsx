@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -62,6 +63,7 @@ const channelConfig = {
 
 export default function ChannelsDashboard() {
   const { workspace } = useWorkspace();
+  const navigate = useNavigate();
   const [channelStats, setChannelStats] = useState<ChannelStats[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -190,7 +192,11 @@ export default function ChannelsDashboard() {
                 const Icon = config.icon;
 
                 return (
-                  <Card key={stat.channel} className={`p-6 ${config.bgColor}`}>
+                  <Card 
+                    key={stat.channel} 
+                    className={`p-6 ${config.bgColor} cursor-pointer hover:shadow-lg transition-all`}
+                    onClick={() => navigate(`/channel/${stat.channel}`)}
+                  >
                     <div className="flex items-start justify-between mb-4">
                       <div className="flex items-center gap-3">
                         <div className="p-3 rounded-lg bg-background">
