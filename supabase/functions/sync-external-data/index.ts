@@ -290,21 +290,21 @@ async function syncFAQDatabase(
       }
     }
 
-    // Batch insert new FAQs (500 at a time) using upsert to handle duplicates
+    // Batch insert new FAQs (500 at a time)
     if (toInsert.length > 0) {
-      console.log(`Upserting ${toInsert.length} FAQs in batches...`);
+      console.log(`Inserting ${toInsert.length} new FAQs in batches...`);
       for (let i = 0; i < toInsert.length; i += 500) {
         const batch = toInsert.slice(i, i + 500);
         const { error } = await localSupabase
           .from('faq_database')
-          .upsert(batch, { 
-            onConflict: 'external_id,workspace_id',
-            ignoreDuplicates: false 
-          });
+          .insert(batch);
         
         if (error) {
-          console.error('Batch upsert error:', error);
-          stats.errors.push(`Batch upsert failed: ${error.message}`);
+          console.error('Batch insert error:', error);
+          // Don't treat duplicates as fatal errors
+          if (error.code !== '23505') {
+            stats.errors.push(`Batch insert failed: ${error.message}`);
+          }
         } else {
           stats.inserted += batch.length;
         }
@@ -790,7 +790,7 @@ async function processBatchConversations(
         customer_satisfaction: externalConv.customer_satisfaction || null,
         led_to_booking: externalConv.led_to_booking ?? false,
         embedding: externalConv.embedding || null,
-        needs_embedding: !externalConv.embedding,
+        // Don't set needs_embedding - it's a generated column
         first_response_at: externalConv.sent_at || null,
         metadata: externalConv.metadata || {},
         created_at: externalConv.created_at || new Date().toISOString(),
@@ -818,10 +818,7 @@ async function processBatchConversations(
   if (toInsert.length > 0) {
     const { error } = await localSupabase
       .from('conversations')
-      .upsert(toInsert, { 
-        onConflict: 'external_conversation_id,workspace_id',
-        ignoreDuplicates: false 
-      });
+      .insert(toInsert);
     
     if (error) {
       result.errors.push(`Batch insert failed: ${error.message}`);
