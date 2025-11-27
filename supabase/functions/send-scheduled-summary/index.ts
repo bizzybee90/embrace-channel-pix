@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.81.1';
-import { Resend } from "https://esm.sh/resend@2.0.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -18,13 +17,13 @@ serve(async (req) => {
   }
 
   try {
-    const resendApiKey = Deno.env.get('RESEND_API_KEY');
+    const postmarkApiKey = Deno.env.get('POSTMARK_API_KEY');
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     const defaultRecipient = Deno.env.get('SUMMARY_EMAIL_RECIPIENT');
 
-    if (!resendApiKey) {
-      throw new Error('RESEND_API_KEY not configured');
+    if (!postmarkApiKey) {
+      throw new Error('POSTMARK_API_KEY not configured');
     }
 
     if (!supabaseUrl || !supabaseServiceKey) {
@@ -32,7 +31,6 @@ serve(async (req) => {
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    const resend = new Resend(resendApiKey);
     
     const { type, recipientEmail }: SummaryRequest = await req.json();
     const recipient = recipientEmail || defaultRecipient;
@@ -200,25 +198,36 @@ serve(async (req) => {
 </html>
     `;
 
-    // Send email
-    const { data: emailData, error: emailError } = await resend.emails.send({
-      from: 'BizzyBee <onboarding@resend.dev>',
-      to: [recipient],
-      subject: `BizzyBee - ${subject}`,
-      html
+    // Send email via Postmark
+    const response = await fetch('https://api.postmarkapp.com/email', {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'X-Postmark-Server-Token': postmarkApiKey,
+      },
+      body: JSON.stringify({
+        From: 'noreply@yourdomain.com',
+        To: recipient,
+        Subject: `BizzyBee - ${subject}`,
+        HtmlBody: html,
+        MessageStream: 'outbound'
+      })
     });
 
-    if (emailError) {
-      console.error('Error sending email:', emailError);
-      throw emailError;
+    if (!response.ok) {
+      const errorData = await response.text();
+      console.error('Error sending email:', errorData);
+      throw new Error(`Postmark API error: ${response.status} - ${errorData}`);
     }
 
+    const emailData = await response.json();
     console.log('Summary email sent successfully:', emailData);
 
     return new Response(
       JSON.stringify({
         success: true,
-        emailId: emailData?.id,
+        messageId: emailData?.MessageID,
         stats: {
           total,
           aiHandled,
