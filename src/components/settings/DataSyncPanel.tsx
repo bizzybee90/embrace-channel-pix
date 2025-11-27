@@ -69,7 +69,7 @@ export function DataSyncPanel() {
   const handleSync = async (tables?: string[]) => {
     setSyncing(true);
     try {
-      const tablesToSync = tables || ['faq_database', 'price_list', 'business_facts'];
+      const tablesToSync = tables || ['faq_database', 'price_list', 'business_facts', 'conversations'];
       const params = new URLSearchParams({
         tables: tablesToSync.join(','),
         full: 'true',
@@ -169,7 +169,7 @@ export function DataSyncPanel() {
 
           <div className="space-y-2">
             <h3 className="font-semibold">Selective Sync</h3>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button
                 variant="outline"
                 size="sm"
@@ -193,6 +193,14 @@ export function DataSyncPanel() {
                 disabled={syncing}
               >
                 Facts
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleSync(['conversations'])}
+                disabled={syncing}
+              >
+                Conversations
               </Button>
             </div>
           </div>
@@ -306,7 +314,7 @@ export function DataSyncPanel() {
           Automatic Sync Schedule
         </h3>
         <p className="text-sm text-muted-foreground">
-          Knowledge base data (FAQs, pricing, business facts) syncs automatically daily at 3:00 AM UTC.
+          Knowledge base data (FAQs, pricing, business facts, conversations) syncs automatically daily at 3:00 AM UTC.
           Customer data is synced in real-time via Apify webhooks every 8-12 hours.
         </p>
       </Card>
