@@ -15,6 +15,7 @@ import { MobileEscalationHub } from "./pages/mobile/MobileEscalationHub";
 import { AuthGuard } from "./components/AuthGuard";
 import { useIsMobile } from "./hooks/use-mobile";
 import { LiveActivityDashboard } from "./components/dashboard/LiveActivityDashboard";
+import ChannelsDashboard from "./pages/ChannelsDashboard";
 
 const queryClient = new QueryClient();
 
@@ -133,6 +134,14 @@ const RouterContent = () => {
         element={
           <AuthGuard>
             <Escalations />
+          </AuthGuard>
+        } 
+      />
+      <Route 
+        path="/channels" 
+        element={
+          <AuthGuard>
+            <ChannelsDashboard />
           </AuthGuard>
         } 
       />
