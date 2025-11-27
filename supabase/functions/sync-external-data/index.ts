@@ -192,10 +192,10 @@ async function syncFAQDatabase(
   };
 
   try {
-    // Fetch ALL external FAQs using pagination
+    // Fetch external FAQs in smaller batches
     let allFAQs: any[] = [];
     let from = 0;
-    const batchSize = 1000;
+    const batchSize = 500; // Reduced from 1000
     let hasMore = true;
 
     console.log('Fetching FAQs with fullSync:', fullSync);
@@ -235,64 +235,99 @@ async function syncFAQDatabase(
     stats.fetched = allFAQs.length;
     console.log(`Fetched ${stats.fetched} FAQs total from external database`);
 
-    const externalFAQs = allFAQs;
+    if (allFAQs.length === 0) {
+      return stats;
+    }
 
-    // Process each FAQ
-    for (const externalFAQ of externalFAQs || []) {
-      try {
-        // Check if FAQ exists
-        const { data: existing } = await localSupabase
-          .from('faq_database')
-          .select('id, updated_at')
-          .eq('external_id', externalFAQ.id)
-          .eq('workspace_id', workspaceId)
-          .maybeSingle();
+    // Fetch ALL existing FAQs in ONE query
+    const externalIds = allFAQs.map(f => f.id);
+    const { data: existingFAQs } = await localSupabase
+      .from('faq_database')
+      .select('id, external_id, updated_at')
+      .eq('workspace_id', workspaceId)
+      .in('external_id', externalIds);
 
-        const faqData = {
-          workspace_id: workspaceId,
-          external_id: externalFAQ.id,
-          category: externalFAQ.category,
-          question: externalFAQ.question,
-          answer: externalFAQ.answer,
-          keywords: externalFAQ.tags || [],
-          priority: externalFAQ.priority || 0,
-          is_active: externalFAQ.is_active ?? true,
-          enabled: externalFAQ.enabled ?? true,
-          embedding: externalFAQ.embedding || null,
-          is_mac_specific: externalFAQ.is_mac_specific ?? false,
-          is_industry_standard: externalFAQ.is_industry_standard ?? false,
-          source_company: externalFAQ.source_company || null,
-          updated_at: externalFAQ.updated_at || new Date().toISOString(),
-        };
+    // Create a Map for fast lookups
+    const existingMap = new Map(
+      (existingFAQs || []).map((f: any) => [f.external_id, f])
+    );
 
-        if (existing) {
-          // Check if update needed
-          if (new Date(externalFAQ.updated_at) > new Date(existing.updated_at)) {
-            const { error: updateError } = await localSupabase
-              .from('faq_database')
-              .update(faqData)
-              .eq('id', existing.id);
+    console.log(`Found ${existingFAQs?.length || 0} existing FAQs in local database`);
 
-            if (updateError) throw updateError;
-            stats.updated++;
-          } else {
-            stats.unchanged++;
-          }
+    // Prepare batched inserts and updates
+    const toInsert: any[] = [];
+    const toUpdate: any[] = [];
+
+    for (const externalFAQ of allFAQs) {
+      const faqData = {
+        workspace_id: workspaceId,
+        external_id: externalFAQ.id,
+        category: externalFAQ.category,
+        question: externalFAQ.question,
+        answer: externalFAQ.answer,
+        keywords: externalFAQ.tags || [],
+        priority: externalFAQ.priority || 0,
+        is_active: externalFAQ.is_active ?? true,
+        enabled: externalFAQ.enabled ?? true,
+        embedding: externalFAQ.embedding || null,
+        is_mac_specific: externalFAQ.is_mac_specific ?? false,
+        is_industry_standard: externalFAQ.is_industry_standard ?? false,
+        source_company: externalFAQ.source_company || null,
+        updated_at: externalFAQ.updated_at || new Date().toISOString(),
+      };
+
+      const existing: any = existingMap.get(externalFAQ.id);
+      
+      if (existing) {
+        // Check if update needed
+        if (new Date(externalFAQ.updated_at) > new Date(existing.updated_at)) {
+          toUpdate.push({ ...faqData, id: existing.id });
         } else {
-          // Insert new FAQ
-          const { error: insertError } = await localSupabase
-            .from('faq_database')
-            .insert(faqData);
-
-          if (insertError) throw insertError;
-          stats.inserted++;
+          stats.unchanged++;
         }
-      } catch (error) {
-        console.error('Error processing FAQ:', error);
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        stats.errors.push(`FAQ ${externalFAQ.id}: ${errorMessage}`);
+      } else {
+        toInsert.push(faqData);
       }
     }
+
+    // Batch insert new FAQs (500 at a time)
+    if (toInsert.length > 0) {
+      console.log(`Inserting ${toInsert.length} new FAQs in batches...`);
+      for (let i = 0; i < toInsert.length; i += 500) {
+        const batch = toInsert.slice(i, i + 500);
+        const { error } = await localSupabase
+          .from('faq_database')
+          .insert(batch);
+        
+        if (error) {
+          console.error('Batch insert error:', error);
+          stats.errors.push(`Batch insert failed: ${error.message}`);
+        } else {
+          stats.inserted += batch.length;
+        }
+      }
+    }
+
+    // Batch update existing FAQs (100 at a time - updates are more expensive)
+    if (toUpdate.length > 0) {
+      console.log(`Updating ${toUpdate.length} FAQs...`);
+      for (const faq of toUpdate) {
+        const { id, ...updateData } = faq;
+        const { error } = await localSupabase
+          .from('faq_database')
+          .update(updateData)
+          .eq('id', id);
+        
+        if (error) {
+          console.error('Update error:', error);
+          stats.errors.push(`Update failed for FAQ ${id}: ${error.message}`);
+        } else {
+          stats.updated++;
+        }
+      }
+    }
+
+    console.log(`FAQ sync complete: inserted ${stats.inserted}, updated ${stats.updated}, unchanged ${stats.unchanged}`);
   } catch (error) {
     console.error('Error syncing FAQ database:', error);
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -318,10 +353,10 @@ async function syncPriceList(
   };
 
   try {
-    // Fetch ALL external prices using pagination
+    // Fetch external prices
     let allPrices: any[] = [];
     let from = 0;
-    const batchSize = 1000;
+    const batchSize = 500;
     let hasMore = true;
 
     while (hasMore) {
@@ -353,74 +388,94 @@ async function syncPriceList(
     stats.fetched = allPrices.length;
     console.log(`Fetched ${stats.fetched} prices from external database`);
 
-    const externalPrices = allPrices;
+    if (allPrices.length === 0) {
+      return stats;
+    }
 
-    // Process each price
-    for (const externalPrice of externalPrices || []) {
-      try {
-        // Check if price exists
-        const { data: existing } = await localSupabase
-          .from('price_list')
-          .select('id, updated_at')
-          .eq('external_id', externalPrice.id)
-          .eq('workspace_id', workspaceId)
-          .maybeSingle();
+    // Fetch existing prices in ONE query
+    const externalIds = allPrices.map(p => p.id);
+    const { data: existingPrices } = await localSupabase
+      .from('price_list')
+      .select('id, external_id, updated_at')
+      .eq('workspace_id', workspaceId)
+      .in('external_id', externalIds);
 
-        const priceData = {
-          workspace_id: workspaceId,
-          external_id: externalPrice.id,
-          service_code: externalPrice.service_code,
-          service_name: externalPrice.service_name,
-          category: externalPrice.category,
-          description: externalPrice.description || null,
-          property_type: externalPrice.property_type || null,
-          bedrooms: externalPrice.bedrooms || null,
-          base_price: externalPrice.price_typical || null,
-          price_typical: externalPrice.price_typical || null,
-          price_min: externalPrice.price_min || null,
-          price_max: externalPrice.price_max || null,
-          window_price_min: externalPrice.window_price_min || null,
-          window_price_max: externalPrice.window_price_max || null,
-          price_range: externalPrice.price_min && externalPrice.price_max 
-            ? `£${externalPrice.price_min} - £${externalPrice.price_max}` 
-            : null,
-          applies_to_properties: externalPrice.applies_to_properties || null,
-          rule_priority: externalPrice.rule_priority || 0,
-          customer_count: externalPrice.customer_count || 0,
-          affects_package: externalPrice.affects_package ?? false,
-          per_unit: externalPrice.per_unit ?? false,
-          is_active: externalPrice.is_active ?? true,
-          currency: 'GBP',
-          unit: externalPrice.per_unit ? 'per unit' : null,
-          updated_at: externalPrice.updated_at || new Date().toISOString(),
-        };
+    const existingMap = new Map(
+      (existingPrices || []).map((p: any) => [p.external_id, p])
+    );
 
-        if (existing) {
-          // Check if update needed
-          if (new Date(externalPrice.updated_at) > new Date(existing.updated_at)) {
-            const { error: updateError } = await localSupabase
-              .from('price_list')
-              .update(priceData)
-              .eq('id', existing.id);
+    const toInsert: any[] = [];
+    const toUpdate: any[] = [];
 
-            if (updateError) throw updateError;
-            stats.updated++;
-          } else {
-            stats.unchanged++;
-          }
+    for (const externalPrice of allPrices) {
+      const priceData = {
+        workspace_id: workspaceId,
+        external_id: externalPrice.id,
+        service_code: externalPrice.service_code,
+        service_name: externalPrice.service_name,
+        category: externalPrice.category,
+        description: externalPrice.description || null,
+        property_type: externalPrice.property_type || null,
+        bedrooms: externalPrice.bedrooms || null,
+        base_price: externalPrice.price_typical || null,
+        price_typical: externalPrice.price_typical || null,
+        price_min: externalPrice.price_min || null,
+        price_max: externalPrice.price_max || null,
+        window_price_min: externalPrice.window_price_min || null,
+        window_price_max: externalPrice.window_price_max || null,
+        price_range: externalPrice.price_min && externalPrice.price_max 
+          ? `£${externalPrice.price_min} - £${externalPrice.price_max}` 
+          : null,
+        applies_to_properties: externalPrice.applies_to_properties || null,
+        rule_priority: externalPrice.rule_priority || 0,
+        customer_count: externalPrice.customer_count || 0,
+        affects_package: externalPrice.affects_package ?? false,
+        per_unit: externalPrice.per_unit ?? false,
+        is_active: externalPrice.is_active ?? true,
+        currency: 'GBP',
+        unit: externalPrice.per_unit ? 'per unit' : null,
+        updated_at: externalPrice.updated_at || new Date().toISOString(),
+      };
+
+      const existing: any = existingMap.get(externalPrice.id);
+      
+      if (existing) {
+        if (new Date(externalPrice.updated_at) > new Date(existing.updated_at)) {
+          toUpdate.push({ ...priceData, id: existing.id });
         } else {
-          // Insert new price
-          const { error: insertError } = await localSupabase
-            .from('price_list')
-            .insert(priceData);
-
-          if (insertError) throw insertError;
-          stats.inserted++;
+          stats.unchanged++;
         }
-      } catch (error) {
-        console.error('Error processing price:', error);
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        stats.errors.push(`Price ${externalPrice.id}: ${errorMessage}`);
+      } else {
+        toInsert.push(priceData);
+      }
+    }
+
+    // Batch operations
+    if (toInsert.length > 0) {
+      const { error } = await localSupabase
+        .from('price_list')
+        .insert(toInsert);
+      
+      if (error) {
+        stats.errors.push(`Insert failed: ${error.message}`);
+      } else {
+        stats.inserted = toInsert.length;
+      }
+    }
+
+    if (toUpdate.length > 0) {
+      for (const price of toUpdate) {
+        const { id, ...updateData } = price;
+        const { error } = await localSupabase
+          .from('price_list')
+          .update(updateData)
+          .eq('id', id);
+        
+        if (error) {
+          stats.errors.push(`Update failed: ${error.message}`);
+        } else {
+          stats.updated++;
+        }
       }
     }
   } catch (error) {
@@ -448,10 +503,10 @@ async function syncBusinessFacts(
   };
 
   try {
-    // Fetch ALL external facts using pagination
+    // Fetch external facts
     let allFacts: any[] = [];
     let from = 0;
-    const batchSize = 1000;
+    const batchSize = 500;
     let hasMore = true;
 
     while (hasMore) {
@@ -483,55 +538,75 @@ async function syncBusinessFacts(
     stats.fetched = allFacts.length;
     console.log(`Fetched ${stats.fetched} business facts from external database`);
 
-    const externalFacts = allFacts;
+    if (allFacts.length === 0) {
+      return stats;
+    }
 
-    // Process each fact
-    for (const externalFact of externalFacts || []) {
-      try {
-        // Check if fact exists
-        const { data: existing } = await localSupabase
-          .from('business_facts')
-          .select('id, updated_at')
-          .eq('external_id', externalFact.id)
-          .eq('workspace_id', workspaceId)
-          .maybeSingle();
+    // Fetch existing facts in ONE query
+    const externalIds = allFacts.map(f => f.id);
+    const { data: existingFacts } = await localSupabase
+      .from('business_facts')
+      .select('id, external_id, updated_at')
+      .eq('workspace_id', workspaceId)
+      .in('external_id', externalIds);
 
-        const factData = {
-          workspace_id: workspaceId,
-          external_id: externalFact.id,
-          category: externalFact.category,
-          fact_key: externalFact.fact_key,
-          fact_value: externalFact.fact_value,
-          metadata: {},
-          updated_at: externalFact.updated_at || new Date().toISOString(),
-        };
+    const existingMap = new Map(
+      (existingFacts || []).map((f: any) => [f.external_id, f])
+    );
 
-        if (existing) {
-          // Check if update needed
-          if (new Date(externalFact.updated_at) > new Date(existing.updated_at)) {
-            const { error: updateError } = await localSupabase
-              .from('business_facts')
-              .update(factData)
-              .eq('id', existing.id);
+    const toInsert: any[] = [];
+    const toUpdate: any[] = [];
 
-            if (updateError) throw updateError;
-            stats.updated++;
-          } else {
-            stats.unchanged++;
-          }
+    for (const externalFact of allFacts) {
+      const factData = {
+        workspace_id: workspaceId,
+        external_id: externalFact.id,
+        category: externalFact.category,
+        fact_key: externalFact.fact_key,
+        fact_value: externalFact.fact_value,
+        metadata: externalFact.metadata || {},
+        updated_at: externalFact.updated_at || new Date().toISOString(),
+      };
+
+      const existing: any = existingMap.get(externalFact.id);
+      
+      if (existing) {
+        if (new Date(externalFact.updated_at) > new Date(existing.updated_at)) {
+          toUpdate.push({ ...factData, id: existing.id });
         } else {
-          // Insert new fact
-          const { error: insertError } = await localSupabase
-            .from('business_facts')
-            .insert(factData);
-
-          if (insertError) throw insertError;
-          stats.inserted++;
+          stats.unchanged++;
         }
-      } catch (error) {
-        console.error('Error processing business fact:', error);
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        stats.errors.push(`Fact ${externalFact.id}: ${errorMessage}`);
+      } else {
+        toInsert.push(factData);
+      }
+    }
+
+    // Batch operations
+    if (toInsert.length > 0) {
+      const { error } = await localSupabase
+        .from('business_facts')
+        .insert(toInsert);
+      
+      if (error) {
+        stats.errors.push(`Insert failed: ${error.message}`);
+      } else {
+        stats.inserted = toInsert.length;
+      }
+    }
+
+    if (toUpdate.length > 0) {
+      for (const fact of toUpdate) {
+        const { id, ...updateData } = fact;
+        const { error } = await localSupabase
+          .from('business_facts')
+          .update(updateData)
+          .eq('id', id);
+        
+        if (error) {
+          stats.errors.push(`Update failed: ${error.message}`);
+        } else {
+          stats.updated++;
+        }
       }
     }
   } catch (error) {
