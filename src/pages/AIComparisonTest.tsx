@@ -6,7 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, CheckCircle2, XCircle, Clock, Zap } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, Clock, Zap, Columns } from 'lucide-react';
 
 interface TestResult {
   model: string;
@@ -118,6 +118,53 @@ export default function AIComparisonTest() {
     }
   };
 
+  const compareAllChannels = async () => {
+    if (!customerMessage.trim()) {
+      toast({
+        title: 'Error',
+        description: 'Please enter a customer message',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Run tests for all 4 channels in parallel
+      const channelTests = CHANNELS.map(ch => 
+        supabase.functions.invoke('ai-comparison-test', {
+          body: { model, channel: ch.value, customerMessage }
+        })
+      );
+
+      const responses = await Promise.all(channelTests);
+
+      // Check for errors
+      const errors = responses.filter(r => r.error);
+      if (errors.length > 0) {
+        throw new Error(`${errors.length} channel test(s) failed`);
+      }
+
+      // Add all results
+      const newResults = responses.map(r => r.data).filter(d => d && !d.error);
+      setResults([...newResults, ...results]);
+
+      toast({
+        title: 'Channel Comparison Complete',
+        description: `Tested ${model} across all 4 channels`
+      });
+    } catch (error: any) {
+      console.error('Comparison error:', error);
+      toast({
+        title: 'Comparison Failed',
+        description: error.message || 'Failed to run comparison',
+        variant: 'destructive'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const loadScenario = (scenario: typeof TEST_SCENARIOS[0]) => {
     setChannel(scenario.channel);
     setCustomerMessage(scenario.message);
@@ -211,19 +258,35 @@ export default function AIComparisonTest() {
               />
             </div>
 
-            <Button onClick={runTest} disabled={loading} className="w-full">
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Running Test...
-                </>
-              ) : (
-                <>
-                  <Zap className="mr-2 h-4 w-4" />
-                  Run Test
-                </>
-              )}
-            </Button>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <Button onClick={runTest} disabled={loading}>
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Running...
+                  </>
+                ) : (
+                  <>
+                    <Zap className="mr-2 h-4 w-4" />
+                    Run Test
+                  </>
+                )}
+              </Button>
+              
+              <Button onClick={compareAllChannels} disabled={loading} variant="outline">
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Comparing...
+                  </>
+                ) : (
+                  <>
+                    <Columns className="mr-2 h-4 w-4" />
+                    Compare All Channels
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         </Card>
 
