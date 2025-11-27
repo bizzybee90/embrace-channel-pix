@@ -8,6 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useInterfaceMode } from '@/hooks/useInterfaceMode';
 import { Card } from '@/components/ui/card';
+import { ActivitySidebarWidget } from '@/components/dashboard/ActivitySidebarWidget';
 import { useState, useEffect } from 'react';
 import beeLogo from '@/assets/bee-logo.png';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -286,6 +287,63 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
 
         <Separator className="my-4" />
 
+        {/* AI Activity Section */}
+        <div className="mb-6">
+          {!isCollapsed && (
+            <h2 className="text-xs font-semibold text-foreground/60 uppercase tracking-wider mb-3 px-1">
+              AI Activity
+            </h2>
+          )}
+          <div className="space-y-1">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div>
+                  <NavLink
+                    to="/escalations"
+                    onClick={onNavigate}
+                    className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all hover-scale`}
+                    activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
+                  >
+                    <div className="flex items-center justify-center w-8 h-8 rounded-md bg-orange-500/10">
+                      <AlertTriangle className="h-4 w-4 text-orange-500" />
+                    </div>
+                    {!isCollapsed && <span>Escalations</span>}
+                  </NavLink>
+                </div>
+              </TooltipTrigger>
+              {isCollapsed && (
+                <TooltipContent side="right">
+                  <p>Escalations</p>
+                </TooltipContent>
+              )}
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div>
+                  <NavLink
+                    to="/dashboard"
+                    onClick={onNavigate}
+                    className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all hover-scale`}
+                    activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
+                  >
+                    <div className="flex items-center justify-center w-8 h-8 rounded-md bg-blue-500/10">
+                      <Columns className="h-4 w-4 text-blue-500" />
+                    </div>
+                    {!isCollapsed && <span>Live Dashboard</span>}
+                  </NavLink>
+                </div>
+              </TooltipTrigger>
+              {isCollapsed && (
+                <TooltipContent side="right">
+                  <p>Live Dashboard</p>
+                </TooltipContent>
+              )}
+            </Tooltip>
+          </div>
+        </div>
+
+        <Separator className="my-4" />
+
         <div className="mb-6">
           {!isCollapsed && (
             <h2 className="text-xs font-semibold text-foreground/60 uppercase tracking-wider mb-3 px-1">
@@ -414,6 +472,15 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
         </div>
 
         <Separator className="my-4" />
+
+        {/* Live Activity Widget - Only show when not collapsed */}
+        {!isCollapsed && (
+          <div className="mb-6">
+            <ActivitySidebarWidget />
+          </div>
+        )}
+
+        {!isCollapsed && <Separator className="my-4" />}
 
         {/* Interface Mode Toggle */}
         {!loading && (

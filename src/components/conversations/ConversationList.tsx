@@ -16,7 +16,7 @@ import PullToRefresh from 'react-simple-pull-to-refresh';
 interface ConversationListProps {
   selectedId?: string;
   onSelect: (conversation: Conversation) => void;
-  filter?: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'completed' | 'sent' | 'high-priority' | 'vip-customers';
+  filter?: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'completed' | 'sent' | 'high-priority' | 'vip-customers' | 'escalations';
   onConversationsChange?: (conversations: Conversation[]) => void;
 }
 
@@ -104,6 +104,8 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
         query = query.in('priority', ['high', 'urgent']).in('status', ['new', 'open', 'waiting_customer', 'waiting_internal']);
       } else if (filter === 'vip-customers') {
         query = query.eq('metadata->>tier', 'vip').in('status', ['new', 'open', 'waiting_customer', 'waiting_internal']);
+      } else if (filter === 'escalations') {
+        query = query.eq('is_escalated', true).in('status', ['new', 'in_progress', 'waiting']);
       }
 
       // Apply additional filters

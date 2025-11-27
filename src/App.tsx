@@ -9,10 +9,12 @@ import NotFound from "./pages/NotFound";
 import Settings from "./pages/Settings";
 import WebhookLogs from "./pages/WebhookLogs";
 import Privacy from "./pages/Privacy";
+import Escalations from "./pages/Escalations";
 import { EscalationHub } from "./pages/EscalationHub";
 import { MobileEscalationHub } from "./pages/mobile/MobileEscalationHub";
 import { AuthGuard } from "./components/AuthGuard";
 import { useIsMobile } from "./hooks/use-mobile";
+import { LiveActivityDashboard } from "./components/dashboard/LiveActivityDashboard";
 
 const queryClient = new QueryClient();
 
@@ -119,7 +121,23 @@ const RouterContent = () => {
         } 
       />
       <Route 
-        path="/settings" 
+        path="/escalations" 
+        element={
+          <AuthGuard>
+            <Escalations />
+          </AuthGuard>
+        } 
+      />
+      <Route 
+        path="/dashboard" 
+        element={
+          <AuthGuard>
+            <LiveActivityDashboard />
+          </AuthGuard>
+        } 
+      />
+      <Route 
+        path="/settings"
         element={
           <AuthGuard>
             <Settings />

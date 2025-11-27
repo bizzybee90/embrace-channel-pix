@@ -552,6 +552,7 @@ export type Database = {
           actor_id: string | null
           actor_name: string | null
           actor_type: string
+          attachments: Json | null
           body: string
           channel: string
           conversation_id: string | null
@@ -565,6 +566,7 @@ export type Database = {
           actor_id?: string | null
           actor_name?: string | null
           actor_type: string
+          attachments?: Json | null
           body: string
           channel: string
           conversation_id?: string | null
@@ -578,6 +580,7 @@ export type Database = {
           actor_id?: string | null
           actor_name?: string | null
           actor_type?: string
+          attachments?: Json | null
           body?: string
           channel?: string
           conversation_id?: string | null
@@ -782,6 +785,44 @@ export type Database = {
             columns: ["conversation_id"]
             isOneToOne: false
             referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workspace_channels: {
+        Row: {
+          channel: string
+          config: Json | null
+          created_at: string | null
+          enabled: boolean | null
+          id: string
+          updated_at: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          channel: string
+          config?: Json | null
+          created_at?: string | null
+          enabled?: boolean | null
+          id?: string
+          updated_at?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          channel?: string
+          config?: Json | null
+          created_at?: string | null
+          enabled?: boolean | null
+          id?: string
+          updated_at?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_channels_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
         ]

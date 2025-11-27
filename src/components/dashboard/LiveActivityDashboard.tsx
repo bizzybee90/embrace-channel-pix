@@ -1,0 +1,299 @@
+import { useEffect, useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { 
+  Bot, 
+  AlertCircle, 
+  CheckCircle2, 
+  Clock, 
+  TrendingUp,
+  MessageSquare,
+  Zap
+} from 'lucide-react';
+import { format } from 'date-fns';
+import { useWorkspace } from '@/hooks/useWorkspace';
+
+interface ConversationStats {
+  total: number;
+  aiHandled: number;
+  escalated: number;
+  resolved: number;
+  avgConfidence: number;
+  positiveCount: number;
+  neutralCount: number;
+  negativeCount: number;
+}
+
+interface RecentConversation {
+  id: string;
+  title: string;
+  status: string;
+  is_escalated: boolean;
+  ai_confidence: number | null;
+  ai_sentiment: string | null;
+  category: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export const LiveActivityDashboard = () => {
+  const { workspace } = useWorkspace();
+  const [stats, setStats] = useState<ConversationStats>({
+    total: 0,
+    aiHandled: 0,
+    escalated: 0,
+    resolved: 0,
+    avgConfidence: 0,
+    positiveCount: 0,
+    neutralCount: 0,
+    negativeCount: 0
+  });
+  const [recentConversations, setRecentConversations] = useState<RecentConversation[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchData = async () => {
+    if (!workspace?.id) return;
+
+    try {
+      // Get today's date range
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayStr = today.toISOString();
+
+      // Fetch conversations from today
+      const { data: conversations, error } = await supabase
+        .from('conversations')
+        .select('*')
+        .eq('workspace_id', workspace.id)
+        .gte('created_at', todayStr)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+
+      if (conversations) {
+        // Calculate stats
+        const total = conversations.length;
+        const escalated = conversations.filter(c => c.is_escalated).length;
+        const aiHandled = conversations.filter(c => !c.is_escalated && c.conversation_type === 'ai_handled').length;
+        const resolved = conversations.filter(c => c.status === 'resolved').length;
+        
+        const confidenceScores = conversations
+          .filter(c => c.ai_confidence !== null)
+          .map(c => c.ai_confidence as number);
+        const avgConfidence = confidenceScores.length > 0
+          ? confidenceScores.reduce((a, b) => a + b, 0) / confidenceScores.length
+          : 0;
+
+        const positiveCount = conversations.filter(c => c.ai_sentiment === 'positive').length;
+        const neutralCount = conversations.filter(c => c.ai_sentiment === 'neutral').length;
+        const negativeCount = conversations.filter(c => c.ai_sentiment === 'negative').length;
+
+        setStats({
+          total,
+          aiHandled,
+          escalated,
+          resolved,
+          avgConfidence,
+          positiveCount,
+          neutralCount,
+          negativeCount
+        });
+
+        setRecentConversations(conversations.slice(0, 20) as RecentConversation[]);
+      }
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+
+    // Set up realtime subscription
+    const channel = supabase
+      .channel('dashboard-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'conversations',
+          filter: `workspace_id=eq.${workspace?.id}`
+        },
+        (payload) => {
+          console.log('Realtime update:', payload);
+          fetchData(); // Re-fetch data on any change
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [workspace?.id]);
+
+  const getSentimentIcon = (sentiment: string | null) => {
+    switch (sentiment) {
+      case 'positive': return '😊';
+      case 'negative': return '😟';
+      default: return '😐';
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'resolved': return 'default';
+      case 'in_progress': return 'secondary';
+      case 'waiting': return 'outline';
+      default: return 'secondary';
+    }
+  };
+
+  if (loading) {
+    return <div className="p-8">Loading dashboard...</div>;
+  }
+
+  return (
+    <div className="p-8 space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold">Live Activity Dashboard</h1>
+        <p className="text-muted-foreground">Real-time AI performance metrics for today</p>
+      </div>
+
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Total Conversations</p>
+              <h3 className="text-3xl font-bold mt-2">{stats.total}</h3>
+            </div>
+            <MessageSquare className="h-8 w-8 text-primary" />
+          </div>
+        </Card>
+
+        <Card className="p-6 bg-green-50 dark:bg-green-950/20">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">AI Handled</p>
+              <h3 className="text-3xl font-bold mt-2 text-green-600 dark:text-green-400">
+                {stats.aiHandled}
+              </h3>
+              <p className="text-xs text-muted-foreground mt-1">
+                {stats.total > 0 ? Math.round((stats.aiHandled / stats.total) * 100) : 0}% auto-resolved
+              </p>
+            </div>
+            <Bot className="h-8 w-8 text-green-600 dark:text-green-400" />
+          </div>
+        </Card>
+
+        <Card className="p-6 bg-orange-50 dark:bg-orange-950/20">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Escalated</p>
+              <h3 className="text-3xl font-bold mt-2 text-orange-600 dark:text-orange-400">
+                {stats.escalated}
+              </h3>
+              <p className="text-xs text-muted-foreground mt-1">Needs human attention</p>
+            </div>
+            <AlertCircle className="h-8 w-8 text-orange-600 dark:text-orange-400" />
+          </div>
+        </Card>
+
+        <Card className="p-6 bg-blue-50 dark:bg-blue-950/20">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Avg Confidence</p>
+              <h3 className="text-3xl font-bold mt-2 text-blue-600 dark:text-blue-400">
+                {Math.round(stats.avgConfidence)}%
+              </h3>
+              <p className="text-xs text-muted-foreground mt-1">AI certainty score</p>
+            </div>
+            <Zap className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+          </div>
+        </Card>
+      </div>
+
+      {/* Sentiment Breakdown */}
+      <Card className="p-6">
+        <h3 className="text-lg font-semibold mb-4">Customer Sentiment</h3>
+        <div className="grid grid-cols-3 gap-4">
+          <div className="text-center">
+            <div className="text-3xl mb-2">😊</div>
+            <p className="text-2xl font-bold text-green-600">{stats.positiveCount}</p>
+            <p className="text-sm text-muted-foreground">Positive</p>
+          </div>
+          <div className="text-center">
+            <div className="text-3xl mb-2">😐</div>
+            <p className="text-2xl font-bold">{stats.neutralCount}</p>
+            <p className="text-sm text-muted-foreground">Neutral</p>
+          </div>
+          <div className="text-center">
+            <div className="text-3xl mb-2">😟</div>
+            <p className="text-2xl font-bold text-red-600">{stats.negativeCount}</p>
+            <p className="text-sm text-muted-foreground">Negative</p>
+          </div>
+        </div>
+      </Card>
+
+      {/* Recent Conversations */}
+      <Card className="p-6">
+        <h3 className="text-lg font-semibold mb-4">Recent Conversations (Live)</h3>
+        <ScrollArea className="h-[400px]">
+          <div className="space-y-3">
+            {recentConversations.map((conv) => (
+              <div
+                key={conv.id}
+                className="p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-2">
+                      {conv.is_escalated ? (
+                        <AlertCircle className="h-4 w-4 text-orange-600 shrink-0" />
+                      ) : (
+                        <Bot className="h-4 w-4 text-green-600 shrink-0" />
+                      )}
+                      <p className="font-medium truncate">{conv.title}</p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 text-sm">
+                      <Badge variant={getStatusColor(conv.status)}>{conv.status}</Badge>
+                      {conv.category && (
+                        <Badge variant="outline">{conv.category}</Badge>
+                      )}
+                      {conv.ai_confidence !== null && (
+                        <span className="text-xs text-muted-foreground">
+                          {Math.round(conv.ai_confidence)}% confident
+                        </span>
+                      )}
+                      {conv.ai_sentiment && (
+                        <span className="text-xs">{getSentimentIcon(conv.ai_sentiment)}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-right text-xs text-muted-foreground shrink-0">
+                    <div>{format(new Date(conv.created_at), 'HH:mm')}</div>
+                    <div className="flex items-center gap-1 mt-1">
+                      <Clock className="h-3 w-3" />
+                      {format(new Date(conv.updated_at), 'HH:mm')}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {recentConversations.length === 0 && (
+              <p className="text-center text-muted-foreground py-8">
+                No conversations yet today
+              </p>
+            )}
+          </div>
+        </ScrollArea>
+      </Card>
+    </div>
+  );
+};

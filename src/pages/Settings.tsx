@@ -6,6 +6,7 @@ import { RetentionPolicyPanel } from '@/components/settings/RetentionPolicyPanel
 import { InterfaceModeToggle } from '@/components/settings/InterfaceModeToggle';
 import { GDPRDashboard } from '@/components/settings/GDPRDashboard';
 import { CustomerMergePanel } from '@/components/settings/CustomerMergePanel';
+import { ChannelManagementPanel } from '@/components/settings/ChannelManagementPanel';
 import { AIActivityWidget } from '@/components/dashboard/AIActivityWidget';
 import { Card } from '@/components/ui/card';
 
@@ -18,9 +19,10 @@ export default function Settings() {
       </div>
 
       <Tabs defaultValue="dashboard" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-8">
+        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-9">
           <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
           <TabsTrigger value="interface">Interface</TabsTrigger>
+          <TabsTrigger value="channels">Channels</TabsTrigger>
           <TabsTrigger value="gdpr">GDPR</TabsTrigger>
           <TabsTrigger value="cleanup">Cleanup</TabsTrigger>
           <TabsTrigger value="export">Data Export</TabsTrigger>
@@ -37,6 +39,10 @@ export default function Settings() {
 
         <TabsContent value="interface" className="space-y-4">
           <InterfaceModeToggle />
+        </TabsContent>
+
+        <TabsContent value="channels">
+          <ChannelManagementPanel />
         </TabsContent>
 
         <TabsContent value="gdpr">
