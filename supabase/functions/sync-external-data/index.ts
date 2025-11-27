@@ -127,6 +127,12 @@ Deno.serve(async (req) => {
       totalUnchanged += convStats.unchanged;
     }
 
+    // Two-way sync: Push local changes back to external Bizzy Bee
+    console.log('Starting two-way sync: pushing local changes to Bizzy Bee...');
+    const pushStats = await pushLocalChangesToExternal(externalSupabase, localSupabase, workspace.id);
+    
+    const totalPushed = pushStats.reduce((sum: number, s: any) => sum + s.pushed, 0);
+
     // Update sync log
     if (syncLog) {
       await localSupabase
@@ -138,7 +144,11 @@ Deno.serve(async (req) => {
           records_inserted: totalInserted,
           records_updated: totalUpdated,
           records_unchanged: totalUnchanged,
-          details: { stats },
+          details: { 
+            stats, 
+            push_stats: pushStats,
+            total_pushed: totalPushed 
+          },
         })
         .eq('id', syncLog.id);
     }
@@ -147,11 +157,13 @@ Deno.serve(async (req) => {
       success: true,
       sync_id: syncLog?.id,
       stats,
+      push_stats: pushStats,
       totals: {
         fetched: totalFetched,
         inserted: totalInserted,
         updated: totalUpdated,
         unchanged: totalUnchanged,
+        pushed: totalPushed,
       },
     };
 
@@ -842,6 +854,361 @@ async function processBatchConversations(
         result.updated++;
       }
     }
+  }
+
+  return result;
+}
+
+// ============================================================================
+// TWO-WAY SYNC: Push local changes back to external Bizzy Bee database
+// ============================================================================
+
+async function pushLocalChangesToExternal(
+  externalSupabase: any,
+  localSupabase: any,
+  workspaceId: string
+): Promise<any[]> {
+  const pushStats = [];
+
+  console.log('Pushing conversation updates to Bizzy Bee...');
+  const convPushResult = await pushConversationUpdates(externalSupabase, localSupabase, workspaceId);
+  pushStats.push(convPushResult);
+
+  console.log('Pushing customer updates to Bizzy Bee...');
+  const custPushResult = await pushCustomerUpdates(externalSupabase, localSupabase, workspaceId);
+  pushStats.push(custPushResult);
+
+  console.log('Pushing FAQ updates to Bizzy Bee...');
+  const faqPushResult = await pushFAQUpdates(externalSupabase, localSupabase, workspaceId);
+  pushStats.push(faqPushResult);
+
+  console.log('Pushing price list updates to Bizzy Bee...');
+  const pricePushResult = await pushPriceListUpdates(externalSupabase, localSupabase, workspaceId);
+  pushStats.push(pricePushResult);
+
+  console.log('Pushing business facts updates to Bizzy Bee...');
+  const factsPushResult = await pushBusinessFactsUpdates(externalSupabase, localSupabase, workspaceId);
+  pushStats.push(factsPushResult);
+
+  console.log('Two-way sync complete:', pushStats);
+  return pushStats;
+}
+
+async function pushConversationUpdates(
+  externalSupabase: any,
+  localSupabase: any,
+  workspaceId: string
+): Promise<any> {
+  const result = { table: 'conversations', pushed: 0, errors: [] as string[] };
+
+  try {
+    // Get conversations modified locally
+    const { data: localConvs, error: localError } = await localSupabase
+      .from('conversations')
+      .select('*')
+      .eq('workspace_id', workspaceId)
+      .not('external_conversation_id', 'is', null)
+      .order('updated_at', { ascending: false })
+      .limit(1000);
+
+    if (localError) throw localError;
+    if (!localConvs || localConvs.length === 0) {
+      console.log('No local conversation updates to push');
+      return result;
+    }
+
+    console.log(`Found ${localConvs.length} local conversations to check`);
+
+    // Process in batches of 50
+    for (let i = 0; i < localConvs.length; i += 50) {
+      const batch = localConvs.slice(i, i + 50);
+      const externalIds = batch.map((c: any) => c.external_conversation_id).filter(Boolean);
+
+      // Get external versions
+      const { data: externalConvs } = await externalSupabase
+        .from('conversations')
+        .select('id, external_conversation_id, updated_at')
+        .in('external_conversation_id', externalIds);
+
+      const externalMap = new Map(
+        (externalConvs || []).map((c: any) => [c.external_conversation_id, c])
+      );
+
+      // Update where local is newer (this system wins)
+      for (const localConv of batch) {
+        const externalConv: any = externalMap.get(localConv.external_conversation_id);
+        
+        if (!externalConv) continue;
+
+        const localUpdated = new Date(localConv.updated_at);
+        const externalUpdated = new Date(externalConv.updated_at);
+
+        // This system wins: push if local is same or newer
+        if (localUpdated >= externalUpdated) {
+          const { error: updateError } = await externalSupabase
+            .from('conversations')
+            .update({
+              status: localConv.status,
+              assigned_to: localConv.assigned_to,
+              priority: localConv.priority,
+              is_escalated: localConv.is_escalated,
+              escalated_at: localConv.escalated_at,
+              resolved_at: localConv.resolved_at,
+              snoozed_until: localConv.snoozed_until,
+              final_response: localConv.final_response,
+              ai_draft_response: localConv.ai_draft_response,
+              human_edited: localConv.human_edited,
+              customer_satisfaction: localConv.customer_satisfaction,
+              updated_at: localConv.updated_at,
+            })
+            .eq('external_conversation_id', localConv.external_conversation_id);
+
+          if (updateError) {
+            result.errors.push(`Conv ${localConv.external_conversation_id}: ${updateError.message}`);
+          } else {
+            result.pushed++;
+          }
+        }
+      }
+    }
+
+    console.log(`Pushed ${result.pushed} conversation updates to Bizzy Bee`);
+  } catch (error: any) {
+    result.errors.push(`Conversation push failed: ${error.message}`);
+  }
+
+  return result;
+}
+
+async function pushCustomerUpdates(
+  externalSupabase: any,
+  localSupabase: any,
+  workspaceId: string
+): Promise<any> {
+  const result = { table: 'customers', pushed: 0, errors: [] as string[] };
+
+  try {
+    const { data: localCustomers, error: localError } = await localSupabase
+      .from('customers')
+      .select('*')
+      .eq('workspace_id', workspaceId)
+      .not('customer_id', 'is', null)
+      .limit(500);
+
+    if (localError) throw localError;
+    if (!localCustomers || localCustomers.length === 0) return result;
+
+    const customerIds = localCustomers.map((c: any) => c.customer_id).filter(Boolean);
+    const { data: externalCustomers } = await externalSupabase
+      .from('customers')
+      .select('customer_id, updated_at')
+      .in('customer_id', customerIds);
+
+    const externalMap = new Map(
+      (externalCustomers || []).map((c: any) => [c.customer_id, c])
+    );
+
+    for (const localCust of localCustomers) {
+      const externalCust: any = externalMap.get(localCust.customer_id);
+      if (!externalCust) continue;
+
+      const localUpdated = new Date(localCust.updated_at);
+      const externalUpdated = new Date(externalCust.updated_at);
+
+      if (localUpdated >= externalUpdated) {
+        const { error: updateError } = await externalSupabase
+          .from('customers')
+          .update({
+            name: localCust.name,
+            email: localCust.email,
+            phone: localCust.phone,
+            notes: localCust.notes,
+            status: localCust.status,
+            tier: localCust.tier,
+            preferred_channel: localCust.preferred_channel,
+            updated_at: localCust.updated_at,
+          })
+          .eq('customer_id', localCust.customer_id);
+
+        if (!updateError) result.pushed++;
+        else result.errors.push(`Cust ${localCust.customer_id}: ${updateError.message}`);
+      }
+    }
+
+    console.log(`Pushed ${result.pushed} customer updates`);
+  } catch (error: any) {
+    result.errors.push(`Customer push failed: ${error.message}`);
+  }
+
+  return result;
+}
+
+async function pushFAQUpdates(
+  externalSupabase: any,
+  localSupabase: any,
+  workspaceId: string
+): Promise<any> {
+  const result = { table: 'faq_database', pushed: 0, errors: [] as string[] };
+
+  try {
+    const { data: localFAQs } = await localSupabase
+      .from('faq_database')
+      .select('*')
+      .eq('workspace_id', workspaceId)
+      .not('external_id', 'is', null);
+
+    if (!localFAQs || localFAQs.length === 0) return result;
+
+    const externalIds = localFAQs.map((f: any) => f.external_id).filter(Boolean);
+    const { data: externalFAQs } = await externalSupabase
+      .from('faq_database')
+      .select('external_id, updated_at')
+      .in('external_id', externalIds);
+
+    const externalMap = new Map(
+      (externalFAQs || []).map((f: any) => [f.external_id, f])
+    );
+
+    for (const localFAQ of localFAQs) {
+      const externalFAQ: any = externalMap.get(localFAQ.external_id);
+      if (!externalFAQ) continue;
+
+      const localUpdated = new Date(localFAQ.updated_at);
+      const externalUpdated = new Date(externalFAQ.updated_at);
+
+      if (localUpdated >= externalUpdated) {
+        const { error } = await externalSupabase
+          .from('faq_database')
+          .update({
+            question: localFAQ.question,
+            answer: localFAQ.answer,
+            category: localFAQ.category,
+            enabled: localFAQ.enabled,
+            updated_at: localFAQ.updated_at,
+          })
+          .eq('external_id', localFAQ.external_id);
+
+        if (!error) result.pushed++;
+      }
+    }
+
+    console.log(`Pushed ${result.pushed} FAQ updates`);
+  } catch (error: any) {
+    result.errors.push(`FAQ push failed: ${error.message}`);
+  }
+
+  return result;
+}
+
+async function pushPriceListUpdates(
+  externalSupabase: any,
+  localSupabase: any,
+  workspaceId: string
+): Promise<any> {
+  const result = { table: 'price_list', pushed: 0, errors: [] as string[] };
+
+  try {
+    const { data: localPrices } = await localSupabase
+      .from('price_list')
+      .select('*')
+      .eq('workspace_id', workspaceId)
+      .not('external_id', 'is', null);
+
+    if (!localPrices || localPrices.length === 0) return result;
+
+    const externalIds = localPrices.map((p: any) => p.external_id).filter(Boolean);
+    const { data: externalPrices } = await externalSupabase
+      .from('price_list')
+      .select('external_id, updated_at')
+      .in('external_id', externalIds);
+
+    const externalMap = new Map(
+      (externalPrices || []).map((p: any) => [p.external_id, p])
+    );
+
+    for (const localPrice of localPrices) {
+      const externalPrice: any = externalMap.get(localPrice.external_id);
+      if (!externalPrice) continue;
+
+      const localUpdated = new Date(localPrice.updated_at);
+      const externalUpdated = new Date(externalPrice.updated_at);
+
+      if (localUpdated >= externalUpdated) {
+        const { error } = await externalSupabase
+          .from('price_list')
+          .update({
+            service_name: localPrice.service_name,
+            base_price: localPrice.base_price,
+            price_min: localPrice.price_min,
+            price_max: localPrice.price_max,
+            is_active: localPrice.is_active,
+            updated_at: localPrice.updated_at,
+          })
+          .eq('external_id', localPrice.external_id);
+
+        if (!error) result.pushed++;
+      }
+    }
+
+    console.log(`Pushed ${result.pushed} price list updates`);
+  } catch (error: any) {
+    result.errors.push(`Price list push failed: ${error.message}`);
+  }
+
+  return result;
+}
+
+async function pushBusinessFactsUpdates(
+  externalSupabase: any,
+  localSupabase: any,
+  workspaceId: string
+): Promise<any> {
+  const result = { table: 'business_facts', pushed: 0, errors: [] as string[] };
+
+  try {
+    const { data: localFacts } = await localSupabase
+      .from('business_facts')
+      .select('*')
+      .eq('workspace_id', workspaceId)
+      .not('external_id', 'is', null);
+
+    if (!localFacts || localFacts.length === 0) return result;
+
+    const externalIds = localFacts.map((f: any) => f.external_id).filter(Boolean);
+    const { data: externalFacts } = await externalSupabase
+      .from('business_facts')
+      .select('external_id, updated_at')
+      .in('external_id', externalIds);
+
+    const externalMap = new Map(
+      (externalFacts || []).map((f: any) => [f.external_id, f])
+    );
+
+    for (const localFact of localFacts) {
+      const externalFact: any = externalMap.get(localFact.external_id);
+      if (!externalFact) continue;
+
+      const localUpdated = new Date(localFact.updated_at);
+      const externalUpdated = new Date(externalFact.updated_at);
+
+      if (localUpdated >= externalUpdated) {
+        const { error } = await externalSupabase
+          .from('business_facts')
+          .update({
+            fact_key: localFact.fact_key,
+            fact_value: localFact.fact_value,
+            category: localFact.category,
+            updated_at: localFact.updated_at,
+          })
+          .eq('external_id', localFact.external_id);
+
+        if (!error) result.pushed++;
+      }
+    }
+
+    console.log(`Pushed ${result.pushed} business facts updates`);
+  } catch (error: any) {
+    result.errors.push(`Business facts push failed: ${error.message}`);
   }
 
   return result;
