@@ -290,18 +290,21 @@ async function syncFAQDatabase(
       }
     }
 
-    // Batch insert new FAQs (500 at a time)
+    // Batch insert new FAQs (500 at a time) using upsert to handle duplicates
     if (toInsert.length > 0) {
-      console.log(`Inserting ${toInsert.length} new FAQs in batches...`);
+      console.log(`Upserting ${toInsert.length} FAQs in batches...`);
       for (let i = 0; i < toInsert.length; i += 500) {
         const batch = toInsert.slice(i, i + 500);
         const { error } = await localSupabase
           .from('faq_database')
-          .insert(batch);
+          .upsert(batch, { 
+            onConflict: 'external_id,workspace_id',
+            ignoreDuplicates: false 
+          });
         
         if (error) {
-          console.error('Batch insert error:', error);
-          stats.errors.push(`Batch insert failed: ${error.message}`);
+          console.error('Batch upsert error:', error);
+          stats.errors.push(`Batch upsert failed: ${error.message}`);
         } else {
           stats.inserted += batch.length;
         }
@@ -648,144 +651,63 @@ async function syncConversations(
     
     console.log(`External conversations table has ${count} total records`);
     
-    // Fetch ALL external conversations using pagination
-    let allConvs: any[] = [];
+    // Process conversations in SMALL STREAMING CHUNKS to avoid memory issues
     let from = 0;
-    const batchSize = 1000;
+    const chunkSize = 100; // Process 100 at a time
     let hasMore = true;
+    let processedCount = 0;
 
     while (hasMore) {
+      // Fetch a small batch
       let query = externalSupabase
         .from('conversations')
         .select('*')
-        .range(from, from + batchSize - 1);
+        .range(from, from + chunkSize - 1);
       
       if (!fullSync) {
         const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
         query = query.gte('created_at', oneDayAgo);
       }
 
-      console.log(`Attempting to fetch conversations batch ${from}-${from + batchSize - 1}`);
-      const { data, error } = await query;
+      console.log(`Processing conversations ${from}-${from + chunkSize - 1}...`);
+      const { data: batchConvs, error } = await query;
       
       if (error) {
-        console.error('Error fetching conversations from external DB:', error);
+        console.error('Error fetching conversations batch:', error);
         stats.errors.push(`Batch fetch error: ${error.message}`);
-        throw error;
+        break;
       }
 
-      if (!data || data.length === 0) {
-        console.log(`No conversations found in batch ${from}-${from + batchSize - 1}`);
+      if (!batchConvs || batchConvs.length === 0) {
+        hasMore = false;
+        break;
+      }
+
+      // Process this batch
+      const batchResults = await processBatchConversations(
+        batchConvs,
+        localSupabase,
+        workspaceId
+      );
+
+      stats.fetched += batchConvs.length;
+      stats.inserted += batchResults.inserted;
+      stats.updated += batchResults.updated;
+      stats.unchanged += batchResults.unchanged;
+      stats.errors.push(...batchResults.errors);
+
+      processedCount += batchConvs.length;
+      console.log(`Processed ${processedCount} conversations so far (inserted: ${stats.inserted}, updated: ${stats.updated})`);
+
+      // Check if we should continue
+      if (batchConvs.length < chunkSize) {
         hasMore = false;
       } else {
-        allConvs = allConvs.concat(data);
-        console.log(`Fetched batch: ${data.length} conversations (total: ${allConvs.length})`);
-        if (data.length < batchSize) {
-          hasMore = false;
-        } else {
-          from += batchSize;
-        }
+        from += chunkSize;
       }
     }
 
-    stats.fetched = allConvs.length;
-    console.log(`Fetched ${stats.fetched} conversations total from external database`);
-
-    const externalConvs = allConvs;
-
-    // Process each conversation
-    for (const externalConv of externalConvs || []) {
-      try {
-        // Check if conversation exists
-        const { data: existing } = await localSupabase
-          .from('conversations')
-          .select('id, updated_at')
-          .eq('external_conversation_id', String(externalConv.id))
-          .eq('workspace_id', workspaceId)
-          .maybeSingle();
-
-        // Map source to channel
-        const channelMap: Record<string, string> = {
-          'whatsapp': 'whatsapp',
-          'sms': 'sms',
-          'email': 'email',
-          'phone': 'phone',
-          'web': 'webchat',
-        };
-        const channel = channelMap[externalConv.source?.toLowerCase()] || 'webchat';
-
-        // Try to find customer by phone or email
-        let customerId = null;
-        if (externalConv.customer_phone || externalConv.customer_email) {
-          const customerQuery = localSupabase
-            .from('customers')
-            .select('id')
-            .eq('workspace_id', workspaceId);
-
-          if (externalConv.customer_phone) {
-            customerQuery.eq('phone', externalConv.customer_phone);
-          } else if (externalConv.customer_email) {
-            customerQuery.eq('email', externalConv.customer_email);
-          }
-
-          const { data: customer } = await customerQuery.maybeSingle();
-          customerId = customer?.id || null;
-        }
-
-        const convData = {
-          workspace_id: workspaceId,
-          external_conversation_id: String(externalConv.id),
-          customer_id: customerId,
-          channel: channel,
-          title: externalConv.text?.substring(0, 100) || 'Imported conversation',
-          summary_for_human: externalConv.text || null,
-          category: externalConv.intent || 'other',
-          mode: externalConv.mode || 'ai',
-          status: externalConv.escalation_handled ? 'resolved' : (externalConv.escalated ? 'escalated' : 'new'),
-          is_escalated: externalConv.escalated ?? false,
-          confidence: externalConv.confidence || null,
-          ai_draft_response: externalConv.ai_draft_response || externalConv.ai_response || null,
-          final_response: externalConv.final_response || null,
-          human_edited: externalConv.human_edited ?? false,
-          auto_responded: externalConv.auto_responded ?? false,
-          customer_satisfaction: externalConv.customer_satisfaction || null,
-          led_to_booking: externalConv.led_to_booking ?? false,
-          embedding: externalConv.embedding || null,
-          needs_embedding: !externalConv.embedding,
-          first_response_at: externalConv.sent_at || null,
-          metadata: externalConv.metadata || {},
-          created_at: externalConv.created_at || new Date().toISOString(),
-          updated_at: externalConv.created_at || new Date().toISOString(),
-        };
-
-        if (existing) {
-          // Check if update needed
-          if (new Date(externalConv.created_at) > new Date(existing.updated_at)) {
-            const { error: updateError } = await localSupabase
-              .from('conversations')
-              .update(convData)
-              .eq('id', existing.id);
-
-            if (updateError) throw updateError;
-            stats.updated++;
-          } else {
-            stats.unchanged++;
-          }
-        } else {
-          // Insert new conversation
-          const { error: insertError } = await localSupabase
-            .from('conversations')
-            .insert(convData);
-
-          if (insertError) throw insertError;
-          stats.inserted++;
-        }
-      } catch (error) {
-        console.error('Error processing conversation:', error);
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        stats.errors.push(`Conversation ${externalConv.id}: ${errorMessage}`);
-      }
-    }
+    console.log(`Conversation sync complete: fetched ${stats.fetched}, inserted ${stats.inserted}, updated ${stats.updated}, unchanged ${stats.unchanged}`);
   } catch (error) {
     console.error('Error syncing conversations:', error);
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -793,4 +715,137 @@ async function syncConversations(
   }
 
   return stats;
+}
+
+async function processBatchConversations(
+  conversations: any[],
+  localSupabase: any,
+  workspaceId: string
+): Promise<{ inserted: number; updated: number; unchanged: number; errors: string[] }> {
+  const result = { inserted: 0, updated: 0, unchanged: 0, errors: [] as string[] };
+
+  // Get all external IDs from this batch
+  const externalIds = conversations.map(c => String(c.id));
+  
+  // Fetch existing conversations in ONE query
+  const { data: existingConvs } = await localSupabase
+    .from('conversations')
+    .select('id, external_conversation_id, updated_at')
+    .eq('workspace_id', workspaceId)
+    .in('external_conversation_id', externalIds);
+
+  const existingMap = new Map(
+    (existingConvs || []).map((c: any) => [c.external_conversation_id, c])
+  );
+
+  const toInsert: any[] = [];
+  const toUpdate: any[] = [];
+
+  for (const externalConv of conversations) {
+    try {
+      // Map source to channel
+      const channelMap: Record<string, string> = {
+        'whatsapp': 'whatsapp',
+        'sms': 'sms',
+        'email': 'email',
+        'phone': 'phone',
+        'web': 'webchat',
+      };
+      const channel = channelMap[externalConv.source?.toLowerCase()] || 'webchat';
+
+      // Try to find customer (simplified - no batch optimization here yet)
+      let customerId = null;
+      if (externalConv.customer_phone || externalConv.customer_email) {
+        const customerQuery = localSupabase
+          .from('customers')
+          .select('id')
+          .eq('workspace_id', workspaceId);
+
+        if (externalConv.customer_phone) {
+          customerQuery.eq('phone', externalConv.customer_phone);
+        } else if (externalConv.customer_email) {
+          customerQuery.eq('email', externalConv.customer_email);
+        }
+
+        const { data: customer } = await customerQuery.maybeSingle();
+        customerId = customer?.id || null;
+      }
+
+      const convData = {
+        workspace_id: workspaceId,
+        external_conversation_id: String(externalConv.id),
+        customer_id: customerId,
+        channel: channel,
+        title: externalConv.text?.substring(0, 100) || 'Imported conversation',
+        summary_for_human: externalConv.text || null,
+        category: externalConv.intent || 'other',
+        mode: externalConv.mode || 'ai',
+        status: externalConv.escalation_handled ? 'resolved' : (externalConv.escalated ? 'escalated' : 'new'),
+        is_escalated: externalConv.escalated ?? false,
+        confidence: externalConv.confidence || null,
+        ai_draft_response: externalConv.ai_draft_response || externalConv.ai_response || null,
+        final_response: externalConv.final_response || null,
+        human_edited: externalConv.human_edited ?? false,
+        auto_responded: externalConv.auto_responded ?? false,
+        customer_satisfaction: externalConv.customer_satisfaction || null,
+        led_to_booking: externalConv.led_to_booking ?? false,
+        embedding: externalConv.embedding || null,
+        needs_embedding: !externalConv.embedding,
+        first_response_at: externalConv.sent_at || null,
+        metadata: externalConv.metadata || {},
+        created_at: externalConv.created_at || new Date().toISOString(),
+        updated_at: externalConv.created_at || new Date().toISOString(),
+      };
+
+      const existing: any = existingMap.get(String(externalConv.id));
+      
+      if (existing) {
+        if (new Date(externalConv.created_at) > new Date(existing.updated_at)) {
+          toUpdate.push({ ...convData, id: existing.id });
+        } else {
+          result.unchanged++;
+        }
+      } else {
+        toInsert.push(convData);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      result.errors.push(`Conversation ${externalConv.id}: ${errorMessage}`);
+    }
+  }
+
+  // Batch insert
+  if (toInsert.length > 0) {
+    const { error } = await localSupabase
+      .from('conversations')
+      .upsert(toInsert, { 
+        onConflict: 'external_conversation_id,workspace_id',
+        ignoreDuplicates: false 
+      });
+    
+    if (error) {
+      result.errors.push(`Batch insert failed: ${error.message}`);
+    } else {
+      result.inserted = toInsert.length;
+    }
+  }
+
+  // Batch update
+  if (toUpdate.length > 0) {
+    for (const conv of toUpdate) {
+      const { id, ...updateData } = conv;
+      const { error } = await localSupabase
+        .from('conversations')
+        .update(updateData)
+        .eq('id', id);
+      
+      if (error) {
+        result.errors.push(`Update failed: ${error.message}`);
+      } else {
+        result.updated++;
+      }
+    }
+  }
+
+  return result;
 }
