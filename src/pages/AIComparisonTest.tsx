@@ -75,6 +75,7 @@ export default function AIComparisonTest() {
   const [model, setModel] = useState('claude-sonnet-4-5');
   const [channel, setChannel] = useState('whatsapp');
   const [customerMessage, setCustomerMessage] = useState('');
+  const [systemPrompt, setSystemPrompt] = useState('');
   const [results, setResults] = useState<TestResult[]>([]);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -92,7 +93,7 @@ export default function AIComparisonTest() {
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('ai-comparison-test', {
-        body: { model, channel, customerMessage }
+        body: { model, channel, customerMessage, systemPrompt: systemPrompt.trim() || undefined }
       });
 
       if (error) throw error;
@@ -134,7 +135,7 @@ export default function AIComparisonTest() {
       // Run tests for all 4 channels in parallel
       const channelTests = CHANNELS.map(ch => 
         supabase.functions.invoke('ai-comparison-test', {
-          body: { model, channel: ch.value, customerMessage }
+          body: { model, channel: ch.value, customerMessage, systemPrompt: systemPrompt.trim() || undefined }
         })
       );
 
@@ -207,6 +208,37 @@ export default function AIComparisonTest() {
               </Button>
             ))}
           </div>
+        </Card>
+
+        {/* System Prompt Editor */}
+        <Card className="p-6">
+          <details className="space-y-4">
+            <summary className="cursor-pointer font-semibold text-lg mb-4">
+              System Prompt {systemPrompt.trim() && <Badge variant="secondary" className="ml-2">Custom</Badge>}
+            </summary>
+            <div>
+              <label className="text-sm font-medium mb-2 block">
+                Custom System Prompt (leave blank to use default MAC Cleaning prompt)
+              </label>
+              <Textarea
+                value={systemPrompt}
+                onChange={(e) => setSystemPrompt(e.target.value)}
+                placeholder="Enter a custom system prompt, or leave blank to use the default MAC Cleaning customer service prompt..."
+                rows={8}
+                className="font-mono text-xs"
+              />
+              {systemPrompt.trim() && (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="mt-2"
+                  onClick={() => setSystemPrompt('')}
+                >
+                  Reset to Default
+                </Button>
+              )}
+            </div>
+          </details>
         </Card>
 
         {/* Test Controls */}
