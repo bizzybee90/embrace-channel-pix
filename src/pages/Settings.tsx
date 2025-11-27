@@ -8,6 +8,8 @@ import { GDPRDashboard } from '@/components/settings/GDPRDashboard';
 import { CustomerMergePanel } from '@/components/settings/CustomerMergePanel';
 import { ChannelManagementPanel } from '@/components/settings/ChannelManagementPanel';
 import { AIActivityWidget } from '@/components/dashboard/AIActivityWidget';
+import { AIAgentPanel } from '@/components/settings/AIAgentPanel';
+import { ConversationOrderingPanel } from '@/components/settings/ConversationOrderingPanel';
 import { Card } from '@/components/ui/card';
 
 export default function Settings() {
@@ -19,9 +21,11 @@ export default function Settings() {
       </div>
 
       <Tabs defaultValue="dashboard" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-9">
+        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-11">
           <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
           <TabsTrigger value="interface">Interface</TabsTrigger>
+          <TabsTrigger value="ordering">Ordering</TabsTrigger>
+          <TabsTrigger value="ai-agent">AI Agent</TabsTrigger>
           <TabsTrigger value="channels">Channels</TabsTrigger>
           <TabsTrigger value="gdpr">GDPR</TabsTrigger>
           <TabsTrigger value="cleanup">Cleanup</TabsTrigger>
@@ -39,6 +43,14 @@ export default function Settings() {
 
         <TabsContent value="interface" className="space-y-4">
           <InterfaceModeToggle />
+        </TabsContent>
+
+        <TabsContent value="ordering">
+          <ConversationOrderingPanel />
+        </TabsContent>
+
+        <TabsContent value="ai-agent">
+          <AIAgentPanel />
         </TabsContent>
 
         <TabsContent value="channels">
