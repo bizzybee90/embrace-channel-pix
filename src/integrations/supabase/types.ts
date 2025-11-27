@@ -53,6 +53,7 @@ export type Database = {
         Row: {
           category: string
           created_at: string | null
+          external_id: number | null
           fact_key: string
           fact_value: string
           id: string
@@ -63,6 +64,7 @@ export type Database = {
         Insert: {
           category: string
           created_at?: string | null
+          external_id?: number | null
           fact_key: string
           fact_value: string
           id?: string
@@ -73,6 +75,7 @@ export type Database = {
         Update: {
           category?: string
           created_at?: string | null
+          external_id?: number | null
           fact_key?: string
           fact_value?: string
           id?: string
@@ -287,40 +290,73 @@ export type Database = {
       }
       customers: {
         Row: {
+          address: string | null
+          balance: number | null
           created_at: string | null
           custom_fields: Json | null
+          customer_id: string | null
           email: string | null
+          embedding: string | null
+          frequency: string | null
           id: string
+          last_updated: string | null
           name: string | null
+          next_appointment: string | null
           notes: string | null
+          payment_method: string | null
           phone: string | null
           preferred_channel: string | null
+          price: number | null
+          schedule_code: string | null
+          status: string | null
           tier: string | null
           updated_at: string | null
           workspace_id: string | null
         }
         Insert: {
+          address?: string | null
+          balance?: number | null
           created_at?: string | null
           custom_fields?: Json | null
+          customer_id?: string | null
           email?: string | null
+          embedding?: string | null
+          frequency?: string | null
           id?: string
+          last_updated?: string | null
           name?: string | null
+          next_appointment?: string | null
           notes?: string | null
+          payment_method?: string | null
           phone?: string | null
           preferred_channel?: string | null
+          price?: number | null
+          schedule_code?: string | null
+          status?: string | null
           tier?: string | null
           updated_at?: string | null
           workspace_id?: string | null
         }
         Update: {
+          address?: string | null
+          balance?: number | null
           created_at?: string | null
           custom_fields?: Json | null
+          customer_id?: string | null
           email?: string | null
+          embedding?: string | null
+          frequency?: string | null
           id?: string
+          last_updated?: string | null
           name?: string | null
+          next_appointment?: string | null
           notes?: string | null
+          payment_method?: string | null
           phone?: string | null
           preferred_channel?: string | null
+          price?: number | null
+          schedule_code?: string | null
+          status?: string | null
           tier?: string | null
           updated_at?: string | null
           workspace_id?: string | null
@@ -544,10 +580,17 @@ export type Database = {
           answer: string
           category: string
           created_at: string | null
+          embedding: string | null
+          enabled: boolean | null
+          external_id: number | null
           id: string
+          is_active: boolean | null
+          is_industry_standard: boolean | null
+          is_mac_specific: boolean | null
           keywords: string[] | null
           priority: number | null
           question: string
+          source_company: string | null
           updated_at: string | null
           workspace_id: string | null
         }
@@ -555,10 +598,17 @@ export type Database = {
           answer: string
           category: string
           created_at?: string | null
+          embedding?: string | null
+          enabled?: boolean | null
+          external_id?: number | null
           id?: string
+          is_active?: boolean | null
+          is_industry_standard?: boolean | null
+          is_mac_specific?: boolean | null
           keywords?: string[] | null
           priority?: number | null
           question: string
+          source_company?: string | null
           updated_at?: string | null
           workspace_id?: string | null
         }
@@ -566,10 +616,17 @@ export type Database = {
           answer?: string
           category?: string
           created_at?: string | null
+          embedding?: string | null
+          enabled?: boolean | null
+          external_id?: number | null
           id?: string
+          is_active?: boolean | null
+          is_industry_standard?: boolean | null
+          is_mac_specific?: boolean | null
           keywords?: string[] | null
           priority?: number | null
           question?: string
+          source_company?: string | null
           updated_at?: string | null
           workspace_id?: string | null
         }
@@ -680,42 +737,90 @@ export type Database = {
       }
       price_list: {
         Row: {
+          affects_package: boolean | null
+          applies_to_properties: string[] | null
           base_price: number | null
+          bedrooms: string | null
+          category: string | null
           created_at: string | null
           currency: string | null
+          customer_count: number | null
           description: string | null
+          external_id: number | null
           id: string
+          is_active: boolean | null
           metadata: Json | null
+          per_unit: boolean | null
+          price_max: number | null
+          price_min: number | null
           price_range: string | null
+          price_typical: number | null
+          property_type: string | null
+          rule_priority: number | null
+          service_code: string | null
           service_name: string
           unit: string | null
           updated_at: string | null
+          window_price_max: number | null
+          window_price_min: number | null
           workspace_id: string | null
         }
         Insert: {
+          affects_package?: boolean | null
+          applies_to_properties?: string[] | null
           base_price?: number | null
+          bedrooms?: string | null
+          category?: string | null
           created_at?: string | null
           currency?: string | null
+          customer_count?: number | null
           description?: string | null
+          external_id?: number | null
           id?: string
+          is_active?: boolean | null
           metadata?: Json | null
+          per_unit?: boolean | null
+          price_max?: number | null
+          price_min?: number | null
           price_range?: string | null
+          price_typical?: number | null
+          property_type?: string | null
+          rule_priority?: number | null
+          service_code?: string | null
           service_name: string
           unit?: string | null
           updated_at?: string | null
+          window_price_max?: number | null
+          window_price_min?: number | null
           workspace_id?: string | null
         }
         Update: {
+          affects_package?: boolean | null
+          applies_to_properties?: string[] | null
           base_price?: number | null
+          bedrooms?: string | null
+          category?: string | null
           created_at?: string | null
           currency?: string | null
+          customer_count?: number | null
           description?: string | null
+          external_id?: number | null
           id?: string
+          is_active?: boolean | null
           metadata?: Json | null
+          per_unit?: boolean | null
+          price_max?: number | null
+          price_min?: number | null
           price_range?: string | null
+          price_typical?: number | null
+          property_type?: string | null
+          rule_priority?: number | null
+          service_code?: string | null
           service_name?: string
           unit?: string | null
           updated_at?: string | null
+          window_price_max?: number | null
+          window_price_min?: number | null
           workspace_id?: string | null
         }
         Relationships: [
@@ -753,6 +858,62 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "sla_configs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sync_logs: {
+        Row: {
+          completed_at: string | null
+          details: Json | null
+          error_message: string | null
+          id: string
+          records_fetched: number | null
+          records_inserted: number | null
+          records_unchanged: number | null
+          records_updated: number | null
+          started_at: string | null
+          status: string | null
+          sync_type: string
+          tables_synced: string[]
+          workspace_id: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          details?: Json | null
+          error_message?: string | null
+          id?: string
+          records_fetched?: number | null
+          records_inserted?: number | null
+          records_unchanged?: number | null
+          records_updated?: number | null
+          started_at?: string | null
+          status?: string | null
+          sync_type: string
+          tables_synced: string[]
+          workspace_id?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          details?: Json | null
+          error_message?: string | null
+          id?: string
+          records_fetched?: number | null
+          records_inserted?: number | null
+          records_unchanged?: number | null
+          records_updated?: number | null
+          started_at?: string | null
+          status?: string | null
+          sync_type?: string
+          tables_synced?: string[]
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sync_logs_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
