@@ -35,3 +35,9 @@ verify_jwt = false
 
 [functions.send-scheduled-summary]
 verify_jwt = false
+
+[functions.receive-apify-data]
+verify_jwt = false
+
+[functions.sync-external-data]
+verify_jwt = false
