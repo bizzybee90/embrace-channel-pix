@@ -170,7 +170,7 @@ export function DataSyncPanel() {
               )}
             </Button>
             <Button 
-              onClick={() => handleSync(['faq_database', 'price_list', 'business_facts', 'conversations'])}
+              onClick={() => handleSync(['faq_database', 'price_list', 'business_facts', 'customers', 'conversations'])}
               disabled={syncing}
               variant="outline"
               className="w-full"
@@ -183,7 +183,7 @@ export function DataSyncPanel() {
               ) : (
                 <>
                   <RefreshCw className="mr-2 h-4 w-4" />
-                  Sync All (Including 10k+ Conversations)
+                  Sync All (Customers + 10k+ Conversations)
                 </>
               )}
             </Button>
@@ -215,6 +215,14 @@ export function DataSyncPanel() {
                 disabled={syncing}
               >
                 Facts
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleSync(['customers'])}
+                disabled={syncing}
+              >
+                Customers
               </Button>
               <Button
                 variant="outline"
@@ -356,8 +364,8 @@ export function DataSyncPanel() {
           Automatic Sync Schedule
         </h3>
         <p className="text-sm text-muted-foreground">
-          Knowledge base data (FAQs, pricing, business facts, conversations) syncs automatically daily at 3:00 AM UTC.
-          Customer data is synced in real-time via Apify webhooks every 8-12 hours.
+          All data (FAQs, pricing, business facts, customers, conversations) syncs automatically daily at 2:00 AM UK time.
+          Two-way sync is enabled - changes made here are pushed back to Bizzy Bee.
         </p>
       </Card>
     </div>
