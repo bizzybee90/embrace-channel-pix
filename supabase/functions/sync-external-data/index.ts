@@ -23,7 +23,7 @@ Deno.serve(async (req) => {
   try {
     // Get query parameters
     const url = new URL(req.url);
-    const tables = url.searchParams.get('tables')?.split(',') || ['faq_database', 'price_list', 'business_facts', 'conversations'];
+    const tables = url.searchParams.get('tables')?.split(',') || ['faq_database', 'price_list', 'business_facts', 'customers', 'conversations'];
     const fullSync = url.searchParams.get('full') === 'true';
 
     console.log('Starting sync:', { tables, fullSync });
@@ -115,6 +115,16 @@ Deno.serve(async (req) => {
       totalInserted += factsStats.inserted;
       totalUpdated += factsStats.updated;
       totalUnchanged += factsStats.unchanged;
+    }
+
+    // Sync Customers (before conversations so customer IDs are available)
+    if (tables.includes('customers')) {
+      const customerStats = await syncCustomers(externalSupabase, localSupabase, workspace.id, fullSync);
+      stats.push(customerStats);
+      totalFetched += customerStats.fetched;
+      totalInserted += customerStats.inserted;
+      totalUpdated += customerStats.updated;
+      totalUnchanged += customerStats.unchanged;
     }
 
     // Sync Conversations
@@ -626,6 +636,195 @@ async function syncBusinessFacts(
     }
   } catch (error) {
     console.error('Error syncing business facts:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    stats.errors.push(errorMessage);
+  }
+
+  return stats;
+}
+
+async function syncCustomers(
+  externalSupabase: any,
+  localSupabase: any,
+  workspaceId: string,
+  fullSync: boolean
+): Promise<SyncStats> {
+  const stats: SyncStats = {
+    table: 'customers',
+    fetched: 0,
+    inserted: 0,
+    updated: 0,
+    unchanged: 0,
+    errors: [],
+  };
+
+  try {
+    // Fetch external customers in batches
+    let allCustomers: any[] = [];
+    let from = 0;
+    const batchSize = 500;
+    let hasMore = true;
+
+    console.log('Fetching customers with fullSync:', fullSync);
+
+    while (hasMore) {
+      let query = externalSupabase
+        .from('customers')
+        .select('*')
+        .range(from, from + batchSize - 1);
+      
+      if (!fullSync) {
+        const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        query = query.gte('updated_at', oneDayAgo);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error('Error fetching external customers:', error);
+        throw error;
+      }
+
+      if (!data || data.length === 0) {
+        hasMore = false;
+      } else {
+        allCustomers = allCustomers.concat(data);
+        console.log(`Fetched batch: ${data.length} customers (total: ${allCustomers.length})`);
+        
+        if (data.length < batchSize) {
+          hasMore = false;
+        } else {
+          from += batchSize;
+        }
+      }
+    }
+
+    stats.fetched = allCustomers.length;
+    console.log(`Fetched ${stats.fetched} customers total from external database`);
+
+    if (allCustomers.length === 0) {
+      return stats;
+    }
+
+    // Build a list of all identifiers (customer_id, phone, email) to check
+    const customerIds = allCustomers.map(c => c.customer_id).filter(Boolean);
+    const phones = allCustomers.map(c => c.phone).filter(Boolean);
+    const emails = allCustomers.map(c => c.email).filter(Boolean);
+
+    // Fetch ALL existing customers in ONE query using multiple identifiers
+    const { data: existingCustomers } = await localSupabase
+      .from('customers')
+      .select('id, customer_id, phone, email, updated_at')
+      .eq('workspace_id', workspaceId)
+      .or(`customer_id.in.(${customerIds.join(',')}),phone.in.(${phones.join(',')}),email.in.(${emails.join(',')})`);
+
+    // Create Maps for fast lookups by different identifiers
+    const existingByCustomerId = new Map(
+      (existingCustomers || []).filter((c: any) => c.customer_id).map((c: any) => [c.customer_id, c])
+    );
+    const existingByPhone = new Map(
+      (existingCustomers || []).filter((c: any) => c.phone).map((c: any) => [c.phone, c])
+    );
+    const existingByEmail = new Map(
+      (existingCustomers || []).filter((c: any) => c.email).map((c: any) => [c.email, c])
+    );
+
+    console.log(`Found ${existingCustomers?.length || 0} existing customers in local database`);
+
+    // Prepare batched inserts and updates
+    const toInsert: any[] = [];
+    const toUpdate: any[] = [];
+
+    for (const externalCustomer of allCustomers) {
+      const customerData = {
+        workspace_id: workspaceId,
+        customer_id: externalCustomer.customer_id || null,
+        name: externalCustomer.name || null,
+        email: externalCustomer.email || null,
+        phone: externalCustomer.phone || null,
+        address: externalCustomer.address || null,
+        schedule_code: externalCustomer.schedule_code || null,
+        frequency: externalCustomer.frequency || null,
+        price: externalCustomer.price || null,
+        balance: externalCustomer.balance || 0,
+        payment_method: externalCustomer.payment_method || null,
+        notes: externalCustomer.notes || null,
+        next_appointment: externalCustomer.next_appointment || null,
+        status: externalCustomer.status || 'active',
+        tier: externalCustomer.tier || 'regular',
+        preferred_channel: externalCustomer.preferred_channel || null,
+        custom_fields: externalCustomer.custom_fields || {},
+        last_updated: externalCustomer.last_updated || null,
+        updated_at: externalCustomer.updated_at || new Date().toISOString(),
+      };
+
+      // Try to find existing customer by customer_id, phone, or email
+      let existing: any = null;
+      if (externalCustomer.customer_id) {
+        existing = existingByCustomerId.get(externalCustomer.customer_id);
+      }
+      if (!existing && externalCustomer.phone) {
+        existing = existingByPhone.get(externalCustomer.phone);
+      }
+      if (!existing && externalCustomer.email) {
+        existing = existingByEmail.get(externalCustomer.email);
+      }
+      
+      if (existing) {
+        // Check if update needed
+        if (new Date(externalCustomer.updated_at || 0) > new Date(existing.updated_at)) {
+          toUpdate.push({ ...customerData, id: existing.id });
+        } else {
+          stats.unchanged++;
+        }
+      } else {
+        toInsert.push(customerData);
+      }
+    }
+
+    // Batch insert new customers (100 at a time)
+    if (toInsert.length > 0) {
+      console.log(`Inserting ${toInsert.length} new customers in batches...`);
+      for (let i = 0; i < toInsert.length; i += 100) {
+        const batch = toInsert.slice(i, i + 100);
+        const { error } = await localSupabase
+          .from('customers')
+          .insert(batch);
+        
+        if (error) {
+          console.error('Batch insert error:', error);
+          // Don't treat duplicates as fatal errors
+          if (error.code !== '23505') {
+            stats.errors.push(`Batch insert failed: ${error.message}`);
+          }
+        } else {
+          stats.inserted += batch.length;
+        }
+      }
+    }
+
+    // Batch update existing customers
+    if (toUpdate.length > 0) {
+      console.log(`Updating ${toUpdate.length} customers...`);
+      for (const customer of toUpdate) {
+        const { id, ...updateData } = customer;
+        const { error } = await localSupabase
+          .from('customers')
+          .update(updateData)
+          .eq('id', id);
+        
+        if (error) {
+          console.error('Update error:', error);
+          stats.errors.push(`Update failed for customer ${id}: ${error.message}`);
+        } else {
+          stats.updated++;
+        }
+      }
+    }
+
+    console.log(`Customer sync complete: inserted ${stats.inserted}, updated ${stats.updated}, unchanged ${stats.unchanged}`);
+  } catch (error) {
+    console.error('Error syncing customers:', error);
     const errorMessage = error instanceof Error ? error.message : String(error);
     stats.errors.push(errorMessage);
   }
