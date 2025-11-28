@@ -121,27 +121,99 @@ export const TestMessageGenerator = () => {
   const generateTestMessage = async (scenario: typeof testScenarios[0]) => {
     setLoading(true);
     try {
-      const { error } = await supabase
-        .from("escalated_messages")
+      // Get user's workspace
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const { data: userData } = await supabase
+        .from('users')
+        .select('workspace_id')
+        .eq('id', user.id)
+        .single();
+
+      if (!userData?.workspace_id) throw new Error("No workspace found");
+
+      // Create or find customer
+      const { data: customer, error: customerError } = await supabase
+        .from('customers')
         .insert({
-          ...scenario,
-          status: "pending" as const,
+          workspace_id: userData.workspace_id,
+          name: scenario.customer_name,
+          email: scenario.channel === 'email' ? scenario.customer_identifier : null,
+          phone: scenario.channel === 'sms' || scenario.channel === 'whatsapp' ? scenario.customer_identifier : null,
+          tier: 'regular'
+        })
+        .select()
+        .single();
+
+      if (customerError) throw customerError;
+
+      // Create conversation
+      const { data: conversation, error: convError } = await supabase
+        .from('conversations')
+        .insert({
+          workspace_id: userData.workspace_id,
+          customer_id: customer.id,
+          channel: scenario.channel,
+          title: `${scenario.customer_name} - ${scenario.priority} priority`,
+          summary_for_human: scenario.message_content,
+          priority: scenario.priority,
+          status: 'new',
+          is_escalated: true,
+          escalated_at: new Date().toISOString(),
+          ai_reason_for_escalation: 'Test escalation - AI conversation required human intervention',
+          ai_confidence: 0.45,
+          ai_sentiment: scenario.priority === 'high' ? 'negative' : 'neutral',
+          category: scenario.priority === 'high' ? 'urgent' : 'other',
           metadata: {
             ...scenario.metadata,
             test_message: true,
             generated_at: new Date().toISOString()
           }
-        });
+        })
+        .select()
+        .single();
 
-      if (error) throw error;
+      if (convError) throw convError;
+
+      // Create conversation history messages
+      const messagesToInsert = [];
+      
+      // Add AI conversation context
+      for (const msg of scenario.conversation_context) {
+        messagesToInsert.push({
+          conversation_id: conversation.id,
+          body: msg.content,
+          actor_type: msg.role === 'customer' ? 'customer' : 'ai',
+          actor_name: msg.role === 'customer' ? scenario.customer_name : 'AI Assistant',
+          direction: msg.role === 'customer' ? 'inbound' : 'outbound',
+          channel: scenario.channel
+        });
+      }
+
+      // Add final escalation message
+      messagesToInsert.push({
+        conversation_id: conversation.id,
+        body: scenario.message_content,
+        actor_type: 'customer',
+        actor_name: scenario.customer_name,
+        direction: 'inbound',
+        channel: scenario.channel
+      });
+
+      const { error: msgError } = await supabase
+        .from('messages')
+        .insert(messagesToInsert);
+
+      if (msgError) throw msgError;
 
       toast({
-        title: "Test message created",
+        title: "Test conversation created",
         description: `Created ${scenario.channel} escalation from ${scenario.customer_name}`,
       });
     } catch (error: any) {
       toast({
-        title: "Error creating test message",
+        title: "Error creating test conversation",
         description: error.message,
         variant: "destructive",
       });
@@ -153,30 +225,18 @@ export const TestMessageGenerator = () => {
   const generateAll = async () => {
     setLoading(true);
     try {
-      const { error } = await supabase
-        .from("escalated_messages")
-        .insert(
-          testScenarios.map(scenario => ({
-            ...scenario,
-            status: "pending" as const,
-            metadata: {
-              ...scenario.metadata,
-              test_message: true,
-              generated_at: new Date().toISOString()
-            }
-          }))
-        );
-
-      if (error) throw error;
+      for (const scenario of testScenarios) {
+        await generateTestMessage(scenario);
+      }
 
       toast({
-        title: "Test messages created",
+        title: "Test conversations created",
         description: `Created ${testScenarios.length} test escalations across all channels`,
       });
       setOpen(false);
     } catch (error: any) {
       toast({
-        title: "Error creating test messages",
+        title: "Error creating test conversations",
         description: error.message,
         variant: "destructive",
       });
