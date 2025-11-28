@@ -13,6 +13,8 @@ import { ConversationOrderingPanel } from '@/components/settings/ConversationOrd
 import { KnowledgeBasePanel } from '@/components/settings/KnowledgeBasePanel';
 import { DataSyncPanel } from '@/components/settings/DataSyncPanel';
 import { Card } from '@/components/ui/card';
+import { TestMessageGenerator } from '@/components/TestMessageGenerator';
+import { TestTube } from 'lucide-react';
 
 export default function Settings() {
   return (
@@ -29,6 +31,10 @@ export default function Settings() {
             <TabsTrigger value="interface">Interface</TabsTrigger>
             <TabsTrigger value="ordering">Ordering</TabsTrigger>
             <TabsTrigger value="ai-agent">AI Agent</TabsTrigger>
+            <TabsTrigger value="testing" className="flex items-center gap-2">
+              <TestTube className="h-4 w-4" />
+              Testing
+            </TabsTrigger>
             <TabsTrigger value="knowledge-base">Knowledge Base</TabsTrigger>
             <TabsTrigger value="data-sync">Data Sync</TabsTrigger>
             <TabsTrigger value="channels">Channels</TabsTrigger>
@@ -57,6 +63,16 @@ export default function Settings() {
 
         <TabsContent value="ai-agent">
           <AIAgentPanel />
+        </TabsContent>
+
+        <TabsContent value="testing" className="space-y-6">
+          <Card className="p-6">
+            <h2 className="text-xl font-semibold mb-4">Test Message Generator</h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              Generate test messages across different channels to verify AI agent behavior and conversation handling.
+            </p>
+            <TestMessageGenerator />
+          </Card>
         </TabsContent>
 
         <TabsContent value="knowledge-base">
