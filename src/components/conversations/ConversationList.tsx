@@ -142,7 +142,7 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
 
     fetchConversations();
 
-    // Real-time subscription - optimized to reduce unnecessary refetches
+    // Real-time subscription
     const channel = supabase
       .channel('conversations-changes')
       .on(
@@ -152,19 +152,8 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
           schema: 'public',
           table: 'conversations'
         },
-        (payload) => {
-          // Only refetch if the change is relevant to current view
-          if (payload.eventType === 'INSERT') {
-            fetchConversations();
-          } else if (payload.eventType === 'UPDATE') {
-            // Update only the specific conversation in state
-            const updated = payload.new as any;
-            setConversations(prev => 
-              prev.map(conv => conv.id === updated.id ? { ...conv, ...updated } : conv)
-            );
-          } else if (payload.eventType === 'DELETE') {
-            setConversations(prev => prev.filter(conv => conv.id !== payload.old.id));
-          }
+        () => {
+          fetchConversations();
         }
       )
       .subscribe();

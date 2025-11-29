@@ -31,9 +31,9 @@ export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerMod
       <ResizablePanelGroup direction="horizontal" className="flex-1">
         {/* Conversation List Panel (hidden on mobile when conversation selected) */}
         <ResizablePanel 
-          defaultSize={18} 
+          defaultSize={20} 
           minSize={15}
-          maxSize={25}
+          maxSize={30}
           collapsible={false}
           className={selectedConversation ? "hidden md:flex min-w-[300px]" : "flex min-w-[300px]"}
         >
@@ -51,8 +51,8 @@ export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerMod
 
         {/* Conversation Thread Panel (full width on mobile when selected) */}
         <ResizablePanel 
-          defaultSize={52} 
-          minSize={35}
+          defaultSize={55} 
+          minSize={40}
           maxSize={70}
           collapsible={false}
           className="w-full"
@@ -79,9 +79,9 @@ export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerMod
 
         {/* Customer Context Panel (hidden on mobile) */}
         <ResizablePanel 
-          defaultSize={22} 
-          minSize={18}
-          maxSize={28}
+          defaultSize={25} 
+          minSize={20}
+          maxSize={30}
           collapsible={false}
           className="hidden md:flex min-w-[280px]"
         >
