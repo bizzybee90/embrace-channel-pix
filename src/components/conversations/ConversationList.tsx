@@ -12,7 +12,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import PullToRefresh from 'react-simple-pull-to-refresh';
-import { useVirtualizer } from '@tanstack/react-virtual';
 
 interface ConversationListProps {
   selectedId?: string;
@@ -194,14 +193,6 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
 
   const activeFilterCount = statusFilter.length + priorityFilter.length + channelFilter.length + categoryFilter.length;
 
-  // Initialize virtualizer - must be called before any conditional returns
-  const rowVirtualizer = useVirtualizer({
-    count: conversations.length,
-    getScrollElement: () => parentRef.current,
-    estimateSize: () => 120,
-    overscan: 5,
-  });
-
   const handleRefresh = async () => {
     setLoading(true);
     setPage(0);
@@ -221,7 +212,7 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
     </div>
   );
 
-  // Render skeleton while loading
+  // Render skeleton while loading initial data
   if (loading && conversations.length === 0) {
     return (
       <div className={cn(
@@ -256,41 +247,22 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
           <p className="text-xs mt-1">Try adjusting your filters</p>
         </div>
       ) : (
-        <div
-          style={{
-            height: `${rowVirtualizer.getTotalSize()}px`,
-            width: '100%',
-            position: 'relative',
-          }}
-        >
-          {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-            const conversation = conversations[virtualRow.index];
-            return (
-              <div
-                key={conversation.id}
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  transform: `translateY(${virtualRow.start}px)`,
-                }}
-              >
-                <ConversationCard
-                  conversation={conversation}
-                  selected={selectedId === conversation.id}
-                  onClick={() => onSelect(conversation)}
-                  onUpdate={handleRefresh}
-                />
-              </div>
-            );
-          })}
-        </div>
-      )}
-      {loading && conversations.length > 0 && (
-        <div className="flex justify-center py-4">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
+        <>
+          {conversations.map((conversation) => (
+            <ConversationCard
+              key={conversation.id}
+              conversation={conversation}
+              selected={selectedId === conversation.id}
+              onClick={() => onSelect(conversation)}
+              onUpdate={handleRefresh}
+            />
+          ))}
+          {loading && (
+            <div className="flex justify-center py-4">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          )}
+        </>
       )}
     </div>
   );
