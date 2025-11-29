@@ -194,6 +194,14 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
 
   const activeFilterCount = statusFilter.length + priorityFilter.length + channelFilter.length + categoryFilter.length;
 
+  // Initialize virtualizer - must be called before any conditional returns
+  const rowVirtualizer = useVirtualizer({
+    count: conversations.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 120,
+    overscan: 5,
+  });
+
   const handleRefresh = async () => {
     setLoading(true);
     setPage(0);
@@ -214,7 +222,7 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
   );
 
   // Render skeleton while loading
-  if (loading) {
+  if (loading && conversations.length === 0) {
     return (
       <div className={cn(
         "flex flex-col h-full",
@@ -224,13 +232,6 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
       </div>
     );
   }
-
-  const rowVirtualizer = useVirtualizer({
-    count: conversations.length,
-    getScrollElement: () => parentRef.current,
-    estimateSize: () => 120,
-    overscan: 5,
-  });
 
   const conversationListContent = (
     <div 
