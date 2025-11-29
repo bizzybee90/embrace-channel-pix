@@ -231,6 +231,16 @@ You must respond with valid JSON only:
   }
 }`;
 
+// Helper function to extract JSON from markdown code fences
+function extractJSON(text: string): string {
+  // Remove markdown code fences if present
+  const jsonMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
+  if (jsonMatch) {
+    return jsonMatch[1].trim();
+  }
+  return text.trim();
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -277,7 +287,8 @@ serve(async (req) => {
     }
 
     const routerData = await routerResponse.json();
-    const routerOutput = JSON.parse(routerData.content[0].text);
+    const cleanRouterText = extractJSON(routerData.content[0].text);
+    const routerOutput = JSON.parse(cleanRouterText);
     console.log('Router decision:', routerOutput);
 
     // Step 2: Query relevant data based on routing
@@ -339,7 +350,8 @@ Customer Message: "${message.message_content}"
     }
 
     const specialistData = await specialistResponse.json();
-    let specialistOutput = JSON.parse(specialistData.content[0].text);
+    const cleanSpecialistText = extractJSON(specialistData.content[0].text);
+    let specialistOutput = JSON.parse(cleanSpecialistText);
 
     // Override with router sentiment if more severe
     if (routerOutput.sentiment === 'frustrated') {
