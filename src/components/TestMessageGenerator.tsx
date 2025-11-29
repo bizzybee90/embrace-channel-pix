@@ -121,99 +121,41 @@ export const TestMessageGenerator = () => {
   const generateTestMessage = async (scenario: typeof testScenarios[0]) => {
     setLoading(true);
     try {
-      // Get user's workspace
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
+      // Call the receive-message edge function to trigger the full AI flow
+      const messagePayload = {
+        channel: scenario.channel,
+        customer_identifier: scenario.customer_identifier,
+        customer_name: scenario.customer_name,
+        message_content: scenario.message_content,
+        message_id: `test-${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        session_id: `test-session-${scenario.channel}-${Date.now()}`,
+        // Add test flag
+        test_message: true,
+        test_priority: scenario.priority
+      };
 
-      const { data: userData } = await supabase
-        .from('users')
-        .select('workspace_id')
-        .eq('id', user.id)
-        .single();
+      console.log('Sending test message to receive-message function:', messagePayload);
 
-      if (!userData?.workspace_id) throw new Error("No workspace found");
+      const { data, error } = await supabase.functions.invoke('receive-message', {
+        body: messagePayload
+      });
 
-      // Create or find customer
-      const { data: customer, error: customerError } = await supabase
-        .from('customers')
-        .insert({
-          workspace_id: userData.workspace_id,
-          name: scenario.customer_name,
-          email: scenario.channel === 'email' ? scenario.customer_identifier : null,
-          phone: scenario.channel === 'sms' || scenario.channel === 'whatsapp' ? scenario.customer_identifier : null,
-          tier: 'regular'
-        })
-        .select()
-        .single();
-
-      if (customerError) throw customerError;
-
-      // Create conversation
-      const { data: conversation, error: convError } = await supabase
-        .from('conversations')
-        .insert({
-          workspace_id: userData.workspace_id,
-          customer_id: customer.id,
-          channel: scenario.channel,
-          title: `${scenario.customer_name} - ${scenario.priority} priority`,
-          summary_for_human: scenario.message_content,
-          priority: scenario.priority,
-          status: 'new',
-          is_escalated: true,
-          escalated_at: new Date().toISOString(),
-          ai_reason_for_escalation: 'Test escalation - AI conversation required human intervention',
-          ai_confidence: 0.45,
-          ai_sentiment: scenario.priority === 'high' ? 'negative' : 'neutral',
-          category: scenario.priority === 'high' ? 'urgent' : 'other',
-          metadata: {
-            ...scenario.metadata,
-            test_message: true,
-            generated_at: new Date().toISOString()
-          }
-        })
-        .select()
-        .single();
-
-      if (convError) throw convError;
-
-      // Create conversation history messages
-      const messagesToInsert = [];
-      
-      // Add AI conversation context
-      for (const msg of scenario.conversation_context) {
-        messagesToInsert.push({
-          conversation_id: conversation.id,
-          body: msg.content,
-          actor_type: msg.role === 'customer' ? 'customer' : 'ai',
-          actor_name: msg.role === 'customer' ? scenario.customer_name : 'AI Assistant',
-          direction: msg.role === 'customer' ? 'inbound' : 'outbound',
-          channel: scenario.channel
-        });
+      if (error) {
+        console.error('Error invoking receive-message:', error);
+        throw error;
       }
 
-      // Add final escalation message
-      messagesToInsert.push({
-        conversation_id: conversation.id,
-        body: scenario.message_content,
-        actor_type: 'customer',
-        actor_name: scenario.customer_name,
-        direction: 'inbound',
-        channel: scenario.channel
-      });
-
-      const { error: msgError } = await supabase
-        .from('messages')
-        .insert(messagesToInsert);
-
-      if (msgError) throw msgError;
+      console.log('AI agent response:', data);
 
       toast({
-        title: "Test conversation created",
-        description: `Created ${scenario.channel} escalation from ${scenario.customer_name}`,
+        title: "Test message sent to AI agent",
+        description: `${scenario.channel} message from ${scenario.customer_name} processed. Check conversations.`,
       });
     } catch (error: any) {
+      console.error('Test message error:', error);
       toast({
-        title: "Error creating test conversation",
+        title: "Error sending test message",
         description: error.message,
         variant: "destructive",
       });
@@ -225,18 +167,26 @@ export const TestMessageGenerator = () => {
   const generateAll = async () => {
     setLoading(true);
     try {
+      let successCount = 0;
       for (const scenario of testScenarios) {
-        await generateTestMessage(scenario);
+        try {
+          await generateTestMessage(scenario);
+          successCount++;
+          // Add small delay between messages to avoid overwhelming the AI
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        } catch (error) {
+          console.error(`Failed to generate test for ${scenario.channel}:`, error);
+        }
       }
 
       toast({
-        title: "Test conversations created",
-        description: `Created ${testScenarios.length} test escalations across all channels`,
+        title: "Test messages sent",
+        description: `Successfully sent ${successCount}/${testScenarios.length} test messages to AI agent`,
       });
       setOpen(false);
     } catch (error: any) {
       toast({
-        title: "Error creating test conversations",
+        title: "Error generating tests",
         description: error.message,
         variant: "destructive",
       });
@@ -255,9 +205,9 @@ export const TestMessageGenerator = () => {
       </DialogTrigger>
       <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Generate Test Escalations</DialogTitle>
+          <DialogTitle>Test AI Agent Flow</DialogTitle>
           <DialogDescription>
-            Create realistic test messages showing AI conversations that need human intervention
+            Send realistic customer messages to test the AI agent's response handling across different channels (SMS, WhatsApp, Email)
           </DialogDescription>
         </DialogHeader>
 
