@@ -28,16 +28,16 @@ export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerMod
       </aside>
 
       {/* Main Content - 3 Column Layout (responsive) */}
-      <ResizablePanelGroup direction="horizontal" className="flex-1">
+      <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
         {/* Conversation List Panel (hidden on mobile when conversation selected) */}
         <ResizablePanel 
           defaultSize={20} 
           minSize={15}
           maxSize={30}
           collapsible={false}
-          className={selectedConversation ? "hidden md:flex min-w-[300px]" : "flex min-w-[300px]"}
+          className={selectedConversation ? "hidden md:flex min-w-[300px] min-h-0" : "flex min-w-[300px] min-h-0"}
         >
-          <div className="h-full flex flex-col border-r border-border/30 bg-card w-full">
+          <div className="h-full flex flex-col border-r border-border/30 bg-card w-full min-h-0">
             <ConversationList
               filter={filter}
               channelFilter={channelFilter}
@@ -55,7 +55,7 @@ export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerMod
           minSize={40}
           maxSize={70}
           collapsible={false}
-          className="w-full"
+          className="w-full min-h-0"
         >
           <div className="flex-1 min-h-0 flex flex-col relative border-r border-border/30 md:border-r w-full">
             {selectedConversation ? (
@@ -83,9 +83,9 @@ export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerMod
           minSize={20}
           maxSize={30}
           collapsible={false}
-          className="hidden md:flex min-w-[280px]"
+          className="hidden md:flex min-w-[280px] min-h-0"
         >
-          <div className="h-full overflow-y-auto bg-card/50 p-4 hidden md:block">
+          <div className="h-full overflow-y-auto bg-card/50 p-4 hidden md:block min-h-0">
             {selectedConversation ? (
               <CustomerContext conversation={selectedConversation} onUpdate={handleUpdate} />
             ) : (
