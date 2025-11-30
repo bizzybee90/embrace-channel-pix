@@ -278,7 +278,7 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
       
       <Dialog open={!!selectedConversation} onOpenChange={(open) => !open && handleClose()}>
         <DialogContent 
-          className="max-w-none h-[100vh] md:h-[90vh] min-h-0 p-0 gap-0 animate-scale-in w-full md:w-auto"
+          className="max-w-none h-[100vh] md:h-[90vh] min-h-0 p-0 gap-0 animate-scale-in w-full md:w-auto flex flex-col"
           style={{ width: window.innerWidth < 900 ? '100%' : `${modalWidth}%`, zIndex: 40 }}
         >
           {/* Resize handle - left edge (hidden on mobile) */}
