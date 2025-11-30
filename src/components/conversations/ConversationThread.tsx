@@ -217,7 +217,7 @@ export const ConversationThread = ({ conversation, onUpdate, onBack }: Conversat
 
   // Desktop layout - uses mobile scroll pattern
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col flex-1 min-h-0">
       <div className="sticky top-0 z-10 bg-background border-b border-border">
         <ConversationHeader conversation={conversation} onUpdate={onUpdate} onBack={onBack} />
       </div>

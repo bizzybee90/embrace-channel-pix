@@ -184,7 +184,7 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
       </div>
 
       {/* Main Content Area - with data attribute for layout validator */}
-      <div data-main-content className="flex-1 flex flex-col overflow-hidden relative">
+      <div data-main-content className="flex-1 flex flex-col min-h-0 relative">
         {!selectedConversation ? (
           // STATE 1: Ticket List View
           <div className="flex flex-col h-full animate-slide-in-left">
@@ -206,7 +206,7 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
           </div>
         ) : (
           // STATE 2: Conversation View
-          <div className="flex flex-col h-full animate-slide-in-right">
+          <div className="flex flex-col flex-1 min-h-0 animate-slide-in-right">
             {/* Back Button Header */}
             <div className="px-8 py-6 border-b border-border/30 bg-card/50 backdrop-blur-sm sticky top-0 z-10">
               <Button
@@ -269,8 +269,8 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
               </div>
             </div>
 
-            {/* Conversation Stack - Let ConversationThread handle scroll */}
-            <div ref={conversationRef} className="flex-1 flex flex-col px-8 min-h-0">
+            {/* Conversation Stack - Scrollable Container */}
+            <div ref={conversationRef} className="flex-1 overflow-y-auto px-8 py-6">
               {isLoadingConversation ? (
                 <ConversationThreadSkeleton />
               ) : (
