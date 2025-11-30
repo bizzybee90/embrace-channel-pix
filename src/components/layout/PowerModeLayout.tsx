@@ -37,7 +37,7 @@ export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerMod
           collapsible={false}
           className={selectedConversation ? "hidden md:flex min-w-[300px] min-h-0" : "flex min-w-[300px] min-h-0"}
         >
-          <div className="h-full flex flex-col border-r border-border/30 bg-card w-full min-h-0">
+          <div className="flex-1 flex flex-col border-r border-border/30 bg-card w-full overflow-hidden">
             <ConversationList
               filter={filter}
               channelFilter={channelFilter}
@@ -57,7 +57,7 @@ export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerMod
           collapsible={false}
           className="w-full min-h-0"
         >
-          <div className="flex-1 min-h-0 flex flex-col relative border-r border-border/30 md:border-r w-full">
+          <div className="flex-1 flex flex-col relative border-r border-border/30 md:border-r w-full overflow-hidden">
             {selectedConversation ? (
               <ConversationThread
                 key={refreshKey}
@@ -85,7 +85,7 @@ export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerMod
           collapsible={false}
           className="hidden md:flex min-w-[280px] min-h-0"
         >
-          <div className="h-full overflow-y-auto bg-card/50 p-4 hidden md:block min-h-0">
+          <div className="flex-1 flex flex-col overflow-y-auto bg-card/50 p-4 hidden md:flex">
             {selectedConversation ? (
               <CustomerContext conversation={selectedConversation} onUpdate={handleUpdate} />
             ) : (
