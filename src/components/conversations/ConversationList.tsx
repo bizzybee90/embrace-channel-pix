@@ -101,7 +101,7 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
     } else if (filter === 'sla-risk') {
       query = query.in('sla_status', ['warning', 'breached']).in('status', ['new', 'open', 'waiting_customer', 'waiting_internal']);
     } else if (filter === 'all-open') {
-      query = query.in('status', ['new', 'open', 'waiting_customer', 'waiting_internal']);
+      query = query.in('status', ['new', 'open', 'waiting_customer', 'waiting_internal', 'escalated']);
     } else if (filter === 'completed') {
       query = query.eq('status', 'resolved');
     } else if (filter === 'high-priority') {
@@ -109,7 +109,7 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
     } else if (filter === 'vip-customers') {
       query = query.eq('metadata->>tier', 'vip').in('status', ['new', 'open', 'waiting_customer', 'waiting_internal']);
     } else if (filter === 'escalations') {
-      query = query.eq('is_escalated', true).in('status', ['new', 'in_progress', 'waiting']);
+      query = query.eq('is_escalated', true).in('status', ['new', 'in_progress', 'waiting', 'open', 'escalated']);
     }
 
     // Apply additional filters
