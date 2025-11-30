@@ -1148,6 +1148,26 @@ export type Database = {
     }
     Functions: {
       get_my_workspace_id: { Args: never; Returns: string }
+      get_sent_conversations: {
+        Args: { p_limit?: number; p_offset?: number; p_user_id: string }
+        Returns: {
+          ai_reason_for_escalation: string
+          assigned_to: string
+          category: string
+          channel: string
+          created_at: string
+          customer_id: string
+          id: string
+          priority: string
+          sla_due_at: string
+          sla_status: string
+          snoozed_until: string
+          status: string
+          summary_for_human: string
+          title: string
+          updated_at: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
