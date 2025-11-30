@@ -269,8 +269,8 @@ export const TabletLayout = ({ filter = 'all-open' }: TabletLayoutProps) => {
               </div>
             </div>
 
-            {/* Conversation Stack - Scrollable */}
-            <div ref={conversationRef} className="flex-1 overflow-y-auto px-8 py-6">
+            {/* Conversation Stack - Let ConversationThread handle scroll */}
+            <div ref={conversationRef} className="flex-1 flex flex-col px-8 min-h-0">
               {isLoadingConversation ? (
                 <ConversationThreadSkeleton />
               ) : (
