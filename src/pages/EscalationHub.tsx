@@ -159,26 +159,23 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
           />
         </main>
       ) : (
-        /* Show conversation detail */
-        <main className="flex-1 flex overflow-hidden">
-          {/* Conversation thread */}
-          <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <ConversationThread
-              key={refreshKey}
-              conversation={selectedConversation}
-              onUpdate={handleUpdate}
-              onBack={handleClose}
-            />
+      /* Show conversation detail */
+      <main className="flex-1 flex overflow-hidden">
+        <ConversationThread
+          key={refreshKey}
+          conversation={selectedConversation}
+          onUpdate={handleUpdate}
+          onBack={handleClose}
+        />
+        
+        {/* Right sidebar - Customer context & actions */}
+        <aside className="w-80 border-l border-border bg-card/50 overflow-y-auto">
+          <div className="p-4 space-y-6">
+            <CustomerContext conversation={selectedConversation} onUpdate={handleUpdate} />
+            <QuickActions conversation={selectedConversation} onUpdate={handleUpdate} onBack={handleClose} />
           </div>
-          
-          {/* Right sidebar - Customer context & actions */}
-          <aside className="w-80 border-l border-border bg-card/50 overflow-y-auto">
-            <div className="p-4 space-y-6">
-              <CustomerContext conversation={selectedConversation} onUpdate={handleUpdate} />
-              <QuickActions conversation={selectedConversation} onUpdate={handleUpdate} onBack={handleClose} />
-            </div>
-          </aside>
-        </main>
+        </aside>
+      </main>
       )}
     </div>
   );
