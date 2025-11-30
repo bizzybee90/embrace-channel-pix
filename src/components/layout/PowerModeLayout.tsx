@@ -57,7 +57,7 @@ export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerMod
           collapsible={false}
           className="w-full"
         >
-          <div className="h-full flex flex-col relative border-r border-border/30 md:border-r w-full">
+          <div className="flex-1 min-h-0 flex flex-col relative border-r border-border/30 md:border-r w-full">
             {selectedConversation ? (
               <ConversationThread
                 key={refreshKey}
