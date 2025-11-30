@@ -331,9 +331,9 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
               </Button>
             </div>
           )}
-          <div className="flex flex-1 h-full flex-col md:flex-row">
+          <div className="flex flex-1 flex-col md:flex-row overflow-hidden">
             {/* Main Content - Conversation */}
-            <div className="flex-1 flex flex-col min-h-0 w-full md:w-auto md:min-w-[600px] h-full">
+            <div className="flex-1 flex flex-col min-h-0 w-full md:w-auto md:min-w-[600px] overflow-hidden">
               {selectedConversation && (
                 <ConversationThread
                   key={refreshKey}
