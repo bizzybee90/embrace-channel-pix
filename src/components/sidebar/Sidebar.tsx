@@ -47,7 +47,7 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
   };
   return (
     <TooltipProvider>
-      <div className={`flex flex-col h-full transition-all duration-300 relative ${isCollapsed ? 'w-[72px] p-1.5' : isMobileDrawer ? '' : 'w-60 p-4'}`}>
+      <div className={`flex flex-col h-full overflow-y-auto transition-all duration-300 relative ${isCollapsed ? 'w-[72px] p-1.5' : isMobileDrawer ? '' : 'w-60 p-4'}`}>
         {/* Collapse Toggle - hide in forced collapsed mode and mobile drawer */}
         {!forceCollapsed && !isMobileDrawer && (
           <Button
