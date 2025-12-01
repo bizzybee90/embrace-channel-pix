@@ -102,7 +102,7 @@ export const MobileEscalationHub = ({ filter = 'all-open' }: MobileEscalationHub
     // Apply sorting
     switch (sortBy) {
       case 'newest':
-        query = query.order('created_at', { ascending: false });
+        query = query.order('updated_at', { ascending: false });
         break;
       case 'oldest':
         query = query.order('created_at', { ascending: true });

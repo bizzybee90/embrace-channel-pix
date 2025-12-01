@@ -106,7 +106,7 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
     // Apply sorting
     switch (sortBy) {
       case 'newest':
-        query = query.order('created_at', { ascending: false });
+        query = query.order('updated_at', { ascending: false });
         break;
       case 'oldest':
         query = query.order('created_at', { ascending: true });
