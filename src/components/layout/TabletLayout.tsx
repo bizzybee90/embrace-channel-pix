@@ -112,18 +112,18 @@ export const TabletLayout = ({ filter = "all-open" }: TabletLayoutProps) => {
       </div>
 
       {/* Main Content Area - with data attribute for layout validator */}
-      <div data-main-content className="flex-1 flex flex-col min-h-0 relative h-full">
+      <div data-main-content className="flex-1 flex flex-col min-h-0 min-w-0 relative h-full">
         {!selectedConversation ? (
           // STATE 1: Ticket List View
           <div className="flex flex-col h-full min-h-0 animate-slide-in-left">
             {/* Header */}
-            <div className="px-8 py-6 border-b border-border/30 bg-card/50 backdrop-blur-sm">
-              <h1 className="text-2xl font-bold text-foreground mb-1">{getFilterTitle()}</h1>
+            <div className="px-4 md:px-8 py-6 border-b border-border/30 bg-card/50 backdrop-blur-sm">
+              <h1 className="text-2xl font-bold text-foreground mb-1 truncate">{getFilterTitle()}</h1>
               <p className="text-sm text-muted-foreground">Support escalations</p>
             </div>
 
             {/* Ticket List - Full Width */}
-            <div className="flex-1 min-h-0 overflow-y-auto px-8 py-6">
+            <div className="flex-1 min-h-0 overflow-y-auto px-4 md:px-8 py-6">
               <ConversationList
                 selectedId={selectedConversation?.id}
                 onSelect={handleSelectConversation}
