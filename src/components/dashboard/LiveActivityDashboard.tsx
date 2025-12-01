@@ -258,46 +258,52 @@ export const LiveActivityDashboard = () => {
 
       {/* Channel Breakdown - Mobile Only */}
       {isMobile && (
-        <div className="grid grid-cols-2 gap-3">
-          <MetricPillCard
-            title="Email"
-            value={stats.unreadByChannel.email}
-            icon={<MessageSquare className="h-5 w-5" />}
-            iconColor="text-blue-600"
-            bgColor="bg-blue-50/50 dark:bg-blue-950/10"
-          />
-          <MetricPillCard
-            title="WhatsApp"
-            value={stats.unreadByChannel.whatsapp}
-            icon={<MessageSquare className="h-5 w-5" />}
-            iconColor="text-green-600"
-            bgColor="bg-green-50/50 dark:bg-green-950/10"
-          />
-          <MetricPillCard
-            title="SMS"
-            value={stats.unreadByChannel.sms}
-            icon={<MessageSquare className="h-5 w-5" />}
-            iconColor="text-purple-600"
-            bgColor="bg-purple-50/50 dark:bg-purple-950/10"
-          />
-          <MetricPillCard
-            title="Phone"
-            value={stats.unreadByChannel.phone}
-            icon={<MessageSquare className="h-5 w-5" />}
-            iconColor="text-orange-600"
-            bgColor="bg-orange-50/50 dark:bg-orange-950/10"
-          />
-          <MetricPillCard
-            title="Web Chat"
-            value={stats.unreadByChannel.webchat}
-            icon={<MessageSquare className="h-5 w-5" />}
-            iconColor="text-indigo-600"
-            bgColor="bg-indigo-50/50 dark:bg-indigo-950/10"
-          />
+        <div className="space-y-3">
+          <h2 className="text-base font-semibold text-foreground">Channel Breakdown</h2>
+          <div className="grid grid-cols-2 gap-3">
+            <MetricPillCard
+              title="Email"
+              value={stats.unreadByChannel.email}
+              icon={<MessageSquare className="h-5 w-5" />}
+              iconColor="text-blue-600"
+              bgColor="bg-blue-50/50 dark:bg-blue-950/10"
+            />
+            <MetricPillCard
+              title="WhatsApp"
+              value={stats.unreadByChannel.whatsapp}
+              icon={<MessageSquare className="h-5 w-5" />}
+              iconColor="text-green-600"
+              bgColor="bg-green-50/50 dark:bg-green-950/10"
+            />
+            <MetricPillCard
+              title="SMS"
+              value={stats.unreadByChannel.sms}
+              icon={<MessageSquare className="h-5 w-5" />}
+              iconColor="text-purple-600"
+              bgColor="bg-purple-50/50 dark:bg-purple-950/10"
+            />
+            <MetricPillCard
+              title="Phone"
+              value={stats.unreadByChannel.phone}
+              icon={<MessageSquare className="h-5 w-5" />}
+              iconColor="text-orange-600"
+              bgColor="bg-orange-50/50 dark:bg-orange-950/10"
+            />
+            <MetricPillCard
+              title="Web Chat"
+              value={stats.unreadByChannel.webchat}
+              icon={<MessageSquare className="h-5 w-5" />}
+              iconColor="text-indigo-600"
+              bgColor="bg-indigo-50/50 dark:bg-indigo-950/10"
+            />
+          </div>
         </div>
       )}
 
       {/* Stats Grid */}
+      {isMobile && (
+        <h2 className="text-base font-semibold text-foreground">Performance Metrics</h2>
+      )}
       <div className={isMobile ? "grid grid-cols-2 gap-3" : "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4"}>
         {isMobile ? (
           <>

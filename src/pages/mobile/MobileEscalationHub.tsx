@@ -3,7 +3,6 @@ import { MobileConversationList } from '@/components/conversations/mobile/Mobile
 import { MobileConversationView } from '@/components/conversations/mobile/MobileConversationView';
 import { MobileSidebarSheet } from '@/components/sidebar/MobileSidebarSheet';
 import { MobileHeader } from '@/components/sidebar/MobileHeader';
-import { MobileBottomNav } from '@/components/layout/MobileBottomNav';
 import { MobileFilterSheet } from '@/components/conversations/mobile/MobileFilterSheet';
 import { Conversation, Message } from '@/lib/types';
 import { supabase } from '@/integrations/supabase/client';
@@ -266,7 +265,7 @@ export const MobileEscalationHub = ({ filter = 'all-open' }: MobileEscalationHub
   // Screen B: Ticket Detail View
   if (selectedConversation) {
     return (
-      <div className="min-h-screen bg-background pb-20">
+      <div className="min-h-screen bg-background">
         <MobileHeader
           onMenuClick={() => setSidebarOpen(true)}
           showBackButton
@@ -302,21 +301,13 @@ export const MobileEscalationHub = ({ filter = 'all-open' }: MobileEscalationHub
           onCategoryFilterChange={setCategoryFilter}
           onSortByChange={setSortBy}
         />
-        <MobileBottomNav
-          activeFilter={currentFilter}
-          onNavigate={(newFilter) => {
-            setCurrentFilter(newFilter);
-            handleBack();
-          }}
-          onMenuClick={() => setSidebarOpen(true)}
-        />
       </div>
     );
   }
 
   // Screen A: Ticket List View
   return (
-    <div className="min-h-screen bg-background pb-20">
+    <div className="min-h-screen bg-background">
       <MobileHeader
         onMenuClick={() => setSidebarOpen(true)}
       />
@@ -357,11 +348,6 @@ export const MobileEscalationHub = ({ filter = 'all-open' }: MobileEscalationHub
         onChannelFilterChange={setChannelFilter}
         onCategoryFilterChange={setCategoryFilter}
         onSortByChange={setSortBy}
-      />
-      <MobileBottomNav
-        activeFilter={currentFilter}
-        onNavigate={setCurrentFilter}
-        onMenuClick={() => setSidebarOpen(true)}
       />
     </div>
   );
