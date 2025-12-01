@@ -77,13 +77,26 @@ export const MobileEscalationHub = ({ filter = 'all-open' }: MobileEscalationHub
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
+    // Get workspace from user
+    const { data: userData } = await supabase
+      .from('users')
+      .select('workspace_id')
+      .eq('id', user.id)
+      .single();
+    
+    if (!userData?.workspace_id) {
+      setConversations([]);
+      return;
+    }
+
     let query = supabase
       .from('conversations')
       .select(`
         *,
         customer:customers(*),
         assigned_user:users(*)
-      `);
+      `)
+      .eq('workspace_id', userData.workspace_id);
 
     // Apply sorting
     switch (sortBy) {

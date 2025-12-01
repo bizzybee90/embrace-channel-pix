@@ -67,13 +67,23 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
       return { data: activeConversations, count: activeConversations.length };
     }
 
+    // Get workspace from user
+    const { data: userData } = await supabase
+      .from('users')
+      .select('workspace_id')
+      .eq('id', user.id)
+      .single();
+    
+    if (!userData?.workspace_id) return { data: [], count: 0 };
+
     let query = supabase
       .from('conversations')
       .select(`
         *,
         customer:customers(*),
         assigned_user:users(*)
-      `, { count: 'exact' });
+      `, { count: 'exact' })
+      .eq('workspace_id', userData.workspace_id);
 
     // Apply sorting
     switch (sortBy) {
