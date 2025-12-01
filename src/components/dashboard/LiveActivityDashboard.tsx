@@ -48,6 +48,7 @@ interface RecentConversation {
 
 import { ThreeColumnLayout } from '@/components/layout/ThreeColumnLayout';
 import { Sidebar } from '@/components/sidebar/Sidebar';
+import { AIActivityWidget } from './AIActivityWidget';
 
 export const LiveActivityDashboard = () => {
   const { workspace } = useWorkspace();
@@ -294,6 +295,9 @@ export const LiveActivityDashboard = () => {
           </div>
         </Card>
       </div>
+
+      {/* AI Activity Summary */}
+      <AIActivityWidget />
 
       {/* Sentiment Breakdown */}
       <Card className="p-6">
