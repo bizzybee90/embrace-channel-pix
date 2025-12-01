@@ -119,7 +119,9 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
         break;
       case 'sla_urgent':
       default:
-        query = query.order('sla_due_at', { ascending: true, nullsFirst: false });
+        query = query
+          .order('sla_due_at', { ascending: true, nullsFirst: false })
+          .order('updated_at', { ascending: false });
         break;
     }
 

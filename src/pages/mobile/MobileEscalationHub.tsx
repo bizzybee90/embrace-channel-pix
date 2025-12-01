@@ -9,7 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 interface MobileEscalationHubProps {
-  filter?: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'completed' | 'sent' | 'high-priority' | 'vip-customers';
+  filter?: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'completed' | 'sent' | 'high-priority' | 'vip-customers' | 'escalations';
 }
 
 export const MobileEscalationHub = ({ filter = 'all-open' }: MobileEscalationHubProps) => {
@@ -42,7 +42,8 @@ export const MobileEscalationHub = ({ filter = 'all-open' }: MobileEscalationHub
     'completed': 'Completed',
     'sent': 'Sent',
     'high-priority': 'High Priority',
-    'vip-customers': 'VIP Customers'
+    'vip-customers': 'VIP Customers',
+    'escalations': 'Escalations'
   };
 
   useEffect(() => {
@@ -114,7 +115,9 @@ export const MobileEscalationHub = ({ filter = 'all-open' }: MobileEscalationHub
         break;
       case 'sla_urgent':
       default:
-        query = query.order('sla_due_at', { ascending: true, nullsFirst: false });
+        query = query
+          .order('sla_due_at', { ascending: true, nullsFirst: false })
+          .order('updated_at', { ascending: false });
         break;
     }
 
@@ -149,6 +152,8 @@ export const MobileEscalationHub = ({ filter = 'all-open' }: MobileEscalationHub
       query = query.in('priority', ['high', 'urgent']).in('status', ['new', 'open', 'waiting_customer', 'waiting_internal', 'ai_handling', 'escalated']);
     } else if (currentFilter === 'vip-customers') {
       query = query.eq('metadata->>tier', 'vip').in('status', ['new', 'open', 'waiting_customer', 'waiting_internal', 'ai_handling', 'escalated']);
+    } else if (currentFilter === 'escalations') {
+      query = query.eq('is_escalated', true).in('status', ['new', 'in_progress', 'waiting', 'open', 'escalated', 'ai_handling']);
     }
 
     // Apply additional filters
