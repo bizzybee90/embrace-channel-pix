@@ -202,10 +202,10 @@ export const LiveActivityDashboard = () => {
             </div>
           </div>
         ) : (
-          <div className="p-8 space-y-6 min-w-0">
+          <div className="p-4 md:p-8 space-y-4 md:space-y-6 min-w-0">
       <div className="min-w-0">
-        <h1 className="text-2xl md:text-3xl font-bold">Live Activity Dashboard</h1>
-        <p className="text-muted-foreground text-sm md:text-base truncate">Real-time AI performance metrics for today</p>
+        <h1 className="text-xl md:text-2xl lg:text-3xl font-bold">Live Activity Dashboard</h1>
+        <p className="text-muted-foreground text-sm md:text-base">Real-time AI performance metrics for today</p>
       </div>
 
       {/* Unread Messages */}
@@ -244,37 +244,37 @@ export const LiveActivityDashboard = () => {
       </Card>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="p-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+        <Card className="p-4 md:p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Total Conversations</p>
-              <h3 className="text-3xl font-bold mt-2">{stats.total}</h3>
+              <p className="text-xs md:text-sm font-medium text-muted-foreground">Total Conversations</p>
+              <h3 className="text-2xl md:text-3xl font-bold mt-2">{stats.total}</h3>
             </div>
-            <MessageSquare className="h-8 w-8 text-primary" />
+            <MessageSquare className="h-6 w-6 md:h-8 md:w-8 text-primary" />
           </div>
         </Card>
 
-        <Card className="p-6 bg-green-50 dark:bg-green-950/20">
+        <Card className="p-4 md:p-6 bg-green-50 dark:bg-green-950/20">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-muted-foreground">AI Handled</p>
-              <h3 className="text-3xl font-bold mt-2 text-green-600 dark:text-green-400">
+              <p className="text-xs md:text-sm font-medium text-muted-foreground">AI Handled</p>
+              <h3 className="text-2xl md:text-3xl font-bold mt-2 text-green-600 dark:text-green-400">
                 {stats.aiHandled}
               </h3>
               <p className="text-xs text-muted-foreground mt-1">
                 {stats.total > 0 ? Math.round((stats.aiHandled / stats.total) * 100) : 0}% auto-resolved
               </p>
             </div>
-            <Bot className="h-8 w-8 text-green-600 dark:text-green-400" />
+            <Bot className="h-6 w-6 md:h-8 md:w-8 text-green-600 dark:text-green-400" />
           </div>
         </Card>
 
-        <Card className="p-6 bg-orange-50 dark:bg-orange-950/20">
+        <Card className="p-4 md:p-6 bg-orange-50 dark:bg-orange-950/20">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Escalated</p>
-              <h3 className="text-3xl font-bold mt-2 text-orange-600 dark:text-orange-400">
+              <p className="text-xs md:text-sm font-medium text-muted-foreground">Escalated</p>
+              <h3 className="text-2xl md:text-3xl font-bold mt-2 text-orange-600 dark:text-orange-400">
                 {stats.escalated}
               </h3>
               <p className="text-xs text-muted-foreground mt-1">Needs human attention</p>

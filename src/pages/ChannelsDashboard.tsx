@@ -222,19 +222,20 @@ export default function ChannelsDashboard() {
             </div>
           </div>
         ) : (
-          <div className="p-8 space-y-6">
-            <div className="flex items-center justify-between gap-4">
-              <div className="min-w-0 flex-1">
-                <h1 className="text-2xl md:text-3xl font-bold truncate">Channels Dashboard</h1>
-                <p className="text-sm text-muted-foreground truncate">Monitor activity across all communication channels</p>
+          <div className="p-4 md:p-8 space-y-4 md:space-y-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div className="min-w-0 flex-1 w-full sm:w-auto">
+                <h1 className="text-xl md:text-2xl lg:text-3xl font-bold">Channels Dashboard</h1>
+                <p className="text-sm text-muted-foreground mt-1">Monitor activity across all channels</p>
               </div>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setShowSettings(!showSettings)}
+                className="self-start sm:self-auto"
               >
                 <Settings className="h-4 w-4 mr-2" />
-                {showSettings ? 'Hide' : 'Show'} Settings
+                {showSettings ? 'Hide' : 'Show'}
               </Button>
             </div>
 
@@ -286,7 +287,7 @@ export default function ChannelsDashboard() {
               </Card>
             )}
 
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
               {visibleChannelStats.map((stat) => {
                 const config = channelConfig[stat.channel as keyof typeof channelConfig];
                 const Icon = config.icon;
@@ -294,40 +295,41 @@ export default function ChannelsDashboard() {
                 return (
                   <Card 
                     key={stat.channel} 
-                    className={`p-6 ${config.bgColor} cursor-pointer hover:shadow-lg transition-all`}
+                    className={`p-4 md:p-6 ${config.bgColor} cursor-pointer hover:shadow-lg transition-all active:scale-[0.98]`}
                     onClick={() => navigate(`/channel/${stat.channel}`)}
                   >
                     <div className="flex items-start justify-between mb-4 gap-3">
                       <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <div className="p-3 rounded-lg bg-background flex-shrink-0">
-                          <Icon className={`h-6 w-6 ${config.color}`} />
+                        <div className="p-2.5 md:p-3 rounded-lg bg-background flex-shrink-0">
+                          <Icon className={`h-5 w-5 md:h-6 md:w-6 ${config.color}`} />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <h3 className="text-lg font-semibold flex items-center gap-2 truncate">
-                            {config.emoji} {config.label}
+                          <h3 className="text-base md:text-lg font-semibold flex items-center gap-2 truncate">
+                            <span className="text-lg md:text-xl">{config.emoji}</span>
+                            <span className="truncate">{config.label}</span>
                           </h3>
-                          <p className="text-sm text-muted-foreground">
+                          <p className="text-xs md:text-sm text-muted-foreground truncate">
                             {stat.total} conversation{stat.total !== 1 ? 's' : ''} today
                           </p>
                         </div>
                       </div>
                       {stat.unread > 0 && (
-                        <Badge variant="destructive" className="text-lg px-3 py-1">
+                        <Badge variant="destructive" className="text-sm md:text-lg px-2 md:px-3 py-0.5 md:py-1 flex-shrink-0">
                           {stat.unread}
                         </Badge>
                       )}
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4 mb-4 p-4 bg-background rounded-lg">
+                    <div className="grid grid-cols-2 gap-3 md:gap-4 mb-4 p-3 md:p-4 bg-background rounded-lg">
                       <div>
                         <p className="text-xs text-muted-foreground mb-1">Unread</p>
-                        <p className={`text-2xl font-bold ${config.color}`}>
+                        <p className={`text-xl md:text-2xl font-bold ${config.color}`}>
                           {stat.unread}
                         </p>
                       </div>
                       <div>
                         <p className="text-xs text-muted-foreground mb-1">Avg Response</p>
-                        <p className="text-2xl font-bold">
+                        <p className="text-xl md:text-2xl font-bold truncate">
                           {formatResponseTime(stat.avgResponseTime)}
                         </p>
                       </div>
@@ -335,19 +337,19 @@ export default function ChannelsDashboard() {
 
                     <div>
                       <h4 className="text-sm font-semibold mb-2">Recent Activity</h4>
-                      <ScrollArea className="h-[200px]">
+                      <ScrollArea className="h-[160px] md:h-[200px]">
                         {stat.recentConversations.length > 0 ? (
-                          <div className="space-y-2">
+                          <div className="space-y-2 pr-3">
                             {stat.recentConversations.map((conv) => (
                               <div
                                 key={conv.id}
-                                className="p-3 bg-background rounded-lg hover:bg-accent/50 transition-colors"
+                                className="p-2.5 md:p-3 bg-background rounded-lg hover:bg-accent/50 active:bg-accent transition-colors"
                               >
-                                 <div className="flex items-center justify-between mb-1 gap-2 min-w-0">
-                                  <p className="font-medium text-sm truncate flex-1 min-w-0">
+                                <div className="flex items-center justify-between mb-1 gap-2 min-w-0">
+                                  <p className="font-medium text-xs md:text-sm truncate flex-1 min-w-0">
                                     {conv.title}
                                   </p>
-                                  <Badge variant={getStatusColor(conv.status)} className="ml-2">
+                                  <Badge variant={getStatusColor(conv.status)} className="ml-2 text-xs flex-shrink-0">
                                     {conv.status}
                                   </Badge>
                                 </div>
