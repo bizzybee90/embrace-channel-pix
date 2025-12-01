@@ -255,9 +255,9 @@ serve(async (req) => {
       
       const sendResponse = await supabase.functions.invoke('send-response', {
         body: {
-          conversation_id: conversationId,
+          conversationId: conversationId,
           channel: normalised.channel,
-          recipient: normalised.customer_identifier,
+          to: normalised.customer_identifier,
           message: aiOutput.response,
         }
       });
