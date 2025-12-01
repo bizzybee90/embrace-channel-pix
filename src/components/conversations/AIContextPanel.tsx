@@ -22,7 +22,9 @@ export const AIContextPanel = ({ conversation, onUpdate, onUseDraft }: AIContext
   const [isDraftOpen, setIsDraftOpen] = useState(true);
   const isMobile = useIsMobile();
 
-  const aiDraftResponse = conversation.metadata?.ai_draft_response as string | undefined;
+  // Fix: Read from both locations - AI agent writes to ai_draft_response directly
+  const aiDraftResponse = (conversation as any).ai_draft_response as string | undefined || 
+                          conversation.metadata?.ai_draft_response as string | undefined;
 
 // Shared header classes for consistent iOS-style rows
 const PANEL_HEADER_CLASSES = "flex items-center justify-between w-full px-4 gap-3 h-14";
@@ -104,7 +106,7 @@ const PANEL_HEADER_CLASSES = "flex items-center justify-between w-full px-4 gap-
       </Collapsible>
 
       {/* AI Draft Response */}
-      {aiDraftResponse && (
+      {aiDraftResponse ? (
         <Collapsible open={isDraftOpen} onOpenChange={setIsDraftOpen}>
           <Card className="relative overflow-hidden apple-shadow-lg border-0 rounded-[22px] md:rounded-[22px] rounded-[18px] bg-gradient-to-br from-blue-500/15 via-blue-400/10 to-purple-500/15 animate-fade-in">
             {/* Glow effect */}
@@ -146,6 +148,16 @@ const PANEL_HEADER_CLASSES = "flex items-center justify-between w-full px-4 gap-
             </CollapsibleContent>
           </Card>
         </Collapsible>
+      ) : (
+        <Card className="p-4 bg-muted/30 border-muted">
+          <div className="flex items-center gap-3 text-muted-foreground">
+            <Sparkles className="h-5 w-5" />
+            <div>
+              <p className="text-sm font-medium">No AI Suggestion Available</p>
+              <p className="text-xs mt-1">AI may not have processed this conversation yet</p>
+            </div>
+          </div>
+        </Card>
       )}
 
       {/* Metadata - Hidden on mobile */}

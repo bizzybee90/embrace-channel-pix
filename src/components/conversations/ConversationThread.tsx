@@ -114,10 +114,20 @@ export const ConversationThread = ({ conversation, onUpdate, onBack }: Conversat
       return;
     }
 
-    if (!isInternal && !conversation.first_response_at) {
+    // Update conversation status and timestamps
+    if (!isInternal) {
+      const updateData: any = {
+        updated_at: new Date().toISOString(),
+        status: 'waiting_customer',
+      };
+      
+      if (!conversation.first_response_at) {
+        updateData.first_response_at = new Date().toISOString();
+      }
+      
       await supabase
         .from('conversations')
-        .update({ first_response_at: new Date().toISOString() })
+        .update(updateData)
         .eq('id', conversation.id);
     }
 

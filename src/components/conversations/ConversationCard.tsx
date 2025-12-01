@@ -2,7 +2,7 @@ import { memo } from 'react';
 import { Conversation } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow } from 'date-fns';
-import { Clock, CheckCircle2, UserPlus, FileEdit } from 'lucide-react';
+import { Clock, CheckCircle2, UserPlus, FileEdit, User } from 'lucide-react';
 import { ChannelIcon } from '../shared/ChannelIcon';
 import { cn } from '@/lib/utils';
 import { useIsTablet } from '@/hooks/use-tablet';
@@ -25,6 +25,7 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate }
 
   // Draft detection state
   const [hasDraft, setHasDraft] = useState(false);
+  const [assignedUserName, setAssignedUserName] = useState<string | null>(null);
 
   // Check for draft on mount and when conversation changes
   useEffect(() => {
@@ -32,6 +33,28 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate }
     const draft = localStorage.getItem(draftKey);
     setHasDraft(!!draft && draft.trim().length > 0);
   }, [conversation.id]);
+
+  // Fetch assigned user name
+  useEffect(() => {
+    const fetchAssignedUser = async () => {
+      if (!conversation.assigned_to) {
+        setAssignedUserName(null);
+        return;
+      }
+      
+      const { data } = await supabase
+        .from('users')
+        .select('name')
+        .eq('id', conversation.assigned_to)
+        .single();
+      
+      if (data) {
+        setAssignedUserName(data.name);
+      }
+    };
+    
+    fetchAssignedUser();
+  }, [conversation.assigned_to]);
 
   // Swipe gesture state
   const [swipeDistance, setSwipeDistance] = useState(0);
@@ -168,6 +191,7 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate }
   const isRightSwipe = swipeDistance > 0;
 
   const isOverdue = conversation.sla_due_at && new Date() > new Date(conversation.sla_due_at);
+  const wasResponded = conversation.status === 'waiting_customer' && conversation.first_response_at;
 
   // Compact tablet layout
   if (isTablet) {
@@ -280,6 +304,24 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate }
                 Draft
               </Badge>
             )}
+
+            {wasResponded && (
+              <Badge variant="outline" className="rounded-full text-xs font-semibold px-3 py-1.5 bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20 flex items-center gap-1.5">
+                <CheckCircle2 className="h-3 w-3" />
+                Responded
+              </Badge>
+            )}
+
+            {conversation.assigned_to ? (
+              <Badge variant="secondary" className="rounded-full text-xs font-semibold px-3 py-1.5 flex items-center gap-1.5">
+                <User className="h-3 w-3" />
+                {assignedUserName || 'Assigned'}
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="rounded-full text-xs font-semibold px-3 py-1.5 text-amber-600 border-amber-500/20 flex items-center gap-1.5">
+                Unassigned
+              </Badge>
+            )}
           </div>
 
           {/* Meta Row */}
@@ -365,6 +407,24 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate }
             <Badge variant="secondary" className="rounded-full text-xs font-semibold px-3 py-1.5 bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 flex items-center gap-1.5">
               <FileEdit className="h-3 w-3" />
               Draft
+            </Badge>
+          )}
+
+          {wasResponded && (
+            <Badge variant="outline" className="rounded-full text-xs font-semibold px-3 py-1.5 bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20 flex items-center gap-1.5">
+              <CheckCircle2 className="h-3 w-3" />
+              Responded
+            </Badge>
+          )}
+
+          {conversation.assigned_to ? (
+            <Badge variant="secondary" className="rounded-full text-xs font-semibold px-3 py-1.5 flex items-center gap-1.5">
+              <User className="h-3 w-3" />
+              {assignedUserName || 'Assigned'}
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="rounded-full text-xs font-semibold px-3 py-1.5 text-amber-600 border-amber-500/20 flex items-center gap-1.5">
+              Unassigned
             </Badge>
           )}
         </div>

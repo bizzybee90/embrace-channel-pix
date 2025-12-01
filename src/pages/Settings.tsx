@@ -12,8 +12,10 @@ import { AIAgentPanel } from '@/components/settings/AIAgentPanel';
 import { ConversationOrderingPanel } from '@/components/settings/ConversationOrderingPanel';
 import { KnowledgeBasePanel } from '@/components/settings/KnowledgeBasePanel';
 import { DataSyncPanel } from '@/components/settings/DataSyncPanel';
+import { IntegrationsPanel } from '@/components/settings/IntegrationsPanel';
 import { Card } from '@/components/ui/card';
 import { TestMessageGenerator } from '@/components/TestMessageGenerator';
+import { RecentActivityWidget } from '@/components/dashboard/RecentActivityWidget';
 import { TestTube } from 'lucide-react';
 
 export default function Settings() {
@@ -37,6 +39,7 @@ export default function Settings() {
             </TabsTrigger>
             <TabsTrigger value="knowledge-base">Knowledge Base</TabsTrigger>
             <TabsTrigger value="data-sync">Data Sync</TabsTrigger>
+            <TabsTrigger value="integrations">Integrations</TabsTrigger>
             <TabsTrigger value="channels">Channels</TabsTrigger>
             <TabsTrigger value="gdpr">GDPR</TabsTrigger>
             <TabsTrigger value="cleanup">Cleanup</TabsTrigger>
@@ -50,6 +53,7 @@ export default function Settings() {
         <TabsContent value="dashboard" className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <AIActivityWidget />
+            <RecentActivityWidget />
           </div>
         </TabsContent>
 
@@ -81,6 +85,10 @@ export default function Settings() {
 
         <TabsContent value="data-sync">
           <DataSyncPanel />
+        </TabsContent>
+
+        <TabsContent value="integrations">
+          <IntegrationsPanel />
         </TabsContent>
 
         <TabsContent value="channels">
