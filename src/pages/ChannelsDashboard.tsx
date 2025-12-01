@@ -223,10 +223,10 @@ export default function ChannelsDashboard() {
           </div>
         ) : (
           <div className="p-8 space-y-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-bold">Channels Dashboard</h1>
-                <p className="text-muted-foreground">Monitor activity across all communication channels</p>
+            <div className="flex items-center justify-between gap-4">
+              <div className="min-w-0 flex-1">
+                <h1 className="text-2xl md:text-3xl font-bold truncate">Channels Dashboard</h1>
+                <p className="text-sm text-muted-foreground truncate">Monitor activity across all communication channels</p>
               </div>
               <Button
                 variant="outline"
@@ -286,7 +286,7 @@ export default function ChannelsDashboard() {
               </Card>
             )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
               {visibleChannelStats.map((stat) => {
                 const config = channelConfig[stat.channel as keyof typeof channelConfig];
                 const Icon = config.icon;
@@ -297,13 +297,13 @@ export default function ChannelsDashboard() {
                     className={`p-6 ${config.bgColor} cursor-pointer hover:shadow-lg transition-all`}
                     onClick={() => navigate(`/channel/${stat.channel}`)}
                   >
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex items-center gap-3">
-                        <div className="p-3 rounded-lg bg-background">
+                    <div className="flex items-start justify-between mb-4 gap-3">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className="p-3 rounded-lg bg-background flex-shrink-0">
                           <Icon className={`h-6 w-6 ${config.color}`} />
                         </div>
-                        <div>
-                          <h3 className="text-lg font-semibold flex items-center gap-2">
+                        <div className="min-w-0 flex-1">
+                          <h3 className="text-lg font-semibold flex items-center gap-2 truncate">
                             {config.emoji} {config.label}
                           </h3>
                           <p className="text-sm text-muted-foreground">
@@ -343,8 +343,8 @@ export default function ChannelsDashboard() {
                                 key={conv.id}
                                 className="p-3 bg-background rounded-lg hover:bg-accent/50 transition-colors"
                               >
-                                <div className="flex items-center justify-between mb-1">
-                                  <p className="font-medium text-sm truncate flex-1">
+                                 <div className="flex items-center justify-between mb-1 gap-2 min-w-0">
+                                  <p className="font-medium text-sm truncate flex-1 min-w-0">
                                     {conv.title}
                                   </p>
                                   <Badge variant={getStatusColor(conv.status)} className="ml-2">

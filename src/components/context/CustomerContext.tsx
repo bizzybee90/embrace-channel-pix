@@ -52,11 +52,13 @@ export const CustomerContext = ({ conversation, onUpdate }: CustomerContextProps
   return (
     <div className="space-y-4 md:p-4 md:space-y-4 mobile-section-spacing">
       <div className="mobile-native-card md:p-0 md:border-0 md:shadow-none md:rounded-none">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex-1">
-            <h3 className="text-2xl md:text-xl font-bold leading-tight">{customerName}</h3>
+        <div className="flex items-center justify-between mb-3 gap-2">
+          <div className="flex-1 min-w-0">
+            <h3 className="text-2xl md:text-xl font-bold leading-tight truncate">{customerName}</h3>
           </div>
-          {getTierBadge(customerTier)}
+          <div className="flex-shrink-0">
+            {getTierBadge(customerTier)}
+          </div>
         </div>
       </div>
 
@@ -66,9 +68,9 @@ export const CustomerContext = ({ conversation, onUpdate }: CustomerContextProps
         <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Contact Info</h4>
         
         {customerEmail && (
-          <div className="flex items-center gap-3 text-sm mobile-touch-target">
+          <div className="flex items-center gap-3 text-sm mobile-touch-target min-w-0">
             <Mail className="h-4 w-4 text-primary flex-shrink-0" />
-            <span className="break-all">{customerEmail}</span>
+            <span className="truncate">{customerEmail}</span>
           </div>
         )}
         

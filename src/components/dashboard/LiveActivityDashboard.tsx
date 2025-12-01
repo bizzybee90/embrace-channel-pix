@@ -204,8 +204,8 @@ export const LiveActivityDashboard = () => {
         ) : (
           <div className="p-8 space-y-6 min-w-0">
       <div className="min-w-0">
-        <h1 className="text-2xl md:text-3xl font-bold truncate">Live Activity Dashboard</h1>
-        <p className="text-muted-foreground text-sm md:text-base">Real-time AI performance metrics for today</p>
+        <h1 className="text-2xl md:text-3xl font-bold">Live Activity Dashboard</h1>
+        <p className="text-muted-foreground text-sm md:text-base truncate">Real-time AI performance metrics for today</p>
       </div>
 
       {/* Unread Messages */}
