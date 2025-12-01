@@ -11,6 +11,8 @@ import { Badge } from '@/components/ui/badge';
 import { TrendingUp, Clock, CheckCircle, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { format, subDays, startOfDay, endOfDay, parseISO } from 'date-fns';
 import { Button } from '@/components/ui/button';
+import { MetricPillCard } from '@/components/shared/MetricPillCard';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
@@ -34,6 +36,7 @@ interface AnalyticsData {
 
 export default function ChannelAnalytics() {
   const { workspace } = useWorkspace();
+  const isMobile = useIsMobile();
   const [timeRange, setTimeRange] = useState('7');
   const [loading, setLoading] = useState(true);
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
@@ -265,17 +268,58 @@ export default function ChannelAnalytics() {
             <>
               {/* Key Metrics */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-xs md:text-sm font-medium">Total Conversations</CardTitle>
-                    <TrendingUp className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-xl md:text-2xl font-bold">
-                      {filteredAnalytics?.volumeByDay.reduce((sum, day) => sum + day.total, 0) || 0}
-                    </div>
-                  </CardContent>
-                </Card>
+                {isMobile ? (
+                  <>
+                    <MetricPillCard
+                      title="Total Conversations"
+                      value={filteredAnalytics?.volumeByDay.reduce((sum, day) => sum + day.total, 0) || 0}
+                      icon={<TrendingUp className="h-9 w-9" />}
+                      iconColor="text-primary"
+                    />
+                    <MetricPillCard
+                      title="Avg Response Time"
+                      value={(() => {
+                        const avgMinutes = filteredAnalytics?.responseTimesByDay.reduce(
+                          (sum, day) => sum + day.avgMinutes, 0
+                        ) / (filteredAnalytics?.responseTimesByDay.length || 1);
+                        return avgMinutes < 60 
+                          ? `${Math.round(avgMinutes)}m`
+                          : `${Math.round(avgMinutes / 60)}h`;
+                      })()}
+                      icon={<Clock className="h-9 w-9" />}
+                      iconColor="text-blue-600"
+                      bgColor="bg-blue-50 dark:bg-blue-950/20"
+                    />
+                    <MetricPillCard
+                      title="Resolution Rate"
+                      value={`${analytics.resolutionRate.rate.toFixed(1)}%`}
+                      subtitle={`${analytics.resolutionRate.resolved} resolved`}
+                      icon={<CheckCircle className="h-9 w-9" />}
+                      iconColor="text-green-600"
+                      bgColor="bg-green-50 dark:bg-green-950/20"
+                    />
+                    <MetricPillCard
+                      title="Peak Hour"
+                      value={`${analytics.peakHours[0]?.hour || 0}:00`}
+                      subtitle={`${analytics.peakHours[0]?.count || 0} conversations`}
+                      icon={<AlertCircle className="h-9 w-9" />}
+                      iconColor="text-orange-600"
+                      bgColor="bg-orange-50 dark:bg-orange-950/20"
+                    />
+                  </>
+                ) : (
+                  <>
+                    <Card>
+                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-xs md:text-sm font-medium">Total Conversations</CardTitle>
+                        <TrendingUp className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-xl md:text-2xl font-bold">
+                          {filteredAnalytics?.volumeByDay.reduce((sum, day) => sum + day.total, 0) || 0}
+                        </div>
+                      </CardContent>
+                    </Card>
 
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -321,7 +365,9 @@ export default function ChannelAnalytics() {
                     </p>
                   </CardContent>
                 </Card>
-              </div>
+              </>
+            )}
+          </div>
 
               <Tabs defaultValue="trends" className="space-y-4">
                 <TabsList>

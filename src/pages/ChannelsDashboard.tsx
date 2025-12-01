@@ -12,6 +12,8 @@ import { Sidebar } from '@/components/sidebar/Sidebar';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { MetricPillCard } from '@/components/shared/MetricPillCard';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface ChannelStats {
   channel: string;
@@ -67,6 +69,7 @@ const channelConfig = {
 export default function ChannelsDashboard() {
   const { workspace } = useWorkspace();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const [channelStats, setChannelStats] = useState<ChannelStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [enabledChannels, setEnabledChannels] = useState<Record<string, boolean>>({});
@@ -291,6 +294,22 @@ export default function ChannelsDashboard() {
               {visibleChannelStats.map((stat) => {
                 const config = channelConfig[stat.channel as keyof typeof channelConfig];
                 const Icon = config.icon;
+
+                if (isMobile) {
+                  return (
+                    <div key={stat.channel} onClick={() => navigate(`/channel/${stat.channel}`)}>
+                      <MetricPillCard
+                        title={`${config.emoji} ${config.label}`}
+                        value={`${stat.unread} unread`}
+                        subtitle={`${stat.total} conversation${stat.total !== 1 ? 's' : ''} today • ${formatResponseTime(stat.avgResponseTime)} avg response`}
+                        icon={<Icon className="h-9 w-9" />}
+                        iconColor={config.color}
+                        bgColor={config.bgColor}
+                        className="cursor-pointer active:scale-[0.98] transition-transform"
+                      />
+                    </div>
+                  );
+                }
 
                 return (
                   <Card 

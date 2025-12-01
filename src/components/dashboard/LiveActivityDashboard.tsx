@@ -50,9 +50,12 @@ import { ThreeColumnLayout } from '@/components/layout/ThreeColumnLayout';
 import { Sidebar } from '@/components/sidebar/Sidebar';
 import { AIActivityWidget } from './AIActivityWidget';
 import { AIConversationSummaryWidget } from './AIConversationSummaryWidget';
+import { MetricPillCard } from '@/components/shared/MetricPillCard';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 export const LiveActivityDashboard = () => {
   const { workspace } = useWorkspace();
+  const isMobile = useIsMobile();
   const [stats, setStats] = useState<ConversationStats>({
     total: 0,
     aiHandled: 0,
@@ -209,92 +212,180 @@ export const LiveActivityDashboard = () => {
       </div>
 
       {/* Unread Messages */}
-      <Card className="p-6 bg-purple-50 dark:bg-purple-950/20">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <p className="text-sm font-medium text-muted-foreground">Unread Conversations</p>
-            <h3 className="text-4xl font-bold mt-2 text-purple-600 dark:text-purple-400">
-              {stats.unread}
-            </h3>
+      {isMobile ? (
+        <MetricPillCard
+          title="Unread Conversations"
+          value={stats.unread}
+          icon={<MessageSquare className="h-9 w-9" />}
+          iconColor="text-purple-600 dark:text-purple-400"
+          bgColor="bg-purple-50 dark:bg-purple-950/20"
+        />
+      ) : (
+        <Card className="p-6 bg-purple-50 dark:bg-purple-950/20">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Unread Conversations</p>
+              <h3 className="text-4xl font-bold mt-2 text-purple-600 dark:text-purple-400">
+                {stats.unread}
+              </h3>
+            </div>
+            <MessageSquare className="h-10 w-10 text-purple-600 dark:text-purple-400" />
           </div>
-          <MessageSquare className="h-10 w-10 text-purple-600 dark:text-purple-400" />
+          <div className="space-y-2 pt-4 border-t">
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">📧 Email</span>
+              <span className="font-semibold">{stats.unreadByChannel.email}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">💬 WhatsApp</span>
+              <span className="font-semibold">{stats.unreadByChannel.whatsapp}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">📱 SMS</span>
+              <span className="font-semibold">{stats.unreadByChannel.sms}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">📞 Phone</span>
+              <span className="font-semibold">{stats.unreadByChannel.phone}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">💻 Web Chat</span>
+              <span className="font-semibold">{stats.unreadByChannel.webchat}</span>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* Channel Breakdown - Mobile Only */}
+      {isMobile && (
+        <div className="space-y-2">
+          <MetricPillCard
+            title="📧 Email"
+            value={stats.unreadByChannel.email}
+            icon={<MessageSquare className="h-7 w-7" />}
+            iconColor="text-blue-600"
+            bgColor="bg-blue-50/50 dark:bg-blue-950/10"
+          />
+          <MetricPillCard
+            title="💬 WhatsApp"
+            value={stats.unreadByChannel.whatsapp}
+            icon={<MessageSquare className="h-7 w-7" />}
+            iconColor="text-green-600"
+            bgColor="bg-green-50/50 dark:bg-green-950/10"
+          />
+          <MetricPillCard
+            title="📱 SMS"
+            value={stats.unreadByChannel.sms}
+            icon={<MessageSquare className="h-7 w-7" />}
+            iconColor="text-purple-600"
+            bgColor="bg-purple-50/50 dark:bg-purple-950/10"
+          />
+          <MetricPillCard
+            title="📞 Phone"
+            value={stats.unreadByChannel.phone}
+            icon={<MessageSquare className="h-7 w-7" />}
+            iconColor="text-orange-600"
+            bgColor="bg-orange-50/50 dark:bg-orange-950/10"
+          />
+          <MetricPillCard
+            title="💻 Web Chat"
+            value={stats.unreadByChannel.webchat}
+            icon={<MessageSquare className="h-7 w-7" />}
+            iconColor="text-indigo-600"
+            bgColor="bg-indigo-50/50 dark:bg-indigo-950/10"
+          />
         </div>
-        <div className="space-y-2 pt-4 border-t">
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">📧 Email</span>
-            <span className="font-semibold">{stats.unreadByChannel.email}</span>
-          </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">💬 WhatsApp</span>
-            <span className="font-semibold">{stats.unreadByChannel.whatsapp}</span>
-          </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">📱 SMS</span>
-            <span className="font-semibold">{stats.unreadByChannel.sms}</span>
-          </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">📞 Phone</span>
-            <span className="font-semibold">{stats.unreadByChannel.phone}</span>
-          </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">💻 Web Chat</span>
-            <span className="font-semibold">{stats.unreadByChannel.webchat}</span>
-          </div>
-        </div>
-      </Card>
+      )}
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-        <Card className="p-4 md:p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs md:text-sm font-medium text-muted-foreground">Total Conversations</p>
-              <h3 className="text-2xl md:text-3xl font-bold mt-2">{stats.total}</h3>
-            </div>
-            <MessageSquare className="h-6 w-6 md:h-8 md:w-8 text-primary" />
-          </div>
-        </Card>
+        {isMobile ? (
+          <>
+            <MetricPillCard
+              title="Total Conversations"
+              value={stats.total}
+              icon={<MessageSquare className="h-9 w-9" />}
+              iconColor="text-primary"
+            />
+            <MetricPillCard
+              title="AI Handled"
+              value={stats.aiHandled}
+              subtitle={`${stats.total > 0 ? Math.round((stats.aiHandled / stats.total) * 100) : 0}% auto-resolved`}
+              icon={<Bot className="h-9 w-9" />}
+              iconColor="text-green-600 dark:text-green-400"
+              bgColor="bg-green-50 dark:bg-green-950/20"
+            />
+            <MetricPillCard
+              title="Escalated"
+              value={stats.escalated}
+              subtitle="Needs human attention"
+              icon={<AlertCircle className="h-9 w-9" />}
+              iconColor="text-orange-600 dark:text-orange-400"
+              bgColor="bg-orange-50 dark:bg-orange-950/20"
+            />
+            <MetricPillCard
+              title="Avg Confidence"
+              value={`${Math.round(stats.avgConfidence)}%`}
+              subtitle="AI certainty score"
+              icon={<Zap className="h-9 w-9" />}
+              iconColor="text-blue-600 dark:text-blue-400"
+              bgColor="bg-blue-50 dark:bg-blue-950/20"
+            />
+          </>
+        ) : (
+          <>
+            <Card className="p-4 md:p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs md:text-sm font-medium text-muted-foreground">Total Conversations</p>
+                  <h3 className="text-2xl md:text-3xl font-bold mt-2">{stats.total}</h3>
+                </div>
+                <MessageSquare className="h-6 w-6 md:h-8 md:w-8 text-primary" />
+              </div>
+            </Card>
 
-        <Card className="p-4 md:p-6 bg-green-50 dark:bg-green-950/20">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs md:text-sm font-medium text-muted-foreground">AI Handled</p>
-              <h3 className="text-2xl md:text-3xl font-bold mt-2 text-green-600 dark:text-green-400">
-                {stats.aiHandled}
-              </h3>
-              <p className="text-xs text-muted-foreground mt-1">
-                {stats.total > 0 ? Math.round((stats.aiHandled / stats.total) * 100) : 0}% auto-resolved
-              </p>
-            </div>
-            <Bot className="h-6 w-6 md:h-8 md:w-8 text-green-600 dark:text-green-400" />
-          </div>
-        </Card>
+            <Card className="p-4 md:p-6 bg-green-50 dark:bg-green-950/20">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs md:text-sm font-medium text-muted-foreground">AI Handled</p>
+                  <h3 className="text-2xl md:text-3xl font-bold mt-2 text-green-600 dark:text-green-400">
+                    {stats.aiHandled}
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {stats.total > 0 ? Math.round((stats.aiHandled / stats.total) * 100) : 0}% auto-resolved
+                  </p>
+                </div>
+                <Bot className="h-6 w-6 md:h-8 md:w-8 text-green-600 dark:text-green-400" />
+              </div>
+            </Card>
 
-        <Card className="p-4 md:p-6 bg-orange-50 dark:bg-orange-950/20">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs md:text-sm font-medium text-muted-foreground">Escalated</p>
-              <h3 className="text-2xl md:text-3xl font-bold mt-2 text-orange-600 dark:text-orange-400">
-                {stats.escalated}
-              </h3>
-              <p className="text-xs text-muted-foreground mt-1">Needs human attention</p>
-            </div>
-            <AlertCircle className="h-8 w-8 text-orange-600 dark:text-orange-400" />
-          </div>
-        </Card>
+            <Card className="p-4 md:p-6 bg-orange-50 dark:bg-orange-950/20">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs md:text-sm font-medium text-muted-foreground">Escalated</p>
+                  <h3 className="text-2xl md:text-3xl font-bold mt-2 text-orange-600 dark:text-orange-400">
+                    {stats.escalated}
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-1">Needs human attention</p>
+                </div>
+                <AlertCircle className="h-8 w-8 text-orange-600 dark:text-orange-400" />
+              </div>
+            </Card>
 
-        <Card className="p-6 bg-blue-50 dark:bg-blue-950/20">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Avg Confidence</p>
-              <h3 className="text-3xl font-bold mt-2 text-blue-600 dark:text-blue-400">
-                {Math.round(stats.avgConfidence)}%
-              </h3>
-              <p className="text-xs text-muted-foreground mt-1">AI certainty score</p>
-            </div>
-            <Zap className="h-8 w-8 text-blue-600 dark:text-blue-400" />
-          </div>
-        </Card>
+            <Card className="p-6 bg-blue-50 dark:bg-blue-950/20">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Avg Confidence</p>
+                  <h3 className="text-3xl font-bold mt-2 text-blue-600 dark:text-blue-400">
+                    {Math.round(stats.avgConfidence)}%
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-1">AI certainty score</p>
+                </div>
+                <Zap className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+              </div>
+            </Card>
+          </>
+        )}
       </div>
 
       {/* AI Activity Summary */}
