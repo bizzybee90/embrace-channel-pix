@@ -20,33 +20,33 @@ import { TestTube } from 'lucide-react';
 
 export default function Settings() {
   return (
-    <div className="container mx-auto py-6 px-4 max-w-6xl">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold">Settings</h1>
-        <p className="text-muted-foreground mt-2">Manage your workspace settings, GDPR compliance, and data policies.</p>
+    <div className="container mx-auto py-4 md:py-6 px-4 max-w-6xl">
+      <div className="mb-4 md:mb-6">
+        <h1 className="text-2xl md:text-3xl font-bold">Settings</h1>
+        <p className="text-sm md:text-base text-muted-foreground mt-1 md:mt-2">Manage your workspace settings, GDPR compliance, and data policies.</p>
       </div>
 
-      <Tabs defaultValue="dashboard" className="space-y-6">
-        <div className="overflow-x-auto pb-2">
+      <Tabs defaultValue="dashboard" className="space-y-4 md:space-y-6">
+        <div className="overflow-x-auto pb-2 -mx-4 px-4">
           <TabsList className="inline-flex w-auto min-w-full">
-            <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-            <TabsTrigger value="interface">Interface</TabsTrigger>
-            <TabsTrigger value="ordering">Ordering</TabsTrigger>
-            <TabsTrigger value="ai-agent">AI Agent</TabsTrigger>
-            <TabsTrigger value="testing" className="flex items-center gap-2">
-              <TestTube className="h-4 w-4" />
+            <TabsTrigger value="dashboard" className="text-xs md:text-sm">Dashboard</TabsTrigger>
+            <TabsTrigger value="interface" className="text-xs md:text-sm">Interface</TabsTrigger>
+            <TabsTrigger value="ordering" className="text-xs md:text-sm">Ordering</TabsTrigger>
+            <TabsTrigger value="ai-agent" className="text-xs md:text-sm">AI Agent</TabsTrigger>
+            <TabsTrigger value="testing" className="flex items-center gap-2 text-xs md:text-sm">
+              <TestTube className="h-3 w-3 md:h-4 md:w-4" />
               Testing
             </TabsTrigger>
-            <TabsTrigger value="knowledge-base">Knowledge Base</TabsTrigger>
-            <TabsTrigger value="data-sync">Data Sync</TabsTrigger>
-            <TabsTrigger value="integrations">Integrations</TabsTrigger>
-            <TabsTrigger value="channels">Channels</TabsTrigger>
-            <TabsTrigger value="gdpr">GDPR</TabsTrigger>
-            <TabsTrigger value="cleanup">Cleanup</TabsTrigger>
-            <TabsTrigger value="export">Data Export</TabsTrigger>
-            <TabsTrigger value="deletion">Data Deletion</TabsTrigger>
-            <TabsTrigger value="retention">Retention</TabsTrigger>
-            <TabsTrigger value="audit">Audit Logs</TabsTrigger>
+            <TabsTrigger value="knowledge-base" className="text-xs md:text-sm">Knowledge Base</TabsTrigger>
+            <TabsTrigger value="data-sync" className="text-xs md:text-sm">Data Sync</TabsTrigger>
+            <TabsTrigger value="integrations" className="text-xs md:text-sm">Integrations</TabsTrigger>
+            <TabsTrigger value="channels" className="text-xs md:text-sm">Channels</TabsTrigger>
+            <TabsTrigger value="gdpr" className="text-xs md:text-sm">GDPR</TabsTrigger>
+            <TabsTrigger value="cleanup" className="text-xs md:text-sm">Cleanup</TabsTrigger>
+            <TabsTrigger value="export" className="text-xs md:text-sm">Data Export</TabsTrigger>
+            <TabsTrigger value="deletion" className="text-xs md:text-sm">Data Deletion</TabsTrigger>
+            <TabsTrigger value="retention" className="text-xs md:text-sm">Retention</TabsTrigger>
+            <TabsTrigger value="audit" className="text-xs md:text-sm">Audit Logs</TabsTrigger>
           </TabsList>
         </div>
 

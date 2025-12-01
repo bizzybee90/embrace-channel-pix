@@ -48,13 +48,13 @@ export default function WebhookLogs() {
   };
 
   return (
-    <div className="container mx-auto py-6 px-4 max-w-7xl">
-      <div className="mb-6 flex items-center justify-between">
+    <div className="container mx-auto py-4 md:py-6 px-4 max-w-7xl">
+      <div className="mb-4 md:mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold">Webhook Logs</h1>
-          <p className="text-muted-foreground mt-2">Monitor n8n webhook communications</p>
+          <h1 className="text-2xl md:text-3xl font-bold">Webhook Logs</h1>
+          <p className="text-sm text-muted-foreground mt-1 md:mt-2">Monitor n8n webhook communications</p>
         </div>
-        <Button onClick={loadLogs} disabled={loading}>
+        <Button onClick={loadLogs} disabled={loading} size="sm" className="self-start sm:self-auto">
           <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
           Refresh
         </Button>
