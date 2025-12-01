@@ -271,10 +271,10 @@ export const CustomerTimeline = ({
                 >
                   <div className="space-y-2">
                     {/* Header */}
-                    <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-start justify-between gap-2 min-w-0">
                       <div className="flex items-center gap-2 flex-1 min-w-0">
                         {getEventIcon(event)}
-                        <span className="text-xs font-medium text-muted-foreground">
+                        <span className="text-xs font-medium text-muted-foreground truncate">
                           {getEventLabel(event)}
                         </span>
                         {event.channel && (
@@ -284,7 +284,7 @@ export const CustomerTimeline = ({
                           />
                         )}
                       </div>
-                      <span className="text-xs text-muted-foreground whitespace-nowrap">
+                      <span className="text-xs text-muted-foreground whitespace-nowrap flex-shrink-0">
                         {formatDistanceToNow(new Date(event.timestamp), { addSuffix: true })}
                       </span>
                     </div>
@@ -346,7 +346,7 @@ export const CustomerTimeline = ({
                   onClick={() => navigate(`/?conversation=${event.conversation_id}`)}
                 >
                   <div className="space-y-2">
-                    <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-start justify-between gap-2 min-w-0">
                       <div className="flex items-center gap-2 flex-1 min-w-0">
                         {event.channel && (
                           <ChannelIcon channel={event.channel} className="h-4 w-4 flex-shrink-0" />

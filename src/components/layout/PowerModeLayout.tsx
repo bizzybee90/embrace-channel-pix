@@ -28,7 +28,7 @@ export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerMod
       </aside>
 
       {/* Main Content - 3 Column Layout (responsive) */}
-      <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0 h-full">
+      <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0 h-full overflow-hidden">
         {/* Conversation List Panel (hidden on mobile when conversation selected) */}
         <ResizablePanel 
           defaultSize={20} 
@@ -37,7 +37,7 @@ export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerMod
           collapsible={false}
           className={selectedConversation ? "hidden md:flex min-h-0" : "flex min-h-0"}
         >
-          <div className="flex-1 flex flex-col border-r border-border/30 bg-card w-full overflow-hidden min-w-0">
+          <div className="flex-1 flex flex-col border-r border-border/30 bg-card w-full overflow-hidden min-w-0 overflow-x-hidden">
             <ConversationList
               filter={filter}
               channelFilter={channelFilter}
@@ -57,7 +57,7 @@ export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerMod
           collapsible={false}
           className="w-full min-h-0 flex flex-col h-full min-w-0"
         >
-          <div className="h-full w-full min-h-0 overflow-hidden">
+          <div className="h-full w-full min-h-0 overflow-hidden min-w-0">
             {selectedConversation ? (
               <ConversationThread
                 key={refreshKey}
@@ -85,7 +85,7 @@ export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerMod
           collapsible={false}
           className="hidden md:flex min-h-0"
         >
-          <div className="flex-1 flex flex-col overflow-y-auto bg-card/50 p-4 hidden md:flex min-w-0">
+          <div className="flex-1 flex flex-col overflow-y-auto overflow-x-hidden bg-card/50 p-4 hidden md:flex min-w-0">
             {selectedConversation ? (
               <CustomerContext conversation={selectedConversation} onUpdate={handleUpdate} />
             ) : (
