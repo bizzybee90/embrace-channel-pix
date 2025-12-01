@@ -35,9 +35,9 @@ export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerMod
           minSize={15}
           maxSize={30}
           collapsible={false}
-          className={selectedConversation ? "hidden md:flex min-w-[300px] min-h-0" : "flex min-w-[300px] min-h-0"}
+          className={selectedConversation ? "hidden md:flex min-h-0" : "flex min-h-0"}
         >
-          <div className="flex-1 flex flex-col border-r border-border/30 bg-card w-full overflow-hidden">
+          <div className="flex-1 flex flex-col border-r border-border/30 bg-card w-full overflow-hidden min-w-0">
             <ConversationList
               filter={filter}
               channelFilter={channelFilter}
@@ -55,7 +55,7 @@ export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerMod
           minSize={40}
           maxSize={70}
           collapsible={false}
-          className="w-full min-h-0 flex flex-col h-full"
+          className="w-full min-h-0 flex flex-col h-full min-w-0"
         >
           <div className="h-full w-full min-h-0 overflow-hidden">
             {selectedConversation ? (
@@ -83,9 +83,9 @@ export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerMod
           minSize={20}
           maxSize={30}
           collapsible={false}
-          className="hidden md:flex min-w-[280px] min-h-0"
+          className="hidden md:flex min-h-0"
         >
-          <div className="flex-1 flex flex-col overflow-y-auto bg-card/50 p-4 hidden md:flex">
+          <div className="flex-1 flex flex-col overflow-y-auto bg-card/50 p-4 hidden md:flex min-w-0">
             {selectedConversation ? (
               <CustomerContext conversation={selectedConversation} onUpdate={handleUpdate} />
             ) : (

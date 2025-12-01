@@ -10,8 +10,8 @@ import { ConversationThread } from '@/components/conversations/ConversationThrea
 import { CustomerContext } from '@/components/context/CustomerContext';
 import { QuickActions } from '@/components/conversations/QuickActions';
 import { MobileQuickActions } from '@/components/conversations/MobileQuickActions';
-import { MobileConversationList } from '@/components/conversations/MobileConversationList';
-import { MobileConversationView } from '@/components/conversations/MobileConversationView';
+import { MobileConversationList } from '@/components/conversations/mobile/MobileConversationList';
+import { MobileConversationView } from '@/components/conversations/mobile/MobileConversationView';
 import { Conversation, Message } from '@/lib/types';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { useInterfaceMode } from '@/hooks/useInterfaceMode';

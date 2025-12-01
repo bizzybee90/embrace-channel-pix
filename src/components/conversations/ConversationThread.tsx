@@ -5,7 +5,7 @@ import { ConversationHeader } from './ConversationHeader';
 import { AIContextPanel } from './AIContextPanel';
 import { MessageTimeline } from './MessageTimeline';
 import { ReplyArea } from './ReplyArea';
-import { MobileConversationView } from './MobileConversationView';
+import { MobileConversationView } from './mobile/MobileConversationView';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
