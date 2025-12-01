@@ -33,7 +33,8 @@ interface TabletLayoutProps {
     | "completed"
     | "sent"
     | "high-priority"
-    | "vip-customers";
+    | "vip-customers"
+    | "escalations";
 }
 
 export const TabletLayout = ({ filter = "all-open" }: TabletLayoutProps) => {
@@ -98,6 +99,8 @@ export const TabletLayout = ({ filter = "all-open" }: TabletLayoutProps) => {
         return "High Priority";
       case "vip-customers":
         return "VIP Customers";
+      case "escalations":
+        return "Escalations";
       default:
         return "Conversations";
     }

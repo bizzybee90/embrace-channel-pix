@@ -10,12 +10,12 @@ export default function Escalations() {
   
   // Use mobile layout on mobile devices
   if (isMobile) {
-    return <MobileEscalationHub filter="all-open" />;
+    return <MobileEscalationHub filter="escalations" />;
   }
   
   // Use tablet-optimized layout on tablet devices
   if (isTablet) {
-    return <TabletLayout filter="all-open" />;
+    return <TabletLayout filter="escalations" />;
   }
   
   return <PowerModeLayout filter="escalations" />;
