@@ -29,19 +29,19 @@ export const MetricPillCard = ({
     )}>
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-muted-foreground mb-3">
+          <p className="text-xs font-medium text-muted-foreground mb-2">
             {title}
           </p>
-          <h3 className="text-4xl font-bold mb-1">
+          <h3 className="text-2xl font-semibold mb-1">
             {value}
           </h3>
           {subtitle && (
-            <p className="text-xs text-muted-foreground mt-2">
+            <p className="text-xs text-muted-foreground mt-1">
               {subtitle}
             </p>
           )}
         </div>
-        <div className={cn('flex-shrink-0 mt-1', iconColor)}>
+        <div className={cn('flex-shrink-0', iconColor)}>
           {icon}
         </div>
       </div>

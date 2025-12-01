@@ -214,9 +214,9 @@ export const LiveActivityDashboard = () => {
       {/* Unread Messages */}
       {isMobile ? (
         <MetricPillCard
-          title="Unread Conversations"
+          title="Unread"
           value={stats.unread}
-          icon={<MessageSquare className="h-9 w-9" />}
+          icon={<MessageSquare className="h-6 w-6" />}
           iconColor="text-purple-600 dark:text-purple-400"
           bgColor="bg-purple-50 dark:bg-purple-950/20"
         />
@@ -258,39 +258,39 @@ export const LiveActivityDashboard = () => {
 
       {/* Channel Breakdown - Mobile Only */}
       {isMobile && (
-        <div className="space-y-2">
+        <div className="grid grid-cols-2 gap-3">
           <MetricPillCard
-            title="📧 Email"
+            title="Email"
             value={stats.unreadByChannel.email}
-            icon={<MessageSquare className="h-7 w-7" />}
+            icon={<MessageSquare className="h-5 w-5" />}
             iconColor="text-blue-600"
             bgColor="bg-blue-50/50 dark:bg-blue-950/10"
           />
           <MetricPillCard
-            title="💬 WhatsApp"
+            title="WhatsApp"
             value={stats.unreadByChannel.whatsapp}
-            icon={<MessageSquare className="h-7 w-7" />}
+            icon={<MessageSquare className="h-5 w-5" />}
             iconColor="text-green-600"
             bgColor="bg-green-50/50 dark:bg-green-950/10"
           />
           <MetricPillCard
-            title="📱 SMS"
+            title="SMS"
             value={stats.unreadByChannel.sms}
-            icon={<MessageSquare className="h-7 w-7" />}
+            icon={<MessageSquare className="h-5 w-5" />}
             iconColor="text-purple-600"
             bgColor="bg-purple-50/50 dark:bg-purple-950/10"
           />
           <MetricPillCard
-            title="📞 Phone"
+            title="Phone"
             value={stats.unreadByChannel.phone}
-            icon={<MessageSquare className="h-7 w-7" />}
+            icon={<MessageSquare className="h-5 w-5" />}
             iconColor="text-orange-600"
             bgColor="bg-orange-50/50 dark:bg-orange-950/10"
           />
           <MetricPillCard
-            title="💻 Web Chat"
+            title="Web Chat"
             value={stats.unreadByChannel.webchat}
-            icon={<MessageSquare className="h-7 w-7" />}
+            icon={<MessageSquare className="h-5 w-5" />}
             iconColor="text-indigo-600"
             bgColor="bg-indigo-50/50 dark:bg-indigo-950/10"
           />
@@ -298,36 +298,36 @@ export const LiveActivityDashboard = () => {
       )}
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+      <div className={isMobile ? "grid grid-cols-2 gap-3" : "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4"}>
         {isMobile ? (
           <>
             <MetricPillCard
-              title="Total Conversations"
+              title="Total"
               value={stats.total}
-              icon={<MessageSquare className="h-9 w-9" />}
+              icon={<MessageSquare className="h-5 w-5" />}
               iconColor="text-primary"
             />
             <MetricPillCard
               title="AI Handled"
               value={stats.aiHandled}
-              subtitle={`${stats.total > 0 ? Math.round((stats.aiHandled / stats.total) * 100) : 0}% auto-resolved`}
-              icon={<Bot className="h-9 w-9" />}
+              subtitle={`${stats.total > 0 ? Math.round((stats.aiHandled / stats.total) * 100) : 0}%`}
+              icon={<Bot className="h-5 w-5" />}
               iconColor="text-green-600 dark:text-green-400"
               bgColor="bg-green-50 dark:bg-green-950/20"
             />
             <MetricPillCard
               title="Escalated"
               value={stats.escalated}
-              subtitle="Needs human attention"
-              icon={<AlertCircle className="h-9 w-9" />}
+              subtitle="Needs review"
+              icon={<AlertCircle className="h-5 w-5" />}
               iconColor="text-orange-600 dark:text-orange-400"
               bgColor="bg-orange-50 dark:bg-orange-950/20"
             />
             <MetricPillCard
-              title="Avg Confidence"
+              title="Confidence"
               value={`${Math.round(stats.avgConfidence)}%`}
-              subtitle="AI certainty score"
-              icon={<Zap className="h-9 w-9" />}
+              subtitle="AI accuracy"
+              icon={<Zap className="h-5 w-5" />}
               iconColor="text-blue-600 dark:text-blue-400"
               bgColor="bg-blue-50 dark:bg-blue-950/20"
             />

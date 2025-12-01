@@ -267,17 +267,17 @@ export default function ChannelAnalytics() {
           ) : (
             <>
               {/* Key Metrics */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+              <div className={isMobile ? "grid grid-cols-2 gap-3" : "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4"}>
                 {isMobile ? (
                   <>
                     <MetricPillCard
-                      title="Total Conversations"
+                      title="Total"
                       value={filteredAnalytics?.volumeByDay.reduce((sum, day) => sum + day.total, 0) || 0}
-                      icon={<TrendingUp className="h-9 w-9" />}
+                      icon={<TrendingUp className="h-5 w-5" />}
                       iconColor="text-primary"
                     />
                     <MetricPillCard
-                      title="Avg Response Time"
+                      title="Response"
                       value={(() => {
                         const avgMinutes = filteredAnalytics?.responseTimesByDay.reduce(
                           (sum, day) => sum + day.avgMinutes, 0
@@ -286,23 +286,23 @@ export default function ChannelAnalytics() {
                           ? `${Math.round(avgMinutes)}m`
                           : `${Math.round(avgMinutes / 60)}h`;
                       })()}
-                      icon={<Clock className="h-9 w-9" />}
+                      icon={<Clock className="h-5 w-5" />}
                       iconColor="text-blue-600"
                       bgColor="bg-blue-50 dark:bg-blue-950/20"
                     />
                     <MetricPillCard
-                      title="Resolution Rate"
-                      value={`${analytics.resolutionRate.rate.toFixed(1)}%`}
-                      subtitle={`${analytics.resolutionRate.resolved} resolved`}
-                      icon={<CheckCircle className="h-9 w-9" />}
+                      title="Resolved"
+                      value={`${analytics.resolutionRate.rate.toFixed(0)}%`}
+                      subtitle={`${analytics.resolutionRate.resolved} total`}
+                      icon={<CheckCircle className="h-5 w-5" />}
                       iconColor="text-green-600"
                       bgColor="bg-green-50 dark:bg-green-950/20"
                     />
                     <MetricPillCard
                       title="Peak Hour"
                       value={`${analytics.peakHours[0]?.hour || 0}:00`}
-                      subtitle={`${analytics.peakHours[0]?.count || 0} conversations`}
-                      icon={<AlertCircle className="h-9 w-9" />}
+                      subtitle={`${analytics.peakHours[0]?.count || 0} msgs`}
+                      icon={<AlertCircle className="h-5 w-5" />}
                       iconColor="text-orange-600"
                       bgColor="bg-orange-50 dark:bg-orange-950/20"
                     />

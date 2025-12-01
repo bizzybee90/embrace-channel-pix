@@ -290,7 +290,7 @@ export default function ChannelsDashboard() {
               </Card>
             )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+            <div className={isMobile ? "grid grid-cols-2 gap-3" : "grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6"}>
               {visibleChannelStats.map((stat) => {
                 const config = channelConfig[stat.channel as keyof typeof channelConfig];
                 const Icon = config.icon;
@@ -299,10 +299,10 @@ export default function ChannelsDashboard() {
                   return (
                     <div key={stat.channel} onClick={() => navigate(`/channel/${stat.channel}`)}>
                       <MetricPillCard
-                        title={`${config.emoji} ${config.label}`}
-                        value={`${stat.unread} unread`}
-                        subtitle={`${stat.total} conversation${stat.total !== 1 ? 's' : ''} today • ${formatResponseTime(stat.avgResponseTime)} avg response`}
-                        icon={<Icon className="h-9 w-9" />}
+                        title={config.label}
+                        value={`${stat.unread}`}
+                        subtitle={`${stat.total} total`}
+                        icon={<Icon className="h-5 w-5" />}
                         iconColor={config.color}
                         bgColor={config.bgColor}
                         className="cursor-pointer active:scale-[0.98] transition-transform"
