@@ -97,19 +97,19 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
 
     // Apply view filter
     if (filter === 'my-tickets') {
-      query = query.eq('assigned_to', user.id).in('status', ['new', 'open', 'waiting_customer', 'waiting_internal']);
+      query = query.eq('assigned_to', user.id).in('status', ['new', 'open', 'waiting_customer', 'waiting_internal', 'ai_handling']);
     } else if (filter === 'unassigned') {
-      query = query.is('assigned_to', null).in('status', ['new', 'open', 'waiting_customer', 'waiting_internal']);
+      query = query.is('assigned_to', null).in('status', ['new', 'open', 'waiting_customer', 'waiting_internal', 'ai_handling']);
     } else if (filter === 'sla-risk') {
-      query = query.in('sla_status', ['warning', 'breached']).in('status', ['new', 'open', 'waiting_customer', 'waiting_internal']);
+      query = query.in('sla_status', ['warning', 'breached']).in('status', ['new', 'open', 'waiting_customer', 'waiting_internal', 'ai_handling']);
     } else if (filter === 'all-open') {
-      query = query.in('status', ['new', 'open', 'waiting_customer', 'waiting_internal', 'escalated']);
+      query = query.in('status', ['new', 'open', 'waiting_customer', 'waiting_internal', 'escalated', 'ai_handling']);
     } else if (filter === 'completed') {
       query = query.eq('status', 'resolved');
     } else if (filter === 'high-priority') {
-      query = query.in('priority', ['high', 'urgent']).in('status', ['new', 'open', 'waiting_customer', 'waiting_internal']);
+      query = query.in('priority', ['high', 'urgent']).in('status', ['new', 'open', 'waiting_customer', 'waiting_internal', 'ai_handling']);
     } else if (filter === 'vip-customers') {
-      query = query.eq('metadata->>tier', 'vip').in('status', ['new', 'open', 'waiting_customer', 'waiting_internal']);
+      query = query.eq('metadata->>tier', 'vip').in('status', ['new', 'open', 'waiting_customer', 'waiting_internal', 'ai_handling']);
     } else if (filter === 'escalations') {
       query = query.eq('is_escalated', true).in('status', ['new', 'in_progress', 'waiting', 'open', 'escalated']);
     }
