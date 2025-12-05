@@ -80,9 +80,6 @@ export const ConversationThread = ({ conversation, onUpdate, onBack }: Conversat
   }, [conversation.id]);
 
   const handleReply = async (body: string, isInternal: boolean) => {
-    // IMMEDIATE DEBUG - This alert confirms the latest code is running
-    alert(`handleReply called! isInternal: ${isInternal}`);
-    
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
