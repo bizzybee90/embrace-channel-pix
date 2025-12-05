@@ -17,6 +17,7 @@ interface SendRequest {
     path: string;
     type: string;
   }>;
+  skipMessageLog?: boolean; // Skip logging if message already saved by frontend
 }
 
 serve(async (req) => {
@@ -181,27 +182,31 @@ serve(async (req) => {
       throw new Error('Conversation not found');
     }
 
-    // Log the outbound message to database
-    const { error: messageError } = await supabase
-      .from('messages')
-      .insert({
-        conversation_id: sendRequest.conversationId,
-        direction: 'outbound',
-        channel: sendRequest.channel,
-        actor_type: 'ai_agent',
-        actor_name: 'MAC Cleaning AI',
-        body: sendRequest.message,
-        attachments: sendRequest.attachments || [],
-        raw_payload: {
-          ...sendRequest.metadata,
-          messageId: messageId,
-          messageStatus: messageStatus
-        }
-      });
+    // Log the outbound message to database (skip if frontend already saved it)
+    if (!sendRequest.skipMessageLog) {
+      const { error: messageError } = await supabase
+        .from('messages')
+        .insert({
+          conversation_id: sendRequest.conversationId,
+          direction: 'outbound',
+          channel: sendRequest.channel,
+          actor_type: sendRequest.metadata?.actorType || 'ai_agent',
+          actor_name: sendRequest.metadata?.actorName || 'MAC Cleaning AI',
+          body: sendRequest.message,
+          attachments: sendRequest.attachments || [],
+          raw_payload: {
+            ...sendRequest.metadata,
+            messageId: messageId,
+            messageStatus: messageStatus
+          }
+        });
 
-    if (messageError) {
-      console.error('Error logging message:', messageError);
-      // Don't fail the request if logging fails
+      if (messageError) {
+        console.error('Error logging message:', messageError);
+        // Don't fail the request if logging fails
+      }
+    } else {
+      console.log('Skipping message log (already saved by frontend)');
     }
 
     // Update conversation

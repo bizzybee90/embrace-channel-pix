@@ -89,6 +89,7 @@ export const ConversationThread = ({ conversation, onUpdate, onBack }: Conversat
       .eq('id', user.id)
       .single();
 
+    // Save message to database first
     const { data: newMessage, error: insertError } = await supabase
       .from('messages')
       .insert({
@@ -114,6 +115,58 @@ export const ConversationThread = ({ conversation, onUpdate, onBack }: Conversat
       return;
     }
 
+    // For external messages, send via Twilio/Postmark
+    if (!isInternal && conversation.customer) {
+      try {
+        // Determine recipient based on channel
+        let recipient = '';
+        if (conversation.channel === 'email') {
+          recipient = conversation.customer.email || '';
+        } else if (conversation.channel === 'sms' || conversation.channel === 'whatsapp') {
+          recipient = conversation.customer.phone || '';
+        }
+
+        if (recipient) {
+          console.log('📤 Sending message via edge function:', { channel: conversation.channel, recipient });
+          
+          const { data: sendResult, error: sendError } = await supabase.functions.invoke('send-response', {
+            body: {
+              conversationId: conversation.id,
+              channel: conversation.channel,
+              to: recipient,
+              message: body,
+              skipMessageLog: true, // We already saved the message above
+              metadata: {
+                actorType: 'human_agent',
+                actorName: userData?.name || 'Agent',
+                actorId: user.id
+              }
+            }
+          });
+
+          if (sendError) {
+            console.error('Error sending via channel:', sendError);
+            toast({
+              title: "Warning",
+              description: `Message saved but delivery failed: ${sendError.message}`,
+              variant: "destructive"
+            });
+          } else {
+            console.log('✅ Message sent successfully:', sendResult);
+          }
+        } else {
+          console.warn('No recipient found for channel:', conversation.channel);
+        }
+      } catch (error: any) {
+        console.error('Error calling send-response:', error);
+        toast({
+          title: "Warning", 
+          description: "Message saved but delivery may have failed",
+          variant: "destructive"
+        });
+      }
+    }
+
     // Update conversation status and timestamps
     if (!isInternal) {
       const updateData: any = {
@@ -136,8 +189,8 @@ export const ConversationThread = ({ conversation, onUpdate, onBack }: Conversat
     
     // Show success toast
     toast({
-      title: "Message sent",
-      description: "Your reply has been saved successfully",
+      title: isInternal ? "Note added" : "Message sent",
+      description: isInternal ? "Internal note saved" : "Your reply has been sent successfully",
     });
     
     // Trigger update to refresh conversation list
