@@ -117,7 +117,9 @@ export const ConversationThread = ({ conversation, onUpdate, onBack }: Conversat
 
     // For external messages, send via Twilio/Postmark
     if (!isInternal) {
-      console.log('🔄 Processing external message for delivery...');
+      toast({ title: "Step 1", description: "Processing external message..." });
+      console.log('🔄 Step 1: Processing external message for delivery...');
+      
       try {
         // Fetch customer data if not available on conversation
         let customer = conversation.customer;
@@ -125,7 +127,9 @@ export const ConversationThread = ({ conversation, onUpdate, onBack }: Conversat
         console.log('🆔 Customer ID:', conversation.customer_id);
         
         if (!customer && conversation.customer_id) {
-          console.log('📡 Fetching customer data from database...');
+          toast({ title: "Step 2", description: "Fetching customer data..." });
+          console.log('📡 Step 2: Fetching customer data from database...');
+          
           const { data: customerData, error: customerError } = await supabase
             .from('customers')
             .select('*')
@@ -134,6 +138,7 @@ export const ConversationThread = ({ conversation, onUpdate, onBack }: Conversat
           
           if (customerError) {
             console.error('❌ Error fetching customer:', customerError);
+            toast({ title: "Error", description: `Customer fetch failed: ${customerError.message}`, variant: "destructive" });
           } else {
             console.log('✅ Customer data fetched:', customerData);
             customer = customerData as typeof conversation.customer;
@@ -141,6 +146,9 @@ export const ConversationThread = ({ conversation, onUpdate, onBack }: Conversat
         }
 
         if (customer) {
+          toast({ title: "Step 3", description: `Customer found: ${customer.name || customer.phone || customer.email}` });
+          console.log('✅ Step 3: Customer found:', customer);
+          
           // Determine recipient based on channel
           let recipient = '';
           console.log('📞 Channel:', conversation.channel);
@@ -156,7 +164,8 @@ export const ConversationThread = ({ conversation, onUpdate, onBack }: Conversat
           console.log('📬 Determined recipient:', recipient);
 
           if (recipient) {
-            console.log('📤 Sending message via edge function:', { channel: conversation.channel, recipient });
+            toast({ title: "Step 4", description: `Calling send-response for ${recipient}...` });
+            console.log('📤 Step 4: Sending message via edge function:', { channel: conversation.channel, recipient });
             
             const { data: sendResult, error: sendError } = await supabase.functions.invoke('send-response', {
               body: {
@@ -174,36 +183,40 @@ export const ConversationThread = ({ conversation, onUpdate, onBack }: Conversat
             });
 
             if (sendError) {
-              console.error('Error sending via channel:', sendError);
+              console.error('❌ Step 5 Error: send-response failed:', sendError);
               toast({
-                title: "Warning",
-                description: `Message saved but delivery failed: ${sendError.message}`,
+                title: "Step 5 Error",
+                description: `Delivery failed: ${sendError.message}`,
                 variant: "destructive"
               });
             } else {
-              console.log('✅ Message sent successfully:', sendResult);
+              console.log('✅ Step 5: Message sent successfully:', sendResult);
+              toast({ 
+                title: "Step 5 Success", 
+                description: `SMS delivered to ${recipient}!`,
+              });
             }
           } else {
-            console.warn('No recipient found for channel:', conversation.channel);
+            console.warn('❌ No recipient found for channel:', conversation.channel);
             toast({
-              title: "Warning",
-              description: "Message saved but no recipient contact info found",
+              title: "Step 4 Error",
+              description: `No ${conversation.channel === 'email' ? 'email' : 'phone'} for customer`,
               variant: "destructive"
             });
           }
         } else {
-          console.warn('No customer found for conversation');
+          console.warn('❌ No customer found for conversation');
           toast({
-            title: "Warning",
-            description: "Message saved but customer not found for delivery",
+            title: "Step 3 Error",
+            description: "No customer found for delivery",
             variant: "destructive"
           });
         }
       } catch (error: any) {
-        console.error('Error calling send-response:', error);
+        console.error('❌ Exception in send flow:', error);
         toast({
-          title: "Warning", 
-          description: "Message saved but delivery may have failed",
+          title: "Exception", 
+          description: `Send failed: ${error.message}`,
           variant: "destructive"
         });
       }
