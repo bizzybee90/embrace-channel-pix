@@ -1,7 +1,7 @@
 export type AppRole = 'admin' | 'manager' | 'reviewer';
 
 export type Priority = 'high' | 'medium' | 'low';
-export type ConversationStatus = 'new' | 'open' | 'waiting_customer' | 'waiting_internal' | 'resolved' | 'closed' | 'ai_handling' | 'escalated';
+export type ConversationStatus = 'new' | 'open' | 'waiting_customer' | 'waiting_internal' | 'resolved' | 'closed' | 'ai_handling' | 'escalated' | 'pending_review';
 export type Channel = 'sms' | 'whatsapp' | 'email' | 'web_chat';
 export type SLAStatus = 'safe' | 'warning' | 'breached';
 export type CustomerTier = 'vip' | 'regular' | 'trial' | 'prospect' | 'at_risk';
