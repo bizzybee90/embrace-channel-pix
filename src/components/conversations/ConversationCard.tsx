@@ -332,7 +332,7 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate }
             <span className="flex items-center gap-1.5">
               <span className="opacity-40">•</span>
               <Clock className="h-3 w-3" />
-              {formatDistanceToNow(new Date(conversation.created_at!), { addSuffix: true })}
+              {formatDistanceToNow(new Date(conversation.updated_at || conversation.created_at!), { addSuffix: true })}
             </span>
           </div>
           </div>
@@ -436,7 +436,7 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate }
           </span>
           <span className="flex items-center gap-1.5">
             <span className="opacity-40">•</span>
-            {formatDistanceToNow(new Date(conversation.created_at!), { addSuffix: true })}
+            {formatDistanceToNow(new Date(conversation.updated_at || conversation.created_at!), { addSuffix: true })}
           </span>
         </div>
       </div>
