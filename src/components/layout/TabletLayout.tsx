@@ -30,6 +30,7 @@ interface TabletLayoutProps {
     | "unassigned"
     | "sla-risk"
     | "all-open"
+    | "awaiting-reply"
     | "completed"
     | "sent"
     | "high-priority"

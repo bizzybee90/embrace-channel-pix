@@ -9,7 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 interface MobileEscalationHubProps {
-  filter?: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'completed' | 'sent' | 'high-priority' | 'vip-customers' | 'escalations';
+  filter?: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'awaiting-reply' | 'completed' | 'sent' | 'high-priority' | 'vip-customers' | 'escalations';
 }
 
 export const MobileEscalationHub = ({ filter = 'all-open' }: MobileEscalationHubProps) => {
@@ -39,6 +39,7 @@ export const MobileEscalationHub = ({ filter = 'all-open' }: MobileEscalationHub
     'unassigned': 'Unassigned',
     'sla-risk': 'SLA Risk',
     'all-open': 'All Open',
+    'awaiting-reply': 'Awaiting Reply',
     'completed': 'Completed',
     'sent': 'Sent',
     'high-priority': 'High Priority',

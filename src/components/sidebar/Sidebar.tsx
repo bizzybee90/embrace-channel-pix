@@ -259,6 +259,30 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
             )}
           </Tooltip>
           
+          {/* Awaiting Reply */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div>
+                <NavLink
+                  to="/awaiting-reply"
+                  onClick={onNavigate}
+                  className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all hover-scale`}
+                  activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
+                >
+                  <div className="flex items-center justify-center w-8 h-8 rounded-md bg-yellow-500/10">
+                    <Clock className="h-4 w-4 text-yellow-500" />
+                  </div>
+                  {!isCollapsed && <span>Awaiting Reply</span>}
+                </NavLink>
+              </div>
+            </TooltipTrigger>
+            {isCollapsed && (
+              <TooltipContent side="right">
+                <p>Awaiting Reply</p>
+              </TooltipContent>
+            )}
+          </Tooltip>
+          
           {/* Sent - Always visible in Views */}
           <Tooltip>
             <TooltipTrigger asChild>

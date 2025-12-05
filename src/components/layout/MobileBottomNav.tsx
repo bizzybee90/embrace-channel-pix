@@ -1,11 +1,11 @@
-import { Inbox, UserCircle, FolderOpen, Menu, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Inbox, UserCircle, FolderOpen, Menu, AlertTriangle, CheckCircle2, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useState, useEffect } from 'react';
 
 interface MobileBottomNavProps {
-  activeFilter: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'completed' | 'sent' | 'high-priority' | 'vip-customers';
-  onNavigate: (filter: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'completed' | 'sent' | 'high-priority' | 'vip-customers') => void;
+  activeFilter: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'awaiting-reply' | 'completed' | 'sent' | 'high-priority' | 'vip-customers';
+  onNavigate: (filter: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'awaiting-reply' | 'completed' | 'sent' | 'high-priority' | 'vip-customers') => void;
   onMenuClick: () => void;
 }
 
@@ -18,11 +18,11 @@ const navItems = [
     iconColor: 'text-primary'
   },
   { 
-    id: 'unassigned' as const, 
-    icon: AlertTriangle, 
-    label: 'Unassigned',
-    badgeBg: 'bg-destructive/10',
-    iconColor: 'text-destructive'
+    id: 'awaiting-reply' as const, 
+    icon: Clock, 
+    label: 'Awaiting',
+    badgeBg: 'bg-yellow-500/10',
+    iconColor: 'text-yellow-500'
   },
   { 
     id: 'all-open' as const, 

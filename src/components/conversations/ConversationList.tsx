@@ -18,7 +18,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 interface ConversationListProps {
   selectedId?: string;
   onSelect: (conversation: Conversation) => void;
-  filter?: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'completed' | 'sent' | 'high-priority' | 'vip-customers' | 'escalations';
+  filter?: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'awaiting-reply' | 'completed' | 'sent' | 'high-priority' | 'vip-customers' | 'escalations';
   onConversationsChange?: (conversations: Conversation[]) => void;
   channelFilter?: string;
 }
@@ -133,7 +133,10 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
     } else if (filter === 'sla-risk') {
       query = query.in('sla_status', ['warning', 'breached']).in('status', ['new', 'open', 'waiting_customer', 'waiting_internal', 'ai_handling', 'escalated']);
     } else if (filter === 'all-open') {
-      query = query.in('status', ['new', 'open', 'waiting_customer', 'waiting_internal', 'ai_handling', 'escalated']);
+      // Exclude waiting_customer - those are in "Awaiting Reply" view
+      query = query.in('status', ['new', 'open', 'waiting_internal', 'ai_handling', 'escalated']);
+    } else if (filter === 'awaiting-reply') {
+      query = query.in('status', ['waiting_customer', 'waiting_internal']);
     } else if (filter === 'completed') {
       query = query.eq('status', 'resolved');
     } else if (filter === 'high-priority') {

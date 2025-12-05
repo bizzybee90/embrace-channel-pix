@@ -108,7 +108,19 @@ const RouterContent = () => {
         } 
       />
       <Route 
-        path="/high-priority" 
+        path="/awaiting-reply" 
+        element={
+          <AuthGuard>
+            {isMobile ? (
+              <MobileEscalationHub filter="awaiting-reply" />
+            ) : (
+              <EscalationHub filter="awaiting-reply" />
+            )}
+          </AuthGuard>
+        } 
+      />
+      <Route 
+        path="/high-priority"
         element={
           <AuthGuard>
             {isMobile ? (
