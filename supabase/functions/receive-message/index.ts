@@ -153,10 +153,12 @@ serve(async (req) => {
       .maybeSingle();
 
     let conversationId: string;
+    let previousStatus: string | null = null;
 
     if (existingConversation) {
       conversationId = existingConversation.id;
-      console.log('💬 [receive-message] Found existing conversation:', conversationId);
+      previousStatus = existingConversation.status;
+      console.log('💬 [receive-message] Found existing conversation:', conversationId, 'previous status:', previousStatus);
       
       await supabase
         .from('conversations')
@@ -298,7 +300,15 @@ serve(async (req) => {
       confidence: aiOutput.confidence,
     };
 
-    if (aiOutput.escalate) {
+    // Check if customer is replying to a conversation we were waiting on
+    const wasWaitingForCustomer = previousStatus === 'waiting_customer';
+    
+    if (wasWaitingForCustomer) {
+      // Customer replied to our message - set to 'open' for human review
+      updateData.status = 'open';
+      updateData.conversation_type = 'customer_replied';
+      console.log('📬 [receive-message] Customer replied to waiting conversation - setting to OPEN');
+    } else if (aiOutput.escalate) {
       // ESCALATED: Save draft but don't send
       updateData.is_escalated = true;
       updateData.escalated_at = new Date().toISOString();
@@ -332,8 +342,8 @@ serve(async (req) => {
       body: { text: conversationText, conversationId: conversationId }
     }).catch(err => console.error('Embedding generation failed:', err));
 
-    // Step 12: Send response ONLY if not escalated
-    if (!aiOutput.escalate) {
+    // Step 12: Send response ONLY if not escalated AND not a customer reply to waiting conversation
+    if (!aiOutput.escalate && !wasWaitingForCustomer) {
       console.log('📤 [receive-message] Sending automated response...');
       
       // Log AI message ONLY when actually sending

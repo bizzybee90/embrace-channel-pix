@@ -2,7 +2,7 @@ import { memo } from 'react';
 import { Conversation } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow } from 'date-fns';
-import { Clock, CheckCircle2, UserPlus, FileEdit, User } from 'lucide-react';
+import { Clock, CheckCircle2, UserPlus, FileEdit, User, Bot, AlertTriangle, MessageSquare, Hourglass } from 'lucide-react';
 import { ChannelIcon } from '../shared/ChannelIcon';
 import { cn } from '@/lib/utils';
 import { useIsTablet } from '@/hooks/use-tablet';
@@ -191,7 +191,26 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate }
   const isRightSwipe = swipeDistance > 0;
 
   const isOverdue = conversation.sla_due_at && new Date() > new Date(conversation.sla_due_at);
-  const wasResponded = conversation.status === 'waiting_customer' && conversation.first_response_at;
+  
+  // Status-based visual indicators
+  const getStatusBadge = () => {
+    switch (conversation.status) {
+      case 'open':
+        return { icon: MessageSquare, label: 'Customer Replied', className: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20' };
+      case 'waiting_customer':
+        return { icon: Hourglass, label: 'Awaiting Reply', className: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20' };
+      case 'ai_handling':
+        return { icon: Bot, label: 'AI Handling', className: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20' };
+      case 'escalated':
+        return { icon: AlertTriangle, label: 'Escalated', className: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20' };
+      case 'resolved':
+        return { icon: CheckCircle2, label: 'Resolved', className: 'bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20' };
+      default:
+        return null;
+    }
+  };
+  
+  const statusBadge = getStatusBadge();
 
   // Compact tablet layout
   if (isTablet) {
@@ -305,10 +324,10 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate }
               </Badge>
             )}
 
-            {wasResponded && (
-              <Badge variant="outline" className="rounded-full text-xs font-semibold px-3 py-1.5 bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20 flex items-center gap-1.5">
-                <CheckCircle2 className="h-3 w-3" />
-                Responded
+            {statusBadge && (
+              <Badge variant="outline" className={cn("rounded-full text-xs font-semibold px-3 py-1.5 border flex items-center gap-1.5", statusBadge.className)}>
+                <statusBadge.icon className="h-3 w-3" />
+                {statusBadge.label}
               </Badge>
             )}
 
@@ -410,10 +429,10 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate }
             </Badge>
           )}
 
-          {wasResponded && (
-            <Badge variant="outline" className="rounded-full text-xs font-semibold px-3 py-1.5 bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20 flex items-center gap-1.5">
-              <CheckCircle2 className="h-3 w-3" />
-              Responded
+          {statusBadge && (
+            <Badge variant="outline" className={cn("rounded-full text-xs font-semibold px-3 py-1.5 border flex items-center gap-1.5", statusBadge.className)}>
+              <statusBadge.icon className="h-3 w-3" />
+              {statusBadge.label}
             </Badge>
           )}
 
