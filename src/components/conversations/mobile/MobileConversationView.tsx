@@ -75,7 +75,8 @@ export const MobileConversationView = ({
       .eq('id', user.id)
       .single();
 
-    await supabase.from('messages').insert({
+    // Save message to database first
+    const { error: insertError } = await supabase.from('messages').insert({
       conversation_id: conversation.id,
       actor_type: isInternal ? 'system' : 'human_agent',
       actor_id: user.id,
@@ -86,14 +87,103 @@ export const MobileConversationView = ({
       is_internal: isInternal
     });
 
-    if (!isInternal && !conversation.first_response_at) {
+    if (insertError) {
+      toast({
+        title: "Error sending message",
+        description: insertError.message,
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // For external messages, send via Twilio/Postmark
+    if (!isInternal) {
+      try {
+        // Fetch customer data if not available
+        let customer = conversation.customer;
+        if (!customer && conversation.customer_id) {
+          const { data: customerData } = await supabase
+            .from('customers')
+            .select('*')
+            .eq('id', conversation.customer_id)
+            .single();
+          customer = customerData as typeof conversation.customer;
+        }
+
+        if (customer) {
+          let recipient = '';
+          if (conversation.channel === 'email') {
+            recipient = customer.email || '';
+          } else if (conversation.channel === 'sms' || conversation.channel === 'whatsapp') {
+            recipient = customer.phone || '';
+          }
+
+          if (recipient) {
+            const { error: sendError } = await supabase.functions.invoke('send-response', {
+              body: {
+                conversationId: conversation.id,
+                channel: conversation.channel,
+                to: recipient,
+                message: body,
+                skipMessageLog: true,
+                metadata: {
+                  actorType: 'human_agent',
+                  actorName: userData?.name || 'Agent',
+                  actorId: user.id
+                }
+              }
+            });
+
+            if (sendError) {
+              toast({
+                title: "Warning",
+                description: `Message saved but delivery failed: ${sendError.message}`,
+                variant: "destructive"
+              });
+            } else {
+              toast({
+                title: "Message sent",
+                description: `Delivered to ${recipient}`,
+              });
+            }
+          } else {
+            toast({
+              title: "Warning",
+              description: "Message saved but no recipient contact found",
+              variant: "destructive"
+            });
+          }
+        }
+      } catch (error: any) {
+        toast({
+          title: "Warning",
+          description: "Message saved but delivery may have failed",
+          variant: "destructive"
+        });
+      }
+    }
+
+    // Update conversation status
+    if (!isInternal) {
       await supabase
         .from('conversations')
-        .update({ first_response_at: new Date().toISOString() })
+        .update({ 
+          updated_at: new Date().toISOString(),
+          status: 'waiting_customer',
+          first_response_at: conversation.first_response_at || new Date().toISOString()
+        })
         .eq('id', conversation.id);
     }
 
     localStorage.removeItem(`draft-${conversation.id}`);
+    
+    if (!isInternal) {
+      toast({
+        title: "Reply sent",
+        description: "Your message has been sent",
+      });
+    }
+    
     onUpdate();
   };
 
