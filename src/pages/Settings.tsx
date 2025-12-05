@@ -97,6 +97,10 @@ export default function Settings() {
           <ChannelManagementPanel />
         </TabsContent>
 
+        <TabsContent value="email-settings">
+          <EmailSettingsPanel />
+        </TabsContent>
+
         <TabsContent value="gdpr">
           <GDPRDashboard />
         </TabsContent>
