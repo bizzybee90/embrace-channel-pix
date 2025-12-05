@@ -57,7 +57,7 @@ export default function ChannelAnalytics() {
     setLoading(true);
     try {
       const daysBack = parseInt(timeRange);
-      const startDate = subDays(new Date(), daysBack);
+      const startDate = daysBack === 0 ? startOfDay(new Date()) : subDays(new Date(), daysBack);
       
       // Fetch all conversations in the time range
       const { data: conversations, error } = await supabase
@@ -213,6 +213,7 @@ export default function ChannelAnalytics() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="0">Today</SelectItem>
                 <SelectItem value="7">Last 7 days</SelectItem>
                 <SelectItem value="14">Last 14 days</SelectItem>
                 <SelectItem value="30">Last 30 days</SelectItem>

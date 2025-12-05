@@ -221,9 +221,21 @@ serve(async (req) => {
     let aiOutput: AIOutput;
     
     try {
+      // Determine sender phone/email for customer lookup
+      const senderPhone = (normalised.channel === 'sms' || normalised.channel === 'whatsapp') 
+        ? normalised.customer_identifier 
+        : null;
+      const senderEmail = normalised.channel === 'email' 
+        ? normalised.customer_identifier 
+        : normalised.customer_email;
+      
       const aiResponse = await supabase.functions.invoke('claude-ai-agent-tools', {
         body: {
-          message: normalised,
+          message: {
+            ...normalised,
+            sender_phone: senderPhone,
+            sender_email: senderEmail,
+          },
           conversation_history: history || [],
           customer_data: existingCustomer,
         }

@@ -81,19 +81,20 @@ export const LiveActivityDashboard = () => {
     if (!workspace?.id) return;
 
     try {
-      // Get today's date range
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const todayStr = today.toISOString();
+      // Get recent conversations (last 7 days for meaningful stats)
+      const weekAgo = new Date();
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      weekAgo.setHours(0, 0, 0, 0);
+      const weekAgoStr = weekAgo.toISOString();
 
-      // Fetch conversations from today
+      // Fetch recent conversations for stats
       const { data: conversations, error } = await supabase
         .from('conversations')
         .select('*')
         .eq('workspace_id', workspace.id)
-        .gte('created_at', todayStr)
+        .gte('created_at', weekAgoStr)
         .order('created_at', { ascending: false })
-        .limit(50);
+        .limit(100);
 
       if (error) throw error;
 
@@ -208,7 +209,7 @@ export const LiveActivityDashboard = () => {
           <div className="p-4 md:p-8 space-y-4 md:space-y-6 min-w-0">
       <div className="min-w-0">
         <h1 className="text-xl md:text-2xl lg:text-3xl font-bold">Live Activity Dashboard</h1>
-        <p className="text-muted-foreground text-sm md:text-base">Real-time AI performance metrics for today</p>
+        <p className="text-muted-foreground text-sm md:text-base">Real-time AI performance metrics (last 7 days)</p>
       </div>
 
       {/* Unread Messages */}

@@ -10,6 +10,24 @@ const corsHeaders = {
 // Knowledge base tools for gathering information
 const KNOWLEDGE_TOOLS = [
   {
+    name: "lookup_customer_by_contact",
+    description: "ALWAYS call this first! Look up a customer by their phone number or email to find their name, address, and account details. Use the sender's phone/email from the incoming message.",
+    input_schema: {
+      type: "object",
+      properties: {
+        phone: {
+          type: "string",
+          description: "Customer's phone number (can be in any format, will be normalized)"
+        },
+        email: {
+          type: "string",
+          description: "Customer's email address"
+        }
+      },
+      required: []
+    }
+  },
+  {
     name: "search_faqs",
     description: "Search the FAQ database for answers to common questions. Returns relevant FAQs based on keywords or category.",
     input_schema: {
@@ -29,7 +47,7 @@ const KNOWLEDGE_TOOLS = [
   },
   {
     name: "get_customer_info",
-    description: "Retrieve detailed information about a customer including their history, preferences, and notes.",
+    description: "Retrieve detailed information about a customer by their ID including their history, preferences, and notes.",
     input_schema: {
       type: "object",
       properties: {
@@ -145,6 +163,15 @@ const SYSTEM_PROMPT = `You are a friendly, professional customer service AI for 
 ## CRITICAL INSTRUCTION
 You MUST call the "respond_to_customer" tool to provide your response. Do NOT write JSON text - use the tool.
 
+## FIRST STEP - ALWAYS LOOK UP THE CUSTOMER
+Before anything else, ALWAYS call "lookup_customer_by_contact" with the sender's phone number or email to find the customer's:
+- Name (use their name in your response!)
+- Address and account details
+- Service history and preferences
+- Account status and balance
+
+If the customer is not found in the system, politely ask for their name and details.
+
 ## Your Personality & Brand Voice
 - Warm and helpful, like a friendly neighbour who genuinely cares
 - Professional but not corporate - real and human
@@ -152,14 +179,16 @@ You MUST call the "respond_to_customer" tool to provide your response. Do NOT wr
 - Concise - customers are busy (2-4 sentences max)
 - Proactive in offering solutions
 - Take ownership of problems - never deflect
+- ALWAYS use the customer's name if you found it via lookup
 
 ## Available Tools
 Use these tools to get accurate information BEFORE responding:
-- search_faqs: Find answers in the FAQ database
-- get_customer_info: Look up customer details and history
-- get_pricing: Get current pricing - ALWAYS use for price questions
-- get_business_facts: Look up business information (hours, areas, policies)
-- search_similar_conversations: Learn from past successful interactions
+1. lookup_customer_by_contact: CALL THIS FIRST with sender's phone/email
+2. search_faqs: Find answers in the FAQ database
+3. get_customer_info: Look up customer details by ID
+4. get_pricing: Get current pricing - ALWAYS use for price questions
+5. get_business_facts: Look up business information (hours, areas, policies)
+6. search_similar_conversations: Learn from past successful interactions
 
 IMPORTANT: After gathering information, you MUST call "respond_to_customer" to send your response.
 
@@ -185,7 +214,7 @@ When a customer is upset or has a complaint:
 - Keep responses 20-500 characters
 - Never include placeholder text like [name] or {{variable}}
 - Don't ask customer to call unless escalating
-- Always personalise if you have customer's name
+- Always personalise using customer's name from lookup
 - End with clear next step or offer of help
 
 ## Confidence Scoring
@@ -212,7 +241,8 @@ serve(async (req) => {
     const { message, conversation_history, customer_data } = await req.json();
 
     console.log('📥 [AI-Agent] Processing message:', message.message_content);
-    console.log('📥 [AI-Agent] Customer:', customer_data?.name || 'Unknown');
+    console.log('📥 [AI-Agent] Sender phone:', message.sender_phone || 'Unknown');
+    console.log('📥 [AI-Agent] Sender email:', message.sender_email || 'Unknown');
     console.log('📥 [AI-Agent] Channel:', message.channel);
 
     // Prepare conversation context
@@ -223,14 +253,20 @@ serve(async (req) => {
     const messages: Message[] = [
       {
         role: 'user',
-        content: `Customer: ${customer_data?.name || 'Unknown'}
+        content: `Incoming message from customer:
+Sender Phone: ${message.sender_phone || 'Not provided'}
+Sender Email: ${message.sender_email || 'Not provided'}
 Channel: ${message.channel}
 Message: "${message.message_content}"
 
 Recent conversation history:
 ${conversation_history.slice(0, 5).map((m: any) => `${m.actor_type}: ${m.body}`).join('\n')}
 
-IMPORTANT: Use tools to gather information, then call "respond_to_customer" with your final response.`
+IMPORTANT: 
+1. FIRST call "lookup_customer_by_contact" with the sender's phone or email to find their account details
+2. Use the customer's name in your response if found
+3. If not found, politely ask for their details
+4. Then call "respond_to_customer" with your final response.`
       }
     ];
 
@@ -310,6 +346,9 @@ IMPORTANT: Use tools to gather information, then call "respond_to_customer" with
 
         try {
           switch (name) {
+            case 'lookup_customer_by_contact':
+              toolResult = await lookupCustomerByContact(supabase, input);
+              break;
             case 'search_faqs':
               toolResult = await searchFaqs(supabase, input);
               break;
@@ -333,7 +372,7 @@ IMPORTANT: Use tools to gather information, then call "respond_to_customer" with
           toolResult = { error: error instanceof Error ? error.message : 'Tool execution failed' };
         }
 
-        console.log(`📋 [AI-Agent] Tool ${name} result:`, JSON.stringify(toolResult).substring(0, 200));
+        console.log(`📋 [AI-Agent] Tool ${name} result:`, JSON.stringify(toolResult).substring(0, 500));
 
         toolResultsForThisIteration.push({
           type: 'tool_result',
@@ -401,6 +440,72 @@ IMPORTANT: Use tools to gather information, then call "respond_to_customer" with
     });
   }
 });
+
+// NEW: Look up customer by phone or email
+async function lookupCustomerByContact(supabase: any, input: any) {
+  const { phone, email } = input;
+  
+  console.log('🔍 [AI-Agent] Looking up customer by phone:', phone, 'email:', email);
+  
+  // Normalize phone number by removing all non-digits
+  const normalizePhone = (p: string) => p.replace(/\D/g, '');
+  
+  let customer = null;
+  
+  // Try to find by phone first
+  if (phone) {
+    const normalizedPhone = normalizePhone(phone);
+    // Try multiple phone formats
+    const { data: phoneResults, error: phoneError } = await supabase
+      .from('customers')
+      .select('*')
+      .or(`phone.ilike.%${normalizedPhone.slice(-10)}%,phone.ilike.%${phone}%`)
+      .limit(1);
+    
+    if (!phoneError && phoneResults && phoneResults.length > 0) {
+      customer = phoneResults[0];
+      console.log('✅ [AI-Agent] Found customer by phone:', customer.name);
+    }
+  }
+  
+  // If not found by phone, try email
+  if (!customer && email) {
+    const { data: emailResults, error: emailError } = await supabase
+      .from('customers')
+      .select('*')
+      .ilike('email', email)
+      .limit(1);
+    
+    if (!emailError && emailResults && emailResults.length > 0) {
+      customer = emailResults[0];
+      console.log('✅ [AI-Agent] Found customer by email:', customer.name);
+    }
+  }
+  
+  if (customer) {
+    return {
+      found: true,
+      customer_id: customer.id,
+      name: customer.name,
+      email: customer.email,
+      phone: customer.phone,
+      address: customer.address,
+      status: customer.status,
+      tier: customer.tier,
+      balance: customer.balance,
+      next_appointment: customer.next_appointment,
+      frequency: customer.frequency,
+      price: customer.price,
+      notes: customer.notes,
+      preferred_channel: customer.preferred_channel
+    };
+  }
+  
+  return {
+    found: false,
+    message: "Customer not found in system. Please ask for their name and details to create their account."
+  };
+}
 
 // Tool implementation functions
 async function searchFaqs(supabase: any, input: any) {
@@ -500,15 +605,17 @@ async function searchSimilarConversations(supabase: any, input: any) {
       return [];
     }
 
-    return (data || []).map((conv: any) => ({
-      text: conv.text,
-      ai_response: conv.ai_response,
-      final_response: conv.final_response,
-      human_edited: conv.human_edited,
-      led_to_booking: conv.led_to_booking,
-    }));
+    return data?.map((match: any) => ({
+      similarity: match.similarity,
+      text: match.text,
+      ai_response: match.ai_response,
+      final_response: match.final_response,
+      human_edited: match.human_edited,
+      led_to_booking: match.led_to_booking,
+      customer_satisfaction: match.customer_satisfaction
+    })) || [];
   } catch (error) {
-    console.error('Similar conversations search failed:', error);
+    console.error('Similar conversations search error:', error);
     return [];
   }
 }
