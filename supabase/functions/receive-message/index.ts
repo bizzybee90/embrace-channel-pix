@@ -166,8 +166,8 @@ serve(async (req) => {
       .order('created_at', { ascending: false })
       .limit(10);
 
-    // Step 6: Call AI agent
-    const aiResponse = await supabase.functions.invoke('claude-ai-agent', {
+    // Step 6: Call AI agent with tools (uses knowledge base, pricing, FAQs)
+    const aiResponse = await supabase.functions.invoke('claude-ai-agent-tools', {
       body: {
         message: normalised,
         conversation_history: history || [],
@@ -183,19 +183,8 @@ serve(async (req) => {
     const aiOutput = aiResponse.data;
     console.log('AI response:', aiOutput);
 
-    // Step 7: Log AI response message
-    await supabase
-      .from('messages')
-      .insert({
-        conversation_id: conversationId,
-        actor_type: 'ai',
-        actor_name: 'BizzyBee AI',
-        body: aiOutput.response,
-        channel: normalised.channel,
-        direction: 'outbound',
-      });
-
-    // Step 8: Update conversation with AI metadata and tracking
+    // Step 7: Update conversation with AI metadata and tracking
+    // NOTE: AI message is only logged to messages table when actually sent (Step 9)
     const updateData: any = {
       ai_confidence: aiOutput.confidence,
       ai_sentiment: aiOutput.sentiment,
@@ -253,6 +242,18 @@ serve(async (req) => {
     if (!aiOutput.escalate) {
       console.log('Sending automated response');
       
+      // Log AI response message ONLY when actually sending
+      await supabase
+        .from('messages')
+        .insert({
+          conversation_id: conversationId,
+          actor_type: 'ai',
+          actor_name: 'BizzyBee AI',
+          body: aiOutput.response,
+          channel: normalised.channel,
+          direction: 'outbound',
+        });
+      
       const sendResponse = await supabase.functions.invoke('send-response', {
         body: {
           conversationId: conversationId,
@@ -266,7 +267,7 @@ serve(async (req) => {
         console.error('Send response error:', sendResponse.error);
       }
     } else {
-      console.log('Conversation escalated - not sending automated response');
+      console.log('Conversation escalated - AI draft saved but not sent or logged as message');
     }
 
     return new Response(JSON.stringify({
