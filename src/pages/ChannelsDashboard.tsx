@@ -80,16 +80,18 @@ export default function ChannelsDashboard() {
     if (!workspace?.id) return;
 
     try {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const todayStr = today.toISOString();
+      // Show last 7 days instead of just today
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      sevenDaysAgo.setHours(0, 0, 0, 0);
+      const sevenDaysAgoStr = sevenDaysAgo.toISOString();
 
-      // Fetch all conversations
+      // Fetch conversations from last 7 days
       const { data: conversations, error } = await supabase
         .from('conversations')
         .select('*')
         .eq('workspace_id', workspace.id)
-        .gte('created_at', todayStr)
+        .gte('created_at', sevenDaysAgoStr)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -229,7 +231,7 @@ export default function ChannelsDashboard() {
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <div className="min-w-0 flex-1 w-full sm:w-auto">
                 <h1 className="text-xl md:text-2xl lg:text-3xl font-bold">Channels Dashboard</h1>
-                <p className="text-sm text-muted-foreground mt-1">Monitor activity across all channels</p>
+                <p className="text-sm text-muted-foreground mt-1">Monitor activity across all channels (last 7 days)</p>
               </div>
               <Button
                 variant="outline"
@@ -328,7 +330,7 @@ export default function ChannelsDashboard() {
                             <span className="truncate">{config.label}</span>
                           </h3>
                           <p className="text-xs md:text-sm text-muted-foreground truncate">
-                            {stat.total} conversation{stat.total !== 1 ? 's' : ''} today
+                            {stat.total} conversation{stat.total !== 1 ? 's' : ''} (7 days)
                           </p>
                         </div>
                       </div>
@@ -380,7 +382,7 @@ export default function ChannelsDashboard() {
                           </div>
                         ) : (
                           <p className="text-sm text-muted-foreground text-center py-8">
-                            No conversations yet today
+                            No conversations in the last 7 days
                           </p>
                         )}
                       </ScrollArea>
