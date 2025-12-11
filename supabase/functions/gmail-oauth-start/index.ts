@@ -27,15 +27,8 @@ serve(async (req) => {
     // Build OAuth URL
     const redirectUri = `${SUPABASE_URL}/functions/v1/gmail-oauth-callback`;
     
-    // Gmail API scopes for reading, sending, and modifying emails
-    const scopes = [
-      'https://www.googleapis.com/auth/gmail.readonly',
-      'https://www.googleapis.com/auth/gmail.send',
-      'https://www.googleapis.com/auth/gmail.modify',
-      'openid',
-      'email',
-      'profile'
-    ].join(' ');
+    // Minimal scopes for testing
+    const scopes = 'openid';
 
     // State contains workspaceId for callback
     const state = btoa(JSON.stringify({ workspaceId }));
