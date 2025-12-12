@@ -6,8 +6,15 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/hooks/useWorkspace';
-import { MessageSquare, Phone, Mail, Globe, Plus } from 'lucide-react';
-import { GmailAccountCard } from './GmailAccountCard';
+import { MessageSquare, Phone, Mail, Globe, Plus, Cloud } from 'lucide-react';
+import { EmailAccountCard } from './EmailAccountCard';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface Channel {
   id: string;
@@ -15,9 +22,10 @@ interface Channel {
   enabled: boolean;
 }
 
-interface GmailConfig {
+interface EmailConfig {
   id: string;
   email_address: string;
+  provider: string;
   import_mode: string;
   last_sync_at: string | null;
   connected_at: string;
@@ -28,9 +36,10 @@ export const ChannelManagementPanel = () => {
   const { workspace } = useWorkspace();
   const { toast } = useToast();
   const [channels, setChannels] = useState<Channel[]>([]);
-  const [gmailConfigs, setGmailConfigs] = useState<GmailConfig[]>([]);
+  const [emailConfigs, setEmailConfigs] = useState<EmailConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
+  const [selectedProvider, setSelectedProvider] = useState<string>('gmail');
 
   const channelIcons: Record<string, any> = {
     sms: Phone,
@@ -46,9 +55,16 @@ export const ChannelManagementPanel = () => {
     webchat: 'Web Chat'
   };
 
+  const providerLabels: Record<string, string> = {
+    gmail: 'Gmail',
+    outlook: 'Outlook / Microsoft 365',
+    icloud: 'Apple Mail / iCloud',
+    imap: 'Other (IMAP)',
+  };
+
   useEffect(() => {
     fetchChannels();
-    fetchGmailConfigs();
+    fetchEmailConfigs();
   }, [workspace?.id]);
 
   const fetchChannels = async () => {
@@ -70,38 +86,67 @@ export const ChannelManagementPanel = () => {
     }
   };
 
-  const fetchGmailConfigs = async () => {
+  const fetchEmailConfigs = async () => {
     if (!workspace?.id) return;
 
     try {
       const { data, error } = await supabase
-        .from('gmail_channel_configs')
+        .from('email_provider_configs')
         .select('*')
         .eq('workspace_id', workspace.id);
 
       if (error) throw error;
-      setGmailConfigs(data || []);
+      setEmailConfigs(data || []);
     } catch (error) {
-      console.error('Error fetching Gmail configs:', error);
+      console.error('Error fetching email configs:', error);
     }
   };
 
-  const handleConnectGmail = async () => {
+  const handleConnectEmail = async () => {
     if (!workspace?.id) return;
     
     setConnecting(true);
     try {
-      const { data, error } = await supabase.functions.invoke('gmail-oauth-start', {
-        body: { workspaceId: workspace.id },
+      const { data, error } = await supabase.functions.invoke('aurinko-auth-start', {
+        body: { 
+          workspaceId: workspace.id,
+          provider: selectedProvider,
+          importMode: 'new_only'
+        },
       });
 
       if (error) throw error;
       if (data?.authUrl) {
-        window.location.href = data.authUrl;
+        window.open(data.authUrl, '_blank', 'width=600,height=700');
+        
+        // Listen for success message from popup
+        const handleMessage = (event: MessageEvent) => {
+          if (event.data?.type === 'aurinko-auth-success') {
+            toast({ title: 'Email account connected successfully!' });
+            fetchEmailConfigs();
+            setConnecting(false);
+            window.removeEventListener('message', handleMessage);
+          } else if (event.data?.type === 'aurinko-auth-error') {
+            toast({ 
+              title: 'Failed to connect email', 
+              description: event.data.error,
+              variant: 'destructive' 
+            });
+            setConnecting(false);
+            window.removeEventListener('message', handleMessage);
+          }
+        };
+        window.addEventListener('message', handleMessage);
+        
+        // Timeout after 5 minutes
+        setTimeout(() => {
+          window.removeEventListener('message', handleMessage);
+          setConnecting(false);
+        }, 300000);
       }
     } catch (error) {
-      console.error('Error starting Gmail OAuth:', error);
-      toast({ title: 'Failed to connect Gmail', variant: 'destructive' });
+      console.error('Error starting email OAuth:', error);
+      toast({ title: 'Failed to connect email', variant: 'destructive' });
       setConnecting(false);
     }
   };
@@ -135,46 +180,63 @@ export const ChannelManagementPanel = () => {
 
   return (
     <div className="space-y-6">
-      {/* Gmail Integration Section */}
+      {/* Email Integration Section */}
       <div className="space-y-4">
         <div>
           <h3 className="text-lg font-semibold flex items-center gap-2">
             <Mail className="h-5 w-5" />
-            Gmail Integration
+            Email Accounts
           </h3>
           <p className="text-sm text-muted-foreground">
-            Connect your Gmail account to receive and send emails directly
+            Connect email accounts to receive and send emails directly. Supports Gmail, Outlook, Apple Mail, and more.
           </p>
         </div>
 
-        {gmailConfigs.length > 0 ? (
+        {emailConfigs.length > 0 && (
           <div className="space-y-3">
-            {gmailConfigs.map(config => (
-              <GmailAccountCard
+            {emailConfigs.map(config => (
+              <EmailAccountCard
                 key={config.id}
                 config={config}
-                onDisconnect={fetchGmailConfigs}
-                onUpdate={fetchGmailConfigs}
+                onDisconnect={fetchEmailConfigs}
+                onUpdate={fetchEmailConfigs}
               />
             ))}
           </div>
-        ) : (
-          <Card className="p-6 border-dashed">
-            <div className="text-center space-y-3">
-              <Mail className="h-10 w-10 mx-auto text-muted-foreground" />
-              <div>
-                <p className="font-medium">No Gmail account connected</p>
-                <p className="text-sm text-muted-foreground">
-                  Connect your Gmail to handle email conversations
-                </p>
-              </div>
-              <Button onClick={handleConnectGmail} disabled={connecting}>
+        )}
+
+        <Card className="p-6 border-dashed">
+          <div className="text-center space-y-4">
+            <Cloud className="h-10 w-10 mx-auto text-muted-foreground" />
+            <div>
+              <p className="font-medium">
+                {emailConfigs.length > 0 ? 'Add another email account' : 'No email account connected'}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Connect your email to handle conversations across providers
+              </p>
+            </div>
+            
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+              <Select value={selectedProvider} onValueChange={setSelectedProvider}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Select provider" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="gmail">Gmail</SelectItem>
+                  <SelectItem value="outlook">Outlook / Microsoft 365</SelectItem>
+                  <SelectItem value="icloud">Apple Mail / iCloud</SelectItem>
+                  <SelectItem value="imap">Other (IMAP)</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              <Button onClick={handleConnectEmail} disabled={connecting}>
                 <Plus className="h-4 w-4 mr-2" />
-                {connecting ? 'Connecting...' : 'Connect Gmail Account'}
+                {connecting ? 'Connecting...' : `Connect ${providerLabels[selectedProvider]}`}
               </Button>
             </div>
-          </Card>
-        )}
+          </div>
+        </Card>
       </div>
 
       {/* Other Channels Section */}

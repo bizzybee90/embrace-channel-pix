@@ -530,6 +530,56 @@ export type Database = {
           },
         ]
       }
+      email_provider_configs: {
+        Row: {
+          access_token: string
+          account_id: string
+          connected_at: string | null
+          created_at: string | null
+          email_address: string
+          id: string
+          import_mode: string | null
+          last_sync_at: string | null
+          provider: string
+          updated_at: string | null
+          workspace_id: string
+        }
+        Insert: {
+          access_token: string
+          account_id: string
+          connected_at?: string | null
+          created_at?: string | null
+          email_address: string
+          id?: string
+          import_mode?: string | null
+          last_sync_at?: string | null
+          provider: string
+          updated_at?: string | null
+          workspace_id: string
+        }
+        Update: {
+          access_token?: string
+          account_id?: string
+          connected_at?: string | null
+          created_at?: string | null
+          email_address?: string
+          id?: string
+          import_mode?: string | null
+          last_sync_at?: string | null
+          provider?: string
+          updated_at?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_provider_configs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_settings: {
         Row: {
           company_address: string | null
