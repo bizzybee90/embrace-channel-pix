@@ -164,36 +164,9 @@ serve(async (req) => {
     
     console.log('Final email address:', emailAddress);
 
-    // Auto-fetch aliases from Aurinko's email settings endpoint
-    let aliases: string[] = [];
-    if (tokenData.accessToken) {
-      try {
-        // For Google accounts, try to get sendAs aliases via Gmail API through Aurinko proxy
-        // or use Aurinko's email settings endpoint
-        const settingsResponse = await fetch('https://api.aurinko.io/v1/email/settings', {
-          headers: {
-            'Authorization': `Bearer ${tokenData.accessToken}`,
-          },
-        });
-
-        if (settingsResponse.ok) {
-          const settingsData = await settingsResponse.json();
-          console.log('Email settings data:', JSON.stringify(settingsData));
-          
-          // Extract sendAs aliases if available
-          if (settingsData.sendAsEmails && Array.isArray(settingsData.sendAsEmails)) {
-            aliases = settingsData.sendAsEmails
-              .map((email: string) => email?.toLowerCase())
-              .filter((email: string) => email && email !== emailAddress.toLowerCase());
-          }
-        } else {
-          console.log('Email settings fetch failed:', settingsResponse.status, await settingsResponse.text());
-        }
-      } catch (e) {
-        console.log('Failed to fetch email settings:', e);
-      }
-    }
-    console.log('Auto-detected aliases:', aliases);
+    // Note: Auto alias detection not available through Aurinko API
+    // Users can manually add aliases in the settings panel
+    const aliases: string[] = [];
 
     // Store in database
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
