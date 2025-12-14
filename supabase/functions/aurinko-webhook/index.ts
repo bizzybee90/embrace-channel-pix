@@ -12,6 +12,22 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Handle Aurinko URL verification (GET request with challenge)
+  if (req.method === 'GET') {
+    const url = new URL(req.url);
+    const challenge = url.searchParams.get('validationToken') || url.searchParams.get('challenge');
+    console.log('Aurinko verification request received, challenge:', challenge);
+    
+    // Return the challenge token as plain text
+    return new Response(challenge || 'OK', {
+      status: 200,
+      headers: { 
+        ...corsHeaders, 
+        'Content-Type': 'text/plain' 
+      }
+    });
+  }
+
   try {
     const payload = await req.json();
     console.log('Aurinko webhook received:', JSON.stringify(payload, null, 2));
