@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/hooks/useWorkspace';
-import { MessageSquare, Phone, Mail, Globe, Plus, Cloud } from 'lucide-react';
+import { MessageSquare, Phone, Mail, Globe, Plus, Cloud, Info, CheckCircle } from 'lucide-react';
 import { EmailAccountCard } from './EmailAccountCard';
 import {
   Select,
@@ -15,6 +15,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface Channel {
   id: string;
@@ -40,6 +45,19 @@ export const ChannelManagementPanel = () => {
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<string>('gmail');
+  const [selectedImportMode, setSelectedImportMode] = useState<string>('all_historical_90_days');
+
+  const importModeLabels: Record<string, string> = {
+    new_only: 'New emails only',
+    unread_only: 'Unread emails + new',
+    all_historical_90_days: 'Last 90 days + new',
+  };
+
+  const importModeDescriptions: Record<string, string> = {
+    new_only: 'Only receive emails after connecting',
+    unread_only: 'Import existing unread emails, then all new',
+    all_historical_90_days: 'Import all emails from the last 90 days, then all new',
+  };
 
   const channelIcons: Record<string, any> = {
     sms: Phone,
@@ -111,7 +129,7 @@ export const ChannelManagementPanel = () => {
         body: { 
           workspaceId: workspace.id,
           provider: selectedProvider,
-          importMode: 'new_only'
+          importMode: selectedImportMode
         },
       });
 
@@ -221,23 +239,52 @@ export const ChannelManagementPanel = () => {
               </p>
             </div>
             
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-              <Select value={selectedProvider} onValueChange={setSelectedProvider}>
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder="Select provider" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="gmail">Gmail</SelectItem>
-                  <SelectItem value="outlook">Outlook / Microsoft 365</SelectItem>
-                  <SelectItem value="icloud">Apple Mail / iCloud</SelectItem>
-                  <SelectItem value="imap">Other (IMAP)</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="flex flex-col items-center gap-3">
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                <Select value={selectedProvider} onValueChange={setSelectedProvider}>
+                  <SelectTrigger className="w-[200px]">
+                    <SelectValue placeholder="Select provider" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="gmail">Gmail</SelectItem>
+                    <SelectItem value="outlook">Outlook / Microsoft 365</SelectItem>
+                    <SelectItem value="icloud">Apple Mail / iCloud</SelectItem>
+                    <SelectItem value="imap">Other (IMAP)</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <div className="flex items-center gap-1">
+                  <Select value={selectedImportMode} onValueChange={setSelectedImportMode}>
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Import mode" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all_historical_90_days">Last 90 days + new</SelectItem>
+                      <SelectItem value="unread_only">Unread + new</SelectItem>
+                      <SelectItem value="new_only">New emails only</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p className="font-medium">{importModeLabels[selectedImportMode]}</p>
+                      <p className="text-xs text-muted-foreground">{importModeDescriptions[selectedImportMode]}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+              </div>
               
               <Button onClick={handleConnectEmail} disabled={connecting}>
                 <Plus className="h-4 w-4 mr-2" />
                 {connecting ? 'Connecting...' : `Connect ${providerLabels[selectedProvider]}`}
               </Button>
+
+              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                <CheckCircle className="h-3 w-3 text-green-500" />
+                Real-time sync enabled - new emails arrive instantly
+              </p>
             </div>
           </div>
         </Card>

@@ -4,6 +4,7 @@ import { DataDeletionPanel } from '@/components/settings/DataDeletionPanel';
 import { AuditLogPanel } from '@/components/settings/AuditLogPanel';
 import { RetentionPolicyPanel } from '@/components/settings/RetentionPolicyPanel';
 import { InterfaceModeToggle } from '@/components/settings/InterfaceModeToggle';
+import { TestDataCleanupPanel } from '@/components/settings/TestDataCleanupPanel';
 import { GDPRDashboard } from '@/components/settings/GDPRDashboard';
 import { CustomerMergePanel } from '@/components/settings/CustomerMergePanel';
 import { ChannelManagementPanel } from '@/components/settings/ChannelManagementPanel';
@@ -107,7 +108,8 @@ export default function Settings() {
           <GDPRDashboard />
         </TabsContent>
 
-        <TabsContent value="cleanup">
+        <TabsContent value="cleanup" className="space-y-6">
+          <TestDataCleanupPanel />
           <CustomerMergePanel />
         </TabsContent>
 

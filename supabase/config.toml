@@ -86,3 +86,6 @@ verify_jwt = false
 
 [functions.aurinko-webhook]
 verify_jwt = false
+
+[functions.email-sync]
+verify_jwt = false

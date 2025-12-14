@@ -68,14 +68,16 @@ export const EmailAccountCard = ({ config, onDisconnect, onUpdate }: EmailAccoun
   const handleSync = async () => {
     setSyncing(true);
     try {
-      const { error } = await supabase
-        .from('email_provider_configs')
-        .update({ last_sync_at: new Date().toISOString() })
-        .eq('id', config.id);
+      const { data, error } = await supabase.functions.invoke('email-sync', {
+        body: { configId: config.id, mode: config.import_mode }
+      });
 
       if (error) throw error;
       
-      toast({ title: 'Sync complete', description: 'Email account synced successfully' });
+      toast({ 
+        title: 'Sync complete', 
+        description: `Processed ${data?.messagesProcessed || 0} messages` 
+      });
       onUpdate();
     } catch (error) {
       console.error('Error syncing email:', error);
