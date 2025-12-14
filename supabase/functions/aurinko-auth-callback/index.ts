@@ -1,6 +1,52 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+const getCancelledHTML = () => `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Connection Cancelled</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      display: flex; align-items: center; justify-content: center;
+      min-height: 100vh;
+      background: linear-gradient(135deg, hsl(45, 100%, 52%) 0%, hsl(217, 91%, 60%) 100%);
+    }
+    .card {
+      background: white; padding: 48px; border-radius: 16px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+      text-align: center; max-width: 400px; margin: 20px;
+    }
+    .icon { font-size: 48px; margin-bottom: 16px; }
+    h2 { color: #1a1a1a; margin-bottom: 12px; font-size: 24px; font-weight: 600; }
+    p { color: #666; margin-bottom: 24px; line-height: 1.5; }
+    button {
+      background: hsl(217, 91%, 60%); color: white; border: none;
+      padding: 12px 32px; border-radius: 8px; cursor: pointer;
+      font-size: 14px; font-weight: 500; transition: background 0.2s;
+    }
+    button:hover { background: hsl(217, 91%, 50%); }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">✖️</div>
+    <h2>Connection Cancelled</h2>
+    <p>No worries! You can connect your email account anytime from Settings.</p>
+    <button onclick="window.close()">Close Window</button>
+  </div>
+  <script>
+    window.opener?.postMessage({ type: 'aurinko-auth-cancelled' }, '*');
+    setTimeout(() => window.close(), 100);
+  </script>
+</body>
+</html>
+`;
+
 serve(async (req) => {
   try {
     const url = new URL(req.url);
@@ -10,6 +56,18 @@ serve(async (req) => {
 
     console.log('Aurinko callback received:', { code: !!code, state: !!state, error });
 
+    // Handle cancellation scenarios
+    if (error === 'access_denied' || error === 'user_cancelled' || error === 'consent_required') {
+      console.log('User cancelled OAuth flow:', error);
+      return new Response(getCancelledHTML(), { headers: { 'Content-Type': 'text/html' } });
+    }
+
+    // If no code and no explicit error, treat as cancellation
+    if (!code) {
+      console.log('No code provided, treating as cancellation');
+      return new Response(getCancelledHTML(), { headers: { 'Content-Type': 'text/html' } });
+    }
+
     if (error) {
       console.error('Aurinko auth error:', error);
       return new Response(
@@ -18,8 +76,8 @@ serve(async (req) => {
       );
     }
 
-    if (!code || !state) {
-      throw new Error('Missing code or state parameter');
+    if (!state) {
+      throw new Error('Missing state parameter');
     }
 
     // Decode state

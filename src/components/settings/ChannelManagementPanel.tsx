@@ -119,11 +119,15 @@ export const ChannelManagementPanel = () => {
       if (data?.authUrl) {
         window.open(data.authUrl, '_blank', 'width=600,height=700');
         
-        // Listen for success message from popup
+        // Listen for success/cancel/error message from popup
         const handleMessage = (event: MessageEvent) => {
           if (event.data?.type === 'aurinko-auth-success') {
             toast({ title: 'Email account connected successfully!' });
             fetchEmailConfigs();
+            setConnecting(false);
+            window.removeEventListener('message', handleMessage);
+          } else if (event.data?.type === 'aurinko-auth-cancelled') {
+            // User cancelled - just reset state silently
             setConnecting(false);
             window.removeEventListener('message', handleMessage);
           } else if (event.data?.type === 'aurinko-auth-error') {
