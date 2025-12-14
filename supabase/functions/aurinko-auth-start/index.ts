@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { workspaceId, provider, importMode } = await req.json();
+    const { workspaceId, provider, importMode, origin } = await req.json();
     
     console.log('Starting Aurinko auth for:', { workspaceId, provider, importMode });
 
@@ -36,11 +36,12 @@ serve(async (req) => {
     // Build callback URL
     const callbackUrl = `${SUPABASE_URL}/functions/v1/aurinko-auth-callback`;
     
-    // State contains workspaceId and importMode for callback
+    // State contains workspaceId, importMode, and origin for callback redirect
     const state = btoa(JSON.stringify({ 
       workspaceId, 
       importMode: importMode || 'new_only',
-      provider: serviceType 
+      provider: serviceType,
+      origin: origin || 'https://ikioetqbrybnofqkdcib.lovable.app'
     }));
 
     // Aurinko OAuth authorize URL

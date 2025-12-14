@@ -1,14 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// Get the app URL for redirects
-const getAppUrl = () => {
-  return Deno.env.get('APP_URL') || 'https://ikioetqbrybnofqkdcib.lovable.app';
-};
+// Redirect helper that uses origin from state
 
-// Redirect helper
-const redirectTo = (path: string, params?: Record<string, string>) => {
-  const url = new URL(path, getAppUrl());
+const redirectTo = (baseUrl: string, path: string, params?: Record<string, string>) => {
+  const url = new URL(path, baseUrl);
   if (params) {
     Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
   }
@@ -125,8 +121,9 @@ serve(async (req) => {
       return new Response(getStyledHTML('error', 'Invalid state parameter'), { status: 200, headers: htmlHeaders });
     }
 
-    const { workspaceId, importMode, provider } = stateData;
-    console.log('Decoded state:', { workspaceId, importMode, provider });
+    const { workspaceId, importMode, provider, origin } = stateData;
+    const appOrigin = origin || 'https://ikioetqbrybnofqkdcib.lovable.app';
+    console.log('Decoded state:', { workspaceId, importMode, provider, origin: appOrigin });
 
     const AURINKO_CLIENT_ID = Deno.env.get('AURINKO_CLIENT_ID');
     const AURINKO_CLIENT_SECRET = Deno.env.get('AURINKO_CLIENT_SECRET');
@@ -218,8 +215,8 @@ serve(async (req) => {
 
     console.log('Email provider config saved successfully with', aliases.length, 'aliases');
 
-    // Redirect to settings page with success status (more reliable than returning HTML)
-    return redirectTo('/settings', { 
+    // Redirect to settings page with success status
+    return redirectTo(appOrigin, '/settings', { 
       tab: 'channels',
       email_connected: 'true',
       email: emailAddress 

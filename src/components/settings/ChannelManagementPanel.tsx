@@ -175,7 +175,8 @@ export const ChannelManagementPanel = () => {
         body: { 
           workspaceId: workspace.id,
           provider: selectedProvider,
-          importMode: selectedImportMode
+          importMode: selectedImportMode,
+          origin: window.location.origin
         },
       });
 
