@@ -137,27 +137,43 @@ serve(async (req) => {
     const tokenData = await tokenResponse.json();
     console.log('Token exchange successful:', JSON.stringify(tokenData));
 
-    // Extract email from token response - Aurinko includes it in the token response
+    // Extract email from token response
     let emailAddress = tokenData.email || tokenData.userEmail || 'unknown@email.com';
 
-    // If not in token response, try to get from account info using API key auth
+    // If not in token response, try to get from email profile using Bearer token
     if (emailAddress === 'unknown@email.com') {
       try {
-        const accountResponse = await fetch(`https://api.aurinko.io/v1/account/${tokenData.accountId}`, {
+        // Try email sync profile endpoint with Bearer token
+        const profileResponse = await fetch('https://api.aurinko.io/v1/email/sync/profile', {
           headers: {
-            'Authorization': 'Basic ' + btoa(`${AURINKO_CLIENT_ID}:${AURINKO_CLIENT_SECRET}`),
+            'Authorization': `Bearer ${tokenData.accessToken}`,
           },
         });
 
-        if (accountResponse.ok) {
-          const accountData = await accountResponse.json();
-          console.log('Account data:', JSON.stringify(accountData));
-          emailAddress = accountData.email || accountData.primaryEmail || accountData.userEmail || emailAddress;
+        if (profileResponse.ok) {
+          const profileData = await profileResponse.json();
+          console.log('Profile data:', JSON.stringify(profileData));
+          emailAddress = profileData.email || profileData.emailAddress || profileData.primaryEmail || emailAddress;
         } else {
-          console.log('Account fetch failed:', await accountResponse.text());
+          console.log('Profile fetch status:', profileResponse.status);
+          
+          // Fallback: try user info endpoint
+          const userResponse = await fetch('https://api.aurinko.io/v1/user/me', {
+            headers: {
+              'Authorization': `Bearer ${tokenData.accessToken}`,
+            },
+          });
+          
+          if (userResponse.ok) {
+            const userData = await userResponse.json();
+            console.log('User data:', JSON.stringify(userData));
+            emailAddress = userData.email || userData.emailAddress || emailAddress;
+          } else {
+            console.log('User fetch failed:', userResponse.status);
+          }
         }
       } catch (e) {
-        console.log('Failed to fetch account info:', e);
+        console.log('Failed to fetch profile info:', e);
       }
     }
     
