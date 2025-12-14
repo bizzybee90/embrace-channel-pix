@@ -12,11 +12,12 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const url = new URL(req.url);
+  
   // Handle Aurinko URL verification (GET request with challenge)
   if (req.method === 'GET') {
-    const url = new URL(req.url);
     const challenge = url.searchParams.get('validationToken') || url.searchParams.get('challenge');
-    console.log('Aurinko verification request received, challenge:', challenge);
+    console.log('Aurinko verification GET request, challenge:', challenge);
     
     // Return the challenge token as plain text
     return new Response(challenge || 'OK', {
@@ -28,8 +29,28 @@ serve(async (req) => {
     });
   }
 
+  // Check for validation token in query params (POST verification)
+  const validationToken = url.searchParams.get('validationToken');
+  if (validationToken) {
+    console.log('Aurinko verification POST with token:', validationToken);
+    return new Response(validationToken, {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'text/plain' }
+    });
+  }
+
   try {
-    const payload = await req.json();
+    // Safely parse body - handle empty or invalid JSON
+    const bodyText = await req.text();
+    if (!bodyText || bodyText.trim() === '') {
+      console.log('Empty body received - treating as ping');
+      return new Response(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    
+    const payload = JSON.parse(bodyText);
     console.log('Aurinko webhook received:', JSON.stringify(payload, null, 2));
 
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
