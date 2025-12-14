@@ -163,6 +163,35 @@ serve(async (req) => {
     
     console.log('Final email address:', emailAddress);
 
+    // Auto-fetch aliases from Gmail sendAs API (for Gmail accounts)
+    let aliases: string[] = [];
+    if (provider === 'Google' && tokenData.accessToken) {
+      try {
+        const sendAsResponse = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/settings/sendAs', {
+          headers: {
+            'Authorization': `Bearer ${tokenData.accessToken}`,
+          },
+        });
+
+        if (sendAsResponse.ok) {
+          const sendAsData = await sendAsResponse.json();
+          console.log('Gmail sendAs data:', JSON.stringify(sendAsData));
+          
+          // Extract aliases (exclude the primary email)
+          if (sendAsData.sendAs && Array.isArray(sendAsData.sendAs)) {
+            aliases = sendAsData.sendAs
+              .map((sa: any) => sa.sendAsEmail?.toLowerCase())
+              .filter((email: string) => email && email !== emailAddress.toLowerCase());
+          }
+          console.log('Auto-detected aliases:', aliases);
+        } else {
+          console.log('Gmail sendAs fetch failed:', sendAsResponse.status);
+        }
+      } catch (e) {
+        console.log('Failed to fetch Gmail aliases:', e);
+      }
+    }
+
     // Store in database
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
@@ -176,6 +205,7 @@ serve(async (req) => {
         email_address: emailAddress,
         import_mode: importMode,
         connected_at: new Date().toISOString(),
+        aliases: aliases,
       }, {
         onConflict: 'workspace_id,email_address'
       });
@@ -185,7 +215,7 @@ serve(async (req) => {
       return new Response(getStyledHTML('error', 'Failed to save email configuration'), { headers: htmlHeaders });
     }
 
-    console.log('Email provider config saved successfully');
+    console.log('Email provider config saved successfully with', aliases.length, 'aliases');
 
     // Return success page
     return new Response(getStyledHTML('success'), { headers: htmlHeaders });
