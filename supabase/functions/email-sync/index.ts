@@ -273,28 +273,62 @@ serve(async (req) => {
         messagesProcessed++;
         console.log('Processed message:', subject, 'body length:', body.length);
 
-        // Trigger AI agent for the new conversation
+        // Trigger AI agent for analysis
         if (body.length > 0) {
           try {
             console.log('Triggering AI agent for conversation:', conversation.id);
-            const aiResponse = await fetch(`${SUPABASE_URL}/functions/v1/claude-ai-agent-tools`, {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                conversationId: conversation.id,
-                customerMessage: body.substring(0, 5000),
-                channel: 'email',
-                customerName: fromName,
-                customerEmail: fromEmail,
-              }),
+            
+            // Call AI agent with proper structure matching receive-message
+            const aiResponse = await supabase.functions.invoke('claude-ai-agent-tools', {
+              body: {
+                message: {
+                  message_content: body.substring(0, 5000),
+                  channel: 'email',
+                  customer_identifier: fromEmail,
+                  customer_name: fromName,
+                  sender_phone: customer?.phone || null,
+                  sender_email: fromEmail,
+                },
+                conversation_history: [],
+                customer_data: customer,
+              }
             });
-            console.log('AI agent response status:', aiResponse.status);
-            if (!aiResponse.ok) {
-              const aiError = await aiResponse.text();
-              console.error('AI agent error:', aiError);
+            
+            console.log('AI agent response:', JSON.stringify(aiResponse.data || aiResponse.error));
+            
+            if (aiResponse.data && !aiResponse.error) {
+              const aiOutput = aiResponse.data;
+              
+              // Update conversation with AI analysis
+              const { error: updateError } = await supabase
+                .from('conversations')
+                .update({
+                  ai_confidence: aiOutput.confidence || 0,
+                  ai_sentiment: aiOutput.sentiment || 'neutral',
+                  ai_reason_for_escalation: aiOutput.escalation_reason || null,
+                  ai_draft_response: aiOutput.response || null,
+                  summary_for_human: aiOutput.ai_summary || null,
+                  title: aiOutput.ai_title || subject, // Use AI title if provided
+                  category: aiOutput.ai_category || 'other',
+                  is_escalated: aiOutput.escalate || false,
+                  status: aiOutput.escalate ? 'escalated' : 'new',
+                  escalated_at: aiOutput.escalate ? new Date().toISOString() : null,
+                })
+                .eq('id', conversation.id);
+              
+              if (updateError) {
+                console.error('Error updating conversation with AI data:', updateError);
+              } else {
+                console.log('Updated conversation with AI analysis:', {
+                  title: aiOutput.ai_title,
+                  category: aiOutput.ai_category,
+                  sentiment: aiOutput.sentiment,
+                  confidence: aiOutput.confidence,
+                  escalated: aiOutput.escalate,
+                });
+              }
+            } else {
+              console.error('AI agent error:', aiResponse.error);
             }
           } catch (aiError) {
             console.error('AI agent call failed (non-blocking):', aiError);
