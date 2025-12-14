@@ -164,9 +164,41 @@ serve(async (req) => {
     
     console.log('Final email address:', emailAddress);
 
-    // Note: Auto alias detection not available through Aurinko API
-    // Users can manually add aliases in the settings panel
-    const aliases: string[] = [];
+    // Try to auto-fetch aliases for Google accounts
+    let aliases: string[] = [];
+    console.log('Provider type:', provider, '- attempting alias detection');
+    
+    if (provider === 'Google' && tokenData.accessToken) {
+      try {
+        // Try calling Gmail API directly with the token
+        console.log('Attempting Gmail sendAs API call...');
+        const sendAsResponse = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/settings/sendAs', {
+          headers: {
+            'Authorization': `Bearer ${tokenData.accessToken}`,
+          },
+        });
+
+        console.log('Gmail sendAs response status:', sendAsResponse.status);
+        
+        if (sendAsResponse.ok) {
+          const sendAsData = await sendAsResponse.json();
+          console.log('Gmail sendAs data:', JSON.stringify(sendAsData));
+          
+          // Extract aliases (exclude the primary email)
+          if (sendAsData.sendAs && Array.isArray(sendAsData.sendAs)) {
+            aliases = sendAsData.sendAs
+              .map((sa: any) => sa.sendAsEmail?.toLowerCase())
+              .filter((email: string) => email && email !== emailAddress.toLowerCase());
+          }
+          console.log('Auto-detected aliases:', aliases);
+        } else {
+          const errorText = await sendAsResponse.text();
+          console.log('Gmail sendAs failed:', sendAsResponse.status, errorText);
+        }
+      } catch (e) {
+        console.log('Failed to fetch Gmail aliases:', e);
+      }
+    }
 
     // Store in database
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
