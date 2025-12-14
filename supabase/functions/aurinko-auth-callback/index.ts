@@ -64,10 +64,11 @@ const getStyledHTML = (type: 'cancelled' | 'error' | 'success', message?: string
 </body>
 </html>`;
 
-const htmlHeaders = {
+const htmlHeaders = new Headers({
   'Content-Type': 'text/html; charset=utf-8',
   'Cache-Control': 'no-cache, no-store, must-revalidate',
-};
+  'X-Content-Type-Options': 'nosniff',
+});
 
 serve(async (req) => {
   try {
@@ -81,22 +82,22 @@ serve(async (req) => {
     // Handle cancellation scenarios
     if (error === 'access_denied' || error === 'user_cancelled' || error === 'consent_required') {
       console.log('User cancelled OAuth flow:', error);
-      return new Response(getStyledHTML('cancelled'), { headers: htmlHeaders });
+      return new Response(getStyledHTML('cancelled'), { status: 200, headers: htmlHeaders });
     }
 
     // If no code and no explicit error, treat as cancellation
     if (!code) {
       console.log('No code provided, treating as cancellation');
-      return new Response(getStyledHTML('cancelled'), { headers: htmlHeaders });
+      return new Response(getStyledHTML('cancelled'), { status: 200, headers: htmlHeaders });
     }
 
     if (error) {
       console.error('Aurinko auth error:', error);
-      return new Response(getStyledHTML('error', error), { headers: htmlHeaders });
+      return new Response(getStyledHTML('error', error), { status: 200, headers: htmlHeaders });
     }
 
     if (!state) {
-      return new Response(getStyledHTML('error', 'Missing state parameter'), { headers: htmlHeaders });
+      return new Response(getStyledHTML('error', 'Missing state parameter'), { status: 200, headers: htmlHeaders });
     }
 
     // Decode state
@@ -104,7 +105,7 @@ serve(async (req) => {
     try {
       stateData = JSON.parse(atob(state));
     } catch (e) {
-      return new Response(getStyledHTML('error', 'Invalid state parameter'), { headers: htmlHeaders });
+      return new Response(getStyledHTML('error', 'Invalid state parameter'), { status: 200, headers: htmlHeaders });
     }
 
     const { workspaceId, importMode, provider } = stateData;
@@ -116,7 +117,7 @@ serve(async (req) => {
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
     if (!AURINKO_CLIENT_ID || !AURINKO_CLIENT_SECRET) {
-      return new Response(getStyledHTML('error', 'Aurinko credentials not configured'), { headers: htmlHeaders });
+      return new Response(getStyledHTML('error', 'Aurinko credentials not configured'), { status: 200, headers: htmlHeaders });
     }
 
     // Exchange code for access token
@@ -131,7 +132,7 @@ serve(async (req) => {
     if (!tokenResponse.ok) {
       const errorText = await tokenResponse.text();
       console.error('Token exchange failed:', errorText);
-      return new Response(getStyledHTML('error', 'Failed to exchange authorization code. Please try again.'), { headers: htmlHeaders });
+      return new Response(getStyledHTML('error', 'Failed to exchange authorization code. Please try again.'), { status: 200, headers: htmlHeaders });
     }
 
     const tokenData = await tokenResponse.json();
@@ -212,16 +213,16 @@ serve(async (req) => {
 
     if (dbError) {
       console.error('Database error:', dbError);
-      return new Response(getStyledHTML('error', 'Failed to save email configuration'), { headers: htmlHeaders });
+      return new Response(getStyledHTML('error', 'Failed to save email configuration'), { status: 200, headers: htmlHeaders });
     }
 
     console.log('Email provider config saved successfully with', aliases.length, 'aliases');
 
     // Return success page
-    return new Response(getStyledHTML('success'), { headers: htmlHeaders });
+    return new Response(getStyledHTML('success'), { status: 200, headers: htmlHeaders });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('Error in aurinko-auth-callback:', error);
-    return new Response(getStyledHTML('error', errorMessage), { headers: htmlHeaders });
+    return new Response(getStyledHTML('error', errorMessage), { status: 200, headers: htmlHeaders });
   }
 });

@@ -83,6 +83,30 @@ export const ChannelManagementPanel = () => {
   useEffect(() => {
     fetchChannels();
     fetchEmailConfigs();
+
+    // Set up realtime subscription for email configs
+    if (!workspace?.id) return;
+    
+    const channel = supabase
+      .channel('email-configs-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'email_provider_configs',
+          filter: `workspace_id=eq.${workspace.id}`,
+        },
+        (payload) => {
+          console.log('Email config change detected:', payload);
+          fetchEmailConfigs();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [workspace?.id]);
 
   const fetchChannels = async () => {
