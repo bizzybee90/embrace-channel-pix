@@ -135,21 +135,33 @@ serve(async (req) => {
     }
 
     const tokenData = await tokenResponse.json();
-    console.log('Token exchange successful, account ID:', tokenData.accountId);
+    console.log('Token exchange successful:', JSON.stringify(tokenData));
 
-    // Get account info to retrieve email address
-    const accountResponse = await fetch(`https://api.aurinko.io/v1/accounts/${tokenData.accountId}`, {
-      headers: {
-        'Authorization': `Bearer ${tokenData.accessToken}`,
-      },
-    });
+    // Extract email from token response - Aurinko includes it in the token response
+    let emailAddress = tokenData.email || tokenData.userEmail || 'unknown@email.com';
 
-    let emailAddress = tokenData.email || 'unknown@email.com';
-    if (accountResponse.ok) {
-      const accountData = await accountResponse.json();
-      emailAddress = accountData.email || accountData.primaryEmail || emailAddress;
-      console.log('Account email:', emailAddress);
+    // If not in token response, try to get from account info using API key auth
+    if (emailAddress === 'unknown@email.com') {
+      try {
+        const accountResponse = await fetch(`https://api.aurinko.io/v1/account/${tokenData.accountId}`, {
+          headers: {
+            'Authorization': 'Basic ' + btoa(`${AURINKO_CLIENT_ID}:${AURINKO_CLIENT_SECRET}`),
+          },
+        });
+
+        if (accountResponse.ok) {
+          const accountData = await accountResponse.json();
+          console.log('Account data:', JSON.stringify(accountData));
+          emailAddress = accountData.email || accountData.primaryEmail || accountData.userEmail || emailAddress;
+        } else {
+          console.log('Account fetch failed:', await accountResponse.text());
+        }
+      } catch (e) {
+        console.log('Failed to fetch account info:', e);
+      }
     }
+    
+    console.log('Final email address:', emailAddress);
 
     // Store in database
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
