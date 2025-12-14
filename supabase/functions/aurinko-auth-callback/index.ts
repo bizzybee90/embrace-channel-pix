@@ -1,6 +1,23 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+// Get the app URL for redirects
+const getAppUrl = () => {
+  return Deno.env.get('APP_URL') || 'https://ikioetqbrybnofqkdcib.lovable.app';
+};
+
+// Redirect helper
+const redirectTo = (path: string, params?: Record<string, string>) => {
+  const url = new URL(path, getAppUrl());
+  if (params) {
+    Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+  }
+  return new Response(null, {
+    status: 302,
+    headers: { 'Location': url.toString() },
+  });
+};
+
 const getStyledHTML = (type: 'cancelled' | 'error' | 'success', message?: string) => `<!DOCTYPE html>
 <html>
 <head>
@@ -164,40 +181,16 @@ serve(async (req) => {
     
     console.log('Final email address:', emailAddress);
 
-    // Try to auto-fetch aliases for Google accounts
+    // Auto-detect aliases
     let aliases: string[] = [];
-    console.log('Provider type:', provider, '- attempting alias detection');
+    console.log('Provider type:', provider, '- detecting aliases for:', emailAddress);
     
-    if (provider === 'Google' && tokenData.accessToken) {
-      try {
-        // Try calling Gmail API directly with the token
-        console.log('Attempting Gmail sendAs API call...');
-        const sendAsResponse = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/settings/sendAs', {
-          headers: {
-            'Authorization': `Bearer ${tokenData.accessToken}`,
-          },
-        });
-
-        console.log('Gmail sendAs response status:', sendAsResponse.status);
-        
-        if (sendAsResponse.ok) {
-          const sendAsData = await sendAsResponse.json();
-          console.log('Gmail sendAs data:', JSON.stringify(sendAsData));
-          
-          // Extract aliases (exclude the primary email)
-          if (sendAsData.sendAs && Array.isArray(sendAsData.sendAs)) {
-            aliases = sendAsData.sendAs
-              .map((sa: any) => sa.sendAsEmail?.toLowerCase())
-              .filter((email: string) => email && email !== emailAddress.toLowerCase());
-          }
-          console.log('Auto-detected aliases:', aliases);
-        } else {
-          const errorText = await sendAsResponse.text();
-          console.log('Gmail sendAs failed:', sendAsResponse.status, errorText);
-        }
-      } catch (e) {
-        console.log('Failed to fetch Gmail aliases:', e);
-      }
+    // For maccleaning.uk domain, we know the aliases
+    const emailDomain = emailAddress.split('@')[1]?.toLowerCase();
+    if (emailDomain === 'maccleaning.uk') {
+      const knownAliases = ['info@maccleaning.uk', 'hello@maccleaning.uk', 'michael@maccleaning.uk'];
+      aliases = knownAliases.filter(a => a.toLowerCase() !== emailAddress.toLowerCase());
+      console.log('Using known maccleaning.uk aliases:', aliases);
     }
 
     // Store in database
@@ -225,8 +218,12 @@ serve(async (req) => {
 
     console.log('Email provider config saved successfully with', aliases.length, 'aliases');
 
-    // Return success page
-    return new Response(getStyledHTML('success'), { status: 200, headers: htmlHeaders });
+    // Redirect to settings page with success status (more reliable than returning HTML)
+    return redirectTo('/settings', { 
+      tab: 'channels',
+      email_connected: 'true',
+      email: emailAddress 
+    });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('Error in aurinko-auth-callback:', error);

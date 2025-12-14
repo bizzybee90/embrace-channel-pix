@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -40,12 +41,33 @@ interface EmailConfig {
 export const ChannelManagementPanel = () => {
   const { workspace } = useWorkspace();
   const { toast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [channels, setChannels] = useState<Channel[]>([]);
   const [emailConfigs, setEmailConfigs] = useState<EmailConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<string>('gmail');
   const [selectedImportMode, setSelectedImportMode] = useState<string>('all_historical_90_days');
+
+  // Handle email_connected redirect from OAuth callback
+  useEffect(() => {
+    const emailConnected = searchParams.get('email_connected');
+    const connectedEmail = searchParams.get('email');
+    
+    if (emailConnected === 'true') {
+      toast({ 
+        title: 'Email connected successfully!',
+        description: connectedEmail ? `${connectedEmail} is now connected.` : undefined,
+      });
+      // Remove the query params
+      searchParams.delete('email_connected');
+      searchParams.delete('email');
+      searchParams.delete('tab');
+      setSearchParams(searchParams, { replace: true });
+      // Refresh email configs
+      fetchEmailConfigs();
+    }
+  }, [searchParams]);
 
   const importModeLabels: Record<string, string> = {
     new_only: 'New emails only',
