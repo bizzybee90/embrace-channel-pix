@@ -1,13 +1,13 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const getCancelledHTML = () => `
+const getStyledHTML = (type: 'cancelled' | 'error' | 'success', message?: string) => `
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Connection Cancelled</title>
+  <title>${type === 'success' ? 'Connected!' : type === 'cancelled' ? 'Connection Cancelled' : 'Connection Error'}</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { 
@@ -24,24 +24,43 @@ const getCancelledHTML = () => `
     .icon { font-size: 48px; margin-bottom: 16px; }
     h2 { color: #1a1a1a; margin-bottom: 12px; font-size: 24px; font-weight: 600; }
     p { color: #666; margin-bottom: 24px; line-height: 1.5; }
+    .error-detail { 
+      background: #fef2f2; color: #991b1b; padding: 12px 16px; 
+      border-radius: 8px; margin-bottom: 24px; font-size: 13px;
+      word-break: break-word;
+    }
     button {
       background: hsl(217, 91%, 60%); color: white; border: none;
       padding: 12px 32px; border-radius: 8px; cursor: pointer;
       font-size: 14px; font-weight: 500; transition: background 0.2s;
     }
     button:hover { background: hsl(217, 91%, 50%); }
+    .success-icon { color: #22c55e; }
+    .error-icon { color: #ef4444; }
   </style>
 </head>
 <body>
   <div class="card">
-    <div class="icon">✖️</div>
-    <h2>Connection Cancelled</h2>
-    <p>No worries! You can connect your email account anytime from Settings.</p>
+    ${type === 'success' ? `
+      <div class="icon success-icon">✓</div>
+      <h2>Email Connected!</h2>
+      <p>Your email account has been connected successfully. This window will close automatically.</p>
+    ` : type === 'cancelled' ? `
+      <div class="icon">✖️</div>
+      <h2>Connection Cancelled</h2>
+      <p>No worries! You can connect your email account anytime from Settings.</p>
+    ` : `
+      <div class="icon error-icon">⚠️</div>
+      <h2>Connection Failed</h2>
+      <p>Something went wrong while connecting your email account.</p>
+      ${message ? `<div class="error-detail">${message}</div>` : ''}
+      <p>Please try again or contact support if the issue persists.</p>
+    `}
     <button onclick="window.close()">Close Window</button>
   </div>
   <script>
-    window.opener?.postMessage({ type: 'aurinko-auth-cancelled' }, '*');
-    setTimeout(() => window.close(), 100);
+    window.opener?.postMessage({ type: 'aurinko-auth-${type}'${type === 'error' && message ? `, error: '${message.replace(/'/g, "\\'")}'` : ''} }, '*');
+    ${type === 'success' ? "setTimeout(() => window.close(), 2000);" : ""}
   </script>
 </body>
 </html>
@@ -59,25 +78,22 @@ serve(async (req) => {
     // Handle cancellation scenarios
     if (error === 'access_denied' || error === 'user_cancelled' || error === 'consent_required') {
       console.log('User cancelled OAuth flow:', error);
-      return new Response(getCancelledHTML(), { headers: { 'Content-Type': 'text/html' } });
+      return new Response(getStyledHTML('cancelled'), { headers: { 'Content-Type': 'text/html' } });
     }
 
     // If no code and no explicit error, treat as cancellation
     if (!code) {
       console.log('No code provided, treating as cancellation');
-      return new Response(getCancelledHTML(), { headers: { 'Content-Type': 'text/html' } });
+      return new Response(getStyledHTML('cancelled'), { headers: { 'Content-Type': 'text/html' } });
     }
 
     if (error) {
       console.error('Aurinko auth error:', error);
-      return new Response(
-        `<html><body><script>window.close(); window.opener?.postMessage({ type: 'aurinko-auth-error', error: '${error}' }, '*');</script><p>Authentication failed: ${error}. You can close this window.</p></body></html>`,
-        { headers: { 'Content-Type': 'text/html' } }
-      );
+      return new Response(getStyledHTML('error', error), { headers: { 'Content-Type': 'text/html' } });
     }
 
     if (!state) {
-      throw new Error('Missing state parameter');
+      return new Response(getStyledHTML('error', 'Missing state parameter'), { headers: { 'Content-Type': 'text/html' } });
     }
 
     // Decode state
@@ -85,7 +101,7 @@ serve(async (req) => {
     try {
       stateData = JSON.parse(atob(state));
     } catch (e) {
-      throw new Error('Invalid state parameter');
+      return new Response(getStyledHTML('error', 'Invalid state parameter'), { headers: { 'Content-Type': 'text/html' } });
     }
 
     const { workspaceId, importMode, provider } = stateData;
@@ -97,7 +113,7 @@ serve(async (req) => {
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
     if (!AURINKO_CLIENT_ID || !AURINKO_CLIENT_SECRET) {
-      throw new Error('Aurinko credentials not configured');
+      return new Response(getStyledHTML('error', 'Aurinko credentials not configured'), { headers: { 'Content-Type': 'text/html' } });
     }
 
     // Exchange code for access token
@@ -112,7 +128,7 @@ serve(async (req) => {
     if (!tokenResponse.ok) {
       const errorText = await tokenResponse.text();
       console.error('Token exchange failed:', errorText);
-      throw new Error('Failed to exchange code for token');
+      return new Response(getStyledHTML('error', 'Failed to exchange authorization code. Please try again.'), { headers: { 'Content-Type': 'text/html' } });
     }
 
     const tokenData = await tokenResponse.json();
@@ -151,27 +167,16 @@ serve(async (req) => {
 
     if (dbError) {
       console.error('Database error:', dbError);
-      throw new Error('Failed to save email configuration');
+      return new Response(getStyledHTML('error', 'Failed to save email configuration'), { headers: { 'Content-Type': 'text/html' } });
     }
 
     console.log('Email provider config saved successfully');
 
-    // Redirect back to settings with success message
-    const successUrl = `${url.origin.replace('supabase.co/functions/v1', 'lovable.app')}/settings?email_connected=true`;
-    
-    return new Response(
-      `<html><body><script>
-        window.opener?.postMessage({ type: 'aurinko-auth-success' }, '*');
-        window.location.href = '${successUrl}';
-      </script><p>Email connected successfully! Redirecting...</p></body></html>`,
-      { headers: { 'Content-Type': 'text/html' } }
-    );
+    // Return success page
+    return new Response(getStyledHTML('success'), { headers: { 'Content-Type': 'text/html' } });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('Error in aurinko-auth-callback:', error);
-    return new Response(
-      `<html><body><script>window.opener?.postMessage({ type: 'aurinko-auth-error', error: '${errorMessage}' }, '*');</script><p>Error: ${errorMessage}. You can close this window.</p></body></html>`,
-      { headers: { 'Content-Type': 'text/html' } }
-    );
+    return new Response(getStyledHTML('error', errorMessage), { headers: { 'Content-Type': 'text/html' } });
   }
 });
