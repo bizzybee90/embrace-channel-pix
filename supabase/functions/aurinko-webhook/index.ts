@@ -81,14 +81,38 @@ async function processNewEmail(supabase: any, emailConfig: any, emailData: any) 
   const subject = emailData.subject || 'No Subject';
   const body = emailData.textBody || emailData.snippet || '';
 
+  // Extract the recipient (To) address - the address the customer emailed to
+  // This could be the primary email or an alias
+  let recipientEmail = emailConfig.email_address; // default to primary
+  if (emailData.to && Array.isArray(emailData.to) && emailData.to.length > 0) {
+    // Check if any of the To addresses match our account or aliases
+    const allOurAddresses = [
+      emailConfig.email_address.toLowerCase(),
+      ...(emailConfig.aliases || []).map((a: string) => a.toLowerCase())
+    ];
+    
+    for (const toAddr of emailData.to) {
+      const toEmail = (toAddr.email || toAddr).toLowerCase();
+      if (allOurAddresses.includes(toEmail)) {
+        recipientEmail = toEmail;
+        break;
+      }
+    }
+  }
+  console.log('Recipient address (will reply from):', recipientEmail);
+
   if (!senderEmail) {
     console.log('No sender email, skipping');
     return;
   }
 
-  // Skip emails from the connected account itself (outbound)
-  if (senderEmail === emailConfig.email_address) {
-    console.log('Skipping outbound email');
+  // Skip emails from the connected account itself or any alias (outbound)
+  const allOurAddresses = [
+    emailConfig.email_address.toLowerCase(),
+    ...(emailConfig.aliases || []).map((a: string) => a.toLowerCase())
+  ];
+  if (allOurAddresses.includes(senderEmail.toLowerCase())) {
+    console.log('Skipping outbound email from our account/alias');
     return;
   }
 
@@ -143,7 +167,7 @@ async function processNewEmail(supabase: any, emailConfig: any, emailData: any) 
       .eq('id', conversationId);
     console.log('Updated existing conversation:', conversationId);
   } else {
-    // Create new conversation
+    // Create new conversation with recipient address in metadata
     const { data: newConversation, error: convError } = await supabase
       .from('conversations')
       .insert({
@@ -155,7 +179,8 @@ async function processNewEmail(supabase: any, emailConfig: any, emailData: any) 
         external_conversation_id: `aurinko_${threadId}`,
         metadata: { 
           aurinko_account_id: emailConfig.account_id,
-          aurinko_message_id: emailData.id 
+          aurinko_message_id: emailData.id,
+          original_recipient_email: recipientEmail, // Store which address was emailed
         },
       })
       .select()
@@ -166,7 +191,7 @@ async function processNewEmail(supabase: any, emailConfig: any, emailData: any) 
       return;
     }
     conversationId = newConversation.id;
-    console.log('Created new conversation:', conversationId);
+    console.log('Created new conversation:', conversationId, 'with recipient:', recipientEmail);
   }
 
   // Add message

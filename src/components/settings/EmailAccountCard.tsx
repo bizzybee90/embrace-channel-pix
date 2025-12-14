@@ -3,8 +3,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Mail, RefreshCw, Trash2, Clock, CheckCircle } from 'lucide-react';
+import { Mail, RefreshCw, Trash2, Clock, CheckCircle, Plus, X } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import {
   AlertDialog,
@@ -17,6 +18,11 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 interface EmailConfig {
   id: string;
@@ -26,6 +32,7 @@ interface EmailConfig {
   last_sync_at: string | null;
   connected_at: string;
   workspace_id: string;
+  aliases?: string[];
 }
 
 interface EmailAccountCardProps {
@@ -52,12 +59,15 @@ export const EmailAccountCard = ({ config, onDisconnect, onUpdate }: EmailAccoun
   const { toast } = useToast();
   const [syncing, setSyncing] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
+  const [aliasesOpen, setAliasesOpen] = useState(false);
+  const [newAlias, setNewAlias] = useState('');
+  const [addingAlias, setAddingAlias] = useState(false);
+
+  const aliases = config.aliases || [];
 
   const handleSync = async () => {
     setSyncing(true);
     try {
-      // For now, just update the last_sync_at timestamp
-      // In a full implementation, this would trigger a sync via Aurinko API
       const { error } = await supabase
         .from('email_provider_configs')
         .update({ last_sync_at: new Date().toISOString() })
@@ -92,6 +102,61 @@ export const EmailAccountCard = ({ config, onDisconnect, onUpdate }: EmailAccoun
       toast({ title: 'Failed to disconnect', variant: 'destructive' });
     } finally {
       setDisconnecting(false);
+    }
+  };
+
+  const handleAddAlias = async () => {
+    if (!newAlias.trim()) return;
+    
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(newAlias.trim())) {
+      toast({ title: 'Invalid email', description: 'Please enter a valid email address', variant: 'destructive' });
+      return;
+    }
+
+    // Check if alias already exists
+    if (aliases.includes(newAlias.trim().toLowerCase())) {
+      toast({ title: 'Alias exists', description: 'This alias is already added', variant: 'destructive' });
+      return;
+    }
+
+    setAddingAlias(true);
+    try {
+      const updatedAliases = [...aliases, newAlias.trim().toLowerCase()];
+      const { error } = await supabase
+        .from('email_provider_configs')
+        .update({ aliases: updatedAliases })
+        .eq('id', config.id);
+
+      if (error) throw error;
+      
+      toast({ title: 'Alias added', description: `${newAlias} added as an alias` });
+      setNewAlias('');
+      onUpdate();
+    } catch (error) {
+      console.error('Error adding alias:', error);
+      toast({ title: 'Failed to add alias', variant: 'destructive' });
+    } finally {
+      setAddingAlias(false);
+    }
+  };
+
+  const handleRemoveAlias = async (aliasToRemove: string) => {
+    try {
+      const updatedAliases = aliases.filter(a => a !== aliasToRemove);
+      const { error } = await supabase
+        .from('email_provider_configs')
+        .update({ aliases: updatedAliases })
+        .eq('id', config.id);
+
+      if (error) throw error;
+      
+      toast({ title: 'Alias removed', description: `${aliasToRemove} removed` });
+      onUpdate();
+    } catch (error) {
+      console.error('Error removing alias:', error);
+      toast({ title: 'Failed to remove alias', variant: 'destructive' });
     }
   };
 
@@ -166,6 +231,60 @@ export const EmailAccountCard = ({ config, onDisconnect, onUpdate }: EmailAccoun
           </AlertDialog>
         </div>
       </div>
+
+      {/* Aliases Section */}
+      <Collapsible open={aliasesOpen} onOpenChange={setAliasesOpen} className="mt-4">
+        <CollapsibleTrigger asChild>
+          <Button variant="ghost" size="sm" className="w-full justify-between text-muted-foreground">
+            <span className="flex items-center gap-2">
+              <Mail className="h-4 w-4" />
+              Email Aliases ({aliases.length})
+            </span>
+            <span className="text-xs">{aliasesOpen ? 'Hide' : 'Manage'}</span>
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="mt-3 space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Add email aliases that route to this account. Replies will be sent from the address the customer originally emailed.
+          </p>
+          
+          {/* Existing aliases */}
+          {aliases.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {aliases.map((alias) => (
+                <Badge key={alias} variant="secondary" className="flex items-center gap-1 pr-1">
+                  {alias}
+                  <button
+                    onClick={() => handleRemoveAlias(alias)}
+                    className="ml-1 p-0.5 rounded-full hover:bg-destructive/20 text-muted-foreground hover:text-destructive"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              ))}
+            </div>
+          )}
+          
+          {/* Add new alias */}
+          <div className="flex gap-2">
+            <Input
+              placeholder="Enter alias email (e.g., info@maccleaning.uk)"
+              value={newAlias}
+              onChange={(e) => setNewAlias(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleAddAlias()}
+              className="flex-1"
+            />
+            <Button
+              size="sm"
+              onClick={handleAddAlias}
+              disabled={addingAlias || !newAlias.trim()}
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              Add
+            </Button>
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
     </Card>
   );
 };

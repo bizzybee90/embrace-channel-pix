@@ -534,6 +534,7 @@ export type Database = {
         Row: {
           access_token: string
           account_id: string
+          aliases: string[] | null
           connected_at: string | null
           created_at: string | null
           email_address: string
@@ -547,6 +548,7 @@ export type Database = {
         Insert: {
           access_token: string
           account_id: string
+          aliases?: string[] | null
           connected_at?: string | null
           created_at?: string | null
           email_address: string
@@ -560,6 +562,7 @@ export type Database = {
         Update: {
           access_token?: string
           account_id?: string
+          aliases?: string[] | null
           connected_at?: string | null
           created_at?: string | null
           email_address?: string

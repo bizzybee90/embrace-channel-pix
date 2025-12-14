@@ -20,7 +20,7 @@ interface SendRequest {
   skipMessageLog?: boolean;
 }
 
-// Send email via Gmail API
+// Send email via Gmail API or Aurinko-connected email
 async function sendViaGmail(
   sendRequest: SendRequest,
   supabase: any
@@ -28,7 +28,7 @@ async function sendViaGmail(
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     
-    // Get conversation to find workspace
+    // Get conversation to find workspace and original recipient
     const { data: conversation } = await supabase
       .from('conversations')
       .select('workspace_id, external_conversation_id, metadata')
@@ -39,75 +39,116 @@ async function sendViaGmail(
       return { success: false, error: 'Conversation not found' };
     }
 
-    // Get Gmail config for workspace
+    // Determine which email address to send FROM
+    // Priority: metadata.original_recipient_email > sendRequest.metadata.fromEmail > config default
+    const originalRecipientEmail = conversation.metadata?.original_recipient_email;
+    console.log('Original recipient email from metadata:', originalRecipientEmail);
+
+    // First try Gmail config
     const { data: gmailConfig } = await supabase
       .from('gmail_channel_configs')
       .select('*')
       .eq('workspace_id', conversation.workspace_id)
       .maybeSingle();
 
-    if (!gmailConfig) {
-      console.log('No Gmail config found, will use fallback');
-      return { success: false, error: 'Gmail not configured' };
-    }
-
-    // Refresh token if needed
-    let accessToken = gmailConfig.access_token;
-    if (new Date(gmailConfig.token_expires_at) < new Date()) {
-      accessToken = await refreshGmailToken(gmailConfig.refresh_token, supabase, gmailConfig.id);
-    }
-
-    // Get email settings for signature
-    const { data: emailSettings } = await supabase
-      .from('email_settings')
+    // Also check Aurinko email config
+    const { data: emailConfig } = await supabase
+      .from('email_provider_configs')
       .select('*')
       .eq('workspace_id', conversation.workspace_id)
       .maybeSingle();
 
-    // Build email with signature
-    const htmlBody = buildEmailWithSignature(sendRequest.message, emailSettings);
-    
-    // Get thread ID for reply
-    const threadId = conversation.external_conversation_id?.replace('gmail:', '') || null;
-
-    // Build raw email
-    const rawEmail = buildRawEmail({
-      to: sendRequest.to,
-      from: gmailConfig.email_address,
-      subject: sendRequest.metadata?.subject || 'Re: Your inquiry',
-      htmlBody,
-      textBody: sendRequest.message,
-      threadId,
-      inReplyTo: conversation.metadata?.gmail_message_id,
-    });
-
-    // Send via Gmail API
-    const sendUrl = threadId 
-      ? `https://www.googleapis.com/gmail/v1/users/me/messages/send`
-      : `https://www.googleapis.com/gmail/v1/users/me/messages/send`;
-
-    const response = await fetch(sendUrl, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        raw: rawEmail,
-        threadId: threadId || undefined,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Gmail API error:', response.status, errorText);
-      return { success: false, error: `Gmail error: ${response.status}` };
+    if (!gmailConfig && !emailConfig) {
+      console.log('No email config found, will use fallback');
+      return { success: false, error: 'Email not configured' };
     }
 
-    const result = await response.json();
-    console.log('Email sent via Gmail:', result.id);
+    // Determine the from address
+    let fromAddress: string;
+    if (originalRecipientEmail) {
+      // Use the original address the customer emailed
+      // Verify it's either the primary or an alias of our config
+      const config = gmailConfig || emailConfig;
+      const allAddresses = [
+        config.email_address?.toLowerCase(),
+        ...(emailConfig?.aliases || []).map((a: string) => a.toLowerCase())
+      ].filter(Boolean);
+      
+      if (allAddresses.includes(originalRecipientEmail.toLowerCase())) {
+        fromAddress = originalRecipientEmail;
+        console.log('Using original recipient address as from:', fromAddress);
+      } else {
+        fromAddress = config.email_address;
+        console.log('Original recipient not in our addresses, using default:', fromAddress);
+      }
+    } else {
+      fromAddress = gmailConfig?.email_address || emailConfig?.email_address;
+      console.log('No original recipient, using default from:', fromAddress);
+    }
 
-    return { success: true, messageId: result.id };
+    // For now, use Gmail config if available (direct Gmail OAuth)
+    if (gmailConfig) {
+      // Refresh token if needed
+      let accessToken = gmailConfig.access_token;
+      if (new Date(gmailConfig.token_expires_at) < new Date()) {
+        accessToken = await refreshGmailToken(gmailConfig.refresh_token, supabase, gmailConfig.id);
+      }
+
+      // Get email settings for signature
+      const { data: emailSettings } = await supabase
+        .from('email_settings')
+        .select('*')
+        .eq('workspace_id', conversation.workspace_id)
+        .maybeSingle();
+
+      // Build email with signature
+      const htmlBody = buildEmailWithSignature(sendRequest.message, emailSettings);
+      
+      // Get thread ID for reply
+      const threadId = conversation.external_conversation_id?.replace('gmail:', '') || null;
+
+      // Build raw email with correct from address
+      const rawEmail = buildRawEmail({
+        to: sendRequest.to,
+        from: fromAddress,
+        subject: sendRequest.metadata?.subject || 'Re: Your inquiry',
+        htmlBody,
+        textBody: sendRequest.message,
+        threadId,
+        inReplyTo: conversation.metadata?.gmail_message_id,
+      });
+
+      // Send via Gmail API
+      const sendUrl = `https://www.googleapis.com/gmail/v1/users/me/messages/send`;
+
+      const response = await fetch(sendUrl, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          raw: rawEmail,
+          threadId: threadId || undefined,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Gmail API error:', response.status, errorText);
+        return { success: false, error: `Gmail error: ${response.status}` };
+      }
+
+      const result = await response.json();
+      console.log('Email sent via Gmail:', result.id);
+
+      return { success: true, messageId: result.id };
+    }
+
+    // If no Gmail config but we have Aurinko config, note that sending via Aurinko would require additional implementation
+    // For now, fall back to Postmark
+    console.log('No Gmail config, Aurinko email sending not yet implemented');
+    return { success: false, error: 'Gmail not configured for sending' };
   } catch (error) {
     console.error('Gmail send error:', error);
     return { success: false, error: String(error) };
