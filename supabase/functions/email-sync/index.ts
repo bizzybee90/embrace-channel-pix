@@ -337,6 +337,9 @@ serve(async (req) => {
           console.log('Skipping AI agent - no body content');
         }
 
+        // Mark email as read in Aurinko/Gmail
+        await markEmailAsRead(config.access_token, message.id);
+
       } catch (msgError) {
         console.error('Error processing message:', msgError);
       }
@@ -367,3 +370,25 @@ serve(async (req) => {
     });
   }
 });
+
+async function markEmailAsRead(accessToken: string, messageId: string) {
+  try {
+    console.log('Marking email as read:', messageId);
+    const response = await fetch(`https://api.aurinko.io/v1/email/messages/${messageId}`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ unread: false }),
+    });
+    
+    if (response.ok) {
+      console.log('Email marked as read successfully');
+    } else {
+      console.error('Failed to mark email as read:', response.status, await response.text());
+    }
+  } catch (error) {
+    console.error('Error marking email as read:', error);
+  }
+}

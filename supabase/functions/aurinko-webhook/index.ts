@@ -19,13 +19,9 @@ serve(async (req) => {
     const challenge = url.searchParams.get('validationToken') || url.searchParams.get('challenge');
     console.log('Aurinko verification GET request, challenge:', challenge);
     
-    // Return the challenge token as plain text
     return new Response(challenge || 'OK', {
       status: 200,
-      headers: { 
-        ...corsHeaders, 
-        'Content-Type': 'text/plain' 
-      }
+      headers: { ...corsHeaders, 'Content-Type': 'text/plain' }
     });
   }
 
@@ -40,7 +36,6 @@ serve(async (req) => {
   }
 
   try {
-    // Safely parse body - handle empty or invalid JSON
     const bodyText = await req.text();
     if (!bodyText || bodyText.trim() === '') {
       console.log('Empty body received - treating as ping');
@@ -55,12 +50,31 @@ serve(async (req) => {
 
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
-    // Aurinko sends notifications for email events
-    // Notification types: 'message.created', 'message.updated', etc.
-    const { notification, resource, accountId, subscription } = payload;
+    // Aurinko webhook structure can be:
+    // 1. Old format: { notification, resource, accountId }
+    // 2. New format: { payloads: [{ changeType, resource, ... }], subscription: { accountId } }
+    
+    let accountId = payload.accountId;
+    let notifications: any[] = [];
+
+    // Handle new payloads array format
+    if (payload.payloads && Array.isArray(payload.payloads)) {
+      accountId = payload.subscription?.accountId || payload.accountId;
+      notifications = payload.payloads
+        .filter((p: any) => p.changeType === 'created' || p.changeType === 'updated')
+        .map((p: any) => ({
+          type: p.changeType === 'created' ? 'message.created' : 'message.updated',
+          resource: p.resource || p,
+        }));
+      console.log('Parsed payloads array format, notifications:', notifications.length);
+    } 
+    // Handle old notification format
+    else if (payload.notification && payload.resource) {
+      notifications = [{ type: payload.notification, resource: payload.resource }];
+      console.log('Parsed old notification format');
+    }
 
     if (!accountId) {
       console.log('No accountId in webhook, might be a test ping');
@@ -84,11 +98,13 @@ serve(async (req) => {
       });
     }
 
-    console.log('Found email config for workspace:', emailConfig.workspace_id);
+    console.log('Found email config for workspace:', emailConfig.workspace_id, 'processing', notifications.length, 'notifications');
 
-    // Handle new email notification
-    if (notification === 'message.created' && resource) {
-      await processNewEmail(supabase, emailConfig, resource);
+    // Process each notification
+    for (const notif of notifications) {
+      if (notif.type === 'message.created' && notif.resource) {
+        await processNewEmail(supabase, emailConfig, notif.resource);
+      }
     }
 
     // Update last sync time
@@ -97,7 +113,7 @@ serve(async (req) => {
       .update({ last_sync_at: new Date().toISOString() })
       .eq('id', emailConfig.id);
 
-    return new Response(JSON.stringify({ success: true }), {
+    return new Response(JSON.stringify({ success: true, processed: notifications.length }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   } catch (error: unknown) {
@@ -123,22 +139,20 @@ async function processNewEmail(supabase: any, emailConfig: any, emailData: any) 
 
   if (!messageResponse.ok) {
     console.error('Failed to fetch full message:', messageResponse.status);
-    // Fall back to using the data from the notification
-    return processEmailFromData(supabase, emailConfig, emailData);
+    return processEmailFromData(supabase, emailConfig, emailData, messageId);
   }
 
   const message = await messageResponse.json();
   console.log('Fetched full message, has textBody:', !!message.textBody, 'has htmlBody:', !!message.htmlBody);
   
-  return processEmailFromData(supabase, emailConfig, message);
+  return processEmailFromData(supabase, emailConfig, message, messageId);
 }
 
-async function processEmailFromData(supabase: any, emailConfig: any, message: any) {
-  const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
-  
+async function processEmailFromData(supabase: any, emailConfig: any, message: any, originalMessageId?: string) {
   const senderEmail = (message.from?.email || message.sender?.email || '').toLowerCase();
   const senderName = message.from?.name || message.sender?.name || senderEmail.split('@')[0];
   const subject = message.subject || 'No Subject';
+  const aurinkoMessageId = originalMessageId || message.id;
   
   // Try multiple fields for body content
   let body = message.textBody || message.text || message.body?.text || '';
@@ -188,7 +202,7 @@ async function processEmailFromData(supabase: any, emailConfig: any, message: an
   }
 
   // Find or create customer
-  let { data: customer, error: customerError } = await supabase
+  let { data: customer } = await supabase
     .from('customers')
     .select('*')
     .eq('workspace_id', emailConfig.workspace_id)
@@ -225,10 +239,10 @@ async function processEmailFromData(supabase: any, emailConfig: any, message: an
     .single();
 
   let conversationId;
+  let isNewConversation = false;
 
   if (existingConversation) {
     conversationId = existingConversation.id;
-    // Update conversation with new activity
     await supabase
       .from('conversations')
       .update({
@@ -238,7 +252,7 @@ async function processEmailFromData(supabase: any, emailConfig: any, message: an
       .eq('id', conversationId);
     console.log('Updated existing conversation:', conversationId);
   } else {
-    // Create new conversation with recipient address in metadata
+    isNewConversation = true;
     const { data: newConversation, error: convError } = await supabase
       .from('conversations')
       .insert({
@@ -250,7 +264,7 @@ async function processEmailFromData(supabase: any, emailConfig: any, message: an
         external_conversation_id: `aurinko_${threadId}`,
         metadata: { 
           aurinko_account_id: emailConfig.account_id,
-          aurinko_message_id: message.id,
+          aurinko_message_id: aurinkoMessageId,
           original_recipient_email: recipientEmail,
         },
       })
@@ -262,10 +276,10 @@ async function processEmailFromData(supabase: any, emailConfig: any, message: an
       return;
     }
     conversationId = newConversation.id;
-    console.log('Created new conversation:', conversationId, 'with recipient:', recipientEmail);
+    console.log('Created new conversation:', conversationId);
   }
 
-  // Add message with full body
+  // Add message
   const { error: msgError } = await supabase
     .from('messages')
     .insert({
@@ -283,35 +297,104 @@ async function processEmailFromData(supabase: any, emailConfig: any, message: an
     return;
   }
 
-  console.log('Message added to conversation:', conversationId, 'body length:', body.length);
+  console.log('Message added to conversation:', conversationId);
+
+  // Mark email as read in Aurinko/Gmail
+  await markEmailAsRead(emailConfig, aurinkoMessageId);
 
   // Trigger AI agent for processing
   if (body.length > 0) {
-    try {
-      console.log('Triggering AI agent for conversation:', conversationId);
-      const aiResponse = await fetch(`${SUPABASE_URL}/functions/v1/claude-ai-agent-tools`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          conversationId,
-          customerMessage: body.substring(0, 5000),
-          channel: 'email',
-          customerName: senderName,
-          customerEmail: senderEmail,
-        }),
-      });
-      console.log('AI agent response status:', aiResponse.status);
-      if (!aiResponse.ok) {
-        const aiError = await aiResponse.text();
-        console.error('AI agent error:', aiError);
-      }
-    } catch (aiError) {
-      console.error('Error triggering AI agent:', aiError);
+    await triggerAIAnalysis(supabase, conversationId, body, senderName, senderEmail, customer, subject);
+  }
+}
+
+async function markEmailAsRead(emailConfig: any, messageId: string) {
+  try {
+    console.log('Marking email as read:', messageId);
+    const response = await fetch(`https://api.aurinko.io/v1/email/messages/${messageId}`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${emailConfig.access_token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ unread: false }),
+    });
+    
+    if (response.ok) {
+      console.log('Email marked as read successfully');
+    } else {
+      console.error('Failed to mark email as read:', response.status, await response.text());
     }
-  } else {
-    console.log('Skipping AI agent - no body content');
+  } catch (error) {
+    console.error('Error marking email as read:', error);
+  }
+}
+
+async function triggerAIAnalysis(
+  supabase: any, 
+  conversationId: string, 
+  body: string, 
+  senderName: string, 
+  senderEmail: string, 
+  customer: any,
+  subject: string
+) {
+  try {
+    console.log('Triggering AI agent for conversation:', conversationId);
+    
+    // Call AI agent with proper structure
+    const aiResponse = await supabase.functions.invoke('claude-ai-agent-tools', {
+      body: {
+        message: {
+          message_content: body.substring(0, 5000),
+          channel: 'email',
+          customer_identifier: senderEmail,
+          customer_name: senderName,
+          sender_phone: customer?.phone || null,
+          sender_email: senderEmail,
+        },
+        conversation_history: [],
+        customer_data: customer,
+      }
+    });
+    
+    console.log('AI agent response:', JSON.stringify(aiResponse.data || aiResponse.error));
+    
+    if (aiResponse.data && !aiResponse.error) {
+      const aiOutput = aiResponse.data;
+      
+      // Update conversation with AI analysis
+      const { error: updateError } = await supabase
+        .from('conversations')
+        .update({
+          ai_confidence: aiOutput.confidence || 0,
+          ai_sentiment: aiOutput.sentiment || 'neutral',
+          ai_reason_for_escalation: aiOutput.escalation_reason || null,
+          ai_draft_response: aiOutput.response || null,
+          summary_for_human: aiOutput.ai_summary || null,
+          title: aiOutput.ai_title || subject,
+          category: aiOutput.ai_category || 'other',
+          is_escalated: aiOutput.escalate || false,
+          status: aiOutput.escalate ? 'escalated' : 'new',
+          escalated_at: aiOutput.escalate ? new Date().toISOString() : null,
+        })
+        .eq('id', conversationId);
+      
+      if (updateError) {
+        console.error('Error updating conversation with AI data:', updateError);
+      } else {
+        console.log('Updated conversation with AI analysis:', {
+          title: aiOutput.ai_title,
+          category: aiOutput.ai_category,
+          sentiment: aiOutput.sentiment,
+          confidence: aiOutput.confidence,
+          escalated: aiOutput.escalate,
+        });
+      }
+    } else {
+      console.error('AI agent error:', aiResponse.error);
+    }
+  } catch (aiError) {
+    console.error('AI agent call failed (non-blocking):', aiError);
   }
 }
