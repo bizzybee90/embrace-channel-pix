@@ -112,6 +112,7 @@ export type Database = {
           csat_responded_at: string | null
           customer_id: string | null
           customer_satisfaction: number | null
+          email_classification: string | null
           embedding: string | null
           escalated_at: string | null
           external_conversation_id: string | null
@@ -126,6 +127,7 @@ export type Database = {
           mode: string | null
           needs_embedding: boolean | null
           priority: string | null
+          requires_reply: boolean | null
           resolved_at: string | null
           sla_due_at: string | null
           sla_status: string | null
@@ -155,6 +157,7 @@ export type Database = {
           csat_responded_at?: string | null
           customer_id?: string | null
           customer_satisfaction?: number | null
+          email_classification?: string | null
           embedding?: string | null
           escalated_at?: string | null
           external_conversation_id?: string | null
@@ -169,6 +172,7 @@ export type Database = {
           mode?: string | null
           needs_embedding?: boolean | null
           priority?: string | null
+          requires_reply?: boolean | null
           resolved_at?: string | null
           sla_due_at?: string | null
           sla_status?: string | null
@@ -198,6 +202,7 @@ export type Database = {
           csat_responded_at?: string | null
           customer_id?: string | null
           customer_satisfaction?: number | null
+          email_classification?: string | null
           embedding?: string | null
           escalated_at?: string | null
           external_conversation_id?: string | null
@@ -212,6 +217,7 @@ export type Database = {
           mode?: string | null
           needs_embedding?: boolean | null
           priority?: string | null
+          requires_reply?: boolean | null
           resolved_at?: string | null
           sla_due_at?: string | null
           sla_status?: string | null

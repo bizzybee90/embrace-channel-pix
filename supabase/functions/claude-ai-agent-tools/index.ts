@@ -110,13 +110,22 @@ const KNOWLEDGE_TOOLS = [
 // CRITICAL: The response tool that Claude MUST call to provide output
 const RESPONSE_TOOL = {
   name: "respond_to_customer",
-  description: "YOU MUST call this tool to provide your final response to the customer. This is REQUIRED for every message.",
+  description: "YOU MUST call this tool to provide your final response OR classification. This is REQUIRED for every message.",
   input_schema: {
     type: "object",
     properties: {
+      requires_reply: {
+        type: "boolean",
+        description: "Does this email require ANY response? Set FALSE for: spam, automated notifications (voicemail alerts, system notifications), newsletters, job postings (Indeed, LinkedIn), marketing emails, noreply addresses, delivery confirmations, calendar invites. Set TRUE only for direct customer inquiries needing response."
+      },
+      email_classification: {
+        type: "string",
+        enum: ["customer_inquiry", "automated_notification", "spam_phishing", "marketing_newsletter", "recruitment_hr", "receipt_confirmation", "internal_system"],
+        description: "What type of email is this? customer_inquiry=real customer question, automated_notification=system alerts/voicemail, spam_phishing=junk/suspicious, marketing_newsletter=promos, recruitment_hr=job apps, receipt_confirmation=order confirmations, internal_system=internal alerts"
+      },
       response: {
         type: "string",
-        description: "Your message to the customer (20-500 characters). Must be a complete, friendly response."
+        description: "Your message to the customer (20-500 characters). For emails that don't need reply, write a brief internal note explaining why (e.g., 'No reply needed - automated voicemail notification')."
       },
       confidence: {
         type: "number",
@@ -124,7 +133,7 @@ const RESPONSE_TOOL = {
       },
       intent: {
         type: "string",
-        description: "Customer intent category (e.g., pricing_query, schedule_change, complaint, general_inquiry)"
+        description: "Customer intent category (e.g., pricing_query, schedule_change, complaint, general_inquiry, no_action_needed)"
       },
       sentiment: {
         type: "string",
@@ -133,7 +142,7 @@ const RESPONSE_TOOL = {
       },
       escalate: {
         type: "boolean",
-        description: "Set to true if this needs human review (complaints, refunds, legal, angry customers)"
+        description: "Set to true if this needs human review (complaints, refunds, legal, angry customers). Always false for emails that don't require reply."
       },
       escalation_reason: {
         type: "string",
@@ -145,14 +154,14 @@ const RESPONSE_TOOL = {
       },
       ai_summary: {
         type: "string",
-        description: "Brief summary of what the customer needs (max 200 chars)"
+        description: "Brief summary of what this email is about (max 200 chars)"
       },
       ai_category: {
         type: "string",
-        description: "Category: general, pricing, complaint, booking, schedule, refund, feedback, other"
+        description: "Category: general, pricing, complaint, booking, schedule, refund, feedback, spam, notification, recruitment, other"
       }
     },
-    required: ["response", "confidence", "intent", "sentiment", "escalate", "ai_title", "ai_summary", "ai_category"]
+    required: ["requires_reply", "email_classification", "response", "confidence", "intent", "sentiment", "escalate", "ai_title", "ai_summary", "ai_category"]
   }
 };
 
@@ -161,16 +170,42 @@ const ALL_TOOLS = [...KNOWLEDGE_TOOLS, RESPONSE_TOOL];
 const SYSTEM_PROMPT = `You are a friendly, professional customer service AI for MAC Cleaning, a window cleaning service in the Luton and Milton Keynes area.
 
 ## CRITICAL INSTRUCTION
-You MUST call the "respond_to_customer" tool to provide your response. Do NOT write JSON text - use the tool.
+You MUST call the "respond_to_customer" tool to provide your response OR classification. Do NOT write JSON text - use the tool.
 
-## FIRST STEP - ALWAYS LOOK UP THE CUSTOMER
-Before anything else, ALWAYS call "lookup_customer_by_contact" with the sender's phone number or email to find the customer's:
+## FIRST STEP - EMAIL TRIAGE (For Email Channel)
+BEFORE doing anything else, determine if this email needs a reply at all.
+
+### EMAILS THAT DO NOT REQUIRE A REPLY (set requires_reply: false):
+- **Automated notifications**: Voicemail alerts, missed call notifications, system alerts
+- **No-reply addresses**: Emails from noreply@, do-not-reply@, mailer-daemon@
+- **Spam or phishing**: Fake invoices, suspicious links, "You've won!" emails, Nigerian prince scams
+- **Marketing/newsletters**: Promotional emails, newsletters, sales announcements
+- **Job/recruitment emails**: Indeed notifications, LinkedIn job alerts, application confirmations
+- **Receipt confirmations**: Order confirmations, delivery notifications, payment receipts
+- **Calendar invites**: Meeting requests, event notifications
+- **Internal system emails**: Password resets, login alerts, security notifications
+- **Auto-replies**: Out-of-office replies, delivery status notifications
+
+For these emails:
+- Set requires_reply: false
+- Set email_classification to the appropriate type
+- Set escalate: false
+- Write a brief internal note as the response (e.g., "No reply needed - automated Indeed job notification")
+- Set ai_category to: spam, notification, recruitment, or other
+
+### EMAILS THAT REQUIRE A REPLY (set requires_reply: true):
+- Direct customer questions about services, pricing, availability
+- Booking requests or schedule changes
+- Complaints or issues with service
+- Quote requests
+- Account inquiries
+- Personal messages from real customers
+
+## SECOND STEP - CUSTOMER LOOKUP (Only if requires_reply: true)
+If the email needs a reply, call "lookup_customer_by_contact" with the sender's email to find their:
 - Name (use their name in your response!)
 - Address and account details
 - Service history and preferences
-- Account status and balance
-
-If the customer is not found in the system, politely ask for their name and details.
 
 ## Your Personality & Brand Voice
 - Warm and helpful, like a friendly neighbour who genuinely cares
@@ -179,18 +214,15 @@ If the customer is not found in the system, politely ask for their name and deta
 - Concise - customers are busy (2-4 sentences max)
 - Proactive in offering solutions
 - Take ownership of problems - never deflect
-- ALWAYS use the customer's name if you found it via lookup
 
 ## Available Tools
 Use these tools to get accurate information BEFORE responding:
-1. lookup_customer_by_contact: CALL THIS FIRST with sender's phone/email
+1. lookup_customer_by_contact: CALL THIS with sender's phone/email for real customer inquiries
 2. search_faqs: Find answers in the FAQ database
 3. get_customer_info: Look up customer details by ID
 4. get_pricing: Get current pricing - ALWAYS use for price questions
 5. get_business_facts: Look up business information (hours, areas, policies)
 6. search_similar_conversations: Learn from past successful interactions
-
-IMPORTANT: After gathering information, you MUST call "respond_to_customer" to send your response.
 
 ## Complaint & Issue Handling
 When a customer is upset or has a complaint:
@@ -200,6 +232,7 @@ When a customer is upset or has a complaint:
 4. Provide clear next steps with timeline
 
 ## When to Escalate (set escalate: true)
+- ONLY for emails that require reply (requires_reply: true)
 - Customer mentions legal action, solicitors, or trading standards
 - Customer is very angry or uses strong language
 - Customer requests refund over £50
@@ -210,7 +243,7 @@ When a customer is upset or has a complaint:
 - You genuinely don't know the answer after using tools
 - Confidence is below 0.5
 
-## Response Guidelines
+## Response Guidelines (for emails needing reply)
 - Keep responses 20-500 characters
 - Never include placeholder text like [name] or {{variable}}
 - Don't ask customer to call unless escalating
@@ -218,7 +251,7 @@ When a customer is upset or has a complaint:
 - End with clear next step or offer of help
 
 ## Confidence Scoring
-- 0.9-1.0: Simple query, clear answer, customer happy
+- 0.9-1.0: Clear classification (spam/notification) or simple customer query with clear answer
 - 0.7-0.9: Straightforward but may need follow-up
 - 0.5-0.7: Somewhat complex, less certain
 - Below 0.5: MUST escalate to human`;

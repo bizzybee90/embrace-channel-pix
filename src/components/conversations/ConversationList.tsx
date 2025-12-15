@@ -134,7 +134,10 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
       query = query.in('sla_status', ['warning', 'breached']).in('status', ['new', 'open', 'waiting_customer', 'waiting_internal', 'ai_handling', 'escalated']);
     } else if (filter === 'all-open') {
       // Exclude waiting_customer - those are in "Awaiting Reply" view
-      query = query.in('status', ['new', 'open', 'waiting_internal', 'ai_handling', 'escalated']);
+      // Also exclude auto-triaged emails that don't need reply
+      query = query
+        .in('status', ['new', 'open', 'waiting_internal', 'ai_handling', 'escalated'])
+        .or('requires_reply.is.null,requires_reply.eq.true');
     } else if (filter === 'awaiting-reply') {
       query = query.in('status', ['waiting_customer', 'waiting_internal']);
     } else if (filter === 'completed') {

@@ -304,7 +304,16 @@ serve(async (req) => {
             if (aiResponse.data && !aiResponse.error) {
               const aiOutput = aiResponse.data;
               
-              // Update conversation with AI analysis
+              // Determine status based on requires_reply and escalate flags
+              const requiresReply = aiOutput.requires_reply !== false; // Default to true for backwards compatibility
+              let status = 'new';
+              if (!requiresReply) {
+                status = 'resolved'; // Auto-close emails that don't need reply
+              } else if (aiOutput.escalate) {
+                status = 'escalated';
+              }
+              
+              // Update conversation with AI analysis including triage fields
               const { error: updateError } = await supabase
                 .from('conversations')
                 .update({
@@ -313,11 +322,14 @@ serve(async (req) => {
                   ai_reason_for_escalation: aiOutput.escalation_reason || null,
                   ai_draft_response: aiOutput.response || null,
                   summary_for_human: aiOutput.ai_summary || null,
-                  title: aiOutput.ai_title || subject, // Use AI title if provided
+                  title: aiOutput.ai_title || subject,
                   category: aiOutput.ai_category || 'other',
                   is_escalated: aiOutput.escalate || false,
-                  status: aiOutput.escalate ? 'escalated' : 'new',
+                  status: status,
                   escalated_at: aiOutput.escalate ? new Date().toISOString() : null,
+                  resolved_at: !requiresReply ? new Date().toISOString() : null,
+                  requires_reply: requiresReply,
+                  email_classification: aiOutput.email_classification || null,
                 })
                 .eq('id', conversation.id);
               
@@ -330,6 +342,9 @@ serve(async (req) => {
                   sentiment: aiOutput.sentiment,
                   confidence: aiOutput.confidence,
                   escalated: aiOutput.escalate,
+                  requires_reply: requiresReply,
+                  email_classification: aiOutput.email_classification,
+                  status: status,
                 });
               }
             } else {
