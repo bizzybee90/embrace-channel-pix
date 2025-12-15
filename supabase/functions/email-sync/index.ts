@@ -12,8 +12,8 @@ serve(async (req) => {
   }
 
   try {
-    const { configId, mode } = await req.json();
-    console.log('Email sync requested:', { configId, mode });
+    const { configId, mode, maxMessages } = await req.json();
+    console.log('Email sync requested:', { configId, mode, maxMessages });
 
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -38,6 +38,7 @@ serve(async (req) => {
     console.log('Found config for:', config.email_address, 'mode:', mode || config.import_mode);
 
     const syncMode = mode || config.import_mode || 'new_only';
+    const maxToProcess = typeof maxMessages === 'number' && maxMessages > 0 ? Math.min(maxMessages, 25) : 10;
     let messagesProcessed = 0;
 
     // Determine date filter based on mode
@@ -59,7 +60,7 @@ serve(async (req) => {
     if (afterDate) {
       queryParams.push(`after=${afterDate.toISOString()}`);
     }
-    queryParams.push('limit=50'); // Process in batches
+    queryParams.push(`limit=${Math.max(5, maxToProcess)}`); // Keep runs quick to avoid timeouts
     
     const fetchUrl = `${baseUrl}?${queryParams.join('&')}`;
     console.log('Fetching emails from:', fetchUrl);
@@ -87,8 +88,12 @@ serve(async (req) => {
     const messagesData = await messagesResponse.json();
     console.log('Fetched', messagesData.records?.length || 0, 'messages from list API');
 
-    // Process each message
+    // Process each message (hard-capped to keep sync responsive)
     for (const messageSummary of messagesData.records || []) {
+      if (messagesProcessed >= maxToProcess) {
+        console.log('Reached maxToProcess cap, stopping early:', maxToProcess);
+        break;
+      }
       try {
         // Skip if already processed (check by external ID)
         const externalId = messageSummary.id?.toString();
