@@ -1223,6 +1223,53 @@ export type Database = {
           },
         ]
       }
+      system_prompts: {
+        Row: {
+          agent_type: string
+          created_at: string
+          id: string
+          is_active: boolean | null
+          is_default: boolean | null
+          model: string | null
+          name: string
+          prompt: string
+          updated_at: string
+          workspace_id: string | null
+        }
+        Insert: {
+          agent_type: string
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          is_default?: boolean | null
+          model?: string | null
+          name: string
+          prompt: string
+          updated_at?: string
+          workspace_id?: string | null
+        }
+        Update: {
+          agent_type?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          is_default?: boolean | null
+          model?: string | null
+          name?: string
+          prompt?: string
+          updated_at?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "system_prompts_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       templates: {
         Row: {
           body: string

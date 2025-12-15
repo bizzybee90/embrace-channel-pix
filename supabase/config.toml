@@ -9,9 +9,6 @@ verify_jwt = true
 [functions.ai-comparison-test]
 verify_jwt = true
 
-[functions.claude-ai-agent]
-verify_jwt = false
-
 [functions.claude-ai-agent-tools]
 verify_jwt = false
 
@@ -22,9 +19,6 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.send-response]
-verify_jwt = false
-
-[functions.receive-email]
 verify_jwt = false
 
 [functions.send-scheduled-summary]
@@ -61,21 +55,6 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.test-integration]
-verify_jwt = false
-
-[functions.gmail-oauth-start]
-verify_jwt = false
-
-[functions.gmail-oauth-callback]
-verify_jwt = false
-
-[functions.gmail-webhook]
-verify_jwt = false
-
-[functions.gmail-sync]
-verify_jwt = false
-
-[functions.gmail-disconnect]
 verify_jwt = false
 
 [functions.aurinko-auth-start]
