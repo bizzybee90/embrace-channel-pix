@@ -4,8 +4,8 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { useState, useEffect } from 'react';
 
 interface MobileBottomNavProps {
-  activeFilter: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'awaiting-reply' | 'completed' | 'sent' | 'high-priority' | 'vip-customers';
-  onNavigate: (filter: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'awaiting-reply' | 'completed' | 'sent' | 'high-priority' | 'vip-customers') => void;
+  activeFilter: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'awaiting-reply' | 'completed' | 'sent' | 'high-priority' | 'vip-customers' | 'triaged';
+  onNavigate: (filter: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'awaiting-reply' | 'completed' | 'sent' | 'high-priority' | 'vip-customers' | 'triaged') => void;
   onMenuClick: () => void;
 }
 
@@ -18,18 +18,18 @@ const navItems = [
     iconColor: 'text-primary'
   },
   { 
+    id: 'all-open' as const, 
+    icon: AlertTriangle, 
+    label: 'Action',
+    badgeBg: 'bg-blue-500/10',
+    iconColor: 'text-blue-500'
+  },
+  { 
     id: 'awaiting-reply' as const, 
     icon: Clock, 
     label: 'Awaiting',
     badgeBg: 'bg-yellow-500/10',
     iconColor: 'text-yellow-500'
-  },
-  { 
-    id: 'all-open' as const, 
-    icon: CheckCircle2, 
-    label: 'All Open',
-    badgeBg: 'bg-blue-500/10',
-    iconColor: 'text-blue-500'
   },
 ];
 

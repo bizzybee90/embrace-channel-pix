@@ -2,7 +2,7 @@ import { memo } from 'react';
 import { Conversation } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow } from 'date-fns';
-import { Clock, CheckCircle2, UserPlus, FileEdit, User, Bot, AlertTriangle, MessageSquare, Hourglass, Star } from 'lucide-react';
+import { Clock, CheckCircle2, UserPlus, FileEdit, User, Bot, AlertTriangle, MessageSquare, Hourglass, Star, Mail, Ban, Megaphone, Briefcase, Receipt, Settings2 } from 'lucide-react';
 import { ChannelIcon } from '../shared/ChannelIcon';
 import { cn } from '@/lib/utils';
 import { useIsTablet } from '@/hooks/use-tablet';
@@ -10,6 +10,23 @@ import { useHaptics } from '@/hooks/useHaptics';
 import { useState, useRef, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+
+// Email classification badge helper
+const getClassificationBadge = (classification: string | null | undefined) => {
+  if (!classification) return null;
+  
+  const badges: Record<string, { icon: typeof Mail; label: string; className: string }> = {
+    customer_inquiry: { icon: Mail, label: 'Inquiry', className: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20' },
+    automated_notification: { icon: Bot, label: 'Auto', className: 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20' },
+    spam_phishing: { icon: Ban, label: 'Spam', className: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20' },
+    marketing_newsletter: { icon: Megaphone, label: 'Marketing', className: 'bg-pink-500/10 text-pink-600 dark:text-pink-400 border-pink-500/20' },
+    recruitment_hr: { icon: Briefcase, label: 'Recruitment', className: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20' },
+    receipt_confirmation: { icon: Receipt, label: 'Receipt', className: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' },
+    internal_system: { icon: Settings2, label: 'System', className: 'bg-gray-500/10 text-gray-600 dark:text-gray-400 border-gray-500/20' },
+  };
+  
+  return badges[classification] || null;
+};
 
 interface ConversationCardProps {
   conversation: Conversation;
@@ -319,6 +336,19 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate }
               {conversation.channel}
             </Badge>
 
+            {/* Email Classification Badge */}
+            {(() => {
+              const classificationBadge = getClassificationBadge((conversation as any).email_classification);
+              if (!classificationBadge) return null;
+              const ClassIcon = classificationBadge.icon;
+              return (
+                <Badge variant="outline" className={cn("rounded-full text-xs font-semibold px-3 py-1.5 border flex items-center gap-1.5", classificationBadge.className)}>
+                  <ClassIcon className="h-3 w-3" />
+                  {classificationBadge.label}
+                </Badge>
+              );
+            })()}
+
             {hasDraft && (
               <Badge variant="secondary" className="rounded-full text-xs font-semibold px-3 py-1.5 bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 flex items-center gap-1.5">
                 <FileEdit className="h-3 w-3" />
@@ -430,6 +460,19 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate }
             <ChannelIcon channel={conversation.channel} className="h-3.5 w-3.5" />
             {conversation.channel}
           </Badge>
+
+          {/* Email Classification Badge */}
+          {(() => {
+            const classificationBadge = getClassificationBadge((conversation as any).email_classification);
+            if (!classificationBadge) return null;
+            const ClassIcon = classificationBadge.icon;
+            return (
+              <Badge variant="outline" className={cn("rounded-full text-xs font-semibold px-3 py-1.5 border flex items-center gap-1.5", classificationBadge.className)}>
+                <ClassIcon className="h-3 w-3" />
+                {classificationBadge.label}
+              </Badge>
+            );
+          })()}
 
           {hasDraft && (
             <Badge variant="secondary" className="rounded-full text-xs font-semibold px-3 py-1.5 bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 flex items-center gap-1.5">

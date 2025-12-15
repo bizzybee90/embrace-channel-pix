@@ -18,7 +18,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 interface ConversationListProps {
   selectedId?: string;
   onSelect: (conversation: Conversation) => void;
-  filter?: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'awaiting-reply' | 'completed' | 'sent' | 'high-priority' | 'vip-customers' | 'escalations';
+  filter?: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'awaiting-reply' | 'completed' | 'sent' | 'high-priority' | 'vip-customers' | 'escalations' | 'triaged';
   onConversationsChange?: (conversations: Conversation[]) => void;
   channelFilter?: string;
 }
@@ -148,6 +148,9 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
       query = query.eq('metadata->>tier', 'vip').in('status', ['new', 'open', 'waiting_customer', 'waiting_internal', 'ai_handling', 'escalated']);
     } else if (filter === 'escalations') {
       query = query.eq('is_escalated', true).in('status', ['new', 'in_progress', 'waiting', 'open', 'escalated', 'ai_handling']);
+    } else if (filter === 'triaged') {
+      // Show auto-triaged emails that don't require a reply
+      query = query.eq('requires_reply', false);
     }
     
     console.log('🔎 [ConversationList] Applied filter:', filter);

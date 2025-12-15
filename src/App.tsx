@@ -120,6 +120,18 @@ const RouterContent = () => {
         } 
       />
       <Route 
+        path="/triaged" 
+        element={
+          <AuthGuard>
+            {isMobile ? (
+              <MobileEscalationHub filter="triaged" />
+            ) : (
+              <EscalationHub filter="triaged" />
+            )}
+          </AuthGuard>
+        } 
+      />
+      <Route 
         path="/high-priority"
         element={
           <AuthGuard>
