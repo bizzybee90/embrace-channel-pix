@@ -6,7 +6,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const TRIAGE_SYSTEM_PROMPT = `You are an expert email triage agent for service businesses. Your job is to instantly classify, prioritize, and extract key information from incoming emails. You must be fast, accurate, and consistent.
+// Default fallback prompt
+const DEFAULT_TRIAGE_PROMPT = `You are an expert email triage agent for service businesses. Your job is to instantly classify, prioritize, and extract key information from incoming emails. You must be fast, accurate, and consistent.
 
 ## Classification Taxonomy
 
@@ -34,61 +35,52 @@ Classify every email into ONE of these categories:
 | internal_system | Internal system emails (password resets, calendar invites, software notifications) |
 | informational_only | FYI emails requiring no action (policy updates, terms changes, announcements) |
 
-## Urgency Detection
-
-### HIGH URGENCY
-- Words: "urgent", "ASAP", "emergency", "today", "immediately", "critical"
-- Same-day or next-day date mentions
-- ALL CAPS in subject or body
-- Multiple exclamation marks
-- Complaint about missed appointment
-- Mentions of refund/cancellation
-- Legal or safety concerns
-
-### MEDIUM URGENCY
-- Words: "soon", "this week", "waiting", "follow up"
-- Date within 7 days mentioned
-- Second or third email about same issue
-- Request for callback
-
-### LOW URGENCY
-- General inquiries
-- Quote requests without timeline
-- Feedback (positive)
-- FYI communications
-
-## Sentiment Analysis
-
-| Sentiment | Signals |
-|-----------|---------|
-| angry | Profanity, threats, ALL CAPS, "unacceptable", "disgusted", "worst" |
-| frustrated | "Again", "still waiting", "third time", "nobody responds" |
-| concerned | "Worried", "not sure", "problem", "issue" |
-| neutral | Factual tone, no emotional language |
-| positive | "Thank you", "great", "happy", "pleased", "recommend" |
-
-## Entity Extraction
-Extract these entities when present:
-- customer_name: Full name of the sender or mentioned customer
-- phone_number: Any phone numbers mentioned
-- address: Any addresses or postcodes mentioned
-- date_mentioned: Specific dates or times referenced
-- order_id: Order numbers, booking references, invoice numbers
-- amount: Monetary amounts mentioned
-- service_type: What service they're asking about
-- competitor_mentioned: If they mention another company
-
-## Edge Cases
-1. Ambiguous emails: If confidence < 0.7, set needs_human_review: true
-2. Mixed content: If email contains both inquiry AND complaint, prioritize complaint
-3. Empty body: Classify based on subject line
-4. Reply chains: Consider thread context but classify based on latest message
-
 ## Remember
 1. When in doubt, set requires_reply: true - safer to over-escalate than miss a customer
 2. High urgency + negative sentiment = immediate human attention
 3. Always provide reasoning for audit trail
 4. Never hallucinate entity values - only extract what's explicitly stated`;
+
+async function getTriagePrompt(supabase: any, workspaceId?: string): Promise<{ prompt: string; model: string }> {
+  try {
+    // Try workspace-specific prompt first
+    if (workspaceId) {
+      const { data: wsPrompt } = await supabase
+        .from('system_prompts')
+        .select('prompt, model')
+        .eq('agent_type', 'triage')
+        .eq('workspace_id', workspaceId)
+        .eq('is_active', true)
+        .eq('is_default', true)
+        .single();
+      
+      if (wsPrompt?.prompt) {
+        console.log('Using workspace-specific triage prompt');
+        return { prompt: wsPrompt.prompt, model: wsPrompt.model || 'claude-3-5-haiku-20241022' };
+      }
+    }
+
+    // Fall back to global default prompt
+    const { data: globalPrompt } = await supabase
+      .from('system_prompts')
+      .select('prompt, model')
+      .eq('agent_type', 'triage')
+      .is('workspace_id', null)
+      .eq('is_active', true)
+      .eq('is_default', true)
+      .single();
+
+    if (globalPrompt?.prompt) {
+      console.log('Using global default triage prompt');
+      return { prompt: globalPrompt.prompt, model: globalPrompt.model || 'claude-3-5-haiku-20241022' };
+    }
+  } catch (error) {
+    console.error('Error fetching triage prompt:', error);
+  }
+
+  console.log('Using hardcoded fallback triage prompt');
+  return { prompt: DEFAULT_TRIAGE_PROMPT, model: 'claude-3-5-haiku-20241022' };
+}
 
 const TRIAGE_TOOL = {
   name: "classify_email",
@@ -296,6 +288,13 @@ serve(async (req) => {
       throw new Error('ANTHROPIC_API_KEY not configured');
     }
 
+    const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
+
+    // Fetch triage prompt from database
+    const { prompt: triagePrompt, model: triageModel } = await getTriagePrompt(supabase, workspace_id);
+
     // Prepare the email content for analysis
     const emailContent = `
 FROM: ${email.from_name} <${email.from_email}>
@@ -306,7 +305,7 @@ BODY:
 ${email.body.substring(0, 5000)}
 `;
 
-    // Call Claude Haiku for fast triage
+    // Call Claude for triage
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -315,9 +314,9 @@ ${email.body.substring(0, 5000)}
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-3-5-haiku-20241022',
+        model: triageModel,
         max_tokens: 1024,
-        system: TRIAGE_SYSTEM_PROMPT + contextualPrompt,
+        system: triagePrompt + contextualPrompt,
         tools: [TRIAGE_TOOL],
         tool_choice: { type: 'tool', name: 'classify_email' },
         messages: [

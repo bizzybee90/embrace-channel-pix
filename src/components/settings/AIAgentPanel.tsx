@@ -29,15 +29,16 @@ const claudeModels: AIModel[] = [
 interface SystemPrompt {
   id: string;
   name: string;
-  agent_type: 'router' | 'customer_support' | 'quote';
+  agent_type: 'router' | 'customer_support' | 'quote' | 'triage';
   prompt: string;
   model: string;
   is_default: boolean;
   is_active: boolean;
 }
 
-const agentTypeInfo = {
-  router: { icon: Route, label: 'Router Agent', description: 'Analyzes messages and routes to the appropriate specialist' },
+const agentTypeInfo: Record<string, { icon: any; label: string; description: string }> = {
+  triage: { icon: Sparkles, label: 'Triage Agent', description: 'Classifies incoming emails - determines urgency, sentiment, and if reply needed' },
+  router: { icon: Route, label: 'Router Agent', description: 'Routes messages to Customer Support or Quote specialist' },
   customer_support: { icon: MessageSquare, label: 'Customer Support', description: 'Handles general inquiries, complaints, and account questions' },
   quote: { icon: Calculator, label: 'Quote Agent', description: 'Handles pricing questions and quote requests' },
 };
@@ -51,7 +52,7 @@ export const AIAgentPanel = () => {
   const [promptName, setPromptName] = useState('');
   const [promptText, setPromptText] = useState('');
   const [selectedModel, setSelectedModel] = useState('claude-sonnet-4-20250514');
-  const [selectedAgentType, setSelectedAgentType] = useState<'router' | 'customer_support' | 'quote'>('customer_support');
+  const [selectedAgentType, setSelectedAgentType] = useState<'router' | 'customer_support' | 'quote' | 'triage'>('customer_support');
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -256,6 +257,7 @@ export const AIAgentPanel = () => {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
+                          <SelectItem value="triage">✨ Triage Agent</SelectItem>
                           <SelectItem value="router">🚦 Router Agent</SelectItem>
                           <SelectItem value="customer_support">💬 Customer Support</SelectItem>
                           <SelectItem value="quote">📊 Quote Agent</SelectItem>
