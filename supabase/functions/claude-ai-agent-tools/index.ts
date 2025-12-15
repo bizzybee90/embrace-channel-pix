@@ -278,6 +278,100 @@ serve(async (req) => {
     console.log('📥 [AI-Agent] Sender email:', message.sender_email || 'Unknown');
     console.log('📥 [AI-Agent] Channel:', message.channel);
 
+    // NEW: Check sender rules first
+    const senderEmail = message.sender_email || '';
+    const senderDomain = senderEmail.includes('@') ? senderEmail.split('@')[1] : '';
+    
+    let senderRuleMatch = null;
+    if (senderEmail || senderDomain) {
+      const { data: rules } = await supabase
+        .from('sender_rules')
+        .select('*')
+        .eq('is_active', true);
+      
+      if (rules && rules.length > 0) {
+        for (const rule of rules) {
+          const pattern = rule.sender_pattern.toLowerCase();
+          const email = senderEmail.toLowerCase();
+          
+          // Check if pattern matches (support @domain.com or exact email patterns)
+          if (pattern.startsWith('@')) {
+            if (email.endsWith(pattern)) {
+              senderRuleMatch = rule;
+              console.log('🎯 [AI-Agent] Sender rule match:', pattern);
+              break;
+            }
+          } else if (email === pattern || email.includes(pattern)) {
+            senderRuleMatch = rule;
+            console.log('🎯 [AI-Agent] Sender rule match:', pattern);
+            break;
+          }
+        }
+      }
+    }
+
+    // If we have a sender rule match with no override conditions, apply it directly
+    if (senderRuleMatch && (!senderRuleMatch.override_keywords || senderRuleMatch.override_keywords.length === 0)) {
+      console.log('⚡ [AI-Agent] Applying sender rule directly:', senderRuleMatch.default_classification);
+      
+      // Increment hit count
+      await supabase
+        .from('sender_rules')
+        .update({ hit_count: (senderRuleMatch.hit_count || 0) + 1 })
+        .eq('id', senderRuleMatch.id);
+      
+      return new Response(JSON.stringify({
+        requires_reply: senderRuleMatch.default_requires_reply,
+        email_classification: senderRuleMatch.default_classification,
+        response: `No reply needed - matched sender rule: ${senderRuleMatch.sender_pattern}`,
+        confidence: 0.95,
+        intent: 'no_action_needed',
+        sentiment: 'neutral',
+        escalate: false,
+        escalation_reason: null,
+        ai_title: `Auto-classified: ${senderRuleMatch.default_classification.replace('_', ' ')}`,
+        ai_summary: message.message_content?.substring(0, 100) || 'Email matched sender rule',
+        ai_category: senderRuleMatch.default_classification === 'recruitment_hr' ? 'recruitment' : 
+                     senderRuleMatch.default_classification === 'receipt_confirmation' ? 'receipt' :
+                     senderRuleMatch.default_classification === 'spam_phishing' ? 'spam' :
+                     senderRuleMatch.default_classification === 'marketing_newsletter' ? 'marketing' : 'notification',
+        matched_sender_rule: senderRuleMatch.sender_pattern,
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // NEW: Fetch business context for the AI prompt
+    let businessContextStr = '';
+    const { data: businessContext } = await supabase
+      .from('business_context')
+      .select('*')
+      .limit(1)
+      .single();
+    
+    if (businessContext) {
+      const contextParts = [];
+      if (businessContext.is_hiring) {
+        contextParts.push('- IMPORTANT: We are currently hiring! Job applications and Indeed/LinkedIn emails should go to Action Required.');
+      }
+      if (businessContext.active_stripe_case) {
+        contextParts.push('- IMPORTANT: We have an active Stripe support case. Stripe support emails should go to Action Required.');
+      }
+      if (businessContext.active_insurance_claim) {
+        contextParts.push('- IMPORTANT: We have an active insurance claim. Insurance-related emails should go to Action Required.');
+      }
+      if (businessContext.custom_flags && typeof businessContext.custom_flags === 'object') {
+        for (const [key, value] of Object.entries(businessContext.custom_flags)) {
+          if (value) {
+            contextParts.push(`- IMPORTANT: Business flag "${key.replace(/_/g, ' ')}" is active. Related emails should go to Action Required.`);
+          }
+        }
+      }
+      if (contextParts.length > 0) {
+        businessContextStr = `\n\n## CURRENT BUSINESS CONTEXT\n${contextParts.join('\n')}`;
+      }
+    }
+
     // Prepare conversation context
     type Message = 
       | { role: 'user'; content: string | any[] }
@@ -294,6 +388,7 @@ Message: "${message.message_content}"
 
 Recent conversation history:
 ${conversation_history.slice(0, 5).map((m: any) => `${m.actor_type}: ${m.body}`).join('\n')}
+${businessContextStr}
 
 IMPORTANT: 
 1. FIRST call "lookup_customer_by_contact" with the sender's phone or email to find their account details
