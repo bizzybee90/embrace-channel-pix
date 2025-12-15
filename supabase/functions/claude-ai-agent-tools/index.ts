@@ -11,250 +11,122 @@ const corsHeaders = {
 const KNOWLEDGE_TOOLS = [
   {
     name: "lookup_customer_by_contact",
-    description: "ALWAYS call this first! Look up a customer by their phone number or email to find their name, address, and account details. Use the sender's phone/email from the incoming message.",
+    description: "ALWAYS call this first! Look up a customer by their phone number or email to find their name, address, and account details.",
     input_schema: {
       type: "object",
       properties: {
-        phone: {
-          type: "string",
-          description: "Customer's phone number (can be in any format, will be normalized)"
-        },
-        email: {
-          type: "string",
-          description: "Customer's email address"
-        }
+        phone: { type: "string", description: "Customer's phone number" },
+        email: { type: "string", description: "Customer's email address" }
       },
       required: []
     }
   },
   {
     name: "search_faqs",
-    description: "Search the FAQ database for answers to common questions. Returns relevant FAQs based on keywords or category.",
+    description: "Search the FAQ database for answers to common questions.",
     input_schema: {
       type: "object",
       properties: {
-        query: {
-          type: "string",
-          description: "Search query or keywords to find relevant FAQs"
-        },
-        category: {
-          type: "string",
-          description: "Optional category to filter FAQs (e.g., 'pricing', 'scheduling', 'services')"
-        }
+        query: { type: "string", description: "Search query or keywords" },
+        category: { type: "string", description: "Optional category filter" }
       },
       required: ["query"]
     }
   },
   {
     name: "get_customer_info",
-    description: "Retrieve detailed information about a customer by their ID including their history, preferences, and notes.",
+    description: "Retrieve detailed information about a customer by their ID.",
     input_schema: {
       type: "object",
       properties: {
-        customer_id: {
-          type: "string",
-          description: "The UUID of the customer"
-        }
+        customer_id: { type: "string", description: "The UUID of the customer" }
       },
       required: ["customer_id"]
     }
   },
   {
     name: "get_pricing",
-    description: "Get pricing information for services. Can search by service name or get all pricing.",
+    description: "Get pricing information for services.",
     input_schema: {
       type: "object",
       properties: {
-        service_name: {
-          type: "string",
-          description: "Optional service name to filter pricing (e.g., 'window cleaning', 'conservatory', 'gutters')"
-        }
+        service_name: { type: "string", description: "Optional service name to filter pricing" }
       },
       required: []
     }
   },
   {
     name: "get_business_facts",
-    description: "Retrieve business-specific facts and information like operating hours, service areas, policies, etc.",
+    description: "Retrieve business-specific facts like operating hours, service areas, policies.",
     input_schema: {
       type: "object",
       properties: {
-        category: {
-          type: "string",
-          description: "Optional category to filter facts (e.g., 'hours', 'areas', 'policies')"
-        }
+        category: { type: "string", description: "Optional category to filter facts" }
       },
       required: []
     }
   },
   {
     name: "search_similar_conversations",
-    description: "Search past conversations using semantic similarity to learn from successful interactions and human corrections.",
+    description: "Search past conversations using semantic similarity.",
     input_schema: {
       type: "object",
       properties: {
-        query: {
-          type: "string",
-          description: "The text to find similar past conversations for"
-        },
-        limit: {
-          type: "number",
-          description: "Maximum number of results to return (default 5)"
-        }
+        query: { type: "string", description: "The text to find similar conversations for" },
+        limit: { type: "number", description: "Maximum results (default 5)" }
       },
       required: ["query"]
     }
   }
 ];
 
-// CRITICAL: The response tool that Claude MUST call to provide output
+// Response tool that Claude MUST call
 const RESPONSE_TOOL = {
   name: "respond_to_customer",
-  description: "YOU MUST call this tool to provide your final response OR classification. This is REQUIRED for every message.",
+  description: "YOU MUST call this tool to provide your final response. Required for every message.",
   input_schema: {
     type: "object",
     properties: {
-      requires_reply: {
-        type: "boolean",
-        description: "Does this email require ANY response? Set FALSE for: spam, automated notifications (voicemail alerts, system notifications), newsletters, job postings (Indeed, LinkedIn), marketing emails, noreply addresses, delivery confirmations, calendar invites. Set TRUE only for direct customer inquiries needing response."
-      },
+      requires_reply: { type: "boolean", description: "Does this need a response?" },
       email_classification: {
         type: "string",
         enum: ["customer_inquiry", "automated_notification", "spam_phishing", "marketing_newsletter", "recruitment_hr", "receipt_confirmation", "internal_system"],
-        description: "What type of email is this? customer_inquiry=real customer question, automated_notification=system alerts/voicemail, spam_phishing=junk/suspicious, marketing_newsletter=promos, recruitment_hr=job apps, receipt_confirmation=order confirmations, internal_system=internal alerts"
+        description: "Email classification type"
       },
-      response: {
-        type: "string",
-        description: "Your message to the customer (20-500 characters). For emails that don't need reply, write a brief internal note explaining why (e.g., 'No reply needed - automated voicemail notification')."
-      },
-      confidence: {
-        type: "number",
-        description: "Confidence score from 0.0 to 1.0. Below 0.5 means escalate."
-      },
-      intent: {
-        type: "string",
-        description: "Customer intent category (e.g., pricing_query, schedule_change, complaint, general_inquiry, no_action_needed)"
-      },
-      sentiment: {
-        type: "string",
-        enum: ["positive", "neutral", "upset", "angry"],
-        description: "Customer sentiment"
-      },
-      escalate: {
-        type: "boolean",
-        description: "Set to true if this needs human review (complaints, refunds, legal, angry customers). Always false for emails that don't require reply."
-      },
-      escalation_reason: {
-        type: "string",
-        description: "If escalating, explain why (required if escalate is true)"
-      },
-      ai_title: {
-        type: "string",
-        description: "Short title for this conversation (max 50 chars)"
-      },
-      ai_summary: {
-        type: "string",
-        description: "Brief summary of what this email is about (max 200 chars)"
-      },
-      ai_category: {
-        type: "string",
-        description: "Category: general, pricing, complaint, booking, schedule, refund, feedback, spam, notification, recruitment, other"
-      }
+      response: { type: "string", description: "Your message to the customer (20-500 characters)" },
+      confidence: { type: "number", description: "Confidence score 0.0-1.0" },
+      intent: { type: "string", description: "Customer intent category" },
+      sentiment: { type: "string", enum: ["positive", "neutral", "upset", "angry"], description: "Customer sentiment" },
+      escalate: { type: "boolean", description: "Needs human review?" },
+      escalation_reason: { type: "string", description: "Why escalating (if applicable)" },
+      ai_title: { type: "string", description: "Short title (max 50 chars)" },
+      ai_summary: { type: "string", description: "Brief summary (max 200 chars)" },
+      ai_category: { type: "string", description: "Category: general, pricing, complaint, booking, etc." }
     },
-    required: ["requires_reply", "email_classification", "response", "confidence", "intent", "sentiment", "escalate", "ai_title", "ai_summary", "ai_category"]
+    required: ["requires_reply", "response", "confidence", "intent", "sentiment", "escalate", "ai_title", "ai_summary", "ai_category"]
   }
 };
 
 const ALL_TOOLS = [...KNOWLEDGE_TOOLS, RESPONSE_TOOL];
 
-const SYSTEM_PROMPT = `You are a friendly, professional customer service AI for MAC Cleaning, a window cleaning service in the Luton and Milton Keynes area.
+// Default prompts if database fetch fails
+const DEFAULT_ROUTER_PROMPT = `You are the Router Agent. Analyze the customer message and determine which specialist should handle it.
 
-## CRITICAL INSTRUCTION
-You MUST call the "respond_to_customer" tool to provide your response OR classification. Do NOT write JSON text - use the tool.
+Route to QUOTE when:
+- Customer explicitly asks for a quote or price
+- New customer asking about services
+- "How much does X cost?"
 
-## FIRST STEP - EMAIL TRIAGE (For Email Channel)
-BEFORE doing anything else, determine if this email needs a reply at all.
+Route to CUSTOMER_SUPPORT when:
+- Existing customer questions
+- Schedule changes, complaints, payments
+- General inquiries from known customers
 
-### EMAILS THAT DO NOT REQUIRE A REPLY (set requires_reply: false):
-- **Automated notifications**: Voicemail alerts, missed call notifications, system alerts
-- **No-reply addresses**: Emails from noreply@, do-not-reply@, mailer-daemon@
-- **Spam or phishing**: Fake invoices, suspicious links, "You've won!" emails, Nigerian prince scams
-- **Marketing/newsletters**: Promotional emails, newsletters, sales announcements
-- **Job/recruitment emails**: Indeed notifications, LinkedIn job alerts, application confirmations
-- **Receipt confirmations**: Order confirmations, delivery notifications, payment receipts
-- **Calendar invites**: Meeting requests, event notifications
-- **Internal system emails**: Password resets, login alerts, security notifications
-- **Auto-replies**: Out-of-office replies, delivery status notifications
+Respond with ONLY: {"route": "quote"} or {"route": "customer_support"}`;
 
-For these emails:
-- Set requires_reply: false
-- Set email_classification to the appropriate type
-- Set escalate: false
-- Write a brief internal note as the response (e.g., "No reply needed - automated Indeed job notification")
-- Set ai_category to: spam, notification, recruitment, or other
+const DEFAULT_CUSTOMER_SUPPORT_PROMPT = `You are a customer service agent for MAC Cleaning. Be warm, helpful, and professional. Use British English. Keep responses to 2-4 sentences.`;
 
-### EMAILS THAT REQUIRE A REPLY (set requires_reply: true):
-- Direct customer questions about services, pricing, availability
-- Booking requests or schedule changes
-- Complaints or issues with service
-- Quote requests
-- Account inquiries
-- Personal messages from real customers
-
-## SECOND STEP - CUSTOMER LOOKUP (Only if requires_reply: true)
-If the email needs a reply, call "lookup_customer_by_contact" with the sender's email to find their:
-- Name (use their name in your response!)
-- Address and account details
-- Service history and preferences
-
-## Your Personality & Brand Voice
-- Warm and helpful, like a friendly neighbour who genuinely cares
-- Professional but not corporate - real and human
-- British English (favour, colour, apologise)
-- Concise - customers are busy (2-4 sentences max)
-- Proactive in offering solutions
-- Take ownership of problems - never deflect
-
-## Available Tools
-Use these tools to get accurate information BEFORE responding:
-1. lookup_customer_by_contact: CALL THIS with sender's phone/email for real customer inquiries
-2. search_faqs: Find answers in the FAQ database
-3. get_customer_info: Look up customer details by ID
-4. get_pricing: Get current pricing - ALWAYS use for price questions
-5. get_business_facts: Look up business information (hours, areas, policies)
-6. search_similar_conversations: Learn from past successful interactions
-
-## Complaint & Issue Handling
-When a customer is upset or has a complaint:
-1. Lead with empathy - acknowledge frustration FIRST
-2. Take ownership - say "I'm sorry this happened"
-3. Don't make excuses
-4. Provide clear next steps with timeline
-
-## When to Escalate (set escalate: true)
-- ONLY for emails that require reply (requires_reply: true)
-- Customer mentions legal action, solicitors, or trading standards
-- Customer is very angry or uses strong language
-- Customer requests refund over £50
-- Customer has photographic/video evidence of poor service
-- Payment disputes or billing errors
-- Property damage claims
-- Personal circumstances (illness, bereavement)
-- You genuinely don't know the answer after using tools
-- Confidence is below 0.5
-
-## Response Guidelines (for emails needing reply)
-- Keep responses 20-500 characters
-- Never include placeholder text like [name] or {{variable}}
-- Don't ask customer to call unless escalating
-- Always personalise using customer's name from lookup
-- End with clear next step or offer of help
-
-## Confidence Scoring
-- 0.9-1.0: Clear classification (spam/notification) or simple customer query with clear answer
-- 0.7-0.9: Straightforward but may need follow-up
-- 0.5-0.7: Somewhat complex, less certain
-- Below 0.5: MUST escalate to human`;
+const DEFAULT_QUOTE_PROMPT = `You are the Quote Specialist for MAC Cleaning. Gather property details and provide accurate pricing using the get_pricing tool.`;
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -263,158 +135,169 @@ serve(async (req) => {
 
   try {
     const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
-    if (!ANTHROPIC_API_KEY) {
-      throw new Error('ANTHROPIC_API_KEY is not set');
-    }
+    if (!ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY is not set');
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { message, conversation_history, customer_data } = await req.json();
+    const { message, conversation_history, customer_data, triage_context } = await req.json();
 
-    console.log('📥 [AI-Agent] Processing message:', message.message_content);
-    console.log('📥 [AI-Agent] Sender phone:', message.sender_phone || 'Unknown');
-    console.log('📥 [AI-Agent] Sender email:', message.sender_email || 'Unknown');
-    console.log('📥 [AI-Agent] Channel:', message.channel);
+    console.log('📥 [Multi-Agent] Processing message:', message.message_content?.substring(0, 100));
+    console.log('📥 [Multi-Agent] Channel:', message.channel);
 
-    // NEW: Check sender rules first
+    // Fetch system prompts from database
+    const { data: prompts } = await supabase
+      .from('system_prompts')
+      .select('*')
+      .eq('is_active', true)
+      .eq('is_default', true);
+
+    const getPrompt = (agentType: string) => {
+      const dbPrompt = prompts?.find(p => p.agent_type === agentType);
+      if (dbPrompt) return { prompt: dbPrompt.prompt, model: dbPrompt.model || 'claude-sonnet-4-20250514' };
+      
+      // Fallback defaults
+      if (agentType === 'router') return { prompt: DEFAULT_ROUTER_PROMPT, model: 'claude-sonnet-4-20250514' };
+      if (agentType === 'quote') return { prompt: DEFAULT_QUOTE_PROMPT, model: 'claude-sonnet-4-20250514' };
+      return { prompt: DEFAULT_CUSTOMER_SUPPORT_PROMPT, model: 'claude-sonnet-4-20250514' };
+    };
+
+    // Check sender rules first
     const senderEmail = message.sender_email || '';
     const senderDomain = senderEmail.includes('@') ? senderEmail.split('@')[1] : '';
     
-    let senderRuleMatch = null;
     if (senderEmail || senderDomain) {
       const { data: rules } = await supabase
         .from('sender_rules')
         .select('*')
         .eq('is_active', true);
       
-      if (rules && rules.length > 0) {
+      if (rules) {
         for (const rule of rules) {
           const pattern = rule.sender_pattern.toLowerCase();
           const email = senderEmail.toLowerCase();
           
-          // Check if pattern matches (support @domain.com or exact email patterns)
-          if (pattern.startsWith('@')) {
-            if (email.endsWith(pattern)) {
-              senderRuleMatch = rule;
-              console.log('🎯 [AI-Agent] Sender rule match:', pattern);
-              break;
-            }
-          } else if (email === pattern || email.includes(pattern)) {
-            senderRuleMatch = rule;
-            console.log('🎯 [AI-Agent] Sender rule match:', pattern);
-            break;
+          if ((pattern.startsWith('@') && email.endsWith(pattern)) || 
+              email === pattern || email.includes(pattern)) {
+            console.log('🎯 [Multi-Agent] Sender rule match:', pattern);
+            
+            await supabase
+              .from('sender_rules')
+              .update({ hit_count: (rule.hit_count || 0) + 1 })
+              .eq('id', rule.id);
+            
+            return new Response(JSON.stringify({
+              requires_reply: rule.default_requires_reply,
+              email_classification: rule.default_classification,
+              response: `No reply needed - matched sender rule: ${rule.sender_pattern}`,
+              confidence: 0.95,
+              intent: 'no_action_needed',
+              sentiment: 'neutral',
+              escalate: false,
+              ai_title: `Auto-classified: ${rule.default_classification.replace('_', ' ')}`,
+              ai_summary: message.message_content?.substring(0, 100) || 'Email matched sender rule',
+              ai_category: 'notification',
+              routed_to: 'sender_rule',
+            }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
           }
         }
       }
     }
 
-    // If we have a sender rule match with no override conditions, apply it directly
-    if (senderRuleMatch && (!senderRuleMatch.override_keywords || senderRuleMatch.override_keywords.length === 0)) {
-      console.log('⚡ [AI-Agent] Applying sender rule directly:', senderRuleMatch.default_classification);
-      
-      // Increment hit count
-      await supabase
-        .from('sender_rules')
-        .update({ hit_count: (senderRuleMatch.hit_count || 0) + 1 })
-        .eq('id', senderRuleMatch.id);
-      
-      return new Response(JSON.stringify({
-        requires_reply: senderRuleMatch.default_requires_reply,
-        email_classification: senderRuleMatch.default_classification,
-        response: `No reply needed - matched sender rule: ${senderRuleMatch.sender_pattern}`,
-        confidence: 0.95,
-        intent: 'no_action_needed',
-        sentiment: 'neutral',
-        escalate: false,
-        escalation_reason: null,
-        ai_title: `Auto-classified: ${senderRuleMatch.default_classification.replace('_', ' ')}`,
-        ai_summary: message.message_content?.substring(0, 100) || 'Email matched sender rule',
-        ai_category: senderRuleMatch.default_classification === 'recruitment_hr' ? 'recruitment' : 
-                     senderRuleMatch.default_classification === 'receipt_confirmation' ? 'receipt' :
-                     senderRuleMatch.default_classification === 'spam_phishing' ? 'spam' :
-                     senderRuleMatch.default_classification === 'marketing_newsletter' ? 'marketing' : 'notification',
-        matched_sender_rule: senderRuleMatch.sender_pattern,
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // NEW: Fetch business context for the AI prompt
-    let businessContextStr = '';
-    const { data: businessContext } = await supabase
-      .from('business_context')
-      .select('*')
-      .limit(1)
-      .single();
+    // STEP 1: ROUTER AGENT - Determine which specialist to use
+    console.log('🚦 [Router] Analyzing message for routing...');
+    const routerConfig = getPrompt('router');
     
-    if (businessContext) {
-      const contextParts = [];
-      if (businessContext.is_hiring) {
-        contextParts.push('- IMPORTANT: We are currently hiring! Job applications and Indeed/LinkedIn emails should go to Action Required.');
-      }
-      if (businessContext.active_stripe_case) {
-        contextParts.push('- IMPORTANT: We have an active Stripe support case. Stripe support emails should go to Action Required.');
-      }
-      if (businessContext.active_insurance_claim) {
-        contextParts.push('- IMPORTANT: We have an active insurance claim. Insurance-related emails should go to Action Required.');
-      }
-      if (businessContext.custom_flags && typeof businessContext.custom_flags === 'object') {
-        for (const [key, value] of Object.entries(businessContext.custom_flags)) {
-          if (value) {
-            contextParts.push(`- IMPORTANT: Business flag "${key.replace(/_/g, ' ')}" is active. Related emails should go to Action Required.`);
+    const routerResponse = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'claude-3-5-haiku-20241022', // Fast model for routing
+        max_tokens: 100,
+        system: routerConfig.prompt,
+        messages: [{ role: 'user', content: `Customer message: "${message.message_content}"` }],
+      }),
+    });
+
+    let route = 'customer_support'; // Default route
+    if (routerResponse.ok) {
+      const routerData = await routerResponse.json();
+      const routerText = routerData.content?.[0]?.text || '';
+      console.log('🚦 [Router] Response:', routerText);
+      
+      try {
+        // Extract JSON from response
+        const jsonMatch = routerText.match(/\{[^}]+\}/);
+        if (jsonMatch) {
+          const routerJson = JSON.parse(jsonMatch[0]);
+          if (routerJson.route === 'quote' || routerJson.route === 'customer_support') {
+            route = routerJson.route;
           }
         }
-      }
-      if (contextParts.length > 0) {
-        businessContextStr = `\n\n## CURRENT BUSINESS CONTEXT\n${contextParts.join('\n')}`;
+      } catch (e) {
+        console.log('🚦 [Router] JSON parse failed, using default route');
       }
     }
+    
+    console.log(`🚦 [Router] Routing to: ${route.toUpperCase()}`);
 
-    // Prepare conversation context
-    type Message = 
-      | { role: 'user'; content: string | any[] }
-      | { role: 'assistant'; content: any[] };
+    // STEP 2: SPECIALIST AGENT - Generate response
+    const specialistType = route === 'quote' ? 'quote' : 'customer_support';
+    const specialistConfig = getPrompt(specialistType);
+    
+    console.log(`🤖 [${specialistType}] Processing with specialist agent...`);
 
-    const messages: Message[] = [
-      {
-        role: 'user',
-        content: `Incoming message from customer:
+    // Build conversation context
+    const conversationContext = conversation_history?.slice(0, 5).map((m: any) => 
+      `${m.actor_type}: ${m.body}`
+    ).join('\n') || '';
+
+    // Build triage context if available
+    let triageInfo = '';
+    if (triage_context) {
+      triageInfo = `\nTriage Info: Category=${triage_context.category}, Urgency=${triage_context.urgency}, Sentiment=${triage_context.sentiment}`;
+    }
+
+    const messages: any[] = [{
+      role: 'user',
+      content: `Incoming message from customer:
 Sender Phone: ${message.sender_phone || 'Not provided'}
 Sender Email: ${message.sender_email || 'Not provided'}
 Channel: ${message.channel}
 Message: "${message.message_content}"
 
-Recent conversation history:
-${conversation_history.slice(0, 5).map((m: any) => `${m.actor_type}: ${m.body}`).join('\n')}
-${businessContextStr}
+Recent conversation:
+${conversationContext}
+${triageInfo}
 
 IMPORTANT: 
-1. FIRST call "lookup_customer_by_contact" with the sender's phone or email to find their account details
+1. FIRST call "lookup_customer_by_contact" with sender's phone or email
 2. Use the customer's name in your response if found
-3. If not found, politely ask for their details
-4. Then call "respond_to_customer" with your final response.`
-      }
-    ];
+3. Then call "respond_to_customer" with your final response.`
+    }];
 
     let finalResponse = null;
-    const maxIterations = 8; // Allow more iterations for tool use
+    const maxIterations = 8;
     let iteration = 0;
 
-    // Tool calling loop - continue until respond_to_customer is called
+    // Tool calling loop
     while (iteration < maxIterations && !finalResponse) {
       iteration++;
       
-      const claudeBody: any = {
-        model: 'claude-sonnet-4-20250514',
+      const claudeBody = {
+        model: specialistConfig.model,
         max_tokens: 2048,
-        system: SYSTEM_PROMPT,
+        system: specialistConfig.prompt,
         messages,
         tools: ALL_TOOLS,
       };
 
-      console.log(`🔄 [AI-Agent] Iteration ${iteration}`);
+      console.log(`🔄 [${specialistType}] Iteration ${iteration}`);
 
       const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
@@ -428,322 +311,221 @@ IMPORTANT:
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('❌ [AI-Agent] Claude API error:', errorText);
+        console.error('❌ [Specialist] Claude API error:', errorText);
         throw new Error(`Claude API failed: ${response.status}`);
       }
 
       const data = await response.json();
-      console.log('🤖 [AI-Agent] Claude response:', JSON.stringify(data, null, 2));
-
-      // Check for tool use
       const toolUseBlocks = data.content.filter((block: any) => block.type === 'tool_use');
       
       if (toolUseBlocks.length === 0) {
-        // No tools called - this shouldn't happen but handle it
-        console.warn('⚠️ [AI-Agent] No tool called - forcing escalation');
-        finalResponse = {
-          response: "Thank you for your message. A team member will review this and get back to you shortly.",
-          confidence: 0,
-          intent: "unknown",
-          sentiment: "neutral",
-          escalate: true,
-          escalation_reason: "AI did not use response tool",
-          ai_title: "Needs Review",
-          ai_summary: message.message_content.substring(0, 100),
-          ai_category: "other"
-        };
-        break;
+        console.log('⚠️ [Specialist] No tool calls, prompting for response');
+        messages.push({ role: 'assistant', content: data.content });
+        messages.push({ role: 'user', content: 'Please call the respond_to_customer tool now.' });
+        continue;
       }
 
-      // Process tool calls
-      const toolResultsForThisIteration: any[] = [];
-      
+      const toolResults = [];
       for (const toolUse of toolUseBlocks) {
-        const { name, input, id } = toolUse;
-        console.log(`🔧 [AI-Agent] Tool called: ${name}`, JSON.stringify(input));
-
-        // Check if this is the response tool
-        if (name === 'respond_to_customer') {
-          console.log('✅ [AI-Agent] Response tool called with:', JSON.stringify(input, null, 2));
-          finalResponse = input;
+        console.log(`🔧 [Tool] Calling: ${toolUse.name}`);
+        
+        if (toolUse.name === 'respond_to_customer') {
+          finalResponse = toolUse.input;
+          console.log('✅ [Specialist] Final response received');
           break;
         }
 
         // Execute knowledge tools
-        let toolResult: any;
-
+        let result;
         try {
-          switch (name) {
+          switch (toolUse.name) {
             case 'lookup_customer_by_contact':
-              toolResult = await lookupCustomerByContact(supabase, input);
+              result = await lookupCustomerByContact(supabase, toolUse.input);
               break;
             case 'search_faqs':
-              toolResult = await searchFaqs(supabase, input);
+              result = await searchFaqs(supabase, toolUse.input);
               break;
             case 'get_customer_info':
-              toolResult = await getCustomerInfo(supabase, input, customer_data);
+              result = await getCustomerInfo(supabase, toolUse.input);
               break;
             case 'get_pricing':
-              toolResult = await getPricing(supabase, input);
+              result = await getPricing(supabase, toolUse.input);
               break;
             case 'get_business_facts':
-              toolResult = await getBusinessFacts(supabase, input);
+              result = await getBusinessFacts(supabase, toolUse.input);
               break;
             case 'search_similar_conversations':
-              toolResult = await searchSimilarConversations(supabase, input);
+              result = await searchSimilarConversations(supabase, toolUse.input);
               break;
             default:
-              toolResult = { error: `Unknown tool: ${name}` };
+              result = { error: 'Unknown tool' };
           }
-        } catch (error) {
-          console.error(`❌ [AI-Agent] Tool ${name} error:`, error);
-          toolResult = { error: error instanceof Error ? error.message : 'Tool execution failed' };
+        } catch (e) {
+          result = { error: 'Tool execution failed' };
         }
 
-        console.log(`📋 [AI-Agent] Tool ${name} result:`, JSON.stringify(toolResult).substring(0, 500));
-
-        toolResultsForThisIteration.push({
+        toolResults.push({
           type: 'tool_result',
-          tool_use_id: id,
-          content: JSON.stringify(toolResult)
+          tool_use_id: toolUse.id,
+          content: JSON.stringify(result),
         });
       }
 
-      // If we got the final response, exit loop
       if (finalResponse) break;
 
-      // Add assistant message with tool use
-      messages.push({
-        role: 'assistant',
-        content: data.content
-      });
-
-      // Add tool results
-      messages.push({
-        role: 'user',
-        content: toolResultsForThisIteration
-      });
+      messages.push({ role: 'assistant', content: data.content });
+      messages.push({ role: 'user', content: toolResults });
     }
 
-    // If loop ended without response, escalate
+    // Fallback if no response generated
     if (!finalResponse) {
-      console.warn('⚠️ [AI-Agent] Max iterations reached without response tool call');
+      console.log('⚠️ [Multi-Agent] Max iterations reached, escalating');
       finalResponse = {
-        response: "Thank you for your message. A team member will review this and get back to you shortly.",
-        confidence: 0,
-        intent: "unknown",
-        sentiment: "neutral",
+        requires_reply: true,
+        email_classification: 'customer_inquiry',
+        response: "Thank you for your message. I've passed this to our team who will get back to you shortly.",
+        confidence: 0.3,
+        intent: 'unknown',
+        sentiment: 'neutral',
         escalate: true,
-        escalation_reason: "AI did not provide response after max iterations",
-        ai_title: "Needs Review",
-        ai_summary: message.message_content.substring(0, 100),
-        ai_category: "other"
+        escalation_reason: 'AI could not generate confident response',
+        ai_title: 'Needs human review',
+        ai_summary: message.message_content?.substring(0, 100) || 'Message requires review',
+        ai_category: 'general',
       };
     }
 
-    console.log('📤 [AI-Agent] Final output:', JSON.stringify(finalResponse, null, 2));
+    // Add routing info to response
+    finalResponse.routed_to = route;
+    
+    console.log('✅ [Multi-Agent] Complete:', {
+      route,
+      confidence: finalResponse.confidence,
+      escalate: finalResponse.escalate,
+    });
 
     return new Response(JSON.stringify(finalResponse), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
-    console.error('❌ [AI-Agent] Fatal error:', error);
-    
-    const fallbackResponse = {
-      response: "Thank you for your message. A team member will review this and get back to you shortly.",
-      confidence: 0,
-      intent: "unknown",
-      sentiment: "neutral",
+    console.error('❌ [Multi-Agent] Error:', error);
+    return new Response(JSON.stringify({
+      requires_reply: true,
+      response: "Thank you for your message. Our team will review this and get back to you shortly.",
+      confidence: 0.2,
       escalate: true,
-      escalation_reason: error instanceof Error ? `AI agent error: ${error.message}` : 'AI agent error',
-      ai_title: "AI Error - Needs Review",
-      ai_summary: "AI agent encountered an error processing this message",
-      ai_category: "error"
-    };
-
-    return new Response(JSON.stringify(fallbackResponse), {
-      status: 200, // Return 200 so receive-message can handle it
+      escalation_reason: `System error: ${error instanceof Error ? error.message : 'Unknown'}`,
+      ai_title: 'System error - needs review',
+      ai_summary: 'Error processing message',
+      ai_category: 'general',
+      routed_to: 'error',
+    }), {
+      status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 });
 
-// NEW: Look up customer by phone or email
+// Tool implementations
 async function lookupCustomerByContact(supabase: any, input: any) {
   const { phone, email } = input;
+  let query = supabase.from('customers').select('*');
   
-  console.log('🔍 [AI-Agent] Looking up customer by phone:', phone, 'email:', email);
-  
-  // Normalize phone number by removing all non-digits
-  const normalizePhone = (p: string) => p.replace(/\D/g, '');
-  
-  let customer = null;
-  
-  // Try to find by phone first
   if (phone) {
-    const normalizedPhone = normalizePhone(phone);
-    // Try multiple phone formats
-    const { data: phoneResults, error: phoneError } = await supabase
-      .from('customers')
-      .select('*')
-      .or(`phone.ilike.%${normalizedPhone.slice(-10)}%,phone.ilike.%${phone}%`)
-      .limit(1);
-    
-    if (!phoneError && phoneResults && phoneResults.length > 0) {
-      customer = phoneResults[0];
-      console.log('✅ [AI-Agent] Found customer by phone:', customer.name);
-    }
+    const normalizedPhone = phone.replace(/\D/g, '').slice(-10);
+    query = query.or(`phone.ilike.%${normalizedPhone}%,phone.ilike.%${phone}%`);
+  }
+  if (email) {
+    query = query.or(`email.ilike.${email}`);
   }
   
-  // If not found by phone, try email
-  if (!customer && email) {
-    const { data: emailResults, error: emailError } = await supabase
-      .from('customers')
-      .select('*')
-      .ilike('email', email)
-      .limit(1);
-    
-    if (!emailError && emailResults && emailResults.length > 0) {
-      customer = emailResults[0];
-      console.log('✅ [AI-Agent] Found customer by email:', customer.name);
-    }
-  }
+  const { data } = await query.limit(1).maybeSingle();
   
-  if (customer) {
+  if (data) {
     return {
       found: true,
-      customer_id: customer.id,
-      name: customer.name,
-      email: customer.email,
-      phone: customer.phone,
-      address: customer.address,
-      status: customer.status,
-      tier: customer.tier,
-      balance: customer.balance,
-      next_appointment: customer.next_appointment,
-      frequency: customer.frequency,
-      price: customer.price,
-      notes: customer.notes,
-      preferred_channel: customer.preferred_channel
+      customer: {
+        name: data.name,
+        email: data.email,
+        phone: data.phone,
+        address: data.address,
+        tier: data.tier,
+        balance: data.balance,
+        next_appointment: data.next_appointment,
+        notes: data.notes,
+      }
     };
   }
-  
-  return {
-    found: false,
-    message: "Customer not found in system. Please ask for their name and details to create their account."
-  };
+  return { found: false, message: 'Customer not found. You may need to ask for their details.' };
 }
 
-// Tool implementation functions
 async function searchFaqs(supabase: any, input: any) {
-  const { query, category } = input;
+  let query = supabase.from('faq_database').select('question, answer, category').eq('is_active', true);
   
-  let queryBuilder = supabase
-    .from('faq_database')
-    .select('question, answer, category')
-    .or(`question.ilike.%${query}%,answer.ilike.%${query}%,keywords.cs.{${query}}`);
-  
-  if (category) {
-    queryBuilder = queryBuilder.eq('category', category);
+  if (input.category) {
+    query = query.eq('category', input.category);
   }
-
-  const { data, error } = await queryBuilder.limit(5);
-
-  if (error) throw error;
   
-  return data || [];
+  const { data } = await query.limit(5);
+  
+  if (data && data.length > 0) {
+    const searchTerms = input.query.toLowerCase().split(' ');
+    const filtered = data.filter((faq: any) => 
+      searchTerms.some((term: string) => 
+        faq.question.toLowerCase().includes(term) || 
+        faq.answer.toLowerCase().includes(term)
+      )
+    );
+    return { faqs: filtered.slice(0, 3) };
+  }
+  return { faqs: [], message: 'No relevant FAQs found' };
 }
 
-async function getCustomerInfo(supabase: any, input: any, existingCustomerData: any) {
-  if (existingCustomerData) {
-    return existingCustomerData;
-  }
-
-  const { customer_id } = input;
-  
-  const { data, error } = await supabase
+async function getCustomerInfo(supabase: any, input: any) {
+  const { data } = await supabase
     .from('customers')
     .select('*')
-    .eq('id', customer_id)
+    .eq('id', input.customer_id)
     .single();
-
-  if (error) throw error;
   
-  return data;
+  if (data) {
+    return { customer: data };
+  }
+  return { error: 'Customer not found' };
 }
 
 async function getPricing(supabase: any, input: any) {
-  const { service_name } = input;
+  let query = supabase.from('price_list').select('*').eq('is_active', true);
   
-  let queryBuilder = supabase
-    .from('price_list')
-    .select('*');
-  
-  if (service_name) {
-    queryBuilder = queryBuilder.ilike('service_name', `%${service_name}%`);
+  if (input.service_name) {
+    query = query.ilike('service_name', `%${input.service_name}%`);
   }
-
-  const { data, error } = await queryBuilder.order('service_name');
-
-  if (error) throw error;
   
-  return data || [];
+  const { data } = await query.limit(10);
+  return { pricing: data || [] };
 }
 
 async function getBusinessFacts(supabase: any, input: any) {
-  const { category } = input;
+  let query = supabase.from('business_facts').select('category, fact_key, fact_value');
   
-  let queryBuilder = supabase
-    .from('business_facts')
-    .select('*');
-  
-  if (category) {
-    queryBuilder = queryBuilder.eq('category', category);
+  if (input.category) {
+    query = query.eq('category', input.category);
   }
-
-  const { data, error } = await queryBuilder;
-
-  if (error) throw error;
   
-  return data || [];
+  const { data } = await query.limit(20);
+  return { facts: data || [] };
 }
 
 async function searchSimilarConversations(supabase: any, input: any) {
-  const { query, limit = 5 } = input;
+  // Simplified: just return recent resolved conversations
+  const { data } = await supabase
+    .from('conversations')
+    .select('title, ai_draft_response, final_response, category')
+    .eq('status', 'resolved')
+    .not('final_response', 'is', null)
+    .order('updated_at', { ascending: false })
+    .limit(input.limit || 3);
   
-  try {
-    const { data: embeddingData, error: embeddingError } = await supabase.functions.invoke('generate-embedding', {
-      body: { text: query }
-    });
-
-    if (embeddingError || !embeddingData?.embedding) {
-      console.error('Failed to generate embedding:', embeddingError);
-      return [];
-    }
-
-    const { data, error } = await supabase.rpc('match_conversations', {
-      query_embedding: embeddingData.embedding,
-      match_threshold: 0.7,
-      match_count: limit
-    });
-
-    if (error) {
-      console.error('Vector search error:', error);
-      return [];
-    }
-
-    return data?.map((match: any) => ({
-      similarity: match.similarity,
-      text: match.text,
-      ai_response: match.ai_response,
-      final_response: match.final_response,
-      human_edited: match.human_edited,
-      led_to_booking: match.led_to_booking,
-      customer_satisfaction: match.customer_satisfaction
-    })) || [];
-  } catch (error) {
-    console.error('Similar conversations search error:', error);
-    return [];
-  }
+  return { similar: data || [] };
 }
