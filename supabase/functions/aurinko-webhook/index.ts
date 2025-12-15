@@ -173,11 +173,23 @@ async function processEmailFromData(supabase: any, emailConfig: any, message: an
   if (message.to && Array.isArray(message.to) && message.to.length > 0) {
     const allOurAddresses = [
       emailConfig.email_address.toLowerCase(),
-      ...(emailConfig.aliases || []).map((a: string) => a.toLowerCase())
+      ...(emailConfig.aliases || []).map((a: string) => a.toLowerCase()),
     ];
-    
+
+    const extractEmail = (value: any): string | null => {
+      if (!value) return null;
+      if (typeof value === 'string') return value;
+      if (typeof value.email === 'string') return value.email;
+      if (typeof value.address === 'string') return value.address;
+      // Some providers nest email inside an object
+      if (value.email && typeof value.email.address === 'string') return value.email.address;
+      return null;
+    };
+
     for (const toAddr of message.to) {
-      const toEmail = (toAddr.email || toAddr).toLowerCase();
+      const raw = extractEmail(toAddr);
+      if (!raw) continue;
+      const toEmail = raw.toLowerCase();
       if (allOurAddresses.includes(toEmail)) {
         recipientEmail = toEmail;
         break;

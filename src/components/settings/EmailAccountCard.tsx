@@ -69,19 +69,27 @@ export const EmailAccountCard = ({ config, onDisconnect, onUpdate }: EmailAccoun
     setSyncing(true);
     try {
       const { data, error } = await supabase.functions.invoke('email-sync', {
-        body: { configId: config.id, mode: config.import_mode }
+        body: { configId: config.id, mode: config.import_mode },
       });
 
       if (error) throw error;
-      
-      toast({ 
-        title: 'Sync complete', 
-        description: `Processed ${data?.messagesProcessed || 0} messages` 
+
+      toast({
+        title: 'Sync complete',
+        description: `Processed ${data?.messagesProcessed || 0} messages`,
       });
       onUpdate();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error syncing email:', error);
-      toast({ title: 'Sync failed', variant: 'destructive' });
+      const message =
+        (typeof error?.message === 'string' && error.message) ||
+        (typeof error?.details === 'string' && error.details) ||
+        'Unknown error';
+      toast({
+        title: 'Sync failed',
+        description: message,
+        variant: 'destructive',
+      });
     } finally {
       setSyncing(false);
     }
