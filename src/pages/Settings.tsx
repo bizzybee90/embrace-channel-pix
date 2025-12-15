@@ -15,10 +15,13 @@ import { KnowledgeBasePanel } from '@/components/settings/KnowledgeBasePanel';
 import { DataSyncPanel } from '@/components/settings/DataSyncPanel';
 import { IntegrationsPanel } from '@/components/settings/IntegrationsPanel';
 import { EmailSettingsPanel } from '@/components/settings/EmailSettingsPanel';
+import { BusinessContextPanel } from '@/components/settings/BusinessContextPanel';
+import { SenderRulesPanel } from '@/components/settings/SenderRulesPanel';
+import { TriageLearningPanel } from '@/components/settings/TriageLearningPanel';
 import { Card } from '@/components/ui/card';
 import { TestMessageGenerator } from '@/components/TestMessageGenerator';
 import { RecentActivityWidget } from '@/components/dashboard/RecentActivityWidget';
-import { TestTube } from 'lucide-react';
+import { TestTube, Filter } from 'lucide-react';
 import { BackButton } from '@/components/shared/BackButton';
 
 export default function Settings() {
@@ -46,6 +49,10 @@ export default function Settings() {
             <TabsTrigger value="integrations" className="text-xs md:text-sm">Integrations</TabsTrigger>
             <TabsTrigger value="channels" className="text-xs md:text-sm">Channels</TabsTrigger>
             <TabsTrigger value="email-settings" className="text-xs md:text-sm">Email</TabsTrigger>
+            <TabsTrigger value="email-triage" className="flex items-center gap-2 text-xs md:text-sm">
+              <Filter className="h-3 w-3 md:h-4 md:w-4" />
+              Email Triage
+            </TabsTrigger>
             <TabsTrigger value="gdpr" className="text-xs md:text-sm">GDPR</TabsTrigger>
             <TabsTrigger value="cleanup" className="text-xs md:text-sm">Cleanup</TabsTrigger>
             <TabsTrigger value="export" className="text-xs md:text-sm">Data Export</TabsTrigger>
@@ -102,6 +109,12 @@ export default function Settings() {
 
         <TabsContent value="email-settings">
           <EmailSettingsPanel />
+        </TabsContent>
+
+        <TabsContent value="email-triage" className="space-y-6">
+          <BusinessContextPanel />
+          <SenderRulesPanel />
+          <TriageLearningPanel />
         </TabsContent>
 
         <TabsContent value="gdpr">

@@ -10,6 +10,7 @@ import { useHaptics } from '@/hooks/useHaptics';
 import { useState, useRef, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { TriageQuickActions } from './TriageQuickActions';
 
 // Email classification badge helper
 const getClassificationBadge = (classification: string | null | undefined) => {
@@ -33,9 +34,10 @@ interface ConversationCardProps {
   selected: boolean;
   onClick: () => void;
   onUpdate?: () => void;
+  showTriageActions?: boolean;
 }
 
-const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate }: ConversationCardProps) => {
+const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, showTriageActions }: ConversationCardProps) => {
   const isTablet = useIsTablet();
   const { trigger } = useHaptics();
   const { toast } = useToast();
@@ -382,7 +384,6 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate }
             )}
           </div>
 
-          {/* Meta Row */}
           <div className="flex items-center justify-between text-xs text-muted-foreground font-medium">
             <span className="uppercase tracking-wide">
               {conversation.category?.replace(/_/g, ' ') || 'General'}
@@ -393,6 +394,11 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate }
               {formatDistanceToNow(new Date(conversation.updated_at || conversation.created_at!), { addSuffix: true })}
             </span>
           </div>
+          
+          {/* Triage Quick Actions */}
+          {showTriageActions && (
+            <TriageQuickActions conversation={conversation} onUpdate={onUpdate} />
+          )}
           </div>
         </div>
       </div>
@@ -517,6 +523,11 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate }
             {formatDistanceToNow(new Date(conversation.updated_at || conversation.created_at!), { addSuffix: true })}
           </span>
         </div>
+        
+        {/* Triage Quick Actions */}
+        {showTriageActions && (
+          <TriageQuickActions conversation={conversation} onUpdate={onUpdate} />
+        )}
       </div>
     </div>
   );
@@ -530,6 +541,7 @@ export const ConversationCard = memo(ConversationCardComponent, (prevProps, next
     prevProps.conversation.updated_at === nextProps.conversation.updated_at &&
     prevProps.conversation.status === nextProps.conversation.status &&
     prevProps.conversation.priority === nextProps.conversation.priority &&
-    prevProps.selected === nextProps.selected
+    prevProps.selected === nextProps.selected &&
+    prevProps.showTriageActions === nextProps.showTriageActions
   );
 });

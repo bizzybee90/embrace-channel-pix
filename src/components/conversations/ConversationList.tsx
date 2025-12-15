@@ -358,6 +358,7 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
               selected={selectedId === conversation.id}
               onClick={() => onSelect(conversation)}
               onUpdate={handleRefresh}
+              showTriageActions={filter === 'triaged'}
             />
           ))}
           {isFetching && (

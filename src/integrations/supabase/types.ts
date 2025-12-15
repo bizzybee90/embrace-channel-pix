@@ -49,6 +49,47 @@ export type Database = {
           },
         ]
       }
+      business_context: {
+        Row: {
+          active_insurance_claim: boolean | null
+          active_stripe_case: boolean | null
+          created_at: string | null
+          custom_flags: Json | null
+          id: string
+          is_hiring: boolean | null
+          updated_at: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          active_insurance_claim?: boolean | null
+          active_stripe_case?: boolean | null
+          created_at?: string | null
+          custom_flags?: Json | null
+          id?: string
+          is_hiring?: boolean | null
+          updated_at?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          active_insurance_claim?: boolean | null
+          active_stripe_case?: boolean | null
+          created_at?: string | null
+          custom_flags?: Json | null
+          id?: string
+          is_hiring?: boolean | null
+          updated_at?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_context_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       business_facts: {
         Row: {
           category: string
@@ -1007,6 +1048,72 @@ export type Database = {
           },
         ]
       }
+      sender_rules: {
+        Row: {
+          confidence_adjustment: number | null
+          created_at: string | null
+          created_from_correction: string | null
+          default_classification: string
+          default_requires_reply: boolean | null
+          hit_count: number | null
+          id: string
+          is_active: boolean | null
+          override_classification: string | null
+          override_keywords: string[] | null
+          override_requires_reply: boolean | null
+          sender_pattern: string
+          updated_at: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          confidence_adjustment?: number | null
+          created_at?: string | null
+          created_from_correction?: string | null
+          default_classification: string
+          default_requires_reply?: boolean | null
+          hit_count?: number | null
+          id?: string
+          is_active?: boolean | null
+          override_classification?: string | null
+          override_keywords?: string[] | null
+          override_requires_reply?: boolean | null
+          sender_pattern: string
+          updated_at?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          confidence_adjustment?: number | null
+          created_at?: string | null
+          created_from_correction?: string | null
+          default_classification?: string
+          default_requires_reply?: boolean | null
+          hit_count?: number | null
+          id?: string
+          is_active?: boolean | null
+          override_classification?: string | null
+          override_keywords?: string[] | null
+          override_requires_reply?: boolean | null
+          sender_pattern?: string
+          updated_at?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sender_rules_created_from_correction_fkey"
+            columns: ["created_from_correction"]
+            isOneToOne: false
+            referencedRelation: "triage_corrections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sender_rules_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sla_configs: {
         Row: {
           first_response_minutes: number
@@ -1126,6 +1233,76 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "templates_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      triage_corrections: {
+        Row: {
+          conversation_id: string | null
+          corrected_at: string | null
+          corrected_by: string | null
+          created_at: string | null
+          id: string
+          new_classification: string | null
+          new_requires_reply: boolean | null
+          original_classification: string | null
+          original_requires_reply: boolean | null
+          sender_domain: string | null
+          sender_email: string | null
+          subject_keywords: string[] | null
+          workspace_id: string | null
+        }
+        Insert: {
+          conversation_id?: string | null
+          corrected_at?: string | null
+          corrected_by?: string | null
+          created_at?: string | null
+          id?: string
+          new_classification?: string | null
+          new_requires_reply?: boolean | null
+          original_classification?: string | null
+          original_requires_reply?: boolean | null
+          sender_domain?: string | null
+          sender_email?: string | null
+          subject_keywords?: string[] | null
+          workspace_id?: string | null
+        }
+        Update: {
+          conversation_id?: string | null
+          corrected_at?: string | null
+          corrected_by?: string | null
+          created_at?: string | null
+          id?: string
+          new_classification?: string | null
+          new_requires_reply?: boolean | null
+          original_classification?: string | null
+          original_requires_reply?: boolean | null
+          sender_domain?: string | null
+          sender_email?: string | null
+          subject_keywords?: string[] | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "triage_corrections_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "triage_corrections_corrected_by_fkey"
+            columns: ["corrected_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "triage_corrections_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
