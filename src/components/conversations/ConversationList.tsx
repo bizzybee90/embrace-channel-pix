@@ -33,7 +33,7 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
   });
   const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState<string>(() => {
-    return localStorage.getItem('conversation-sort') || 'sla_urgent';
+    return localStorage.getItem('conversation-sort') || 'newest';
   });
   const [searchQuery, setSearchQuery] = useState('');
   const parentRef = useRef<HTMLDivElement>(null);
