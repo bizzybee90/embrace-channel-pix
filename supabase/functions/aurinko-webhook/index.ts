@@ -130,20 +130,32 @@ async function processNewEmail(supabase: any, emailConfig: any, emailData: any) 
   const messageId = emailData.id || emailData.messageId;
   console.log('Processing new email notification, messageId:', messageId);
 
-  // Fetch full message details from Aurinko API
-  const messageResponse = await fetch(`https://api.aurinko.io/v1/email/messages/${messageId}`, {
+  // Fetch full message details from Aurinko API with body content
+  // The bodyType=full parameter is required to get the actual email body
+  const messageUrl = `https://api.aurinko.io/v1/email/messages/${messageId}?bodyType=full`;
+  console.log('Fetching message from:', messageUrl);
+  
+  const messageResponse = await fetch(messageUrl, {
     headers: {
       'Authorization': `Bearer ${emailConfig.access_token}`,
     },
   });
 
   if (!messageResponse.ok) {
-    console.error('Failed to fetch full message:', messageResponse.status);
+    const errorText = await messageResponse.text();
+    console.error('Failed to fetch full message:', messageResponse.status, errorText);
     return processEmailFromData(supabase, emailConfig, emailData, messageId);
   }
 
   const message = await messageResponse.json();
-  console.log('Fetched full message, has textBody:', !!message.textBody, 'has htmlBody:', !!message.htmlBody);
+  console.log('Fetched full message:', {
+    hasFrom: !!message.from,
+    fromEmail: message.from?.email,
+    hasTextBody: !!message.textBody,
+    hasHtmlBody: !!message.htmlBody,
+    hasBody: !!message.body,
+    subject: message.subject,
+  });
   
   return processEmailFromData(supabase, emailConfig, message, messageId);
 }
