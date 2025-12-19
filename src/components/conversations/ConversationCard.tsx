@@ -1,8 +1,8 @@
 import { memo } from 'react';
-import { Conversation } from '@/lib/types';
+import { Conversation, DecisionBucket } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow } from 'date-fns';
-import { Clock, CheckCircle2, UserPlus, FileEdit, User, Bot, AlertTriangle, MessageSquare, Hourglass, Star, Mail, Ban, Megaphone, Briefcase, Receipt, Settings2, Zap, Users, Package, Info, ThumbsUp, MessageCircle } from 'lucide-react';
+import { Clock, CheckCircle2, UserPlus, FileEdit, User, Bot, AlertTriangle, MessageSquare, Hourglass, Star, Mail, Ban, Megaphone, Briefcase, Receipt, Settings2, Zap, Users, Package, Info, ThumbsUp, MessageCircle, CircleAlert, CircleCheck, CirclePause, Timer } from 'lucide-react';
 import { ChannelIcon } from '../shared/ChannelIcon';
 import { cn } from '@/lib/utils';
 import { useIsTablet } from '@/hooks/use-tablet';
@@ -12,20 +12,53 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { TriageQuickActions } from './TriageQuickActions';
 
-// Email classification badge helper - expanded for triage agent
+// Decision bucket badge helper - PRIMARY display
+const getDecisionBucketBadge = (bucket: DecisionBucket | string | null | undefined) => {
+  if (!bucket) return null;
+  
+  const badges: Record<string, { icon: typeof CircleAlert; label: string; emoji: string; className: string }> = {
+    act_now: { 
+      icon: CircleAlert, 
+      label: 'Act Now', 
+      emoji: '🔴',
+      className: 'bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/30 font-bold' 
+    },
+    quick_win: { 
+      icon: Timer, 
+      label: 'Quick Win', 
+      emoji: '🟡',
+      className: 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30 font-bold' 
+    },
+    auto_handled: { 
+      icon: CircleCheck, 
+      label: 'Auto-Handled', 
+      emoji: '🟢',
+      className: 'bg-green-500/15 text-green-600 dark:text-green-400 border-green-500/30 font-bold' 
+    },
+    wait: { 
+      icon: CirclePause, 
+      label: 'Wait', 
+      emoji: '🔵',
+      className: 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30 font-bold' 
+    },
+  };
+  
+  return badges[bucket] || null;
+};
+
+// Email classification badge helper - SECONDARY display
 const getClassificationBadge = (classification: string | null | undefined) => {
   if (!classification) return null;
   
   const badges: Record<string, { icon: typeof Mail; label: string; className: string }> = {
-    // Requires reply categories
     customer_inquiry: { icon: Mail, label: 'Inquiry', className: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20' },
     customer_complaint: { icon: AlertTriangle, label: 'Complaint', className: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20' },
     customer_feedback: { icon: ThumbsUp, label: 'Feedback', className: 'bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20' },
     lead_new: { icon: UserPlus, label: 'New Lead', className: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20' },
     lead_followup: { icon: MessageCircle, label: 'Follow-up', className: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20' },
+    supplier_invoice: { icon: Receipt, label: 'Invoice', className: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' },
     supplier_urgent: { icon: Zap, label: 'Supplier', className: 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/20' },
     partner_request: { icon: Users, label: 'Partner', className: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20' },
-    // Auto-triage categories
     automated_notification: { icon: Bot, label: 'Auto', className: 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20' },
     spam_phishing: { icon: Ban, label: 'Spam', className: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20' },
     marketing_newsletter: { icon: Megaphone, label: 'Marketing', className: 'bg-pink-500/10 text-pink-600 dark:text-pink-400 border-pink-500/20' },
@@ -51,18 +84,15 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
   const { trigger } = useHaptics();
   const { toast } = useToast();
 
-  // Draft detection state
   const [hasDraft, setHasDraft] = useState(false);
   const [assignedUserName, setAssignedUserName] = useState<string | null>(null);
 
-  // Check for draft on mount and when conversation changes
   useEffect(() => {
     const draftKey = `draft-${conversation.id}`;
     const draft = localStorage.getItem(draftKey);
     setHasDraft(!!draft && draft.trim().length > 0);
   }, [conversation.id]);
 
-  // Fetch assigned user name
   useEffect(() => {
     const fetchAssignedUser = async () => {
       if (!conversation.assigned_to) {
@@ -84,7 +114,6 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
     fetchAssignedUser();
   }, [conversation.assigned_to]);
 
-  // Swipe gesture state
   const [swipeDistance, setSwipeDistance] = useState(0);
   const [isSwiping, setIsSwiping] = useState(false);
   const touchStartX = useRef(0);
@@ -100,7 +129,6 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
     }
   };
 
-  // Swipe gesture handlers
   const handleTouchStart = (e: React.TouchEvent) => {
     if (!isTouchDevice || !isTablet) return;
     touchStartX.current = e.touches[0].clientX;
@@ -112,7 +140,6 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
     const currentX = e.touches[0].clientX;
     const distance = currentX - touchStartX.current;
     
-    // Only allow horizontal swipes (not vertical scrolling)
     if (Math.abs(distance) > 10) {
       setIsSwiping(true);
       setSwipeDistance(distance);
@@ -128,18 +155,14 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
 
     const absDistance = Math.abs(swipeDistance);
     
-    // Execute action if threshold met
     if (absDistance >= SWIPE_THRESHOLD) {
       if (swipeDistance > 0) {
-        // Right swipe: Assign to me
         await handleAssignToMe();
       } else {
-        // Left swipe: Resolve
         await handleResolve();
       }
     }
     
-    // Snap back animation
     setSwipeDistance(0);
     setIsSwiping(false);
   };
@@ -192,14 +215,14 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
     }
   };
   
-  const getPriorityVariant = (priority: string | null) => {
-    if (!priority) return 'secondary';
-    switch (priority.toLowerCase()) {
-      case 'urgent': return 'priority-urgent';
-      case 'high': return 'priority-high';
-      case 'medium': return 'priority-medium';
-      case 'low': return 'priority-low';
-      default: return 'secondary';
+  const getBucketBarColor = (bucket: string | null | undefined) => {
+    if (!bucket) return 'bg-muted';
+    switch (bucket) {
+      case 'act_now': return 'bg-red-500';
+      case 'quick_win': return 'bg-amber-500';
+      case 'auto_handled': return 'bg-green-500';
+      case 'wait': return 'bg-blue-500';
+      default: return 'bg-muted';
     }
   };
 
@@ -214,33 +237,15 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
     }
   };
 
-
   const swipeProgress = Math.min(Math.abs(swipeDistance) / SWIPE_THRESHOLD, 1);
   const isRightSwipe = swipeDistance > 0;
-
   const isOverdue = conversation.sla_due_at && new Date() > new Date(conversation.sla_due_at);
   
-  // Status-based visual indicators
-  const getStatusBadge = () => {
-    switch (conversation.status) {
-      case 'open':
-        return { icon: MessageSquare, label: 'Customer Replied', className: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20' };
-      case 'waiting_customer':
-        return { icon: Hourglass, label: 'Awaiting Reply', className: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20' };
-      case 'ai_handling':
-        return { icon: Bot, label: 'AI Handling', className: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20' };
-      case 'pending_review':
-        return { icon: FileEdit, label: 'Draft Ready', className: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20' };
-      case 'escalated':
-        return { icon: AlertTriangle, label: 'Escalated', className: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20' };
-      case 'resolved':
-        return { icon: CheckCircle2, label: 'Resolved', className: 'bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20' };
-      default:
-        return null;
-    }
-  };
+  // Get decision bucket badge (primary)
+  const bucketBadge = getDecisionBucketBadge(conversation.decision_bucket);
   
-  const statusBadge = getStatusBadge();
+  // Determine the primary description to show
+  const primaryDescription = conversation.why_this_needs_you || conversation.summary_for_human || conversation.ai_reason_for_escalation;
 
   // Compact tablet layout
   if (isTablet) {
@@ -252,33 +257,24 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
-        {/* Swipe Action Background - Left (Resolve) */}
+        {/* Swipe backgrounds */}
         <div 
           className="absolute inset-0 bg-blue-500/20 flex items-center justify-end pr-8 pointer-events-none transition-opacity duration-200"
-          style={{ 
-            opacity: !isRightSwipe && isSwiping ? swipeProgress : 0 
-          }}
+          style={{ opacity: !isRightSwipe && isSwiping ? swipeProgress : 0 }}
         >
           <CheckCircle2 
             className="h-6 w-6 text-blue-600 dark:text-blue-400 transition-transform duration-200" 
-            style={{ 
-              transform: `scale(${swipeProgress})` 
-            }}
+            style={{ transform: `scale(${swipeProgress})` }}
           />
         </div>
 
-        {/* Swipe Action Background - Right (Assign) */}
         <div 
           className="absolute inset-0 bg-green-500/20 flex items-center justify-start pl-8 pointer-events-none transition-opacity duration-200"
-          style={{ 
-            opacity: isRightSwipe && isSwiping ? swipeProgress : 0 
-          }}
+          style={{ opacity: isRightSwipe && isSwiping ? swipeProgress : 0 }}
         >
           <UserPlus 
             className="h-6 w-6 text-green-600 dark:text-green-400 transition-transform duration-200" 
-            style={{ 
-              transform: `scale(${swipeProgress})` 
-            }}
+            style={{ transform: `scale(${swipeProgress})` }}
           />
         </div>
 
@@ -296,142 +292,110 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
             transition: isSwiping ? 'none' : 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
           }}
         >
-        {/* Priority/Status Accent Bar */}
-        <div 
-          className={cn(
-            "absolute top-0 left-0 right-0 h-1",
-            conversation.status === 'resolved' 
-              ? "bg-green-500" 
-              : conversation.priority 
-                ? getPriorityBarColor(conversation.priority)
-                : "bg-muted"
-          )}
-        />
-        
-        {/* Overdue Badge */}
-        {isOverdue && (
-          <Badge variant="priority-urgent" className="absolute top-4 right-4 text-[11px] font-bold uppercase tracking-wide px-3 py-1.5 rounded-full shadow-sm">
-            Overdue
-          </Badge>
-        )}
-
-        <div className="p-5">
-          {/* Title */}
-          <h3 className={cn(
-            "font-semibold text-base leading-snug mb-2.5 line-clamp-2 text-foreground",
-            isOverdue && "pr-20"
-          )}>
-            {conversation.title || 'Untitled Conversation'}
-          </h3>
-
-          {/* Description */}
-          {(conversation.summary_for_human || conversation.ai_reason_for_escalation) && (
-            <p className="text-sm text-muted-foreground leading-relaxed mb-3.5 line-clamp-2">
-              {conversation.summary_for_human || conversation.ai_reason_for_escalation}
-            </p>
-          )}
-
-          {/* Badge Row */}
-          <div className="flex flex-wrap items-center gap-2 mb-3.5">
-            {/* Urgency Badge */}
-            {conversation.urgency && (
-              <Badge 
-                variant={conversation.urgency === 'high' ? 'destructive' : conversation.urgency === 'medium' ? 'secondary' : 'outline'}
-                className={cn(
-                  "rounded-full text-xs font-bold uppercase tracking-wide px-3 py-1.5 shadow-sm",
-                  conversation.urgency === 'high' && "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20",
-                  conversation.urgency === 'medium' && "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
-                  conversation.urgency === 'low' && "bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20"
-                )}
-                title={conversation.urgency_reason || undefined}
-              >
-                {conversation.urgency === 'high' ? '🔴' : conversation.urgency === 'medium' ? '🟡' : '⚪'} {conversation.urgency}
-              </Badge>
+          {/* Decision Bucket Accent Bar - PRIMARY indicator */}
+          <div 
+            className={cn(
+              "absolute top-0 left-0 right-0 h-1.5",
+              conversation.decision_bucket 
+                ? getBucketBarColor(conversation.decision_bucket)
+                : conversation.status === 'resolved' 
+                  ? "bg-green-500" 
+                  : getPriorityBarColor(conversation.priority)
             )}
-
-            {conversation.priority && !conversation.urgency && (
-              <Badge 
-                variant={getPriorityVariant(conversation.priority)}
-                className="rounded-full text-xs font-bold uppercase tracking-wide px-3 py-1.5 shadow-sm"
-              >
-                {conversation.priority}
-              </Badge>
-            )}
-            
-            <Badge variant="outline" className="rounded-full text-xs font-semibold px-3 py-1.5 border-border/50 flex items-center gap-1.5">
-              <ChannelIcon channel={conversation.channel} className="h-3.5 w-3.5" />
-              {conversation.channel}
-            </Badge>
-
-            {/* Email Classification Badge */}
-            {(() => {
-              const classificationBadge = getClassificationBadge(conversation.email_classification);
-              if (!classificationBadge) return null;
-              const ClassIcon = classificationBadge.icon;
-              return (
-                <Badge variant="outline" className={cn("rounded-full text-xs font-semibold px-3 py-1.5 border flex items-center gap-1.5", classificationBadge.className)}>
-                  <ClassIcon className="h-3 w-3" />
-                  {classificationBadge.label}
-                </Badge>
-              );
-            })()}
-
-            {hasDraft && (
-              <Badge variant="secondary" className="rounded-full text-xs font-semibold px-3 py-1.5 bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 flex items-center gap-1.5">
-                <FileEdit className="h-3 w-3" />
-                Draft
-              </Badge>
-            )}
-
-            {statusBadge && (
-              <Badge variant="outline" className={cn("rounded-full text-xs font-semibold px-3 py-1.5 border flex items-center gap-1.5", statusBadge.className)}>
-                <statusBadge.icon className="h-3 w-3" />
-                {statusBadge.label}
-              </Badge>
-            )}
-
-            {conversation.assigned_to ? (
-              <Badge variant="secondary" className="rounded-full text-xs font-semibold px-3 py-1.5 flex items-center gap-1.5">
-                <User className="h-3 w-3" />
-                {assignedUserName || 'Assigned'}
-              </Badge>
-            ) : (
-              <Badge variant="outline" className="rounded-full text-xs font-semibold px-3 py-1.5 text-amber-600 border-amber-500/20 flex items-center gap-1.5">
-                Unassigned
-              </Badge>
-            )}
-
-            {conversation.customer_satisfaction && (
-              <Badge variant="outline" className="rounded-full text-xs font-semibold px-3 py-1.5 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/20 flex items-center gap-1.5">
-                <Star className="h-3 w-3 fill-current" />
-                {conversation.customer_satisfaction}/5
-              </Badge>
-            )}
-
-            {/* Triage Confidence Indicator */}
-            {conversation.triage_confidence !== null && conversation.triage_confidence !== undefined && conversation.triage_confidence < 0.7 && (
-              <Badge variant="outline" className="rounded-full text-xs font-semibold px-3 py-1.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 flex items-center gap-1.5">
-                <AlertTriangle className="h-3 w-3" />
-                Review
-              </Badge>
-            )}
-          </div>
-
-          <div className="flex items-center justify-between text-xs text-muted-foreground font-medium">
-            <span className="uppercase tracking-wide">
-              {conversation.category?.replace(/_/g, ' ') || 'General'}
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="opacity-40">•</span>
-              <Clock className="h-3 w-3" />
-              {formatDistanceToNow(new Date(conversation.updated_at || conversation.created_at!), { addSuffix: true })}
-            </span>
-          </div>
+          />
           
-          {/* Triage Quick Actions */}
-          {showTriageActions && (
-            <TriageQuickActions conversation={conversation} onUpdate={onUpdate} />
+          {isOverdue && (
+            <Badge variant="destructive" className="absolute top-4 right-4 text-[11px] font-bold uppercase tracking-wide px-3 py-1.5 rounded-full shadow-sm">
+              Overdue
+            </Badge>
           )}
+
+          <div className="p-5">
+            {/* Decision Bucket Badge - FIRST AND PROMINENT */}
+            {bucketBadge && (
+              <div className="mb-3">
+                <Badge 
+                  variant="outline" 
+                  className={cn(
+                    "rounded-full text-sm px-4 py-2 border-2 flex items-center gap-2 w-fit",
+                    bucketBadge.className
+                  )}
+                >
+                  <span className="text-base">{bucketBadge.emoji}</span>
+                  <bucketBadge.icon className="h-4 w-4" />
+                  {bucketBadge.label}
+                </Badge>
+              </div>
+            )}
+
+            {/* Title */}
+            <h3 className={cn(
+              "font-semibold text-base leading-snug mb-2 line-clamp-2 text-foreground",
+              isOverdue && !bucketBadge && "pr-20"
+            )}>
+              {conversation.title || 'Untitled Conversation'}
+            </h3>
+
+            {/* Why This Needs You - PRIMARY description */}
+            {primaryDescription && (
+              <p className={cn(
+                "text-sm leading-relaxed mb-3 line-clamp-2",
+                conversation.why_this_needs_you 
+                  ? "text-foreground font-medium" 
+                  : "text-muted-foreground"
+              )}>
+                {primaryDescription}
+              </p>
+            )}
+
+            {/* Secondary Badge Row - Compact */}
+            <div className="flex flex-wrap items-center gap-1.5 mb-3">
+              <Badge variant="outline" className="rounded-full text-[11px] font-medium px-2.5 py-1 border-border/50 flex items-center gap-1">
+                <ChannelIcon channel={conversation.channel} className="h-3 w-3" />
+                {conversation.channel}
+              </Badge>
+
+              {/* Classification badge - secondary */}
+              {(() => {
+                const classificationBadge = getClassificationBadge(conversation.email_classification);
+                if (!classificationBadge) return null;
+                const ClassIcon = classificationBadge.icon;
+                return (
+                  <Badge variant="outline" className={cn("rounded-full text-[11px] font-medium px-2.5 py-1 border flex items-center gap-1", classificationBadge.className)}>
+                    <ClassIcon className="h-3 w-3" />
+                    {classificationBadge.label}
+                  </Badge>
+                );
+              })()}
+
+              {hasDraft && (
+                <Badge variant="secondary" className="rounded-full text-[11px] font-medium px-2.5 py-1 bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 flex items-center gap-1">
+                  <FileEdit className="h-3 w-3" />
+                  Draft
+                </Badge>
+              )}
+
+              {conversation.assigned_to && (
+                <Badge variant="secondary" className="rounded-full text-[11px] font-medium px-2.5 py-1 flex items-center gap-1">
+                  <User className="h-3 w-3" />
+                  {assignedUserName || 'Assigned'}
+                </Badge>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between text-xs text-muted-foreground font-medium">
+              <span className="uppercase tracking-wide text-[10px]">
+                {conversation.category?.replace(/_/g, ' ') || 'General'}
+              </span>
+              <span className="flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                {formatDistanceToNow(new Date(conversation.updated_at || conversation.created_at!), { addSuffix: true })}
+              </span>
+            </div>
+          
+            {showTriageActions && (
+              <TriageQuickActions conversation={conversation} onUpdate={onUpdate} />
+            )}
           </div>
         </div>
       </div>
@@ -449,74 +413,70 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
         selected && "border-primary/50 apple-shadow-lg bg-gradient-to-br from-primary/8 via-primary/4 to-card"
       )}
     >
-      {/* Priority/Status Accent Bar */}
+      {/* Decision Bucket Accent Bar */}
       <div 
         className={cn(
-          "absolute top-0 left-0 right-0 h-1",
-          conversation.status === 'resolved' 
-            ? "bg-green-500" 
-            : conversation.priority 
-              ? getPriorityBarColor(conversation.priority)
-              : "bg-muted"
+          "absolute top-0 left-0 right-0 h-1.5",
+          conversation.decision_bucket 
+            ? getBucketBarColor(conversation.decision_bucket)
+            : conversation.status === 'resolved' 
+              ? "bg-green-500" 
+              : getPriorityBarColor(conversation.priority)
         )}
       />
       
-      {/* Overdue Badge */}
       {isOverdue && (
-        <Badge variant="priority-urgent" className="absolute top-4 right-4 text-[11px] font-bold uppercase tracking-wide px-3 py-1.5 rounded-full shadow-sm">
+        <Badge variant="destructive" className="absolute top-4 right-4 text-[11px] font-bold uppercase tracking-wide px-3 py-1.5 rounded-full shadow-sm">
           Overdue
         </Badge>
       )}
 
       <div className="p-6">
+        {/* Decision Bucket Badge - FIRST AND PROMINENT */}
+        {bucketBadge && (
+          <div className="mb-3">
+            <Badge 
+              variant="outline" 
+              className={cn(
+                "rounded-full text-sm px-4 py-2 border-2 flex items-center gap-2 w-fit",
+                bucketBadge.className
+              )}
+            >
+              <span className="text-base">{bucketBadge.emoji}</span>
+              <bucketBadge.icon className="h-4 w-4" />
+              {bucketBadge.label}
+            </Badge>
+          </div>
+        )}
+
         {/* Title */}
         <h3 className={cn(
-          "font-semibold text-lg leading-snug mb-2.5 text-foreground line-clamp-2",
-          isOverdue && "pr-20"
+          "font-semibold text-lg leading-snug mb-2 text-foreground line-clamp-2",
+          isOverdue && !bucketBadge && "pr-20"
         )}>
           {conversation.title || 'Untitled Conversation'}
         </h3>
 
-        {/* Description */}
-        {conversation.ai_reason_for_escalation && (
-          <p className="text-[15px] text-muted-foreground leading-relaxed mb-4 line-clamp-2">
-            {conversation.ai_reason_for_escalation}
+        {/* Why This Needs You - PRIMARY description */}
+        {primaryDescription && (
+          <p className={cn(
+            "text-[15px] leading-relaxed mb-4 line-clamp-2",
+            conversation.why_this_needs_you 
+              ? "text-foreground font-medium" 
+              : "text-muted-foreground"
+          )}>
+            {primaryDescription}
           </p>
         )}
 
-        {/* Badge Row */}
-        <div className="flex flex-wrap items-center gap-2.5 mb-4">
-          {/* Urgency Badge */}
-          {conversation.urgency && (
-            <Badge 
-              variant={conversation.urgency === 'high' ? 'destructive' : conversation.urgency === 'medium' ? 'secondary' : 'outline'}
-              className={cn(
-                "rounded-full text-xs font-bold uppercase tracking-wide px-3 py-1.5 shadow-sm",
-                conversation.urgency === 'high' && "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20",
-                conversation.urgency === 'medium' && "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
-                conversation.urgency === 'low' && "bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20"
-              )}
-              title={conversation.urgency_reason || undefined}
-            >
-              {conversation.urgency === 'high' ? '🔴' : conversation.urgency === 'medium' ? '🟡' : '⚪'} {conversation.urgency}
-            </Badge>
-          )}
-
-          {conversation.priority && !conversation.urgency && (
-            <Badge 
-              variant={getPriorityVariant(conversation.priority)}
-              className="rounded-full text-xs font-bold uppercase tracking-wide px-3 py-1.5 shadow-sm"
-            >
-              {conversation.priority}
-            </Badge>
-          )}
-          
+        {/* Secondary Badge Row */}
+        <div className="flex flex-wrap items-center gap-2 mb-4">
           <Badge variant="outline" className="rounded-full text-xs font-semibold px-3 py-1.5 border-border/50 flex items-center gap-1.5">
             <ChannelIcon channel={conversation.channel} className="h-3.5 w-3.5" />
             {conversation.channel}
           </Badge>
 
-          {/* Email Classification Badge */}
+          {/* Classification badge - secondary */}
           {(() => {
             const classificationBadge = getClassificationBadge(conversation.email_classification);
             if (!classificationBadge) return null;
@@ -533,13 +493,6 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
             <Badge variant="secondary" className="rounded-full text-xs font-semibold px-3 py-1.5 bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 flex items-center gap-1.5">
               <FileEdit className="h-3 w-3" />
               Draft
-            </Badge>
-          )}
-
-          {statusBadge && (
-            <Badge variant="outline" className={cn("rounded-full text-xs font-semibold px-3 py-1.5 border flex items-center gap-1.5", statusBadge.className)}>
-              <statusBadge.icon className="h-3 w-3" />
-              {statusBadge.label}
             </Badge>
           )}
 
@@ -561,7 +514,7 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
             </Badge>
           )}
 
-          {/* Triage Confidence Indicator */}
+          {/* Low confidence indicator */}
           {conversation.triage_confidence !== null && conversation.triage_confidence !== undefined && conversation.triage_confidence < 0.7 && (
             <Badge variant="outline" className="rounded-full text-xs font-semibold px-3 py-1.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 flex items-center gap-1.5">
               <AlertTriangle className="h-3 w-3" />
@@ -572,16 +525,15 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
 
         {/* Meta Row */}
         <div className="flex items-center justify-between text-[13px] text-muted-foreground font-medium">
-          <span className="uppercase tracking-wide">
+          <span className="uppercase tracking-wide text-[11px]">
             {conversation.category?.replace(/_/g, ' ') || 'General'}
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="opacity-40">•</span>
+            <Clock className="h-3.5 w-3.5" />
             {formatDistanceToNow(new Date(conversation.updated_at || conversation.created_at!), { addSuffix: true })}
           </span>
         </div>
         
-        {/* Triage Quick Actions */}
         {showTriageActions && (
           <TriageQuickActions conversation={conversation} onUpdate={onUpdate} />
         )}
@@ -592,12 +544,13 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
 
 // Memoize to prevent unnecessary re-renders
 export const ConversationCard = memo(ConversationCardComponent, (prevProps, nextProps) => {
-  // Only re-render if these props change
   return (
     prevProps.conversation.id === nextProps.conversation.id &&
     prevProps.conversation.updated_at === nextProps.conversation.updated_at &&
     prevProps.conversation.status === nextProps.conversation.status &&
     prevProps.conversation.priority === nextProps.conversation.priority &&
+    prevProps.conversation.decision_bucket === nextProps.conversation.decision_bucket &&
+    prevProps.conversation.why_this_needs_you === nextProps.conversation.why_this_needs_you &&
     prevProps.selected === nextProps.selected &&
     prevProps.showTriageActions === nextProps.showTriageActions
   );

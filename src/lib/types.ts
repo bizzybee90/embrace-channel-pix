@@ -7,6 +7,11 @@ export type SLAStatus = 'safe' | 'warning' | 'breached';
 export type CustomerTier = 'vip' | 'regular' | 'trial' | 'prospect' | 'at_risk';
 export type UserStatus = 'available' | 'away' | 'busy';
 
+// Decision Router Types
+export type DecisionBucket = 'act_now' | 'quick_win' | 'auto_handled' | 'wait';
+export type CognitiveLoad = 'high' | 'low';
+export type RiskLevel = 'financial' | 'retention' | 'reputation' | 'legal' | 'none';
+
 export interface Workspace {
   id: string;
   name: string;
@@ -78,7 +83,12 @@ export interface Conversation {
   updated_at: string;
   customer?: Customer;
   assigned_user?: User;
-  // Triage agent fields
+  // Decision Router fields (primary)
+  decision_bucket?: DecisionBucket | null;
+  why_this_needs_you?: string | null;
+  cognitive_load?: CognitiveLoad | null;
+  risk_level?: RiskLevel | null;
+  // Triage agent fields (secondary)
   urgency?: 'high' | 'medium' | 'low' | null;
   urgency_reason?: string | null;
   extracted_entities?: Record<string, any> | null;
@@ -88,6 +98,7 @@ export interface Conversation {
   triage_confidence?: number | null;
   email_classification?: string | null;
   requires_reply?: boolean | null;
+  ai_draft_response?: string | null;
 }
 
 export interface Message {

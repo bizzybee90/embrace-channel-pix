@@ -146,6 +146,7 @@ export type Database = {
           auto_responded: boolean | null
           category: string | null
           channel: string
+          cognitive_load: string | null
           confidence: number | null
           conversation_type: string | null
           created_at: string | null
@@ -153,6 +154,7 @@ export type Database = {
           csat_responded_at: string | null
           customer_id: string | null
           customer_satisfaction: number | null
+          decision_bucket: string | null
           email_classification: string | null
           embedding: string | null
           escalated_at: string | null
@@ -171,6 +173,7 @@ export type Database = {
           priority: string | null
           requires_reply: boolean | null
           resolved_at: string | null
+          risk_level: string | null
           sla_due_at: string | null
           sla_status: string | null
           sla_target_minutes: number | null
@@ -185,6 +188,7 @@ export type Database = {
           updated_at: string | null
           urgency: string | null
           urgency_reason: string | null
+          why_this_needs_you: string | null
           workspace_id: string | null
         }
         Insert: {
@@ -198,6 +202,7 @@ export type Database = {
           auto_responded?: boolean | null
           category?: string | null
           channel: string
+          cognitive_load?: string | null
           confidence?: number | null
           conversation_type?: string | null
           created_at?: string | null
@@ -205,6 +210,7 @@ export type Database = {
           csat_responded_at?: string | null
           customer_id?: string | null
           customer_satisfaction?: number | null
+          decision_bucket?: string | null
           email_classification?: string | null
           embedding?: string | null
           escalated_at?: string | null
@@ -223,6 +229,7 @@ export type Database = {
           priority?: string | null
           requires_reply?: boolean | null
           resolved_at?: string | null
+          risk_level?: string | null
           sla_due_at?: string | null
           sla_status?: string | null
           sla_target_minutes?: number | null
@@ -237,6 +244,7 @@ export type Database = {
           updated_at?: string | null
           urgency?: string | null
           urgency_reason?: string | null
+          why_this_needs_you?: string | null
           workspace_id?: string | null
         }
         Update: {
@@ -250,6 +258,7 @@ export type Database = {
           auto_responded?: boolean | null
           category?: string | null
           channel?: string
+          cognitive_load?: string | null
           confidence?: number | null
           conversation_type?: string | null
           created_at?: string | null
@@ -257,6 +266,7 @@ export type Database = {
           csat_responded_at?: string | null
           customer_id?: string | null
           customer_satisfaction?: number | null
+          decision_bucket?: string | null
           email_classification?: string | null
           embedding?: string | null
           escalated_at?: string | null
@@ -275,6 +285,7 @@ export type Database = {
           priority?: string | null
           requires_reply?: boolean | null
           resolved_at?: string | null
+          risk_level?: string | null
           sla_due_at?: string | null
           sla_status?: string | null
           sla_target_minutes?: number | null
@@ -289,6 +300,7 @@ export type Database = {
           updated_at?: string | null
           urgency?: string | null
           urgency_reason?: string | null
+          why_this_needs_you?: string | null
           workspace_id?: string | null
         }
         Relationships: [

@@ -6,44 +6,86 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Default fallback prompt
-const DEFAULT_TRIAGE_PROMPT = `You are an expert email triage agent for service businesses. Your job is to instantly classify, prioritize, and extract key information from incoming emails. You must be fast, accurate, and consistent.
+// Decision Router Prompt - Routes to ACTION, not categories
+const DEFAULT_TRIAGE_PROMPT = `You are an AI Operations Manager for a service business (window cleaning, home services, etc.). Your job is NOT to classify emails - it's to DECIDE what action the business owner should take.
 
-## Classification Taxonomy
+## CRITICAL: You Are a Decision Router, Not a Classifier
 
-Classify every email into ONE of these categories:
+For every email, you must answer ONE question:
+"What should the business owner DO about this?"
 
-### REQUIRES_REPLY = true (Action Required)
-| Category | Description |
-|----------|-------------|
-| customer_inquiry | Direct questions or requests from customers (quote requests, service questions, booking inquiries) |
-| customer_complaint | Expressions of dissatisfaction or issues (quality complaints, missed appointments, billing disputes) |
-| customer_feedback | Reviews, testimonials, or general feedback ("Great job today!", survey responses) |
-| lead_new | Potential new customer expressing interest ("I found you on Google, do you cover my area?") |
-| lead_followup | Follow-up from previous quote or conversation ("I got your quote, I'd like to proceed") |
-| supplier_urgent | Supplier comms requiring response (invoice queries, delivery issues, account problems) |
-| partner_request | Business partnership or collaboration requests (referral partners, B2B inquiries) |
+## Decision Buckets (Pick ONE)
 
-### REQUIRES_REPLY = false (Auto-Triage)
-| Category | Description |
-|----------|-------------|
-| automated_notification | System-generated alerts (voicemail transcripts, missed call alerts, system notifications) |
-| receipt_confirmation | Transaction confirmations (payment received, booking confirmed, order shipped) |
-| marketing_newsletter | Promotional content (supplier newsletters, promotional offers, industry news) |
-| spam_phishing | Suspicious or malicious (phishing attempts, obvious spam, scams) |
-| recruitment_hr | Job applications (Indeed applications, LinkedIn messages, CV submissions) |
-| internal_system | Internal system emails (password resets, calendar invites, software notifications) |
-| informational_only | FYI emails requiring no action (policy updates, terms changes, announcements) |
+### 🔴 ACT_NOW - Needs immediate human attention
+Use when:
+- Customer is upset, frustrated, or complaining
+- Payment issue or financial risk
+- Service disruption or cancellation threat
+- Time-sensitive request (today/tomorrow)
+- Legal or reputation risk
+- Your confidence is below 70%
 
-## Remember
-1. When in doubt, set requires_reply: true - safer to over-escalate than miss a customer
-2. High urgency + negative sentiment = immediate human attention
-3. Always provide reasoning for audit trail
-4. Never hallucinate entity values - only extract what's explicitly stated`;
+### 🟡 QUICK_WIN - Can be handled in under 30 seconds
+Use when:
+- Simple yes/no reply needed
+- Straightforward confirmation
+- Template response will work
+- No complex thinking required
+- Your confidence is above 85%
+
+### 🟢 AUTO_HANDLED - No human action needed
+Use when:
+- Marketing emails and newsletters
+- Automated notifications (receipts, confirmations, alerts)
+- Spam or phishing attempts
+- System notifications
+- Your confidence is above 95%
+- The business receives these regularly and ignores them
+
+### 🔵 WAIT - Can be deferred, not urgent
+Use when:
+- FYI only, no action required now
+- Low priority updates
+- Information that might be useful later
+- Can safely wait days/weeks
+
+## "Why This Needs You" - ALWAYS Explain
+
+Every email MUST have a clear, human-readable explanation of why it landed in its bucket:
+- ACT_NOW: "Customer upset about [specific issue]" or "Payment at risk - [reason]"
+- QUICK_WIN: "Simple confirmation needed" or "Yes/no reply will resolve this"
+- AUTO_HANDLED: "Automated receipt - no action needed" or "Marketing newsletter"
+- WAIT: "FYI update - no response required"
+
+## Risk Assessment
+
+Evaluate potential harm if this email is ignored:
+- financial: Could cost money (unpaid invoice, cancelled booking, refund demand)
+- retention: Could lose this customer (complaint, dissatisfaction)
+- reputation: Could damage business image (public review threat, social media)
+- legal: Could have legal implications (formal complaint, regulatory)
+- none: No significant risk
+
+## Cognitive Load Assessment
+
+How much thinking does this require?
+- high: Requires careful consideration, context, or complex response
+- low: Straightforward, template response works, minimal thinking
+
+## Important Context
+
+1. This is a SERVICE BUSINESS that RECEIVES invoices from suppliers (not just sends them)
+   - Invoices TO the business = supplier_invoice (may need payment)
+   - Invoices FROM the business = ignore (already sent)
+
+2. When in doubt, escalate to ACT_NOW - it's safer to over-escalate than miss something important
+
+3. Look for emotional signals: frustration, urgency, threats, or praise
+
+4. Consider the sender: known customer vs new lead vs supplier vs automated system`;
 
 async function getTriagePrompt(supabase: any, workspaceId?: string): Promise<{ prompt: string; model: string }> {
   try {
-    // Try workspace-specific prompt first
     if (workspaceId) {
       const { data: wsPrompt } = await supabase
         .from('system_prompts')
@@ -60,7 +102,6 @@ async function getTriagePrompt(supabase: any, workspaceId?: string): Promise<{ p
       }
     }
 
-    // Fall back to global default prompt
     const { data: globalPrompt } = await supabase
       .from('system_prompts')
       .select('prompt, model')
@@ -82,35 +123,68 @@ async function getTriagePrompt(supabase: any, workspaceId?: string): Promise<{ p
   return { prompt: DEFAULT_TRIAGE_PROMPT, model: 'claude-3-5-haiku-20241022' };
 }
 
-const TRIAGE_TOOL = {
-  name: "classify_email",
-  description: "Classify and extract information from an incoming email",
+// Decision Router Tool - Focus on ACTION, not classification
+const DECISION_ROUTER_TOOL = {
+  name: "route_email",
+  description: "Decide what action the business owner should take on this email",
   input_schema: {
     type: "object",
     properties: {
-      classification: {
+      decision: {
         type: "object",
         properties: {
-          category: {
+          bucket: {
             type: "string",
-            enum: [
-              "customer_inquiry", "customer_complaint", "customer_feedback",
-              "lead_new", "lead_followup", "supplier_urgent", "partner_request",
-              "automated_notification", "receipt_confirmation", "marketing_newsletter",
-              "spam_phishing", "recruitment_hr", "internal_system", "informational_only"
-            ],
-            description: "The classification category for this email"
+            enum: ["act_now", "quick_win", "auto_handled", "wait"],
+            description: "The decision bucket: act_now (urgent), quick_win (fast to clear), auto_handled (no human needed), wait (defer)"
           },
-          requires_reply: {
-            type: "boolean",
-            description: "Whether this email requires a human response"
+          why_this_needs_you: {
+            type: "string",
+            description: "Human-readable explanation in 10 words or less. E.g., 'Customer upset about late delivery' or 'Automated receipt - no action needed'"
           },
           confidence: {
             type: "number",
             description: "Confidence score from 0 to 1"
           }
         },
-        required: ["category", "requires_reply", "confidence"]
+        required: ["bucket", "why_this_needs_you", "confidence"]
+      },
+      risk: {
+        type: "object",
+        properties: {
+          level: {
+            type: "string",
+            enum: ["financial", "retention", "reputation", "legal", "none"],
+            description: "Type of risk if this email is ignored"
+          },
+          cognitive_load: {
+            type: "string",
+            enum: ["high", "low"],
+            description: "Whether this requires significant thinking (high) or is simple (low)"
+          }
+        },
+        required: ["level", "cognitive_load"]
+      },
+      classification: {
+        type: "object",
+        description: "Secondary classification metadata (for analytics)",
+        properties: {
+          category: {
+            type: "string",
+            enum: [
+              "customer_inquiry", "customer_complaint", "customer_feedback",
+              "lead_new", "lead_followup", "supplier_invoice", "supplier_urgent", "partner_request",
+              "automated_notification", "receipt_confirmation", "marketing_newsletter",
+              "spam_phishing", "recruitment_hr", "internal_system", "informational_only"
+            ],
+            description: "The classification category (secondary to decision bucket)"
+          },
+          requires_reply: {
+            type: "boolean",
+            description: "Whether this email requires a human response"
+          }
+        },
+        required: ["category", "requires_reply"]
       },
       priority: {
         type: "object",
@@ -134,14 +208,9 @@ const TRIAGE_TOOL = {
             type: "string",
             enum: ["angry", "frustrated", "concerned", "neutral", "positive"],
             description: "Customer sentiment tone"
-          },
-          tone_signals: {
-            type: "array",
-            items: { type: "string" },
-            description: "Specific phrases or signals indicating the tone"
           }
         },
-        required: ["tone", "tone_signals"]
+        required: ["tone"]
       },
       entities: {
         type: "object",
@@ -160,39 +229,26 @@ const TRIAGE_TOOL = {
         properties: {
           one_line: {
             type: "string",
-            description: "One-line summary of the email (max 100 chars)"
+            description: "One-line summary (max 100 chars)"
           },
           key_points: {
             type: "array",
             items: { type: "string" },
-            description: "Key points from the email (max 3)"
+            description: "Key points (max 3)"
           }
         },
         required: ["one_line", "key_points"]
       },
-      suggested_actions: {
-        type: "array",
-        items: { type: "string" },
-        description: "Recommended actions for handling this email (max 3)"
-      },
-      thread_context: {
-        type: "object",
-        properties: {
-          is_reply: { type: "boolean", description: "Whether this appears to be a reply" },
-          reply_to_subject: { type: "string", description: "Original subject if a reply" },
-          estimated_thread_length: { type: "number", description: "Estimated emails in thread" }
-        }
+      suggested_reply: {
+        type: "string",
+        description: "For QUICK_WIN only: A suggested reply that could resolve this in seconds. Leave empty for other buckets."
       },
       reasoning: {
         type: "string",
-        description: "Brief explanation of the classification decision"
-      },
-      needs_human_review: {
-        type: "boolean",
-        description: "Whether this needs human review due to low confidence or ambiguity"
+        description: "Brief explanation of the decision"
       }
     },
-    required: ["classification", "priority", "sentiment", "entities", "summary", "suggested_actions", "reasoning"]
+    required: ["decision", "risk", "classification", "priority", "sentiment", "summary", "reasoning"]
   }
 };
 
@@ -229,35 +285,47 @@ serve(async (req) => {
     const request: TriageRequest = await req.json();
     const { email, workspace_id, business_context, sender_rule } = request;
 
-    console.log('Triage agent processing email from:', email.from_email, 'subject:', email.subject);
+    console.log('Decision router processing email from:', email.from_email, 'subject:', email.subject);
 
-    // If sender rule exists and has an override, apply it directly
+    // If sender rule exists, apply it directly with decision bucket mapping
     if (sender_rule) {
       const classification = sender_rule.override_classification || sender_rule.default_classification;
       const requires_reply = sender_rule.override_requires_reply ?? sender_rule.default_requires_reply;
       
-      console.log('Applying sender rule:', classification, 'requires_reply:', requires_reply);
+      // Map classification to decision bucket
+      const bucket = requires_reply ? 'quick_win' : 'auto_handled';
+      const why_this_needs_you = requires_reply 
+        ? 'Matched sender rule - review needed' 
+        : 'Matched sender rule - no action needed';
+      
+      console.log('Applying sender rule:', classification, 'bucket:', bucket);
       
       return new Response(JSON.stringify({
+        decision: {
+          bucket,
+          why_this_needs_you,
+          confidence: 0.99
+        },
+        risk: {
+          level: 'none',
+          cognitive_load: 'low'
+        },
         classification: {
           category: classification,
-          requires_reply: requires_reply,
-          confidence: 0.99
+          requires_reply: requires_reply
         },
         priority: {
           urgency: requires_reply ? 'medium' : 'low',
           urgency_reason: 'Classified by sender rule'
         },
         sentiment: {
-          tone: 'neutral',
-          tone_signals: []
+          tone: 'neutral'
         },
         entities: {},
         summary: {
           one_line: `Email from ${email.from_email} - classified by sender rule`,
           key_points: ['Matched sender rule pattern']
         },
-        suggested_actions: requires_reply ? ['Review and respond'] : ['No action needed'],
         reasoning: `Classified by sender rule as ${classification}`,
         applied_rule: true,
         processing_time_ms: Date.now() - startTime
@@ -270,15 +338,15 @@ serve(async (req) => {
     let contextualPrompt = '';
     if (business_context) {
       if (business_context.is_hiring) {
-        contextualPrompt += '\n\nIMPORTANT: The business is currently hiring. Recruitment/job application emails should be classified as recruitment_hr with requires_reply: true.';
+        contextualPrompt += '\n\nCONTEXT: The business is currently hiring. Job applications should go to WAIT bucket unless urgent.';
       }
       if (business_context.active_dispute) {
-        contextualPrompt += '\n\nIMPORTANT: There is an active payment dispute. Emails from payment processors (Stripe, PayPal, etc.) should be classified as supplier_urgent with requires_reply: true.';
+        contextualPrompt += '\n\nCONTEXT: There is an active payment dispute. Payment processor emails = ACT_NOW with financial risk.';
       }
       if (business_context.vip_domains && business_context.vip_domains.length > 0) {
         const senderDomain = email.from_email.split('@')[1]?.toLowerCase();
         if (business_context.vip_domains.includes(senderDomain)) {
-          contextualPrompt += '\n\nIMPORTANT: This sender is from a VIP customer domain. Set urgency to high and requires_reply to true.';
+          contextualPrompt += '\n\nCONTEXT: This sender is from a VIP customer domain. Treat as ACT_NOW with retention risk.';
         }
       }
     }
@@ -292,10 +360,8 @@ serve(async (req) => {
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
-    // Fetch triage prompt from database
     const { prompt: triagePrompt, model: triageModel } = await getTriagePrompt(supabase, workspace_id);
 
-    // Prepare the email content for analysis
     const emailContent = `
 FROM: ${email.from_name} <${email.from_email}>
 TO: ${email.to_email || 'Unknown'}
@@ -305,7 +371,8 @@ BODY:
 ${email.body.substring(0, 5000)}
 `;
 
-    // Call Claude for triage
+    console.log('Calling Claude with decision router tool...');
+
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -317,12 +384,12 @@ ${email.body.substring(0, 5000)}
         model: triageModel,
         max_tokens: 1024,
         system: triagePrompt + contextualPrompt,
-        tools: [TRIAGE_TOOL],
-        tool_choice: { type: 'tool', name: 'classify_email' },
+        tools: [DECISION_ROUTER_TOOL],
+        tool_choice: { type: 'tool', name: 'route_email' },
         messages: [
           {
             role: 'user',
-            content: `Classify this email:\n\n${emailContent}`
+            content: `Route this email to the appropriate decision bucket:\n\n${emailContent}`
           }
         ]
       })
@@ -335,33 +402,38 @@ ${email.body.substring(0, 5000)}
     }
 
     const result = await response.json();
-    console.log('Claude triage response received');
+    console.log('Claude decision response received');
 
-    // Extract the tool use result
     const toolUse = result.content?.find((c: any) => c.type === 'tool_use');
-    if (!toolUse || toolUse.name !== 'classify_email') {
+    if (!toolUse || toolUse.name !== 'route_email') {
       console.error('No valid tool use in response');
-      // Return safe defaults
+      // Safe default: ACT_NOW when uncertain
       return new Response(JSON.stringify({
+        decision: {
+          bucket: 'act_now',
+          why_this_needs_you: 'Could not auto-classify - needs review',
+          confidence: 0.3
+        },
+        risk: {
+          level: 'none',
+          cognitive_load: 'high'
+        },
         classification: {
           category: 'customer_inquiry',
-          requires_reply: true,
-          confidence: 0.5
+          requires_reply: true
         },
         priority: {
           urgency: 'medium',
           urgency_reason: 'Could not classify - defaulting to medium'
         },
         sentiment: {
-          tone: 'neutral',
-          tone_signals: []
+          tone: 'neutral'
         },
         entities: {},
         summary: {
           one_line: email.subject,
           key_points: []
         },
-        suggested_actions: ['Manual review required'],
         reasoning: 'Classification failed - requires manual review',
         needs_human_review: true,
         processing_time_ms: Date.now() - startTime
@@ -370,32 +442,38 @@ ${email.body.substring(0, 5000)}
       });
     }
 
-    const triageResult = toolUse.input;
+    const routeResult = toolUse.input;
     const processingTime = Date.now() - startTime;
 
-    console.log('Triage complete:', {
-      category: triageResult.classification.category,
-      requires_reply: triageResult.classification.requires_reply,
-      confidence: triageResult.classification.confidence,
-      urgency: triageResult.priority.urgency,
+    console.log('Decision routing complete:', {
+      bucket: routeResult.decision.bucket,
+      why_this_needs_you: routeResult.decision.why_this_needs_you,
+      confidence: routeResult.decision.confidence,
+      risk_level: routeResult.risk.level,
+      category: routeResult.classification.category,
       processing_time_ms: processingTime
     });
 
-    // Add confidence-based review flag
-    if (triageResult.classification.confidence < 0.7) {
-      triageResult.needs_human_review = true;
+    // Apply confidence-based overrides
+    const confidence = routeResult.decision.confidence;
+    
+    // Low confidence = force to ACT_NOW for safety
+    if (confidence < 0.7 && routeResult.decision.bucket !== 'act_now') {
+      console.log('Low confidence override: moving to act_now');
+      routeResult.decision.bucket = 'act_now';
+      routeResult.decision.why_this_needs_you = `Low confidence (${Math.round(confidence * 100)}%) - needs review`;
+      routeResult.risk.cognitive_load = 'high';
     }
-
-    // If confidence is below threshold but requires_reply is false, override to be safe
-    if (triageResult.classification.confidence < 0.6 && !triageResult.classification.requires_reply) {
-      console.log('Low confidence override: setting requires_reply to true');
-      triageResult.classification.requires_reply = true;
-      triageResult.needs_human_review = true;
-      triageResult.reasoning += ' (Low confidence - escalated for human review)';
+    
+    // Very high confidence auto_handled can stay
+    // Medium confidence quick_win should have suggested reply
+    if (routeResult.decision.bucket === 'quick_win' && !routeResult.suggested_reply) {
+      routeResult.decision.bucket = 'act_now';
+      routeResult.decision.why_this_needs_you = 'No quick reply available - needs attention';
     }
 
     return new Response(JSON.stringify({
-      ...triageResult,
+      ...routeResult,
       processing_time_ms: processingTime
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -405,33 +483,39 @@ ${email.body.substring(0, 5000)}
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('Error in email-triage-agent:', error);
     
-    // Return safe defaults on error
+    // Safe default on error: ACT_NOW
     return new Response(JSON.stringify({
+      decision: {
+        bucket: 'act_now',
+        why_this_needs_you: 'System error - needs manual review',
+        confidence: 0
+      },
+      risk: {
+        level: 'none',
+        cognitive_load: 'high'
+      },
       classification: {
         category: 'customer_inquiry',
-        requires_reply: true,
-        confidence: 0
+        requires_reply: true
       },
       priority: {
         urgency: 'high',
         urgency_reason: 'Classification error - requires immediate review'
       },
       sentiment: {
-        tone: 'neutral',
-        tone_signals: []
+        tone: 'neutral'
       },
       entities: {},
       summary: {
         one_line: 'Classification failed',
         key_points: []
       },
-      suggested_actions: ['Manual review required due to system error'],
       reasoning: `Error during classification: ${errorMessage}`,
       needs_human_review: true,
       error: errorMessage,
       processing_time_ms: Date.now()
     }), {
-      status: 200, // Return 200 even on error to prevent retries
+      status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }
