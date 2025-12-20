@@ -74,3 +74,6 @@ verify_jwt = false
 
 [functions.backfill-decision-buckets]
 verify_jwt = false
+
+[functions.backfill-customers]
+verify_jwt = false

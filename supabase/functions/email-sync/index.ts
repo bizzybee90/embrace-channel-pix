@@ -130,10 +130,12 @@ serve(async (req) => {
           bodyKeys: message.body ? Object.keys(message.body) : [],
         }));
 
-        // Extract email details - check multiple possible field names
-        const fromEmail = (message.from?.email || message.sender?.email || '').toLowerCase();
-        const fromName = message.from?.name || message.sender?.name || fromEmail.split('@')[0];
+        // Extract email details - Aurinko uses 'address' not 'email'
+        const fromEmail = (message.from?.address || message.from?.email || message.sender?.address || message.sender?.email || '').toLowerCase();
+        const fromName = message.from?.name || message.sender?.name || fromEmail.split('@')[0] || 'Unknown';
         const subject = message.subject || 'No Subject';
+        
+        console.log('Extracted sender:', { fromEmail, fromName, rawFrom: message.from });
         
         // Helper to strip HTML and clean up text
         const stripHtml = (html: string): string => {
