@@ -45,18 +45,43 @@ const PANEL_HEADER_CLASSES = "flex items-center justify-between w-full px-4 gap-
     }
   };
 
+  // Dynamic title and color based on decision bucket
+  const getBucketContext = () => {
+    const bucket = (conversation as any).decision_bucket;
+    const whyText = (conversation as any).why_this_needs_you || conversation.ai_reason_for_escalation || conversation.summary_for_human;
+    
+    switch (bucket) {
+      case 'act_now':
+        return { title: 'Why This Needs You', color: 'destructive', icon: AlertCircle, emoji: '🔴', why: whyText || 'Urgent attention required' };
+      case 'quick_win':
+        return { title: 'Why This Is Quick', color: 'amber', icon: Sparkles, emoji: '🟡', why: whyText || 'Simple response needed' };
+      case 'auto_handled':
+        return { title: 'Why This Was Handled', color: 'green', icon: FileText, emoji: '🟢', why: whyText || 'No action needed' };
+      case 'wait':
+        return { title: 'Why This Can Wait', color: 'blue', icon: FileText, emoji: '🔵', why: whyText || 'Deferred for later' };
+      default:
+        return { title: 'AI Context', color: 'primary', icon: AlertCircle, emoji: '❓', why: whyText || conversation.ai_reason_for_escalation || 'No context available' };
+    }
+  };
+
+  const bucketContext = getBucketContext();
+
   return (
     <div className="space-y-3 md:space-y-4 mobile-section-spacing">
-      {/* Why AI Escalated */}
+      {/* Dynamic Why Panel - Based on Decision Bucket */}
       <Collapsible open={isEscalationOpen} onOpenChange={setIsEscalationOpen}>
-        <Card className="card-elevation bg-destructive/5 border-destructive/20 overflow-hidden">
+        <Card className={cn("card-elevation overflow-hidden", 
+          bucketContext.color === 'destructive' && "bg-destructive/5 border-destructive/20",
+          bucketContext.color === 'amber' && "bg-amber-500/5 border-amber-500/20",
+          bucketContext.color === 'green' && "bg-green-500/5 border-green-500/20",
+          bucketContext.color === 'blue' && "bg-blue-500/5 border-blue-500/20",
+          bucketContext.color === 'primary' && "bg-primary/5 border-primary/20"
+        )}>
           <CollapsibleTrigger className={PANEL_HEADER_CLASSES}>
             <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-destructive/10 text-destructive">
-                <AlertCircle className="h-4 w-4" />
-              </div>
+              <span className="text-lg">{bucketContext.emoji}</span>
               <span className="text-sm font-medium text-foreground">
-                Why AI Escalated
+                {bucketContext.title}
               </span>
             </div>
             <ChevronDown
@@ -68,8 +93,8 @@ const PANEL_HEADER_CLASSES = "flex items-center justify-between w-full px-4 gap-
           </CollapsibleTrigger>
           <CollapsibleContent>
             <div className="px-4 pb-4">
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                {conversation.ai_reason_for_escalation || 'No escalation reason provided'}
+              <p className="text-sm text-foreground/80 leading-relaxed font-medium">
+                {bucketContext.why}
               </p>
             </div>
           </CollapsibleContent>

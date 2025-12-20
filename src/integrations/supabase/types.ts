@@ -143,6 +143,7 @@ export type Database = {
           ai_resolution_summary: string | null
           ai_sentiment: string | null
           assigned_to: string | null
+          auto_handled_at: string | null
           auto_responded: boolean | null
           category: string | null
           channel: string
@@ -199,6 +200,7 @@ export type Database = {
           ai_resolution_summary?: string | null
           ai_sentiment?: string | null
           assigned_to?: string | null
+          auto_handled_at?: string | null
           auto_responded?: boolean | null
           category?: string | null
           channel: string
@@ -255,6 +257,7 @@ export type Database = {
           ai_resolution_summary?: string | null
           ai_sentiment?: string | null
           assigned_to?: string | null
+          auto_handled_at?: string | null
           auto_responded?: boolean | null
           category?: string | null
           channel?: string
@@ -1074,6 +1077,68 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "price_list_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sender_behaviour_stats: {
+        Row: {
+          avg_response_time_minutes: number | null
+          created_at: string | null
+          id: string
+          ignored_count: number | null
+          ignored_rate: number | null
+          last_interaction_at: string | null
+          replied_count: number | null
+          reply_rate: number | null
+          sender_domain: string
+          sender_email: string | null
+          suggested_bucket: string | null
+          total_messages: number | null
+          updated_at: string | null
+          vip_score: number | null
+          workspace_id: string | null
+        }
+        Insert: {
+          avg_response_time_minutes?: number | null
+          created_at?: string | null
+          id?: string
+          ignored_count?: number | null
+          ignored_rate?: number | null
+          last_interaction_at?: string | null
+          replied_count?: number | null
+          reply_rate?: number | null
+          sender_domain: string
+          sender_email?: string | null
+          suggested_bucket?: string | null
+          total_messages?: number | null
+          updated_at?: string | null
+          vip_score?: number | null
+          workspace_id?: string | null
+        }
+        Update: {
+          avg_response_time_minutes?: number | null
+          created_at?: string | null
+          id?: string
+          ignored_count?: number | null
+          ignored_rate?: number | null
+          last_interaction_at?: string | null
+          replied_count?: number | null
+          reply_rate?: number | null
+          sender_domain?: string
+          sender_email?: string | null
+          suggested_bucket?: string | null
+          total_messages?: number | null
+          updated_at?: string | null
+          vip_score?: number | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sender_behaviour_stats_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"

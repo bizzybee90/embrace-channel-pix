@@ -77,3 +77,15 @@ verify_jwt = false
 
 [functions.backfill-customers]
 verify_jwt = false
+
+[functions.pre-triage-rules]
+verify_jwt = false
+
+[functions.email-draft-agent]
+verify_jwt = false
+
+[functions.populate-sender-rules]
+verify_jwt = false
+
+[functions.compute-sender-stats]
+verify_jwt = false
