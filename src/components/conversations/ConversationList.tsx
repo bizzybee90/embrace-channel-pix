@@ -6,7 +6,7 @@ import { ConversationCardSkeleton } from './ConversationCardSkeleton';
 import { ConversationFilters } from './ConversationFilters';
 import { SearchInput } from './SearchInput';
 import { useIsTablet } from '@/hooks/use-tablet';
-import { Loader2, SlidersHorizontal } from 'lucide-react';
+import { Loader2, SlidersHorizontal, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
@@ -210,6 +210,28 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
   // Track last update time
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
+  // Fetch auto-handled count for "BizzyBee handled X today" metric
+  const { data: autoHandledCount = 0 } = useQuery({
+    queryKey: ['auto-handled-count'],
+    queryFn: async () => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      const { count, error } = await supabase
+        .from('conversations')
+        .select('*', { count: 'exact', head: true })
+        .gte('auto_handled_at', today.toISOString());
+      
+      if (error) {
+        console.error('Error fetching auto-handled count:', error);
+        return 0;
+      }
+      return count || 0;
+    },
+    staleTime: 60000, // Cache for 1 minute
+    refetchInterval: 60000, // Refetch every minute
+  });
+
   // React Query setup with optimistic UI
   const queryKey = ['conversations', filter, statusFilter, priorityFilter, channelFilter, categoryFilter, sortBy, page];
   
@@ -389,6 +411,19 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
       "flex flex-col h-full",
       isTablet ? "bg-transparent" : "bg-muted/30 min-w-[300px]"
     )}>
+      {/* BizzyBee handled X today - Emotional metric header */}
+      {filter === 'needs-me' && autoHandledCount > 0 && (
+        <div className="px-4 py-3 bg-gradient-to-r from-primary/5 to-primary/10 border-b border-primary/10">
+          <div className="flex items-center gap-2 text-sm">
+            <Sparkles className="h-4 w-4 text-primary" />
+            <span className="text-foreground/80">
+              <span className="font-semibold text-primary">{autoHandledCount}</span>
+              {' '}messages handled automatically today
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Search and Filter Controls */}
       <div className={cn(
         "py-3 border-b border-border/50 bg-background/80 backdrop-blur-sm space-y-2",

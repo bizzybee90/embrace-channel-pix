@@ -365,34 +365,103 @@ async function triggerAIAnalysis(
   toEmail?: string
 ) {
   try {
-    console.log('Triggering triage agent for conversation:', conversationId);
+    console.log('Triggering AI analysis pipeline for conversation:', conversationId);
     
-    // First, check for sender rules
     const senderDomain = senderEmail.split('@')[1]?.toLowerCase();
-    const { data: senderRule } = await supabase
-      .from('sender_rules')
-      .select('*')
-      .or(`sender_pattern.eq.${senderEmail.toLowerCase()},sender_pattern.eq.@${senderDomain}`)
-      .eq('is_active', true)
-      .limit(1)
-      .maybeSingle();
-
-    // Fetch business context
+    
+    // Fetch workspace
     const { data: workspace } = await supabase
       .from('users')
       .select('workspace_id')
       .limit(1)
       .single();
     
+    const workspaceId = workspace?.workspace_id;
+
+    // ============================================================
+    // STEP 1: Call pre-triage-rules FIRST (deterministic, no LLM)
+    // This should handle 30-50% of emails with 100% accuracy
+    // ============================================================
+    console.log('Step 1: Calling pre-triage-rules...');
+    
+    const preTriageResponse = await supabase.functions.invoke('pre-triage-rules', {
+      body: {
+        email: {
+          from_email: senderEmail,
+          from_name: senderName,
+          subject: subject,
+          body: body.substring(0, 5000),
+        },
+        workspace_id: workspaceId,
+      }
+    });
+
+    console.log('Pre-triage response:', JSON.stringify(preTriageResponse.data || preTriageResponse.error));
+
+    // If pre-triage matched a rule and wants to skip LLM
+    if (preTriageResponse.data?.matched && preTriageResponse.data?.skip_llm) {
+      const preTriage = preTriageResponse.data;
+      console.log('Pre-triage matched! Skipping LLM. Bucket:', preTriage.decision_bucket);
+      
+      // Update conversation directly from pre-triage result
+      const updateData: any = {
+        status: preTriage.decision_bucket === 'auto_handled' ? 'resolved' : 'new',
+        requires_reply: preTriage.requires_reply ?? false,
+        decision_bucket: preTriage.decision_bucket,
+        why_this_needs_you: preTriage.why_this_needs_you || `Matched rule: ${preTriage.rule_type}`,
+        triage_confidence: 0.99,
+        email_classification: preTriage.classification || 'automated_notification',
+        urgency: preTriage.decision_bucket === 'act_now' ? 'high' : 'low',
+        urgency_reason: `Pre-triage rule: ${preTriage.rule_type}`,
+        cognitive_load: 'low',
+        risk_level: 'none',
+      };
+
+      // Set auto_handled_at for metrics
+      if (preTriage.decision_bucket === 'auto_handled') {
+        updateData.auto_handled_at = new Date().toISOString();
+        updateData.resolved_at = new Date().toISOString();
+      }
+
+      await supabase
+        .from('conversations')
+        .update(updateData)
+        .eq('id', conversationId);
+
+      console.log('Conversation updated from pre-triage (no LLM call):', {
+        bucket: preTriage.decision_bucket,
+        rule_type: preTriage.rule_type,
+      });
+
+      // Update sender behaviour stats
+      await updateSenderStats(supabase, workspaceId, senderDomain, senderEmail, preTriage.decision_bucket);
+
+      return; // Skip LLM entirely!
+    }
+
+    // ============================================================
+    // STEP 2: If pre-triage didn't match, call LLM triage agent
+    // ============================================================
+    console.log('Step 2: Pre-triage did not match, calling LLM triage agent...');
+
+    // Fetch business context
     let businessContext = null;
-    if (workspace?.workspace_id) {
+    if (workspaceId) {
       const { data: context } = await supabase
         .from('business_context')
         .select('*')
-        .eq('workspace_id', workspace.workspace_id)
+        .eq('workspace_id', workspaceId)
         .single();
       businessContext = context;
     }
+
+    // Fetch sender behaviour stats for personalization
+    const { data: senderStats } = await supabase
+      .from('sender_behaviour_stats')
+      .select('*')
+      .eq('workspace_id', workspaceId)
+      .eq('sender_domain', senderDomain)
+      .maybeSingle();
 
     // Call the dedicated triage agent (Haiku - fast & cheap)
     const triageResponse = await supabase.functions.invoke('email-triage-agent', {
@@ -404,17 +473,18 @@ async function triggerAIAnalysis(
           body: body.substring(0, 5000),
           to_email: toEmail,
         },
-        workspace_id: workspace?.workspace_id,
+        workspace_id: workspaceId,
         business_context: businessContext ? {
           is_hiring: businessContext.is_hiring,
           active_dispute: businessContext.active_stripe_case || businessContext.active_insurance_claim,
         } : null,
-        sender_rule: senderRule ? {
-          default_classification: senderRule.default_classification,
-          default_requires_reply: senderRule.default_requires_reply,
-          override_classification: senderRule.override_classification,
-          override_requires_reply: senderRule.override_requires_reply,
+        sender_behaviour: senderStats ? {
+          reply_rate: senderStats.reply_rate,
+          ignored_rate: senderStats.ignored_rate,
+          vip_score: senderStats.vip_score,
+          suggested_bucket: senderStats.suggested_bucket,
         } : null,
+        pre_triage_hints: preTriageResponse.data?.hints || null,
       }
     });
 
@@ -436,14 +506,6 @@ async function triggerAIAnalysis(
     }
 
     const triage = triageResponse.data;
-
-    // Update sender rule hit count if applied
-    if (senderRule && triage.applied_rule) {
-      await supabase
-        .from('sender_rules')
-        .update({ hit_count: (senderRule.hit_count || 0) + 1 })
-        .eq('id', senderRule.id);
-    }
 
     // Determine status based on triage result
     let status = 'new';
@@ -548,6 +610,9 @@ async function triggerAIAnalysis(
       }
     }
 
+    // Update sender behaviour stats after processing
+    await updateSenderStats(supabase, workspaceId, senderDomain, senderEmail, triage.decision?.bucket || 'wait');
+
   } catch (aiError) {
     console.error('Triage/AI pipeline failed (non-blocking):', aiError);
     // Ensure conversation is at least visible
@@ -558,5 +623,59 @@ async function triggerAIAnalysis(
         requires_reply: true,
       })
       .eq('id', conversationId);
+  }
+}
+
+// Helper to update sender behaviour stats
+async function updateSenderStats(
+  supabase: any,
+  workspaceId: string | null,
+  senderDomain: string,
+  senderEmail: string,
+  bucket: string
+) {
+  if (!workspaceId || !senderDomain) return;
+
+  try {
+    // Upsert sender stats
+    const { data: existing } = await supabase
+      .from('sender_behaviour_stats')
+      .select('*')
+      .eq('workspace_id', workspaceId)
+      .eq('sender_domain', senderDomain)
+      .maybeSingle();
+
+    const isAutoHandled = bucket === 'auto_handled';
+    
+    if (existing) {
+      const totalMessages = (existing.total_messages || 0) + 1;
+      const ignoredCount = (existing.ignored_count || 0) + (isAutoHandled ? 1 : 0);
+      
+      await supabase
+        .from('sender_behaviour_stats')
+        .update({
+          total_messages: totalMessages,
+          ignored_count: ignoredCount,
+          ignored_rate: ignoredCount / totalMessages,
+          last_interaction_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', existing.id);
+    } else {
+      await supabase
+        .from('sender_behaviour_stats')
+        .insert({
+          workspace_id: workspaceId,
+          sender_domain: senderDomain,
+          sender_email: senderEmail,
+          total_messages: 1,
+          ignored_count: isAutoHandled ? 1 : 0,
+          ignored_rate: isAutoHandled ? 1 : 0,
+          last_interaction_at: new Date().toISOString(),
+        });
+    }
+  } catch (error) {
+    console.error('Error updating sender stats:', error);
+    // Non-blocking - don't fail the main flow
   }
 }

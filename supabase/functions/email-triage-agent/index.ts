@@ -299,6 +299,56 @@ interface TriageRequest {
     override_classification?: string;
     override_requires_reply?: boolean;
   };
+  sender_behaviour?: {
+    reply_rate?: number;
+    ignored_rate?: number;
+    vip_score?: number;
+    suggested_bucket?: string;
+  };
+  pre_triage_hints?: {
+    likely_bucket?: string;
+    confidence_boost?: number;
+  };
+}
+
+// LLM Output Validator - catches invalid/conflicting outputs
+function validateTriageResult(result: any): { valid: boolean; issues: string[] } {
+  const issues: string[] = [];
+  
+  if (!result?.decision?.bucket) {
+    issues.push('Missing decision bucket');
+    return { valid: false, issues };
+  }
+
+  // Rule 1: AUTO_HANDLED cannot require reply
+  if (result.decision.bucket === 'auto_handled' && result.classification?.requires_reply) {
+    issues.push('AUTO_HANDLED + requires_reply conflict');
+  }
+  
+  // Rule 2: why_this_needs_you must be specific (not generic)
+  const genericPhrases = ['needs a response', 'requires attention', 'action needed', 'needs human'];
+  const why = result.decision.why_this_needs_you?.toLowerCase() || '';
+  if (genericPhrases.some(p => why.includes(p)) && why.length < 30) {
+    issues.push('Generic why_this_needs_you');
+  }
+  
+  // Rule 3: Empty why_this_needs_you is invalid
+  if (!result.decision.why_this_needs_you || result.decision.why_this_needs_you.length < 5) {
+    issues.push('Empty or too short why_this_needs_you');
+  }
+  
+  // Rule 4: High-risk categories cannot have no risk
+  const highRiskCategories = ['supplier_invoice', 'customer_complaint', 'supplier_urgent'];
+  if (highRiskCategories.includes(result.classification?.category) && result.risk?.level === 'none') {
+    issues.push('High-risk category with no risk assessment');
+  }
+
+  // Rule 5: WAIT bucket should be rare - flag if confidence is high
+  if (result.decision.bucket === 'wait' && result.decision.confidence > 0.9) {
+    issues.push('WAIT with very high confidence - likely should be AUTO_HANDLED');
+  }
+  
+  return { valid: issues.length === 0, issues };
 }
 
 serve(async (req) => {
@@ -307,10 +357,11 @@ serve(async (req) => {
   }
 
   const startTime = Date.now();
+  const MAX_RETRIES = 1;
 
   try {
     const request: TriageRequest = await req.json();
-    const { email, workspace_id, business_context, sender_rule } = request;
+    const { email, workspace_id, business_context, sender_rule, sender_behaviour, pre_triage_hints } = request;
 
     console.log('Decision router processing email from:', email.from_email, 'subject:', email.subject);
 
@@ -376,6 +427,31 @@ serve(async (req) => {
           contextualPrompt += '\n\nCONTEXT: This sender is from a VIP customer domain. Treat as ACT_NOW with retention risk.';
         }
       }
+    }
+
+    // Add sender behaviour priors for personalization
+    if (sender_behaviour) {
+      const { reply_rate, ignored_rate, vip_score, suggested_bucket } = sender_behaviour;
+      contextualPrompt += '\n\nSENDER HISTORY:';
+      if (reply_rate !== undefined) {
+        contextualPrompt += `\n- This sender's emails are replied to ${Math.round((reply_rate || 0) * 100)}% of the time.`;
+        if (reply_rate > 0.8) {
+          contextualPrompt += ' (High engagement - consider QUICK_WIN or ACT_NOW)';
+        } else if (reply_rate < 0.2) {
+          contextualPrompt += ' (Usually ignored - consider AUTO_HANDLED)';
+        }
+      }
+      if (vip_score !== undefined && vip_score > 50) {
+        contextualPrompt += `\n- VIP Score: ${vip_score}/100 - treat as important.`;
+      }
+      if (suggested_bucket) {
+        contextualPrompt += `\n- Historical suggestion: ${suggested_bucket}`;
+      }
+    }
+
+    // Add pre-triage hints if available
+    if (pre_triage_hints?.likely_bucket) {
+      contextualPrompt += `\n\nPRE-TRIAGE HINT: Pattern matching suggests "${pre_triage_hints.likely_bucket}" bucket. Validate with content analysis.`;
     }
 
     const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
@@ -469,17 +545,56 @@ ${email.body.substring(0, 5000)}
       });
     }
 
-    const routeResult = toolUse.input;
+    let routeResult = toolUse.input;
     const processingTime = Date.now() - startTime;
 
-    console.log('Decision routing complete:', {
+    console.log('Initial decision routing:', {
       bucket: routeResult.decision.bucket,
       why_this_needs_you: routeResult.decision.why_this_needs_you,
       confidence: routeResult.decision.confidence,
-      risk_level: routeResult.risk.level,
-      category: routeResult.classification.category,
-      processing_time_ms: processingTime
     });
+
+    // ============================================================
+    // VALIDATION + AUTO-RETRY: Catch invalid/conflicting outputs
+    // ============================================================
+    const validation = validateTriageResult(routeResult);
+    
+    if (!validation.valid) {
+      console.log('Validation failed:', validation.issues);
+      
+      // Try to auto-correct common issues instead of re-calling LLM
+      if (validation.issues.includes('AUTO_HANDLED + requires_reply conflict')) {
+        // If auto_handled but requires reply, move to quick_win
+        routeResult.decision.bucket = 'quick_win';
+        routeResult.decision.why_this_needs_you = routeResult.decision.why_this_needs_you || 'Needs simple reply';
+        console.log('Auto-corrected: AUTO_HANDLED → QUICK_WIN due to requires_reply');
+      }
+      
+      if (validation.issues.includes('Generic why_this_needs_you') || validation.issues.includes('Empty or too short why_this_needs_you')) {
+        // Generate a better why based on bucket
+        const bucket = routeResult.decision.bucket;
+        const category = routeResult.classification?.category || 'unknown';
+        
+        const betterWhys: Record<string, string> = {
+          'act_now': `Urgent ${category.replace(/_/g, ' ')} - review needed`,
+          'quick_win': `Quick ${category.replace(/_/g, ' ')} - template reply likely`,
+          'auto_handled': `Automated ${category.replace(/_/g, ' ')} - no action needed`,
+          'wait': `Deferred ${category.replace(/_/g, ' ')} - check back later`,
+        };
+        
+        routeResult.decision.why_this_needs_you = betterWhys[bucket] || `${category.replace(/_/g, ' ')} - review`;
+        console.log('Auto-corrected why_this_needs_you:', routeResult.decision.why_this_needs_you);
+      }
+      
+      if (validation.issues.includes('WAIT with very high confidence - likely should be AUTO_HANDLED')) {
+        // High confidence WAIT is often wrong - check if it's really actionable
+        if (!routeResult.classification?.requires_reply) {
+          routeResult.decision.bucket = 'auto_handled';
+          routeResult.decision.why_this_needs_you = 'No action required - informational only';
+          console.log('Auto-corrected: WAIT → AUTO_HANDLED (no reply needed)');
+        }
+      }
+    }
 
     // Apply confidence-based overrides
     const confidence = routeResult.decision.confidence;
@@ -499,8 +614,19 @@ ${email.body.substring(0, 5000)}
       routeResult.decision.why_this_needs_you = 'No quick reply available - needs attention';
     }
 
+    console.log('Final decision:', {
+      bucket: routeResult.decision.bucket,
+      why_this_needs_you: routeResult.decision.why_this_needs_you,
+      confidence: routeResult.decision.confidence,
+      risk_level: routeResult.risk?.level,
+      category: routeResult.classification?.category,
+      processing_time_ms: processingTime,
+      validation_issues: validation.issues,
+    });
+
     return new Response(JSON.stringify({
       ...routeResult,
+      validation_issues: validation.issues.length > 0 ? validation.issues : undefined,
       processing_time_ms: processingTime
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
