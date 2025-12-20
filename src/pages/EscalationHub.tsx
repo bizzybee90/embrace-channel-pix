@@ -20,7 +20,7 @@ import { useSLANotifications } from '@/hooks/useSLANotifications';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useIsTablet } from '@/hooks/use-tablet';
-import { ChevronLeft, ChevronRight, PanelRightClose, PanelRight } from 'lucide-react';
+import { PanelRightClose, PanelRightOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -39,7 +39,7 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
   const [channelFilter, setChannelFilter] = useState<string[]>([]);
   const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(() => {
-    return localStorage.getItem('right-panel-collapsed') === 'true';
+    return localStorage.getItem('customerPanelCollapsed') === 'true';
   });
   const [sortBy, setSortBy] = useState<string>(() => {
     return localStorage.getItem('conversation-sort') || 'sla_urgent';
@@ -51,7 +51,7 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
 
   // Persist right panel preference
   useEffect(() => {
-    localStorage.setItem('right-panel-collapsed', rightPanelCollapsed.toString());
+    localStorage.setItem('customerPanelCollapsed', rightPanelCollapsed.toString());
   }, [rightPanelCollapsed]);
 
   // Persist sort preference
@@ -184,34 +184,41 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
           />
         </div>
         
-        {/* Right sidebar - Customer context & actions */}
-        <div className="relative flex-shrink-0">
-          {/* Toggle button - always visible on left edge of panel */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setRightPanelCollapsed(!rightPanelCollapsed)}
-            className={cn(
-              "absolute top-4 -left-8 z-20 h-8 w-8 rounded-full bg-background border border-border shadow-md hover:bg-accent flex items-center justify-center",
-              rightPanelCollapsed && "left-auto -right-12"
-            )}
-            title={rightPanelCollapsed ? "Show customer panel" : "Hide customer panel"}
-          >
-            {rightPanelCollapsed ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-          </Button>
-          
-          <aside className={cn(
-            "border-l border-border bg-card/50 overflow-y-auto h-full transition-all duration-300",
-            rightPanelCollapsed ? "w-0 border-l-0 overflow-hidden" : "w-[340px]"
-          )}>
-            <div className={cn(
-              "p-5 space-y-5 w-[340px]",
-              rightPanelCollapsed ? "opacity-0 pointer-events-none" : "opacity-100"
-            )}>
+        {/* Collapsed panel indicator - thin bar with expand button */}
+        {rightPanelCollapsed && (
+          <div className="w-10 flex-shrink-0 border-l border-border bg-muted/30 flex flex-col items-center pt-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setRightPanelCollapsed(false)}
+              className="h-8 w-8 hover:bg-accent"
+              title="Show customer panel"
+            >
+              <PanelRightOpen className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+
+        {/* Right sidebar - Customer context & actions (when expanded) */}
+        {!rightPanelCollapsed && (
+          <aside className="w-[340px] flex-shrink-0 border-l border-border bg-card/50 overflow-y-auto h-full transition-all duration-200">
+            {/* Collapse button in top-right */}
+            <div className="flex justify-end p-2 border-b border-border/50">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setRightPanelCollapsed(true)}
+                className="h-8 w-8 hover:bg-accent"
+                title="Hide customer panel"
+              >
+                <PanelRightClose className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="p-5 space-y-5">
               <CustomerContext key={selectedConversation.id} conversation={selectedConversation} onUpdate={handleUpdate} />
             </div>
           </aside>
-        </div>
+        )}
       </main>
       )}
     </div>
