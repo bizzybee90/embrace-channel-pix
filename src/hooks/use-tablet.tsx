@@ -4,20 +4,21 @@ const TABLET_MIN_BREAKPOINT = 760;
 const TABLET_MAX_BREAKPOINT = 1200;
 
 export function useIsTablet() {
-  const [isTablet, setIsTablet] = React.useState<boolean>(() => {
+  // Initialize with actual value to prevent flicker
+  const getIsTablet = () => {
     if (typeof window === 'undefined') return false;
     const width = window.innerWidth;
     return width >= TABLET_MIN_BREAKPOINT && width < TABLET_MAX_BREAKPOINT;
-  });
+  };
+
+  const [isTablet, setIsTablet] = React.useState<boolean>(getIsTablet);
 
   React.useEffect(() => {
     const onChange = () => {
-      const width = window.innerWidth;
-      setIsTablet(width >= TABLET_MIN_BREAKPOINT && width < TABLET_MAX_BREAKPOINT);
+      setIsTablet(getIsTablet());
     };
     
     window.addEventListener("resize", onChange);
-    onChange();
     
     return () => window.removeEventListener("resize", onChange);
   }, []);

@@ -17,7 +17,7 @@
 
 import { useState, useEffect } from "react";
 import { Sidebar } from "@/components/sidebar/Sidebar";
-import { ConversationList } from "@/components/conversations/ConversationList";
+import { JaceStyleInbox } from "@/components/conversations/JaceStyleInbox";
 import { MobileConversationView } from "@/components/conversations/mobile/MobileConversationView";
 import { Conversation, Message } from "@/lib/types";
 import { supabase } from "@/integrations/supabase/client";
@@ -123,24 +123,11 @@ export const TabletLayout = ({ filter = "all-open" }: TabletLayoutProps) => {
       {/* Main Content Area - with data attribute for layout validator */}
       <div data-main-content className="flex-1 flex flex-col min-h-0 min-w-0 relative h-full">
         {!selectedConversation ? (
-          // STATE 1: Ticket List View
-          <div className="flex flex-col h-full min-h-0 animate-slide-in-left">
-            {/* Header */}
-            <div className="px-4 md:px-8 py-6 border-b border-border/30 bg-card/50 backdrop-blur-sm">
-              <h1 className="text-2xl font-bold text-foreground mb-1 truncate">{getFilterTitle()}</h1>
-              <p className="text-sm text-muted-foreground">Support escalations</p>
-            </div>
-
-            {/* Ticket List - Full Width */}
-            <div className="flex-1 min-h-0 overflow-y-auto px-4 md:px-8 py-6">
-              <ConversationList
-                selectedId={selectedConversation?.id}
-                onSelect={handleSelectConversation}
-                filter={filter}
-                key={refreshKey}
-              />
-            </div>
-          </div>
+          // STATE 1: Jace-style List View
+          <JaceStyleInbox
+            onSelect={handleSelectConversation}
+            filter={filter}
+          />
         ) : (
           // STATE 2: Conversation View - Using MobileConversationView pattern for reliable scrolling
           <MobileConversationView
