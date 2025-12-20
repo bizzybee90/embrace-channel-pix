@@ -1,17 +1,12 @@
-import { Inbox, AlertTriangle, CheckCircle2, Clock, Filter, Zap, Columns, Settings, ChevronRight, PanelLeftClose, CheckCheck, SlidersHorizontal, Webhook, MessageSquare, LayoutDashboard, BarChart3 } from 'lucide-react';
+import { Home, Mail, Info, CheckCircle2, Clock, ChevronDown, ChevronRight, PanelLeftClose, Send, Inbox, BarChart3, MessageSquare, Settings } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
-import { TeamStatus } from './TeamStatus';
 import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
-import { useInterfaceMode } from '@/hooks/useInterfaceMode';
-import { Card } from '@/components/ui/card';
-import { ActivitySidebarWidget } from '@/components/dashboard/ActivitySidebarWidget';
 import { useState, useEffect } from 'react';
 import beeLogo from '@/assets/bee-logo.png';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { supabase } from '@/integrations/supabase/client';
+import { useQuery } from '@tanstack/react-query';
 
 interface SidebarProps {
   forceCollapsed?: boolean;
@@ -21,35 +16,75 @@ interface SidebarProps {
 }
 
 export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, isMobileDrawer = false }: SidebarProps = {}) => {
-  const { interfaceMode, toggleMode, loading } = useInterfaceMode();
-  // Default to collapsed for a cleaner look
   const [collapsed, setCollapsed] = useState(true);
+  const [moreOpen, setMoreOpen] = useState(false);
   
   const isCollapsed = forceCollapsed || collapsed;
-  const [visibleFilters, setVisibleFilters] = useState({
-    myTickets: true,
-    unassigned: true,
-    slaRisk: true,
-    allOpen: true,
-    completed: true,
+
+  // Fetch view counts
+  const { data: viewCounts } = useQuery({
+    queryKey: ['sidebar-view-counts'],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return { toReply: 0, fyi: 0, done: 0, snoozed: 0 };
+
+      const { data: userData } = await supabase
+        .from('users')
+        .select('workspace_id')
+        .eq('id', user.id)
+        .single();
+
+      if (!userData?.workspace_id) return { toReply: 0, fyi: 0, done: 0, snoozed: 0 };
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const [toReplyResult, fyiResult, doneResult, snoozedResult] = await Promise.all([
+        // To Reply: act_now + quick_win
+        supabase
+          .from('conversations')
+          .select('id', { count: 'exact', head: true })
+          .eq('workspace_id', userData.workspace_id)
+          .in('decision_bucket', ['act_now', 'quick_win'])
+          .in('status', ['new', 'open', 'waiting_internal', 'ai_handling', 'escalated']),
+        // FYI: wait bucket
+        supabase
+          .from('conversations')
+          .select('id', { count: 'exact', head: true })
+          .eq('workspace_id', userData.workspace_id)
+          .eq('decision_bucket', 'wait')
+          .in('status', ['new', 'open', 'waiting_internal', 'ai_handling']),
+        // Done: auto_handled or resolved (last 24h)
+        supabase
+          .from('conversations')
+          .select('id', { count: 'exact', head: true })
+          .eq('workspace_id', userData.workspace_id)
+          .or('decision_bucket.eq.auto_handled,status.eq.resolved')
+          .gte('updated_at', today.toISOString()),
+        // Snoozed
+        supabase
+          .from('conversations')
+          .select('id', { count: 'exact', head: true })
+          .eq('workspace_id', userData.workspace_id)
+          .not('snoozed_until', 'is', null)
+          .gt('snoozed_until', new Date().toISOString()),
+      ]);
+
+      return {
+        toReply: toReplyResult.count || 0,
+        fyi: fyiResult.count || 0,
+        done: doneResult.count || 0,
+        snoozed: snoozedResult.count || 0,
+      };
+    },
+    staleTime: 30000,
+    refetchInterval: 60000,
   });
 
-  useEffect(() => {
-    const saved = localStorage.getItem('visibleFilters');
-    if (saved) {
-      setVisibleFilters(JSON.parse(saved));
-    }
-  }, []);
-
-  const toggleFilter = (filter: keyof typeof visibleFilters) => {
-    const updated = { ...visibleFilters, [filter]: !visibleFilters[filter] };
-    setVisibleFilters(updated);
-    localStorage.setItem('visibleFilters', JSON.stringify(updated));
-  };
   return (
     <TooltipProvider>
       <div className={`flex flex-col h-full overflow-y-auto transition-all duration-300 relative ${isCollapsed ? 'w-[72px] p-1.5' : isMobileDrawer ? '' : 'w-60 p-4'}`}>
-        {/* Collapse Toggle - hide in forced collapsed mode and mobile drawer */}
+        {/* Collapse Toggle */}
         {!forceCollapsed && !isMobileDrawer && (
           <Button
             variant="ghost"
@@ -72,576 +107,263 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
               </TooltipTrigger>
               <TooltipContent side="right">
                 <p className="font-semibold">BizzyBee</p>
-                <p className="text-xs text-muted-foreground">Escalation Hub</p>
               </TooltipContent>
             </Tooltip>
           ) : (
-            <>
+            <div className="flex items-center gap-3">
               <div className="flex-shrink-0">
                 <img src={beeLogo} alt="BizzyBee Logo" className="h-10 w-10 rounded-lg" />
               </div>
               <div className="flex-1 min-w-0">
                 <h1 className="text-xl font-bold text-primary">BizzyBee</h1>
-                <p className="text-sm text-muted-foreground">Escalation Hub</p>
-              </div>
-              <Popover>
-               <PopoverTrigger asChild>
-                 <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0">
-                   <SlidersHorizontal className="h-4 w-4" />
-                 </Button>
-               </PopoverTrigger>
-          <PopoverContent className="w-64" align="end">
-            <div className="space-y-4">
-              <h3 className="font-semibold">Filter Visibility</h3>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="my-tickets">My Tickets</Label>
-                  <Switch
-                    id="my-tickets"
-                    checked={visibleFilters.myTickets}
-                    onCheckedChange={() => toggleFilter('myTickets')}
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="unassigned">Unassigned</Label>
-                  <Switch
-                    id="unassigned"
-                    checked={visibleFilters.unassigned}
-                    onCheckedChange={() => toggleFilter('unassigned')}
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="sla-risk">SLA at Risk</Label>
-                  <Switch
-                    id="sla-risk"
-                    checked={visibleFilters.slaRisk}
-                    onCheckedChange={() => toggleFilter('slaRisk')}
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="all-open">Action Required</Label>
-                  <Switch
-                    id="all-open"
-                    checked={visibleFilters.allOpen}
-                    onCheckedChange={() => toggleFilter('allOpen')}
-                  />
-                </div>
               </div>
             </div>
-              </PopoverContent>
-            </Popover>
-          </>
           )}
         </div>
 
-        <nav className="space-y-1 mb-6">
-          {!isCollapsed && (
-            <h2 className="text-xs font-semibold text-foreground/60 uppercase tracking-wider mb-3 px-1">
-              Views
-            </h2>
-          )}
-          
-          {/* Needs Me - Primary view (ACT_NOW + QUICK_WIN) */}
+        {/* Primary Navigation - Clean label style */}
+        <nav className="space-y-1 flex-1">
+          {/* Home */}
           <Tooltip>
             <TooltipTrigger asChild>
               <div>
                 <NavLink
-                  to="/needs-me"
+                  to="/"
+                  end
                   onClick={onNavigate}
-                  className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all hover-scale`}
-                  activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
+                  className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all`}
+                  activeClassName="bg-accent text-accent-foreground font-medium"
                 >
-                  <div className="flex items-center justify-center w-8 h-8 rounded-md bg-destructive/10">
-                    <AlertTriangle className="h-4 w-4 text-destructive" />
-                  </div>
-                  {!isCollapsed && <span>Needs Me</span>}
+                  <Home className="h-5 w-5 text-muted-foreground" />
+                  {!isCollapsed && <span>Home</span>}
                 </NavLink>
               </div>
             </TooltipTrigger>
             {isCollapsed && (
               <TooltipContent side="right">
-                <p>Needs Me</p>
+                <p>Home</p>
               </TooltipContent>
             )}
           </Tooltip>
 
-          {visibleFilters.myTickets && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div>
-                  <NavLink
-                    to="/my-tickets"
-                    onClick={onNavigate}
-                    className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all hover-scale`}
-                    activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
-                  >
-                    <div className="flex items-center justify-center w-8 h-8 rounded-md bg-primary/10">
-                      <Inbox className="h-4 w-4 text-primary" />
-                    </div>
-                    {!isCollapsed && <span>My Tickets</span>}
-                  </NavLink>
-                </div>
-              </TooltipTrigger>
-              {isCollapsed && (
-                <TooltipContent side="right">
-                  <p>My Tickets</p>
-                </TooltipContent>
-              )}
-            </Tooltip>
-          )}
-          {visibleFilters.unassigned && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div>
-                  <NavLink
-                    to="/unassigned"
-                    onClick={onNavigate}
-                    className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all hover-scale`}
-                    activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
-                  >
-                    <div className="flex items-center justify-center w-8 h-8 rounded-md bg-orange-500/10">
-                      <Inbox className="h-4 w-4 text-orange-500" />
-                    </div>
-                    {!isCollapsed && <span>Unassigned</span>}
-                  </NavLink>
-                </div>
-              </TooltipTrigger>
-              {isCollapsed && (
-                <TooltipContent side="right">
-                  <p>Unassigned</p>
-                </TooltipContent>
-              )}
-            </Tooltip>
-          )}
-          {visibleFilters.slaRisk && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div>
-                  <NavLink
-                    to="/sla-risk"
-                    onClick={onNavigate}
-                    className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all hover-scale`}
-                    activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
-                  >
-                    <div className="flex items-center justify-center w-8 h-8 rounded-md bg-orange-500/10">
-                      <Clock className="h-4 w-4 text-orange-500" />
-                    </div>
-                    {!isCollapsed && <span>SLA at Risk</span>}
-                  </NavLink>
-                </div>
-              </TooltipTrigger>
-              {isCollapsed && (
-                <TooltipContent side="right">
-                  <p>SLA at Risk</p>
-                </TooltipContent>
-              )}
-            </Tooltip>
-          )}
-          
-          {/* Snoozed - WAIT bucket (should be rare) */}
+          {/* To Reply (Primary) */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div>
+                <NavLink
+                  to="/to-reply"
+                  onClick={onNavigate}
+                  className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all`}
+                  activeClassName="bg-accent text-accent-foreground font-medium"
+                >
+                  <Mail className="h-5 w-5 text-destructive" />
+                  {!isCollapsed && (
+                    <span className="flex-1 flex items-center justify-between">
+                      <span>To Reply</span>
+                      {viewCounts?.toReply ? (
+                        <span className="text-xs font-semibold text-destructive">{viewCounts.toReply}</span>
+                      ) : null}
+                    </span>
+                  )}
+                </NavLink>
+              </div>
+            </TooltipTrigger>
+            {isCollapsed && (
+              <TooltipContent side="right">
+                <p>To Reply {viewCounts?.toReply ? `(${viewCounts.toReply})` : ''}</p>
+              </TooltipContent>
+            )}
+          </Tooltip>
+
+          {/* FYI */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div>
+                <NavLink
+                  to="/fyi"
+                  onClick={onNavigate}
+                  className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all`}
+                  activeClassName="bg-accent text-accent-foreground font-medium"
+                >
+                  <Info className="h-5 w-5 text-blue-500" />
+                  {!isCollapsed && (
+                    <span className="flex-1 flex items-center justify-between">
+                      <span>FYI</span>
+                      {viewCounts?.fyi ? (
+                        <span className="text-xs text-muted-foreground">{viewCounts.fyi}</span>
+                      ) : null}
+                    </span>
+                  )}
+                </NavLink>
+              </div>
+            </TooltipTrigger>
+            {isCollapsed && (
+              <TooltipContent side="right">
+                <p>FYI {viewCounts?.fyi ? `(${viewCounts.fyi})` : ''}</p>
+              </TooltipContent>
+            )}
+          </Tooltip>
+
+          {/* Done */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div>
+                <NavLink
+                  to="/done"
+                  onClick={onNavigate}
+                  className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all`}
+                  activeClassName="bg-accent text-accent-foreground font-medium"
+                >
+                  <CheckCircle2 className="h-5 w-5 text-green-500" />
+                  {!isCollapsed && (
+                    <span className="flex-1 flex items-center justify-between">
+                      <span>Done</span>
+                      {viewCounts?.done ? (
+                        <span className="text-xs text-muted-foreground">{viewCounts.done}</span>
+                      ) : null}
+                    </span>
+                  )}
+                </NavLink>
+              </div>
+            </TooltipTrigger>
+            {isCollapsed && (
+              <TooltipContent side="right">
+                <p>Done {viewCounts?.done ? `(${viewCounts.done})` : ''}</p>
+              </TooltipContent>
+            )}
+          </Tooltip>
+
+          {/* Snoozed */}
           <Tooltip>
             <TooltipTrigger asChild>
               <div>
                 <NavLink
                   to="/snoozed"
                   onClick={onNavigate}
-                  className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all hover-scale`}
-                  activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
+                  className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all`}
+                  activeClassName="bg-accent text-accent-foreground font-medium"
                 >
-                  <div className="flex items-center justify-center w-8 h-8 rounded-md bg-blue-500/10">
-                    <Clock className="h-4 w-4 text-blue-500" />
-                  </div>
-                  {!isCollapsed && <span>Snoozed</span>}
+                  <Clock className="h-5 w-5 text-amber-500" />
+                  {!isCollapsed && (
+                    <span className="flex-1 flex items-center justify-between">
+                      <span>Snoozed</span>
+                      {viewCounts?.snoozed ? (
+                        <span className="text-xs text-muted-foreground">{viewCounts.snoozed}</span>
+                      ) : null}
+                    </span>
+                  )}
                 </NavLink>
               </div>
             </TooltipTrigger>
             {isCollapsed && (
               <TooltipContent side="right">
-                <p>Snoozed</p>
+                <p>Snoozed {viewCounts?.snoozed ? `(${viewCounts.snoozed})` : ''}</p>
               </TooltipContent>
             )}
           </Tooltip>
-          
-          {/* Cleared - AUTO_HANDLED + resolved (trust-building view) */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div>
-                <NavLink
-                  to="/cleared"
-                  onClick={onNavigate}
-                  className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all hover-scale`}
-                  activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
+
+          {/* More Section - Collapsible */}
+          {!isCollapsed && (
+            <Collapsible open={moreOpen} onOpenChange={setMoreOpen} className="mt-4">
+              <CollapsibleTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className="w-full justify-between px-3 py-2.5 h-auto text-sm text-muted-foreground hover:text-foreground"
                 >
-                  <div className="flex items-center justify-center w-8 h-8 rounded-md bg-green-500/10">
-                    <CheckCheck className="h-4 w-4 text-green-500" />
-                  </div>
-                  {!isCollapsed && <span>Cleared</span>}
-                </NavLink>
-              </div>
-            </TooltipTrigger>
-            {isCollapsed && (
-              <TooltipContent side="right">
-                <p>Cleared</p>
-              </TooltipContent>
-            )}
-          </Tooltip>
-          
-          {/* Awaiting Reply */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div>
-                <NavLink
-                  to="/awaiting-reply"
-                  onClick={onNavigate}
-                  className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all hover-scale`}
-                  activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
-                >
-                  <div className="flex items-center justify-center w-8 h-8 rounded-md bg-yellow-500/10">
-                    <Clock className="h-4 w-4 text-yellow-500" />
-                  </div>
-                  {!isCollapsed && <span>Awaiting Reply</span>}
-                </NavLink>
-              </div>
-            </TooltipTrigger>
-            {isCollapsed && (
-              <TooltipContent side="right">
-                <p>Awaiting Reply</p>
-              </TooltipContent>
-            )}
-          </Tooltip>
-          
-          {/* Sent */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div>
+                  <span>More</span>
+                  <ChevronDown className={`h-4 w-4 transition-transform ${moreOpen ? 'rotate-180' : ''}`} />
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-1 pt-1">
                 <NavLink
                   to="/sent"
                   onClick={onNavigate}
-                  className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all hover-scale`}
-                  activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
+                  className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-all"
+                  activeClassName="bg-accent text-accent-foreground font-medium"
                 >
-                  <div className="flex items-center justify-center w-8 h-8 rounded-md bg-blue-500/10">
-                    <CheckCircle2 className="h-4 w-4 text-blue-500" />
-                  </div>
-                  {!isCollapsed && <span>Sent</span>}
+                  <Send className="h-4 w-4" />
+                  <span>Sent</span>
                 </NavLink>
-              </div>
-            </TooltipTrigger>
-            {isCollapsed && (
-              <TooltipContent side="right">
-                <p>Sent</p>
-              </TooltipContent>
-            )}
-          </Tooltip>
-        </nav>
-
-        <Separator className="my-4" />
-
-        {/* AI Activity Section */}
-        <div className="mb-6">
-          {!isCollapsed && (
-            <h2 className="text-xs font-semibold text-foreground/60 uppercase tracking-wider mb-3 px-1">
-              AI Activity
-            </h2>
+                <NavLink
+                  to="/all-open"
+                  onClick={onNavigate}
+                  className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-all"
+                  activeClassName="bg-accent text-accent-foreground font-medium"
+                >
+                  <Inbox className="h-4 w-4" />
+                  <span>Inbox (All)</span>
+                </NavLink>
+                <NavLink
+                  to="/channels"
+                  onClick={onNavigate}
+                  className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-all"
+                  activeClassName="bg-accent text-accent-foreground font-medium"
+                >
+                  <MessageSquare className="h-4 w-4" />
+                  <span>Channels</span>
+                </NavLink>
+                <NavLink
+                  to="/analytics"
+                  onClick={onNavigate}
+                  className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-all"
+                  activeClassName="bg-accent text-accent-foreground font-medium"
+                >
+                  <BarChart3 className="h-4 w-4" />
+                  <span>Analytics</span>
+                </NavLink>
+                <NavLink
+                  to="/settings"
+                  onClick={onNavigate}
+                  className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-all"
+                  activeClassName="bg-accent text-accent-foreground font-medium"
+                >
+                  <Settings className="h-4 w-4" />
+                  <span>Settings</span>
+                </NavLink>
+              </CollapsibleContent>
+            </Collapsible>
           )}
-          <div className="space-y-1">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div>
-                  <NavLink
-                    to="/"
-                    end
-                    onClick={onNavigate}
-                    className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all hover-scale`}
-                    activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
-                  >
-                    <div className="flex items-center justify-center w-8 h-8 rounded-md bg-blue-500/10">
-                      <LayoutDashboard className="h-4 w-4 text-blue-500" />
-                    </div>
-                    {!isCollapsed && <span>Dashboard</span>}
-                  </NavLink>
-                </div>
-              </TooltipTrigger>
-              {isCollapsed && (
-                <TooltipContent side="right">
-                  <p>Dashboard</p>
-                </TooltipContent>
-              )}
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div>
-                  <NavLink
-                    to="/channels"
-                    onClick={onNavigate}
-                    className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all hover-scale`}
-                    activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
-                  >
-                    <div className="flex items-center justify-center w-8 h-8 rounded-md bg-green-500/10">
-                      <MessageSquare className="h-4 w-4 text-green-500" />
-                    </div>
-                    {!isCollapsed && <span>Channels</span>}
-                  </NavLink>
-                </div>
-              </TooltipTrigger>
-              {isCollapsed && (
-                <TooltipContent side="right">
-                  <p>Channels</p>
-                </TooltipContent>
-              )}
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div>
-                  <NavLink
-                    to="/analytics"
-                    onClick={onNavigate}
-                    className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all hover-scale`}
-                    activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
-                  >
-                    <div className="flex items-center justify-center w-8 h-8 rounded-md bg-blue-500/10">
-                      <BarChart3 className="h-4 w-4 text-blue-500" />
-                    </div>
-                    {!isCollapsed && <span>Analytics</span>}
-                  </NavLink>
-                </div>
-              </TooltipTrigger>
-              {isCollapsed && (
-                <TooltipContent side="right">
-                  <p>Analytics</p>
-                </TooltipContent>
-              )}
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div>
-                  <NavLink
-                    to="/escalations"
-                    onClick={onNavigate}
-                    className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all hover-scale`}
-                    activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
-                  >
-                    <div className="flex items-center justify-center w-8 h-8 rounded-md bg-orange-500/10">
-                      <AlertTriangle className="h-4 w-4 text-orange-500" />
-                    </div>
-                    {!isCollapsed && <span>Escalations</span>}
-                  </NavLink>
-                </div>
-              </TooltipTrigger>
-              {isCollapsed && (
-                <TooltipContent side="right">
-                  <p>Escalations</p>
-                </TooltipContent>
-              )}
-            </Tooltip>
-          </div>
-        </div>
 
-        <Separator className="my-4" />
-
-        <div className="mb-6">
-          {!isCollapsed && (
-            <h2 className="text-xs font-semibold text-foreground/60 uppercase tracking-wider mb-3 px-1">
-              Saved Filters
-            </h2>
-          )}
-          <div className="space-y-1">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div>
-                  <NavLink
-                    to="/high-priority"
-                    onClick={onNavigate}
-                    className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all hover-scale`}
-                    activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
-                  >
-                    <div className="flex items-center justify-center w-8 h-8 rounded-md bg-blue-500/10">
-                      <Zap className="h-4 w-4 text-blue-500" />
-                    </div>
-                    {!isCollapsed && <span className="text-sm">High Priority</span>}
-                  </NavLink>
-                </div>
-              </TooltipTrigger>
-              {isCollapsed && (
+          {/* Collapsed More Icons */}
+          {isCollapsed && (
+            <div className="space-y-1 pt-4 border-t border-border/50 mt-4">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div>
+                    <NavLink
+                      to="/sent"
+                      onClick={onNavigate}
+                      className="flex items-center justify-center p-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-all"
+                      activeClassName="bg-accent text-accent-foreground"
+                    >
+                      <Send className="h-5 w-5" />
+                    </NavLink>
+                  </div>
+                </TooltipTrigger>
                 <TooltipContent side="right">
-                  <p>High Priority</p>
+                  <p>Sent</p>
                 </TooltipContent>
-              )}
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div>
-                  <NavLink
-                    to="/vip-customers"
-                    onClick={onNavigate}
-                    className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all hover-scale`}
-                    activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
-                  >
-                    <div className="flex items-center justify-center w-8 h-8 rounded-md bg-purple-500/10">
-                      <Filter className="h-4 w-4 text-purple-500" />
-                    </div>
-                    {!isCollapsed && <span className="text-sm">VIP Customers</span>}
-                  </NavLink>
-                </div>
-              </TooltipTrigger>
-              {isCollapsed && (
-                <TooltipContent side="right">
-                  <p>VIP Customers</p>
-                </TooltipContent>
-              )}
-            </Tooltip>
-          </div>
-        </div>
-
-        {/* Filters Button - Mobile Only */}
-        {onFiltersClick && !isCollapsed && (
-          <>
-            <Separator className="my-4" />
-            <Button
-              onClick={onFiltersClick}
-              variant="outline"
-              className="w-full flex items-center justify-center gap-2"
-            >
-              <SlidersHorizontal className="h-4 w-4" />
-              <span>Filters</span>
-            </Button>
-          </>
-        )}
-
-        <Separator className="my-4" />
-
-        {/* Developer Section */}
-        <div className="mb-6">
-          {!isCollapsed && (
-            <h2 className="text-xs font-semibold text-foreground/60 uppercase tracking-wider mb-3 px-1">
-              Developer
-            </h2>
-          )}
-          <div className="space-y-1">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div>
-                  <NavLink
-                    to="/webhooks"
-                    onClick={onNavigate}
-                    className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all hover-scale`}
-                    activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
-                  >
-                    <div className="flex items-center justify-center w-8 h-8 rounded-md bg-purple-500/10">
-                      <Webhook className="h-4 w-4 text-purple-500" />
-                    </div>
-                    {!isCollapsed && <span>Webhook Logs</span>}
-                  </NavLink>
-                </div>
-              </TooltipTrigger>
-              {isCollapsed && (
-                <TooltipContent side="right">
-                  <p>Webhook Logs</p>
-                </TooltipContent>
-              )}
-            </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div>
-                  <NavLink
-                    to="/settings"
-                    onClick={onNavigate}
-                    className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all hover-scale`}
-                    activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
-                  >
-                    <div className="flex items-center justify-center w-8 h-8 rounded-md bg-gray-500/10">
-                      <Settings className="h-4 w-4 text-gray-500" />
-                    </div>
-                    {!isCollapsed && <span>Settings</span>}
-                  </NavLink>
-                </div>
-              </TooltipTrigger>
-              {isCollapsed && (
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div>
+                    <NavLink
+                      to="/settings"
+                      onClick={onNavigate}
+                      className="flex items-center justify-center p-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-all"
+                      activeClassName="bg-accent text-accent-foreground"
+                    >
+                      <Settings className="h-5 w-5" />
+                    </NavLink>
+                  </div>
+                </TooltipTrigger>
                 <TooltipContent side="right">
                   <p>Settings</p>
                 </TooltipContent>
-              )}
-            </Tooltip>
-          </div>
-        </div>
-
-        <Separator className="my-4" />
-
-        {/* Live Activity Widget - Only show when not collapsed */}
-        {!isCollapsed && (
-          <div className="mb-6">
-            <ActivitySidebarWidget />
-          </div>
-        )}
-
-        {!isCollapsed && <Separator className="my-4" />}
-
-        {/* Interface Mode Toggle */}
-        {!loading && (
-          <Card className={`bg-muted/50 ${isCollapsed ? 'p-1.5' : 'p-3'}`}>
-            {!isCollapsed && (
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold text-foreground/60 uppercase">Interface</span>
-              </div>
-            )}
-            {isCollapsed ? (
-              <div className="flex flex-col gap-1">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant={interfaceMode === 'focus' ? 'default' : 'ghost'}
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => interfaceMode === 'power' && toggleMode()}
-                    >
-                      <Zap className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">
-                    <p>Focus Mode</p>
-                  </TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant={interfaceMode === 'power' ? 'default' : 'ghost'}
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => interfaceMode === 'focus' && toggleMode()}
-                    >
-                      <Columns className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">
-                    <p>Power Mode</p>
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-            ) : (
-              <>
-                <Button
-                  variant={interfaceMode === 'focus' ? 'default' : 'outline'}
-                  size="sm"
-                  className="w-full justify-start mb-1"
-                  onClick={() => interfaceMode === 'power' && toggleMode()}
-                >
-                  <Zap className="h-3 w-3 mr-2" />
-                  <span className="text-xs">Focus Mode</span>
-                </Button>
-                <Button
-                  variant={interfaceMode === 'power' ? 'default' : 'outline'}
-                  size="sm"
-                  className="w-full justify-start"
-                  onClick={() => interfaceMode === 'focus' && toggleMode()}
-                >
-                  <Columns className="h-3 w-3 mr-2" />
-                  <span className="text-xs">Power Mode</span>
-                </Button>
-              </>
-            )}
-          </Card>
-        )}
+              </Tooltip>
+            </div>
+          )}
+        </nav>
       </div>
     </TooltipProvider>
   );

@@ -18,7 +18,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 interface ConversationListProps {
   selectedId?: string;
   onSelect: (conversation: Conversation) => void;
-  filter?: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'awaiting-reply' | 'completed' | 'sent' | 'high-priority' | 'vip-customers' | 'escalations' | 'triaged' | 'needs-me' | 'snoozed' | 'cleared';
+  filter?: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'awaiting-reply' | 'completed' | 'sent' | 'high-priority' | 'vip-customers' | 'escalations' | 'triaged' | 'needs-me' | 'snoozed' | 'cleared' | 'fyi';
   onConversationsChange?: (conversations: Conversation[]) => void;
   channelFilter?: string;
 }
@@ -133,9 +133,16 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
         .in('status', ['new', 'open', 'waiting_internal', 'ai_handling', 'escalated']);
       // Sort ACT_NOW first, then QUICK_WIN
       query = query.order('decision_bucket', { ascending: true }); // act_now comes before quick_win alphabetically
+    } else if (filter === 'fyi') {
+      // FYI view: WAIT bucket - things to be aware of, no action needed
+      query = query
+        .eq('decision_bucket', 'wait')
+        .in('status', ['new', 'open', 'waiting_internal', 'ai_handling']);
     } else if (filter === 'snoozed') {
-      // WAIT bucket - deferred human action (should be rare)
-      query = query.eq('decision_bucket', 'wait');
+      // Snoozed - manually snoozed items
+      query = query
+        .not('snoozed_until', 'is', null)
+        .gt('snoozed_until', new Date().toISOString());
     } else if (filter === 'cleared') {
       // AUTO_HANDLED bucket + resolved - trust-building view
       query = query.or('decision_bucket.eq.auto_handled,status.eq.resolved');
@@ -417,8 +424,7 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
           <div className="flex items-center gap-2 text-sm">
             <Sparkles className="h-4 w-4 text-primary" />
             <span className="text-foreground/80">
-              <span className="font-semibold text-primary">{autoHandledCount}</span>
-              {' '}messages handled automatically today
+              🐝 BizzyBee cleared <span className="font-semibold text-primary">{autoHandledCount}</span> messages for you today
             </span>
           </div>
         </div>
