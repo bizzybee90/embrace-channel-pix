@@ -185,13 +185,13 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
         </div>
         
         {/* Collapsed panel indicator - thin bar with expand button */}
-        {rightPanelCollapsed && (
-          <div className="w-10 flex-shrink-0 border-l border-border bg-muted/30 flex flex-col items-center pt-4">
+{rightPanelCollapsed && (
+          <div className="w-10 flex-shrink-0 border-l border-border bg-muted/50 flex flex-col items-center pt-4">
             <Button
-              variant="ghost"
+              variant="outline"
               size="icon"
               onClick={() => setRightPanelCollapsed(false)}
-              className="h-8 w-8 hover:bg-accent"
+              className="h-8 w-8 bg-muted hover:bg-accent"
               title="Show customer panel"
             >
               <PanelRightOpen className="h-4 w-4" />
@@ -203,12 +203,12 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
         {!rightPanelCollapsed && (
           <aside className="w-[340px] flex-shrink-0 border-l border-border bg-card/50 overflow-y-auto h-full transition-all duration-200">
             {/* Collapse button in top-right */}
-            <div className="flex justify-end p-2 border-b border-border/50">
+<div className="flex justify-end p-2 border-b border-border/50">
               <Button
-                variant="ghost"
+                variant="outline"
                 size="icon"
                 onClick={() => setRightPanelCollapsed(true)}
-                className="h-8 w-8 hover:bg-accent"
+                className="h-8 w-8 bg-muted hover:bg-accent"
                 title="Hide customer panel"
               >
                 <PanelRightClose className="h-4 w-4" />

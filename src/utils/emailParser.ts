@@ -9,44 +9,53 @@ export function cleanEmailContent(rawContent: string): string {
   // Remove quoted replies (lines starting with >)
   content = content.replace(/^>.*$/gm, '');
   
-  // Remove "On [date] [person] wrote:" blocks and everything after
-  content = content.replace(/On .+wrote:[\s\S]*/i, '');
+  // Remove "On [date] [person] wrote:" and everything after (works inline too)
+  content = content.replace(/On \d{1,2} .{3,20} \d{4},? at \d{1,2}:\d{2}.*wrote:[\s\S]*/i, '');
+  content = content.replace(/On .{10,60} wrote:[\s\S]*/i, '');
   
-  // Remove common signature markers and everything after
-  const signatureMarkers = [
-    /^--\s*$/m,                              // Standard -- marker
-    /^_{3,}/m,                               // ___ underscores
-    /^-{3,}/m,                               // --- dashes
-    /^Sent from my/im,                       // Mobile signatures
-    /^Get Outlook/im,                        // Outlook mobile
-    /^Confidentiality Note:/im,              // Confidentiality notices
-    /^This e-?mail and any attachments/im,   // Legal disclaimers
-    /^This message is intended/im,           // Intent disclaimers
-    /^#FollowUs/im,                          // Social media footers
-    /^Follow us on/im,                       // Social media footers
-    /^Kind regards,?$/im,                    // Sign-offs followed by signature
-    /^Best regards,?$/im,                    // Sign-offs
-    /^Thanks,?$/im,                          // Sign-offs
-    /^Cheers,?$/im,                          // Sign-offs
-    /^Regards,?$/im,                         // Sign-offs
-    /^www\.[a-zA-Z0-9-]+\.[a-zA-Z]{2,}/m,    // Website URLs as signature start
-    /^https?:\/\/[^\s]+$/m,                  // Standalone URLs on their own line
+  // Cut everything after these markers (inline or line-start) using indexOf
+  const cutoffPatterns = [
+    'Confidentiality Note:',
+    'This e-mail and any attachments',
+    'This email and any attachments',
+    'This message is intended',
+    '#FollowUs',
+    'Follow us on',
+    'Sent from my iPhone',
+    'Sent from my Android',
+    'Get Outlook for',
+    'Get Outlook for iOS',
+    'Get Outlook for Android',
+    '-- \n',
+    '---',
+    '___',
   ];
   
-  for (const marker of signatureMarkers) {
-    const match = content.match(marker);
-    if (match && match.index !== undefined) {
-      content = content.substring(0, match.index);
+  for (const pattern of cutoffPatterns) {
+    const index = content.indexOf(pattern);
+    if (index > 0) {
+      content = content.substring(0, index);
     }
   }
   
-  // Remove email addresses that look like signature elements
-  content = content.replace(/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/gm, '');
+  // Also cut at website URLs that look like signature elements (e.g., www.maccleaning.uk)
+  const urlSignatureMatch = content.match(/\s(www\.[a-zA-Z0-9-]+\.[a-zA-Z]{2,})/);
+  if (urlSignatureMatch && urlSignatureMatch.index) {
+    // Only cut if URL appears in latter half of message (likely signature)
+    if (urlSignatureMatch.index > content.length * 0.5) {
+      content = content.substring(0, urlSignatureMatch.index);
+    }
+  }
   
-  // Remove phone numbers on their own line (likely signature)
-  content = content.replace(/^\+?[\d\s()-]{10,}$/gm, '');
+  // Cut at standalone email addresses (likely signature)
+  const emailSignatureMatch = content.match(/\s([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})\s/);
+  if (emailSignatureMatch && emailSignatureMatch.index) {
+    if (emailSignatureMatch.index > content.length * 0.5) {
+      content = content.substring(0, emailSignatureMatch.index);
+    }
+  }
   
-  // Clean up extra whitespace
+  // Clean up whitespace
   content = content.replace(/\n{3,}/g, '\n\n').trim();
   
   return content;
