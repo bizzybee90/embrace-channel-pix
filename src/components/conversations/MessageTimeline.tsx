@@ -1,13 +1,14 @@
 import { Message } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
-import { Bot, StickyNote, Paperclip, ChevronDown, ChevronUp, MessageCircle } from 'lucide-react';
+import { Bot, StickyNote, Paperclip, ChevronDown, ChevronUp, MessageCircle, Eye, EyeOff } from 'lucide-react';
 import { ChannelIcon } from '@/components/shared/ChannelIcon';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { cleanEmailContent, hasSignificantCleaning } from '@/utils/emailParser';
 
 const getInitials = (name: string | null) => {
   if (!name) return '?';
@@ -24,6 +25,19 @@ const COLLAPSED_MESSAGE_COUNT = 3;
 export const MessageTimeline = ({ messages, defaultCollapsed = true }: MessageTimelineProps) => {
   const [downloadingFile, setDownloadingFile] = useState<string | null>(null);
   const [isExpanded, setIsExpanded] = useState(!defaultCollapsed);
+  const [showOriginalIds, setShowOriginalIds] = useState<Set<string>>(new Set());
+
+  const toggleShowOriginal = (messageId: string) => {
+    setShowOriginalIds(prev => {
+      const next = new Set(prev);
+      if (next.has(messageId)) {
+        next.delete(messageId);
+      } else {
+        next.add(messageId);
+      }
+      return next;
+    });
+  };
 
   const handleDownloadAttachment = async (path: string, name: string) => {
     try {
@@ -66,6 +80,13 @@ export const MessageTimeline = ({ messages, defaultCollapsed = true }: MessageTi
     const isAI = message.actor_type === 'ai_agent';
     const isInternal = message.is_internal;
     const isHuman = message.actor_type === 'human_agent';
+    const isEmail = message.channel === 'email';
+    
+    // Clean email content if it's an email message
+    const cleanedBody = isEmail ? cleanEmailContent(message.body) : message.body;
+    const showOriginal = showOriginalIds.has(message.id);
+    const displayBody = showOriginal ? message.body : cleanedBody;
+    const canShowOriginal = isEmail && hasSignificantCleaning(message.body, cleanedBody);
 
     if (isInternal) {
       return (
@@ -150,7 +171,27 @@ export const MessageTimeline = ({ messages, defaultCollapsed = true }: MessageTi
               {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
             </span>
           </div>
-          <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.body}</p>
+          <p className="text-sm whitespace-pre-wrap leading-relaxed">{displayBody}</p>
+          
+          {/* Show original toggle for email messages with significant cleaning */}
+          {canShowOriginal && (
+            <button
+              onClick={() => toggleShowOriginal(message.id)}
+              className="mt-2 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {showOriginal ? (
+                <>
+                  <EyeOff className="h-3 w-3" />
+                  Show cleaned
+                </>
+              ) : (
+                <>
+                  <Eye className="h-3 w-3" />
+                  Show original
+                </>
+              )}
+            </button>
+          )}
           
           {message.attachments && Array.isArray(message.attachments) && message.attachments.length > 0 && (
             <div className="mt-2 space-y-1">
