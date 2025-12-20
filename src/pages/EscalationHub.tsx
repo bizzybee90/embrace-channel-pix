@@ -173,11 +173,9 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
         </main>
       ) : (
       /* Show conversation detail with customer context */
-      <main className="flex-1 flex overflow-hidden min-h-0 h-full relative">
-        <div className={cn(
-          "flex-1 overflow-hidden transition-all duration-300",
-          rightPanelCollapsed ? "mr-0" : "mr-0"
-        )}>
+      <main className="flex-1 flex overflow-hidden min-h-0 h-full">
+        {/* Conversation thread area */}
+        <div className="flex-1 overflow-hidden">
           <ConversationThread
             key={refreshKey}
             conversation={selectedConversation}
@@ -186,31 +184,34 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
           />
         </div>
         
-        {/* Collapse toggle button - positioned at the edge */}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setRightPanelCollapsed(!rightPanelCollapsed)}
-          className="absolute top-1/2 -translate-y-1/2 right-0 z-20 h-6 w-6 rounded-l-md rounded-r-none bg-muted/80 border border-r-0 border-border hover:bg-accent transition-all"
-          style={{ right: rightPanelCollapsed ? 0 : 340 }}
-          title={rightPanelCollapsed ? "Show customer panel" : "Hide customer panel"}
-        >
-          {rightPanelCollapsed ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-        </Button>
-        
         {/* Right sidebar - Customer context & actions */}
-        <aside className={cn(
-          "border-l border-border bg-card/50 overflow-y-auto flex-shrink-0 transition-all duration-300",
-          rightPanelCollapsed ? "w-0 min-w-0 border-l-0 overflow-hidden" : "w-[340px] min-w-[300px]"
-        )}>
-          <div className={cn(
-            "p-5 space-y-5 transition-opacity duration-200",
-            rightPanelCollapsed ? "opacity-0 pointer-events-none" : "opacity-100"
+        <div className="relative flex-shrink-0">
+          {/* Toggle button - always visible on left edge of panel */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setRightPanelCollapsed(!rightPanelCollapsed)}
+            className={cn(
+              "absolute top-4 -left-8 z-20 h-8 w-8 rounded-full bg-background border border-border shadow-md hover:bg-accent flex items-center justify-center",
+              rightPanelCollapsed && "left-auto -right-12"
+            )}
+            title={rightPanelCollapsed ? "Show customer panel" : "Hide customer panel"}
+          >
+            {rightPanelCollapsed ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+          </Button>
+          
+          <aside className={cn(
+            "border-l border-border bg-card/50 overflow-y-auto h-full transition-all duration-300",
+            rightPanelCollapsed ? "w-0 border-l-0 overflow-hidden" : "w-[340px]"
           )}>
-            <CustomerContext key={selectedConversation.id} conversation={selectedConversation} onUpdate={handleUpdate} />
-            <QuickActions conversation={selectedConversation} onUpdate={handleUpdate} onBack={handleClose} />
-          </div>
-        </aside>
+            <div className={cn(
+              "p-5 space-y-5 w-[340px]",
+              rightPanelCollapsed ? "opacity-0 pointer-events-none" : "opacity-100"
+            )}>
+              <CustomerContext key={selectedConversation.id} conversation={selectedConversation} onUpdate={handleUpdate} />
+            </div>
+          </aside>
+        </div>
       </main>
       )}
     </div>
