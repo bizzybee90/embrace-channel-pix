@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import React from "react";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
@@ -14,7 +14,7 @@ import { EscalationHub } from "./pages/EscalationHub";
 import { MobileEscalationHub } from "./pages/mobile/MobileEscalationHub";
 import { AuthGuard } from "./components/AuthGuard";
 import { useIsMobile } from "./hooks/use-mobile";
-import { LiveActivityDashboard } from "./components/dashboard/LiveActivityDashboard";
+import Home from "./pages/Home";
 import ChannelsDashboard from "./pages/ChannelsDashboard";
 import ChannelConversations from "./pages/ChannelConversations";
 import AnalyticsDashboard from "./pages/AnalyticsDashboard";
@@ -27,14 +27,108 @@ const RouterContent = () => {
   return (
     <Routes>
       <Route path="/auth" element={<Auth />} />
+      
+      {/* Home - Calm reassurance screen */}
       <Route 
         path="/" 
         element={
           <AuthGuard>
-            <LiveActivityDashboard />
+            <Home />
           </AuthGuard>
         } 
       />
+      
+      {/* To Reply - Primary view (renamed from needs-me) */}
+      <Route 
+        path="/to-reply" 
+        element={
+          <AuthGuard>
+            {isMobile ? (
+              <MobileEscalationHub filter="needs-me" />
+            ) : (
+              <EscalationHub filter="needs-me" />
+            )}
+          </AuthGuard>
+        } 
+      />
+      
+      {/* Redirect old needs-me route */}
+      <Route path="/needs-me" element={<Navigate to="/to-reply" replace />} />
+      
+      {/* FYI - Wait bucket (new view) */}
+      <Route 
+        path="/fyi" 
+        element={
+          <AuthGuard>
+            {isMobile ? (
+              <MobileEscalationHub filter="fyi" />
+            ) : (
+              <EscalationHub filter="fyi" />
+            )}
+          </AuthGuard>
+        } 
+      />
+      
+      {/* Done - Auto-handled + resolved (renamed from cleared) */}
+      <Route 
+        path="/done" 
+        element={
+          <AuthGuard>
+            {isMobile ? (
+              <MobileEscalationHub filter="cleared" />
+            ) : (
+              <EscalationHub filter="cleared" />
+            )}
+          </AuthGuard>
+        } 
+      />
+      
+      {/* Redirect old cleared route */}
+      <Route path="/cleared" element={<Navigate to="/done" replace />} />
+      
+      {/* Snoozed */}
+      <Route 
+        path="/snoozed" 
+        element={
+          <AuthGuard>
+            {isMobile ? (
+              <MobileEscalationHub filter="snoozed" />
+            ) : (
+              <EscalationHub filter="snoozed" />
+            )}
+          </AuthGuard>
+        } 
+      />
+      
+      {/* Sent */}
+      <Route 
+        path="/sent" 
+        element={
+          <AuthGuard>
+            {isMobile ? (
+              <MobileEscalationHub filter="sent" />
+            ) : (
+              <EscalationHub filter="sent" />
+            )}
+          </AuthGuard>
+        } 
+      />
+      
+      {/* All Open (Inbox All) - Hidden under More */}
+      <Route 
+        path="/all-open" 
+        element={
+          <AuthGuard>
+            {isMobile ? (
+              <MobileEscalationHub filter="all-open" />
+            ) : (
+              <EscalationHub filter="all-open" />
+            )}
+          </AuthGuard>
+        } 
+      />
+      
+      {/* Legacy routes - redirect or keep for backwards compatibility */}
       <Route 
         path="/my-tickets" 
         element={
@@ -72,40 +166,8 @@ const RouterContent = () => {
         } 
       />
       <Route 
-        path="/all-open" 
-        element={
-          <AuthGuard>
-            {isMobile ? (
-              <MobileEscalationHub filter="all-open" />
-            ) : (
-              <EscalationHub filter="all-open" />
-            )}
-          </AuthGuard>
-        } 
-      />
-      <Route 
         path="/completed" 
-        element={
-          <AuthGuard>
-            {isMobile ? (
-              <MobileEscalationHub filter="completed" />
-            ) : (
-              <EscalationHub filter="completed" />
-            )}
-          </AuthGuard>
-        } 
-      />
-      <Route 
-        path="/sent" 
-        element={
-          <AuthGuard>
-            {isMobile ? (
-              <MobileEscalationHub filter="sent" />
-            ) : (
-              <EscalationHub filter="sent" />
-            )}
-          </AuthGuard>
-        } 
+        element={<Navigate to="/done" replace />}
       />
       <Route 
         path="/awaiting-reply" 
@@ -130,42 +192,6 @@ const RouterContent = () => {
             )}
           </AuthGuard>
         } 
-      />
-      <Route 
-        path="/needs-me" 
-        element={
-          <AuthGuard>
-            {isMobile ? (
-              <MobileEscalationHub filter="needs-me" />
-            ) : (
-              <EscalationHub filter="needs-me" />
-            )}
-          </AuthGuard>
-        } 
-      />
-      <Route 
-        path="/snoozed" 
-        element={
-          <AuthGuard>
-            {isMobile ? (
-              <MobileEscalationHub filter="snoozed" />
-            ) : (
-              <EscalationHub filter="snoozed" />
-            )}
-          </AuthGuard>
-        } 
-      />
-      <Route 
-        path="/cleared" 
-        element={
-          <AuthGuard>
-            {isMobile ? (
-              <MobileEscalationHub filter="cleared" />
-            ) : (
-              <EscalationHub filter="cleared" />
-            )}
-          </AuthGuard>
-        }
       />
       <Route
         path="/high-priority"

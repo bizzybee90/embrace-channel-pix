@@ -25,7 +25,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
 interface EscalationHubProps {
-  filter?: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'awaiting-reply' | 'completed' | 'sent' | 'high-priority' | 'vip-customers' | 'triaged' | 'needs-me' | 'snoozed' | 'cleared';
+  filter?: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'awaiting-reply' | 'completed' | 'sent' | 'high-priority' | 'vip-customers' | 'triaged' | 'needs-me' | 'snoozed' | 'cleared' | 'fyi';
 }
 
 export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
@@ -65,13 +65,17 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
 
   const getFilterTitle = () => {
     switch (filter) {
+      case 'needs-me': return 'To Reply';
+      case 'fyi': return 'FYI';
+      case 'cleared': return 'Done';
+      case 'snoozed': return 'Snoozed';
+      case 'sent': return 'Sent';
       case 'my-tickets': return 'My Tickets';
       case 'unassigned': return 'Unassigned';
       case 'sla-risk': return 'SLA Risk';
-      case 'all-open': return 'All Open';
+      case 'all-open': return 'Inbox (All)';
       case 'awaiting-reply': return 'Awaiting Reply';
       case 'completed': return 'Completed';
-      case 'sent': return 'Sent';
       case 'high-priority': return 'High Priority';
       case 'vip-customers': return 'VIP Customers';
       default: return 'Conversations';
