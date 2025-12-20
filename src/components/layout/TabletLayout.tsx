@@ -36,7 +36,10 @@ interface TabletLayoutProps {
     | "high-priority"
     | "vip-customers"
     | "escalations"
-    | "triaged";
+    | "triaged"
+    | "needs-me"
+    | "snoozed"
+    | "cleared";
 }
 
 export const TabletLayout = ({ filter = "all-open" }: TabletLayoutProps) => {

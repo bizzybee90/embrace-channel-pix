@@ -18,7 +18,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 interface ConversationListProps {
   selectedId?: string;
   onSelect: (conversation: Conversation) => void;
-  filter?: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'awaiting-reply' | 'completed' | 'sent' | 'high-priority' | 'vip-customers' | 'escalations' | 'triaged';
+  filter?: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'awaiting-reply' | 'completed' | 'sent' | 'high-priority' | 'vip-customers' | 'escalations' | 'triaged' | 'needs-me' | 'snoozed' | 'cleared';
   onConversationsChange?: (conversations: Conversation[]) => void;
   channelFilter?: string;
 }
@@ -126,7 +126,20 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
     }
 
     // Apply view filter
-    if (filter === 'my-tickets') {
+    if (filter === 'needs-me') {
+      // PRIMARY VIEW: ACT_NOW + QUICK_WIN buckets - things that need human attention
+      query = query
+        .in('decision_bucket', ['act_now', 'quick_win'])
+        .in('status', ['new', 'open', 'waiting_internal', 'ai_handling', 'escalated']);
+      // Sort ACT_NOW first, then QUICK_WIN
+      query = query.order('decision_bucket', { ascending: true }); // act_now comes before quick_win alphabetically
+    } else if (filter === 'snoozed') {
+      // WAIT bucket - deferred human action (should be rare)
+      query = query.eq('decision_bucket', 'wait');
+    } else if (filter === 'cleared') {
+      // AUTO_HANDLED bucket + resolved - trust-building view
+      query = query.or('decision_bucket.eq.auto_handled,status.eq.resolved');
+    } else if (filter === 'my-tickets') {
       query = query.eq('assigned_to', user.id).in('status', ['new', 'open', 'waiting_customer', 'waiting_internal', 'ai_handling', 'escalated']);
     } else if (filter === 'unassigned') {
       query = query.is('assigned_to', null).in('status', ['new', 'open', 'waiting_customer', 'waiting_internal', 'ai_handling', 'escalated']);

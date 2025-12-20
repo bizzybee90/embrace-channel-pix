@@ -132,6 +132,42 @@ const RouterContent = () => {
         } 
       />
       <Route 
+        path="/needs-me" 
+        element={
+          <AuthGuard>
+            {isMobile ? (
+              <MobileEscalationHub filter="needs-me" />
+            ) : (
+              <EscalationHub filter="needs-me" />
+            )}
+          </AuthGuard>
+        } 
+      />
+      <Route 
+        path="/snoozed" 
+        element={
+          <AuthGuard>
+            {isMobile ? (
+              <MobileEscalationHub filter="snoozed" />
+            ) : (
+              <EscalationHub filter="snoozed" />
+            )}
+          </AuthGuard>
+        } 
+      />
+      <Route 
+        path="/cleared" 
+        element={
+          <AuthGuard>
+            {isMobile ? (
+              <MobileEscalationHub filter="cleared" />
+            ) : (
+              <EscalationHub filter="cleared" />
+            )}
+          </AuthGuard>
+        }
+      />
+      <Route
         path="/high-priority"
         element={
           <AuthGuard>
