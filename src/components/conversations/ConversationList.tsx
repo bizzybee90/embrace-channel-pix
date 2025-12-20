@@ -99,7 +99,7 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
       .select(`
         *,
         customer:customers(*),
-        assigned_user:users(*)
+        assigned_user:users!conversations_assigned_to_fkey(*)
       `, { count: 'exact' })
       .eq('workspace_id', userData.workspace_id);
 
