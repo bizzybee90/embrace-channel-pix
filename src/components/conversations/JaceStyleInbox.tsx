@@ -150,31 +150,44 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
     }
   };
 
-  const getBucketConfig = (bucket: string) => {
-    switch (bucket) {
-      case 'act_now':
-        return { 
-          border: 'border-l-red-500', 
-          badge: <Badge variant="destructive" className="text-[10px] px-1.5 py-0 h-5">Act Now</Badge>
-        };
-      case 'quick_win':
-        return { 
-          border: 'border-l-amber-500', 
-          badge: <Badge className="bg-amber-500/20 text-amber-700 dark:text-amber-400 hover:bg-amber-500/30 text-[10px] px-1.5 py-0 h-5">Quick Win</Badge>
-        };
-      case 'auto_handled':
-        return { 
-          border: 'border-l-green-500', 
-          badge: <Badge className="bg-green-500/20 text-green-700 dark:text-green-400 hover:bg-green-500/30 text-[10px] px-1.5 py-0 h-5">Handled</Badge>
-        };
-      case 'wait':
-        return { 
-          border: 'border-l-blue-500', 
-          badge: <Badge className="bg-blue-500/20 text-blue-700 dark:text-blue-400 hover:bg-blue-500/30 text-[10px] px-1.5 py-0 h-5">Can Wait</Badge>
-        };
-      default:
-        return { border: 'border-l-transparent', badge: null };
+  // State-based labels: what does the user need to DO, not how hard is it
+  const getStateConfig = (bucket: string, hasAiDraft: boolean) => {
+    if (bucket === 'act_now') {
+      return { 
+        border: 'border-l-red-500', 
+        badge: <Badge variant="destructive" className="text-[10px] px-1.5 py-0 h-5 font-medium">Needs attention</Badge>,
+        rowClass: 'bg-red-50/50 dark:bg-red-950/20' // Subtle urgency tint
+      };
     }
+    if (bucket === 'quick_win' && hasAiDraft) {
+      return { 
+        border: 'border-l-purple-500', 
+        badge: <Badge className="bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 hover:bg-purple-200 text-[10px] px-1.5 py-0 h-5">Draft ready</Badge>,
+        rowClass: ''
+      };
+    }
+    if (bucket === 'quick_win') {
+      return { 
+        border: 'border-l-amber-500', 
+        badge: <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 hover:bg-amber-200 text-[10px] px-1.5 py-0 h-5">Needs reply</Badge>,
+        rowClass: ''
+      };
+    }
+    if (bucket === 'wait') {
+      return { 
+        border: 'border-l-slate-400', 
+        badge: <Badge className="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 hover:bg-slate-200 text-[10px] px-1.5 py-0 h-5">FYI</Badge>,
+        rowClass: ''
+      };
+    }
+    if (bucket === 'auto_handled') {
+      return { 
+        border: 'border-l-green-500', 
+        badge: <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 hover:bg-green-200 text-[10px] px-1.5 py-0 h-5">Done</Badge>,
+        rowClass: ''
+      };
+    }
+    return { border: 'border-l-transparent', badge: null, rowClass: '' };
   };
 
   const formatTime = (dateStr: string) => {
@@ -186,8 +199,9 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
     const conv = conversation as any;
     const customerName = conv.customer?.name || conv.customer?.email?.split('@')[0] || 'Unknown';
     const hasAiDraft = !!conv.ai_draft_response;
-    const bucketConfig = getBucketConfig(conv.decision_bucket);
+    const stateConfig = getStateConfig(conv.decision_bucket, hasAiDraft);
     const messageCount = conv.message_count || 0;
+    const isUrgent = conv.decision_bucket === 'act_now';
 
     return (
       <div
@@ -195,12 +209,16 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
         className={cn(
           "flex items-center gap-2 px-3 py-2.5 cursor-pointer border-b border-border/30 transition-all",
           "border-l-4 hover:bg-muted/50",
-          bucketConfig.border
+          stateConfig.border,
+          stateConfig.rowClass
         )}
       >
         {/* Sender - fixed width, truncate */}
         <div className="w-24 flex-shrink-0 min-w-0">
-          <span className="font-medium text-sm text-foreground truncate block">
+          <span className={cn(
+            "text-sm text-foreground truncate block",
+            isUrgent ? "font-semibold" : "font-medium"
+          )}>
             {customerName}
           </span>
         </div>
@@ -208,21 +226,18 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
         {/* Subject + Preview - fills remaining space, single line with truncation */}
         <div className="flex-1 min-w-0 overflow-hidden">
           <p className="text-sm text-foreground truncate">
-            <span className="font-medium">{conv.title || 'No subject'}</span>
+            <span className={cn(isUrgent ? "font-semibold" : "font-medium")}>
+              {conv.title || 'No subject'}
+            </span>
             {conv.summary_for_human && (
               <span className="text-muted-foreground ml-1">· {conv.summary_for_human}</span>
             )}
           </p>
         </div>
 
-        {/* Badges - stack vertically on narrow, inline on wide */}
+        {/* State badge - single badge, no separate Draft badge */}
         <div className="flex items-center gap-1 flex-shrink-0">
-          {bucketConfig.badge}
-          {hasAiDraft && (
-            <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 border-primary/30 text-primary">
-              Draft
-            </Badge>
-          )}
+          {stateConfig.badge}
         </div>
 
         {/* Thread Count + Time - compact */}
