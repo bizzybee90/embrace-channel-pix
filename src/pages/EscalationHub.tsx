@@ -20,10 +20,11 @@ import { useSLANotifications } from '@/hooks/useSLANotifications';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useIsTablet } from '@/hooks/use-tablet';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, PanelRightClose, PanelRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { cn } from '@/lib/utils';
 
 interface EscalationHubProps {
   filter?: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'awaiting-reply' | 'completed' | 'sent' | 'high-priority' | 'vip-customers' | 'triaged' | 'needs-me' | 'snoozed' | 'cleared' | 'fyi';
@@ -37,6 +38,9 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
   const [priorityFilter, setPriorityFilter] = useState<string[]>([]);
   const [channelFilter, setChannelFilter] = useState<string[]>([]);
   const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
+  const [rightPanelCollapsed, setRightPanelCollapsed] = useState(() => {
+    return localStorage.getItem('right-panel-collapsed') === 'true';
+  });
   const [sortBy, setSortBy] = useState<string>(() => {
     return localStorage.getItem('conversation-sort') || 'sla_urgent';
   });
@@ -44,6 +48,11 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
   const { interfaceMode, loading: modeLoading } = useInterfaceMode();
   const isMobile = useIsMobile();
   const isTablet = useIsTablet();
+
+  // Persist right panel preference
+  useEffect(() => {
+    localStorage.setItem('right-panel-collapsed', rightPanelCollapsed.toString());
+  }, [rightPanelCollapsed]);
 
   // Persist sort preference
   useEffect(() => {
@@ -164,21 +173,59 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
         </main>
       ) : (
       /* Show conversation detail with customer context */
-      <main className="flex-1 flex overflow-hidden min-h-0 h-full">
-        <ConversationThread
-          key={refreshKey}
-          conversation={selectedConversation}
-          onUpdate={handleUpdate}
-          onBack={handleClose}
-        />
+      <main className="flex-1 flex overflow-hidden min-h-0 h-full relative">
+        <div className={cn(
+          "flex-1 overflow-hidden transition-all duration-300",
+          rightPanelCollapsed ? "mr-0" : "mr-0"
+        )}>
+          <ConversationThread
+            key={refreshKey}
+            conversation={selectedConversation}
+            onUpdate={handleUpdate}
+            onBack={handleClose}
+          />
+        </div>
         
         {/* Right sidebar - Customer context & actions */}
-        <aside className="w-[340px] min-w-[300px] border-l border-border bg-card/50 overflow-y-auto flex-shrink-0">
-          <div className="p-5 space-y-5">
+        <aside className={cn(
+          "border-l border-border bg-card/50 overflow-y-auto flex-shrink-0 transition-all duration-300 relative",
+          rightPanelCollapsed ? "w-0 min-w-0 border-l-0 overflow-hidden" : "w-[340px] min-w-[300px]"
+        )}>
+          {/* Collapse/Expand toggle button */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setRightPanelCollapsed(!rightPanelCollapsed)}
+            className={cn(
+              "absolute top-3 z-10 h-8 w-8 rounded-full bg-background border border-border shadow-sm hover:bg-accent",
+              rightPanelCollapsed ? "-left-4" : "left-3"
+            )}
+            title={rightPanelCollapsed ? "Show panel" : "Hide panel"}
+          >
+            {rightPanelCollapsed ? <PanelRight className="h-4 w-4" /> : <PanelRightClose className="h-4 w-4" />}
+          </Button>
+          
+          <div className={cn(
+            "p-5 space-y-5 transition-opacity duration-200",
+            rightPanelCollapsed ? "opacity-0" : "opacity-100"
+          )}>
             <CustomerContext key={selectedConversation.id} conversation={selectedConversation} onUpdate={handleUpdate} />
             <QuickActions conversation={selectedConversation} onUpdate={handleUpdate} onBack={handleClose} />
           </div>
         </aside>
+        
+        {/* Floating expand button when panel is collapsed */}
+        {rightPanelCollapsed && (
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setRightPanelCollapsed(false)}
+            className="absolute top-3 right-3 h-8 w-8 rounded-full bg-background border border-border shadow-md hover:bg-accent z-10"
+            title="Show customer panel"
+          >
+            <PanelRight className="h-4 w-4" />
+          </Button>
+        )}
       </main>
       )}
     </div>

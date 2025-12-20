@@ -4,12 +4,14 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Mail, Phone, MessageSquare, Crown, Clock, CheckCircle2, UserPlus } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Mail, Phone, MessageSquare, Crown, Clock, CheckCircle2, UserPlus, ChevronDown } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
 import { SnoozeDialog } from '@/components/conversations/SnoozeDialog';
 import { CustomerTimeline } from '@/components/conversations/CustomerTimeline';
+import { cn } from '@/lib/utils';
 
 interface CustomerContextProps {
   conversation: Conversation;
@@ -20,6 +22,7 @@ export const CustomerContext = ({ conversation, onUpdate }: CustomerContextProps
   const customer = conversation.customer;
   const { toast } = useToast();
   const [snoozeOpen, setSnoozeOpen] = useState(false);
+  const [quickActionsOpen, setQuickActionsOpen] = useState(true);
 
   // Fallback to metadata if customer record is incomplete
   const metadata = conversation.metadata as any || {};
@@ -115,80 +118,88 @@ export const CustomerContext = ({ conversation, onUpdate }: CustomerContextProps
 
       <Separator />
 
-      <div className="space-y-3">
-        <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Quick Actions</h4>
-        <div className="grid gap-2">
-          {conversation.status !== 'resolved' && (
-            <Button 
-              variant="default" 
-              className="w-full justify-start bg-success hover:bg-success/90"
-              onClick={async () => {
-                await supabase
-                  .from('conversations')
-                  .update({ 
-                    status: 'resolved',
-                    resolved_at: new Date().toISOString()
-                  })
-                  .eq('id', conversation.id);
-                toast({ title: "Conversation resolved" });
-                onUpdate();
-              }}
-            >
-              <CheckCircle2 className="h-4 w-4 mr-2" />
-              Resolve & Close
-            </Button>
-          )}
+      <Collapsible open={quickActionsOpen} onOpenChange={setQuickActionsOpen}>
+        <CollapsibleTrigger className="flex items-center justify-between w-full py-1 group">
+          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Quick Actions</h4>
+          <ChevronDown className={cn(
+            "h-4 w-4 text-muted-foreground transition-transform",
+            quickActionsOpen && "rotate-180"
+          )} />
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="grid gap-2 pt-3">
+            {conversation.status !== 'resolved' && (
+              <Button 
+                variant="default" 
+                className="w-full justify-start bg-success hover:bg-success/90"
+                onClick={async () => {
+                  await supabase
+                    .from('conversations')
+                    .update({ 
+                      status: 'resolved',
+                      resolved_at: new Date().toISOString()
+                    })
+                    .eq('id', conversation.id);
+                  toast({ title: "Conversation resolved" });
+                  onUpdate();
+                }}
+              >
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+                Resolve & Close
+              </Button>
+            )}
 
-          <Button 
-            variant="outline" 
-            className="w-full justify-start"
-            onClick={() => setSnoozeOpen(true)}
-          >
-            <Clock className="h-4 w-4 mr-2" />
-            Snooze
-          </Button>
-
-          <Select
-            value={conversation.priority}
-            onValueChange={(value) => updatePriority(value)}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Change Priority" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="high">🔴 High Priority</SelectItem>
-              <SelectItem value="medium">🟡 Medium Priority</SelectItem>
-              <SelectItem value="low">🟢 Low Priority</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select
-            value={conversation.status}
-            onValueChange={(value) => updateStatus(value)}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Change Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="new">New</SelectItem>
-              <SelectItem value="open">Open</SelectItem>
-              <SelectItem value="waiting_customer">Waiting Customer</SelectItem>
-              <SelectItem value="resolved">Resolved</SelectItem>
-            </SelectContent>
-          </Select>
-
-          {!conversation.assigned_to && (
             <Button 
               variant="outline" 
-              className="w-full justify-start" 
-              onClick={handleAssignToMe}
+              className="w-full justify-start"
+              onClick={() => setSnoozeOpen(true)}
             >
-              <UserPlus className="h-4 w-4 mr-2" />
-              Assign to Me
+              <Clock className="h-4 w-4 mr-2" />
+              Snooze
             </Button>
-          )}
-        </div>
-      </div>
+
+            <Select
+              value={conversation.priority}
+              onValueChange={(value) => updatePriority(value)}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Change Priority" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="high">🔴 High Priority</SelectItem>
+                <SelectItem value="medium">🟡 Medium Priority</SelectItem>
+                <SelectItem value="low">🟢 Low Priority</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={conversation.status}
+              onValueChange={(value) => updateStatus(value)}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Change Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="new">New</SelectItem>
+                <SelectItem value="open">Open</SelectItem>
+                <SelectItem value="waiting_customer">Waiting Customer</SelectItem>
+                <SelectItem value="resolved">Resolved</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {!conversation.assigned_to && (
+              <Button 
+                variant="outline" 
+                className="w-full justify-start" 
+                onClick={handleAssignToMe}
+              >
+                <UserPlus className="h-4 w-4 mr-2" />
+                Assign to Me
+              </Button>
+            )}
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
 
       <SnoozeDialog
         conversationId={conversation.id}
