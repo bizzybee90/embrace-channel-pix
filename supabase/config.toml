@@ -71,3 +71,6 @@ verify_jwt = false
 
 [functions.email-triage-agent]
 verify_jwt = false
+
+[functions.backfill-decision-buckets]
+verify_jwt = false
