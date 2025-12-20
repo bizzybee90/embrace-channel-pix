@@ -150,14 +150,30 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
     }
   };
 
-  const getBucketBadge = (bucket: string) => {
+  const getBucketConfig = (bucket: string) => {
     switch (bucket) {
       case 'act_now':
-        return <Badge variant="destructive" className="text-[10px] px-1.5 py-0 h-5">Urgent</Badge>;
+        return { 
+          border: 'border-l-red-500', 
+          badge: <Badge variant="destructive" className="text-[10px] px-1.5 py-0 h-5">Act Now</Badge>
+        };
       case 'quick_win':
-        return <Badge className="bg-primary/20 text-primary hover:bg-primary/30 text-[10px] px-1.5 py-0 h-5">Quick</Badge>;
+        return { 
+          border: 'border-l-amber-500', 
+          badge: <Badge className="bg-amber-500/20 text-amber-700 dark:text-amber-400 hover:bg-amber-500/30 text-[10px] px-1.5 py-0 h-5">Quick Win</Badge>
+        };
+      case 'auto_handled':
+        return { 
+          border: 'border-l-green-500', 
+          badge: <Badge className="bg-green-500/20 text-green-700 dark:text-green-400 hover:bg-green-500/30 text-[10px] px-1.5 py-0 h-5">Handled</Badge>
+        };
+      case 'wait':
+        return { 
+          border: 'border-l-blue-500', 
+          badge: <Badge className="bg-blue-500/20 text-blue-700 dark:text-blue-400 hover:bg-blue-500/30 text-[10px] px-1.5 py-0 h-5">Can Wait</Badge>
+        };
       default:
-        return null;
+        return { border: 'border-l-transparent', badge: null };
     }
   };
 
@@ -170,41 +186,58 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
     const conv = conversation as any;
     const customerName = conv.customer?.name || conv.customer?.email?.split('@')[0] || 'Unknown';
     const hasAiDraft = !!conv.ai_draft_response;
+    const bucketConfig = getBucketConfig(conv.decision_bucket);
+    const messageCount = conv.message_count || 0;
 
     return (
       <div
         onClick={() => onSelect(conversation)}
-        className="flex items-center gap-4 px-4 py-3 hover:bg-muted/50 cursor-pointer border-b border-border/30 transition-colors group"
+        className={cn(
+          "flex items-center gap-3 px-4 py-3 cursor-pointer border-b border-border/30 transition-all group",
+          "border-l-4 hover:bg-muted/50",
+          bucketConfig.border
+        )}
       >
         {/* Sender */}
-        <div className="w-[180px] flex-shrink-0">
+        <div className="w-[140px] flex-shrink-0">
           <span className="font-medium text-sm text-foreground truncate block">
             {customerName}
           </span>
         </div>
 
         {/* Subject + Preview */}
-        <div className="flex-1 min-w-0 flex items-center gap-2">
-          <span className="font-medium text-sm text-foreground truncate">
-            {conv.title || 'No subject'}
-          </span>
-          <span className="text-muted-foreground text-sm truncate hidden lg:block">
-            {conv.summary_for_human || ''}
+        <div className="flex-1 min-w-0">
+          <span className="text-sm text-foreground">
+            <span className="font-medium">{conv.title || 'No subject'}</span>
+            {conv.summary_for_human && (
+              <span className="text-muted-foreground ml-1.5 hidden md:inline">
+                · {conv.summary_for_human}
+              </span>
+            )}
           </span>
         </div>
 
         {/* Badges */}
         <div className="flex items-center gap-1.5 flex-shrink-0">
-          {getBucketBadge(conv.decision_bucket)}
+          {bucketConfig.badge}
           {hasAiDraft && (
             <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 border-primary/30 text-primary">
               Draft
             </Badge>
           )}
           {conv.category && (
-            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-5 capitalize">
+            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-5 capitalize hidden lg:inline-flex">
               {conv.category}
             </Badge>
+          )}
+        </div>
+
+        {/* Thread Count */}
+        <div className="w-[32px] flex-shrink-0 text-center">
+          {messageCount > 1 && (
+            <span className="inline-flex items-center justify-center text-[10px] font-medium text-muted-foreground bg-muted rounded-full h-5 min-w-5 px-1.5">
+              {messageCount}
+            </span>
           )}
         </div>
 
