@@ -186,46 +186,31 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
           />
         </div>
         
+        {/* Collapse toggle button - positioned at the edge */}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setRightPanelCollapsed(!rightPanelCollapsed)}
+          className="absolute top-1/2 -translate-y-1/2 right-0 z-20 h-6 w-6 rounded-l-md rounded-r-none bg-muted/80 border border-r-0 border-border hover:bg-accent transition-all"
+          style={{ right: rightPanelCollapsed ? 0 : 340 }}
+          title={rightPanelCollapsed ? "Show customer panel" : "Hide customer panel"}
+        >
+          {rightPanelCollapsed ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+        </Button>
+        
         {/* Right sidebar - Customer context & actions */}
         <aside className={cn(
-          "border-l border-border bg-card/50 overflow-y-auto flex-shrink-0 transition-all duration-300 relative",
+          "border-l border-border bg-card/50 overflow-y-auto flex-shrink-0 transition-all duration-300",
           rightPanelCollapsed ? "w-0 min-w-0 border-l-0 overflow-hidden" : "w-[340px] min-w-[300px]"
         )}>
-          {/* Collapse/Expand toggle button */}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setRightPanelCollapsed(!rightPanelCollapsed)}
-            className={cn(
-              "absolute top-3 z-10 h-8 w-8 rounded-full bg-background border border-border shadow-sm hover:bg-accent",
-              rightPanelCollapsed ? "-left-4" : "left-3"
-            )}
-            title={rightPanelCollapsed ? "Show panel" : "Hide panel"}
-          >
-            {rightPanelCollapsed ? <PanelRight className="h-4 w-4" /> : <PanelRightClose className="h-4 w-4" />}
-          </Button>
-          
           <div className={cn(
             "p-5 space-y-5 transition-opacity duration-200",
-            rightPanelCollapsed ? "opacity-0" : "opacity-100"
+            rightPanelCollapsed ? "opacity-0 pointer-events-none" : "opacity-100"
           )}>
             <CustomerContext key={selectedConversation.id} conversation={selectedConversation} onUpdate={handleUpdate} />
             <QuickActions conversation={selectedConversation} onUpdate={handleUpdate} onBack={handleClose} />
           </div>
         </aside>
-        
-        {/* Floating expand button when panel is collapsed */}
-        {rightPanelCollapsed && (
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => setRightPanelCollapsed(false)}
-            className="absolute top-3 right-3 h-8 w-8 rounded-full bg-background border border-border shadow-md hover:bg-accent z-10"
-            title="Show customer panel"
-          >
-            <PanelRight className="h-4 w-4" />
-          </Button>
-        )}
       </main>
       )}
     </div>

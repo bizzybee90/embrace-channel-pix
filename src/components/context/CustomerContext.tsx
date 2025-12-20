@@ -22,7 +22,7 @@ export const CustomerContext = ({ conversation, onUpdate }: CustomerContextProps
   const customer = conversation.customer;
   const { toast } = useToast();
   const [snoozeOpen, setSnoozeOpen] = useState(false);
-  const [quickActionsOpen, setQuickActionsOpen] = useState(true);
+  const [quickActionsOpen, setQuickActionsOpen] = useState(false);
 
   // Fallback to metadata if customer record is incomplete
   const metadata = conversation.metadata as any || {};
