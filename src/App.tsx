@@ -18,6 +18,7 @@ import Home from "./pages/Home";
 import ChannelsDashboard from "./pages/ChannelsDashboard";
 import ChannelConversations from "./pages/ChannelConversations";
 import AnalyticsDashboard from "./pages/AnalyticsDashboard";
+import Review from "./pages/Review";
 
 const queryClient = new QueryClient();
 
@@ -85,6 +86,16 @@ const RouterContent = () => {
       
       {/* Redirect old cleared route */}
       <Route path="/cleared" element={<Navigate to="/done" replace />} />
+      
+      {/* Review - Reconciliation flow */}
+      <Route 
+        path="/review" 
+        element={
+          <AuthGuard>
+            <Review />
+          </AuthGuard>
+        } 
+      />
       
       {/* Snoozed */}
       <Route 

@@ -614,18 +614,30 @@ ${email.body.substring(0, 5000)}
       routeResult.decision.why_this_needs_you = 'No quick reply available - needs attention';
     }
 
+    // Determine if this needs review (for reconciliation flow)
+    const senderDomain = request.email.from_email.split('@')[1]?.toLowerCase();
+    const needsReview = 
+      // Low-medium confidence (< 85%)
+      (routeResult.decision.confidence < 0.85 && routeResult.decision.bucket !== 'auto_handled') ||
+      // First-time sender domain (no prior history)
+      (!sender_behaviour && !sender_rule) ||
+      // Low confidence even for auto_handled
+      (routeResult.decision.bucket === 'auto_handled' && routeResult.decision.confidence < 0.9);
+
     console.log('Final decision:', {
       bucket: routeResult.decision.bucket,
       why_this_needs_you: routeResult.decision.why_this_needs_you,
       confidence: routeResult.decision.confidence,
       risk_level: routeResult.risk?.level,
       category: routeResult.classification?.category,
+      needs_review: needsReview,
       processing_time_ms: processingTime,
       validation_issues: validation.issues,
     });
 
     return new Response(JSON.stringify({
       ...routeResult,
+      needs_review: needsReview,
       validation_issues: validation.issues.length > 0 ? validation.issues : undefined,
       processing_time_ms: processingTime
     }), {

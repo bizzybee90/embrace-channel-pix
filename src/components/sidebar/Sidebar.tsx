@@ -1,4 +1,4 @@
-import { Home, Mail, Info, CheckCircle2, Clock, ChevronDown, ChevronRight, PanelLeftClose, Send, Inbox, BarChart3, MessageSquare, Settings } from 'lucide-react';
+import { Home, Mail, Info, CheckCircle2, Clock, ChevronDown, ChevronRight, PanelLeftClose, Send, Inbox, BarChart3, MessageSquare, Settings, ClipboardCheck } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { Button } from '@/components/ui/button';
 import { useState, useEffect } from 'react';
@@ -7,7 +7,6 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
-
 interface SidebarProps {
   forceCollapsed?: boolean;
   onNavigate?: () => void;
@@ -39,7 +38,7 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      const [toReplyResult, fyiResult, doneResult, snoozedResult] = await Promise.all([
+      const [toReplyResult, fyiResult, doneResult, snoozedResult, reviewResult] = await Promise.all([
         // To Reply: act_now + quick_win
         supabase
           .from('conversations')
@@ -68,6 +67,13 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
           .eq('workspace_id', userData.workspace_id)
           .not('snoozed_until', 'is', null)
           .gt('snoozed_until', new Date().toISOString()),
+        // Review: needs_review and not yet reviewed
+        supabase
+          .from('conversations')
+          .select('id', { count: 'exact', head: true })
+          .eq('workspace_id', userData.workspace_id)
+          .eq('needs_review', true)
+          .is('reviewed_at', null),
       ]);
 
       return {
@@ -75,6 +81,7 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
         fyi: fyiResult.count || 0,
         done: doneResult.count || 0,
         snoozed: snoozedResult.count || 0,
+        review: reviewResult.count || 0,
       };
     },
     staleTime: 30000,
@@ -232,6 +239,35 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
               </TooltipContent>
             )}
           </Tooltip>
+
+          {/* Review - only visible when count > 0 */}
+          {viewCounts?.review && viewCounts.review > 0 && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div>
+                  <NavLink
+                    to="/review"
+                    onClick={onNavigate}
+                    className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all`}
+                    activeClassName="bg-accent text-accent-foreground font-medium"
+                  >
+                    <ClipboardCheck className="h-5 w-5 text-purple-500" />
+                    {!isCollapsed && (
+                      <span className="flex-1 flex items-center justify-between">
+                        <span>Review</span>
+                        <span className="text-xs font-semibold text-purple-500">{viewCounts.review}</span>
+                      </span>
+                    )}
+                  </NavLink>
+                </div>
+              </TooltipTrigger>
+              {isCollapsed && (
+                <TooltipContent side="right">
+                  <p>Review ({viewCounts.review})</p>
+                </TooltipContent>
+              )}
+            </Tooltip>
+          )}
 
           {/* Snoozed */}
           <Tooltip>

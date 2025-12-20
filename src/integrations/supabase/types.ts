@@ -171,9 +171,13 @@ export type Database = {
           metadata: Json | null
           mode: string | null
           needs_embedding: boolean | null
+          needs_review: boolean | null
           priority: string | null
           requires_reply: boolean | null
           resolved_at: string | null
+          review_outcome: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
           risk_level: string | null
           sla_due_at: string | null
           sla_status: string | null
@@ -228,9 +232,13 @@ export type Database = {
           metadata?: Json | null
           mode?: string | null
           needs_embedding?: boolean | null
+          needs_review?: boolean | null
           priority?: string | null
           requires_reply?: boolean | null
           resolved_at?: string | null
+          review_outcome?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           risk_level?: string | null
           sla_due_at?: string | null
           sla_status?: string | null
@@ -285,9 +293,13 @@ export type Database = {
           metadata?: Json | null
           mode?: string | null
           needs_embedding?: boolean | null
+          needs_review?: boolean | null
           priority?: string | null
           requires_reply?: boolean | null
           resolved_at?: string | null
+          review_outcome?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           risk_level?: string | null
           sla_due_at?: string | null
           sla_status?: string | null
@@ -319,6 +331,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
           {
