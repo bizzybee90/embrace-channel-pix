@@ -25,7 +25,7 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
     queryKey: ['sidebar-view-counts'],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return { toReply: 0, fyi: 0, done: 0, snoozed: 0 };
+      if (!user) return { toReply: 0, fyi: 0, done: 0, snoozed: 0, review: 0 };
 
       const { data: userData } = await supabase
         .from('users')
@@ -33,7 +33,7 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
         .eq('id', user.id)
         .single();
 
-      if (!userData?.workspace_id) return { toReply: 0, fyi: 0, done: 0, snoozed: 0 };
+      if (!userData?.workspace_id) return { toReply: 0, fyi: 0, done: 0, snoozed: 0, review: 0 };
 
       const today = new Date();
       today.setHours(0, 0, 0, 0);
