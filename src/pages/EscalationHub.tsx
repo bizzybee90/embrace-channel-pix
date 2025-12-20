@@ -12,6 +12,7 @@ import { QuickActions } from '@/components/conversations/QuickActions';
 import { MobileQuickActions } from '@/components/conversations/MobileQuickActions';
 import { MobileConversationList } from '@/components/conversations/mobile/MobileConversationList';
 import { MobileConversationView } from '@/components/conversations/mobile/MobileConversationView';
+import { JaceStyleInbox } from '@/components/conversations/JaceStyleInbox';
 import { Conversation, Message } from '@/lib/types';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { useInterfaceMode } from '@/hooks/useInterfaceMode';
@@ -154,17 +155,15 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
 
       {/* Main content area */}
       {!selectedConversation ? (
-        /* Show conversation list */
-        <main className="flex-1 overflow-y-auto">
-          <ConversationList
+        /* Jace-style full-width inbox when no conversation selected */
+        <main className="flex-1 overflow-hidden">
+          <JaceStyleInbox
             filter={filter}
-            selectedId={selectedConversation?.id}
             onSelect={handleSelectConversation}
-            onConversationsChange={setConversations}
           />
         </main>
       ) : (
-      /* Show conversation detail */
+      /* Show conversation detail with customer context */
       <main className="flex-1 flex overflow-hidden min-h-0 h-full">
         <ConversationThread
           key={refreshKey}
