@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Sidebar } from '@/components/sidebar/Sidebar';
-import { ConversationList } from '@/components/conversations/ConversationList';
+import { JaceStyleInbox } from '@/components/conversations/JaceStyleInbox';
 import { ConversationThread } from '@/components/conversations/ConversationThread';
 import { CustomerContext } from '@/components/context/CustomerContext';
 import { Conversation } from '@/lib/types';
@@ -31,17 +31,15 @@ export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerMod
       <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0 h-full overflow-hidden">
         {/* Conversation List Panel (hidden on mobile when conversation selected) */}
         <ResizablePanel 
-          defaultSize={22} 
-          minSize={18}
-          maxSize={30}
+          defaultSize={28} 
+          minSize={22}
+          maxSize={40}
           collapsible={false}
           className={selectedConversation ? "hidden md:flex min-h-0" : "flex min-h-0"}
         >
           <div className="flex-1 flex flex-col border-r border-border/30 bg-card w-full overflow-hidden min-w-0 overflow-x-hidden">
-            <ConversationList
+            <JaceStyleInbox
               filter={filter}
-              channelFilter={channelFilter}
-              selectedId={selectedConversation?.id}
               onSelect={setSelectedConversation}
             />
           </div>
