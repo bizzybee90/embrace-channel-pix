@@ -1167,6 +1167,7 @@ export type Database = {
       }
       sender_rules: {
         Row: {
+          automation_level: string | null
           confidence_adjustment: number | null
           created_at: string | null
           created_from_correction: string | null
@@ -1179,10 +1180,12 @@ export type Database = {
           override_keywords: string[] | null
           override_requires_reply: boolean | null
           sender_pattern: string
+          tone_preference: string | null
           updated_at: string | null
           workspace_id: string | null
         }
         Insert: {
+          automation_level?: string | null
           confidence_adjustment?: number | null
           created_at?: string | null
           created_from_correction?: string | null
@@ -1195,10 +1198,12 @@ export type Database = {
           override_keywords?: string[] | null
           override_requires_reply?: boolean | null
           sender_pattern: string
+          tone_preference?: string | null
           updated_at?: string | null
           workspace_id?: string | null
         }
         Update: {
+          automation_level?: string | null
           confidence_adjustment?: number | null
           created_at?: string | null
           created_from_correction?: string | null
@@ -1211,6 +1216,7 @@ export type Database = {
           override_keywords?: string[] | null
           override_requires_reply?: boolean | null
           sender_pattern?: string
+          tone_preference?: string | null
           updated_at?: string | null
           workspace_id?: string | null
         }
