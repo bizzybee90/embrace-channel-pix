@@ -193,57 +193,46 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
       <div
         onClick={() => onSelect(conversation)}
         className={cn(
-          "flex items-center gap-3 px-4 py-3 cursor-pointer border-b border-border/30 transition-all group",
+          "flex items-center gap-2 px-3 py-2.5 cursor-pointer border-b border-border/30 transition-all",
           "border-l-4 hover:bg-muted/50",
           bucketConfig.border
         )}
       >
-        {/* Sender */}
-        <div className="w-[140px] flex-shrink-0">
+        {/* Sender - fixed width, truncate */}
+        <div className="w-24 flex-shrink-0 min-w-0">
           <span className="font-medium text-sm text-foreground truncate block">
             {customerName}
           </span>
         </div>
 
-        {/* Subject + Preview */}
-        <div className="flex-1 min-w-0">
-          <span className="text-sm text-foreground">
+        {/* Subject + Preview - fills remaining space, single line with truncation */}
+        <div className="flex-1 min-w-0 overflow-hidden">
+          <p className="text-sm text-foreground truncate">
             <span className="font-medium">{conv.title || 'No subject'}</span>
             {conv.summary_for_human && (
-              <span className="text-muted-foreground ml-1.5 hidden md:inline">
-                · {conv.summary_for_human}
-              </span>
+              <span className="text-muted-foreground ml-1">· {conv.summary_for_human}</span>
             )}
-          </span>
+          </p>
         </div>
 
-        {/* Badges */}
-        <div className="flex items-center gap-1.5 flex-shrink-0">
+        {/* Badges - stack vertically on narrow, inline on wide */}
+        <div className="flex items-center gap-1 flex-shrink-0">
           {bucketConfig.badge}
           {hasAiDraft && (
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 border-primary/30 text-primary">
+            <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 border-primary/30 text-primary">
               Draft
             </Badge>
           )}
-          {conv.category && (
-            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-5 capitalize hidden lg:inline-flex">
-              {conv.category}
-            </Badge>
-          )}
         </div>
 
-        {/* Thread Count */}
-        <div className="w-[32px] flex-shrink-0 text-center">
+        {/* Thread Count + Time - compact */}
+        <div className="flex items-center gap-2 flex-shrink-0">
           {messageCount > 1 && (
-            <span className="inline-flex items-center justify-center text-[10px] font-medium text-muted-foreground bg-muted rounded-full h-5 min-w-5 px-1.5">
+            <span className="text-[10px] font-medium text-muted-foreground bg-muted rounded-full h-4 min-w-4 px-1 flex items-center justify-center">
               {messageCount}
             </span>
           )}
-        </div>
-
-        {/* Time */}
-        <div className="w-[70px] text-right flex-shrink-0">
-          <span className="text-xs text-muted-foreground">
+          <span className="text-xs text-muted-foreground whitespace-nowrap">
             {formatTime(conv.updated_at || conv.created_at)}
           </span>
         </div>

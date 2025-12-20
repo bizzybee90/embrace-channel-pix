@@ -31,13 +31,13 @@ export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerMod
       <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0 h-full overflow-hidden">
         {/* Conversation List Panel (hidden on mobile when conversation selected) */}
         <ResizablePanel 
-          defaultSize={28} 
-          minSize={22}
-          maxSize={40}
+          defaultSize={35} 
+          minSize={30}
+          maxSize={50}
           collapsible={false}
           className={selectedConversation ? "hidden md:flex min-h-0" : "flex min-h-0"}
         >
-          <div className="flex-1 flex flex-col border-r border-border/30 bg-card w-full overflow-hidden min-w-0 overflow-x-hidden">
+          <div className="flex-1 flex flex-col border-r border-border/30 bg-card w-full overflow-hidden min-w-0">
             <JaceStyleInbox
               filter={filter}
               onSelect={setSelectedConversation}
