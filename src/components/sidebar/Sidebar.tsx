@@ -140,6 +140,31 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
               Views
             </h2>
           )}
+          
+          {/* Needs Me - Primary view (ACT_NOW + QUICK_WIN) */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div>
+                <NavLink
+                  to="/needs-me"
+                  onClick={onNavigate}
+                  className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all hover-scale`}
+                  activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
+                >
+                  <div className="flex items-center justify-center w-8 h-8 rounded-md bg-destructive/10">
+                    <AlertTriangle className="h-4 w-4 text-destructive" />
+                  </div>
+                  {!isCollapsed && <span>Needs Me</span>}
+                </NavLink>
+              </div>
+            </TooltipTrigger>
+            {isCollapsed && (
+              <TooltipContent side="right">
+                <p>Needs Me</p>
+              </TooltipContent>
+            )}
+          </Tooltip>
+
           {visibleFilters.myTickets && (
             <Tooltip>
               <TooltipTrigger asChild>
@@ -174,8 +199,8 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
                     className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all hover-scale`}
                     activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
                   >
-                    <div className="flex items-center justify-center w-8 h-8 rounded-md bg-destructive/10">
-                      <AlertTriangle className="h-4 w-4 text-destructive" />
+                    <div className="flex items-center justify-center w-8 h-8 rounded-md bg-orange-500/10">
+                      <Inbox className="h-4 w-4 text-orange-500" />
                     </div>
                     {!isCollapsed && <span>Unassigned</span>}
                   </NavLink>
@@ -212,59 +237,37 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
               )}
             </Tooltip>
           )}
-          {visibleFilters.allOpen && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div>
-                  <NavLink
-                    to="/all-open"
-                    onClick={onNavigate}
-                    className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all hover-scale`}
-                    activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
-                  >
-                    <div className="flex items-center justify-center w-8 h-8 rounded-md bg-blue-500/10">
-                      <CheckCircle2 className="h-4 w-4 text-blue-500" />
-                    </div>
-                    {!isCollapsed && <span>Action Required</span>}
-                  </NavLink>
-                </div>
-              </TooltipTrigger>
-              {isCollapsed && (
-                <TooltipContent side="right">
-                  <p>Action Required</p>
-                </TooltipContent>
-              )}
-            </Tooltip>
-          )}
-          {/* Triaged - Auto-processed emails */}
+          
+          {/* Snoozed - WAIT bucket (should be rare) */}
           <Tooltip>
             <TooltipTrigger asChild>
               <div>
                 <NavLink
-                  to="/triaged"
+                  to="/snoozed"
                   onClick={onNavigate}
                   className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all hover-scale`}
                   activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
                 >
-                  <div className="flex items-center justify-center w-8 h-8 rounded-md bg-slate-500/10">
-                    <Filter className="h-4 w-4 text-slate-500" />
+                  <div className="flex items-center justify-center w-8 h-8 rounded-md bg-blue-500/10">
+                    <Clock className="h-4 w-4 text-blue-500" />
                   </div>
-                  {!isCollapsed && <span>Triaged</span>}
+                  {!isCollapsed && <span>Snoozed</span>}
                 </NavLink>
               </div>
             </TooltipTrigger>
             {isCollapsed && (
               <TooltipContent side="right">
-                <p>Triaged</p>
+                <p>Snoozed</p>
               </TooltipContent>
             )}
           </Tooltip>
-          {/* Completed - Always visible in Views */}
+          
+          {/* Cleared - AUTO_HANDLED + resolved (trust-building view) */}
           <Tooltip>
             <TooltipTrigger asChild>
               <div>
                 <NavLink
-                  to="/completed"
+                  to="/cleared"
                   onClick={onNavigate}
                   className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all hover-scale`}
                   activeClassName="bg-accent text-accent-foreground font-medium shadow-sm"
@@ -272,13 +275,13 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
                   <div className="flex items-center justify-center w-8 h-8 rounded-md bg-green-500/10">
                     <CheckCheck className="h-4 w-4 text-green-500" />
                   </div>
-                  {!isCollapsed && <span>Completed</span>}
+                  {!isCollapsed && <span>Cleared</span>}
                 </NavLink>
               </div>
             </TooltipTrigger>
             {isCollapsed && (
               <TooltipContent side="right">
-                <p>Completed</p>
+                <p>Cleared</p>
               </TooltipContent>
             )}
           </Tooltip>
@@ -307,7 +310,7 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
             )}
           </Tooltip>
           
-          {/* Sent - Always visible in Views */}
+          {/* Sent */}
           <Tooltip>
             <TooltipTrigger asChild>
               <div>
