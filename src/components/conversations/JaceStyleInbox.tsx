@@ -142,40 +142,43 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
 
   // Channel icon is now handled by ChannelIcon component
 
+  // Fixed width for all status badges to ensure consistent alignment
+  const BADGE_CLASS = "text-[10px] px-2 py-0 h-5 min-w-[90px] text-center justify-center";
+  
   // State-based labels: what does the user need to DO, not how hard is it
   const getStateConfig = (bucket: string, hasAiDraft: boolean) => {
     if (bucket === 'act_now') {
       return { 
         border: 'border-l-red-500', 
-        badge: <Badge variant="destructive" className="text-[10px] px-1.5 py-0 h-5 font-medium">Needs attention</Badge>,
+        badge: <Badge variant="destructive" className={`${BADGE_CLASS} font-medium`}>Needs attention</Badge>,
         rowClass: 'bg-red-50/50 dark:bg-red-950/20' // Subtle urgency tint
       };
     }
     if (bucket === 'quick_win' && hasAiDraft) {
       return { 
         border: 'border-l-purple-500', 
-        badge: <Badge className="bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 hover:bg-purple-200 text-[10px] px-1.5 py-0 h-5">Draft ready</Badge>,
+        badge: <Badge className={`bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 hover:bg-purple-200 ${BADGE_CLASS}`}>Draft ready</Badge>,
         rowClass: ''
       };
     }
     if (bucket === 'quick_win') {
       return { 
         border: 'border-l-amber-500', 
-        badge: <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 hover:bg-amber-200 text-[10px] px-1.5 py-0 h-5">Needs reply</Badge>,
+        badge: <Badge className={`bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 hover:bg-amber-200 ${BADGE_CLASS}`}>Needs reply</Badge>,
         rowClass: ''
       };
     }
     if (bucket === 'wait') {
       return { 
         border: 'border-l-slate-400', 
-        badge: <Badge className="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 hover:bg-slate-200 text-[10px] px-1.5 py-0 h-5">FYI</Badge>,
+        badge: <Badge className={`bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 hover:bg-slate-200 ${BADGE_CLASS}`}>FYI</Badge>,
         rowClass: ''
       };
     }
     if (bucket === 'auto_handled') {
       return { 
         border: 'border-l-green-500', 
-        badge: <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 hover:bg-green-200 text-[10px] px-1.5 py-0 h-5">Done</Badge>,
+        badge: <Badge className={`bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 hover:bg-green-200 ${BADGE_CLASS}`}>Done</Badge>,
         rowClass: ''
       };
     }
