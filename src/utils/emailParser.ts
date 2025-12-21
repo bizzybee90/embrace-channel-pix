@@ -1,10 +1,46 @@
 /**
+ * Decodes HTML entities in text
+ */
+function decodeHtmlEntities(text: string): string {
+  return text
+    .replace(/&zwnj;/g, '')              // Remove zero-width non-joiner
+    .replace(/&#8203;/g, '')             // Zero-width space
+    .replace(/&#x200b;/g, '')            // Zero-width space (hex)
+    .replace(/&#160;/g, ' ')             // Non-breaking space (numeric)
+    .replace(/&nbsp;/g, ' ')             // Non-breaking space (named)
+    .replace(/&#xa0;/g, ' ')             // Non-breaking space (hex)
+    .replace(/&amp;/g, '&')              // Ampersand
+    .replace(/&lt;/g, '<')               // Less than
+    .replace(/&gt;/g, '>')               // Greater than
+    .replace(/&quot;/g, '"')             // Quote
+    .replace(/&#39;/g, "'")              // Apostrophe
+    .replace(/&apos;/g, "'")             // Apostrophe (named)
+    .replace(/&#34;/g, '"')              // Quote (numeric)
+    .replace(/&copy;/g, '©')             // Copyright
+    .replace(/&reg;/g, '®')              // Registered
+    .replace(/&trade;/g, '™')            // Trademark
+    .replace(/&sup1;/g, '¹')             // Superscript 1
+    .replace(/&sup2;/g, '²')             // Superscript 2
+    .replace(/&sup3;/g, '³')             // Superscript 3
+    .replace(/&bull;/g, '•')             // Bullet
+    .replace(/&middot;/g, '·')           // Middle dot
+    .replace(/&hellip;/g, '...')         // Ellipsis
+    .replace(/&ndash;/g, '-')            // En dash
+    .replace(/&mdash;/g, '—')            // Em dash
+    .replace(/&#\d+;/g, '')              // Remove any remaining numeric entities
+    .replace(/&[a-zA-Z]+;/g, '')         // Remove any remaining named entities
+    .replace(/\s{3,}/g, ' ')             // Collapse excessive whitespace
+    .trim();
+}
+
+/**
  * Cleans email content by stripping signatures, quoted replies, and legal disclaimers
  */
 export function cleanEmailContent(rawContent: string): string {
   if (!rawContent) return '';
   
-  let content = rawContent;
+  // First decode HTML entities
+  let content = decodeHtmlEntities(rawContent);
   
   // Remove quoted replies (lines starting with >)
   content = content.replace(/^>.*$/gm, '');

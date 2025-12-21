@@ -14,16 +14,24 @@ import {
   Sparkles,
   Brain,
   TrendingUp,
-  BookOpen
+  BookOpen,
+  Activity,
+  FileEdit,
+  Users
 } from 'lucide-react';
 import beeLogo from '@/assets/bee-logo.png';
 import { formatDistanceToNow } from 'date-fns';
+import { ActivityFeed } from '@/components/dashboard/ActivityFeed';
+import { DraftMessages } from '@/components/dashboard/DraftMessages';
+import { HumanAIActivityLog } from '@/components/dashboard/HumanAIActivityLog';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface HomeStats {
   clearedToday: number;
   toReplyCount: number;
   atRiskCount: number;
   reviewCount: number;
+  draftCount: number;
   lastHandled: Date | null;
 }
 
@@ -42,6 +50,7 @@ export const Home = () => {
     toReplyCount: 0,
     atRiskCount: 0,
     reviewCount: 0,
+    draftCount: 0,
     lastHandled: null,
   });
   const [learningMetrics, setLearningMetrics] = useState<LearningMetrics>({
@@ -68,6 +77,7 @@ export const Home = () => {
           toReplyResult, 
           atRiskResult, 
           reviewResult,
+          draftResult,
           lastHandledResult,
           rulesResult,
           reviewedResult
@@ -100,6 +110,16 @@ export const Home = () => {
             .eq('workspace_id', workspace.id)
             .eq('needs_review', true)
             .is('reviewed_at', null),
+          // Draft count
+          supabase
+            .from('conversations')
+            .select('id', { count: 'exact', head: true })
+            .eq('workspace_id', workspace.id)
+            .not('ai_draft_response', 'is', null)
+            .is('final_response', null)
+            .in('status', ['new', 'open', 'ai_handling'])
+            .in('decision_bucket', ['quick_win', 'act_now'])
+            .eq('requires_reply', true),
           // Last handled conversation
           supabase
             .from('conversations')
@@ -134,6 +154,7 @@ export const Home = () => {
           toReplyCount: toReplyResult.count || 0,
           atRiskCount: atRiskResult.count || 0,
           reviewCount: reviewResult.count || 0,
+          draftCount: draftResult.count || 0,
           lastHandled: lastHandledResult.data?.[0]?.auto_handled_at 
             ? new Date(lastHandledResult.data[0].auto_handled_at) 
             : null,
@@ -183,173 +204,202 @@ export const Home = () => {
     return 'Good evening';
   };
 
+  const handleNavigate = (path: string) => {
+    navigate(path);
+  };
+
   const mainContent = (
-    <div className="flex flex-col items-center justify-center min-h-[80vh] p-8">
-      {loading ? (
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading...</p>
-        </div>
-      ) : (
-        <div className="w-full max-w-lg space-y-8">
-          {/* Executive Briefing - Jace-inspired */}
-          <div className="text-center space-y-4">
-            <div className="flex justify-center">
-              <img src={beeLogo} alt="BizzyBee" className="h-16 w-16 rounded-2xl" />
-            </div>
-            <div className="space-y-2">
-              <h1 className="text-2xl font-semibold text-foreground">
-                {getGreeting()}
-              </h1>
-              <p className="text-lg text-muted-foreground">
-                {stats.clearedToday > 0 ? (
-                  <>BizzyBee handled <span className="font-semibold text-foreground">{stats.clearedToday} messages</span> for you today</>
-                ) : (
-                  'BizzyBee is ready to help'
-                )}
-              </p>
-              {stats.toReplyCount > 0 && (
-                <p className="text-base text-muted-foreground">
-                  <span className="font-semibold text-destructive">{stats.toReplyCount}</span> need{stats.toReplyCount === 1 ? 's' : ''} your attention
-                </p>
-              )}
-              {stats.lastHandled && (
-                <p className="text-sm text-muted-foreground/70">
-                  Last message handled {formatDistanceToNow(stats.lastHandled, { addSuffix: true })}
-                </p>
-              )}
+    <ScrollArea className="h-[calc(100vh-4rem)]">
+      <div className="p-6 space-y-6">
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+              <p className="text-muted-foreground">Loading...</p>
             </div>
           </div>
+        ) : (
+          <>
+            {/* Header with greeting */}
+            <div className="flex items-center gap-4">
+              <img src={beeLogo} alt="BizzyBee" className="h-12 w-12 rounded-xl" />
+              <div>
+                <h1 className="text-xl font-semibold text-foreground">
+                  {getGreeting()}
+                </h1>
+                <p className="text-sm text-muted-foreground">
+                  {stats.clearedToday > 0 ? (
+                    <>BizzyBee handled <span className="font-medium text-foreground">{stats.clearedToday}</span> messages today</>
+                  ) : (
+                    'BizzyBee is ready to help'
+                  )}
+                  {stats.lastHandled && (
+                    <> • Last: {formatDistanceToNow(stats.lastHandled, { addSuffix: true })}</>
+                  )}
+                </p>
+              </div>
+            </div>
 
-          {/* Action Cards */}
-          <div className="grid grid-cols-1 gap-4">
-            {/* To Reply */}
-            {stats.toReplyCount > 0 && (
+            {/* Quick Stats Row */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {/* To Reply */}
               <Card 
-                className="p-5 cursor-pointer hover:bg-accent/50 transition-colors border-l-4 border-l-destructive"
+                className="p-4 cursor-pointer hover:bg-accent/50 transition-colors"
                 onClick={() => navigate('/to-reply')}
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="p-2 rounded-lg bg-destructive/10">
-                      <Mail className="h-5 w-5 text-destructive" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-foreground">To Reply</p>
-                      <p className="text-sm text-muted-foreground">Needs your attention</p>
-                    </div>
-                  </div>
-                  <span className="text-2xl font-bold text-destructive">{stats.toReplyCount}</span>
-                </div>
-              </Card>
-            )}
-
-            {/* Review Queue */}
-            {stats.reviewCount > 0 && (
-              <Card 
-                className="p-5 cursor-pointer hover:bg-accent/50 transition-colors border-l-4 border-l-purple-500"
-                onClick={() => navigate('/review')}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="p-2 rounded-lg bg-purple-500/10">
-                      <Sparkles className="h-5 w-5 text-purple-500" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-foreground">Review Queue</p>
-                      <p className="text-sm text-muted-foreground">Help BizzyBee learn</p>
-                    </div>
-                  </div>
-                  <span className="text-2xl font-bold text-purple-500">{stats.reviewCount}</span>
-                </div>
-              </Card>
-            )}
-
-            {/* At Risk */}
-            {stats.atRiskCount > 0 && (
-              <Card 
-                className="p-5 cursor-pointer hover:bg-accent/50 transition-colors border-l-4 border-l-amber-500"
-                onClick={() => navigate('/to-reply')}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="p-2 rounded-lg bg-amber-500/10">
-                      <AlertTriangle className="h-5 w-5 text-amber-500" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-foreground">At Risk</p>
-                      <p className="text-sm text-muted-foreground">SLA approaching</p>
-                    </div>
-                  </div>
-                  <span className="text-2xl font-bold text-amber-500">{stats.atRiskCount}</span>
-                </div>
-              </Card>
-            )}
-
-            {/* All caught up state */}
-            {stats.toReplyCount === 0 && stats.reviewCount === 0 && stats.atRiskCount === 0 && (
-              <Card className="p-6 text-center border-l-4 border-l-green-500">
-                <div className="flex flex-col items-center gap-3">
-                  <div className="p-3 rounded-full bg-green-500/10">
-                    <CheckCircle2 className="h-6 w-6 text-green-500" />
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-destructive/10">
+                    <Mail className="h-4 w-4 text-destructive" />
                   </div>
                   <div>
+                    <p className="text-2xl font-bold text-foreground">{stats.toReplyCount}</p>
+                    <p className="text-xs text-muted-foreground">To Reply</p>
+                  </div>
+                </div>
+              </Card>
+
+              {/* Drafts Ready */}
+              <Card 
+                className="p-4 cursor-pointer hover:bg-accent/50 transition-colors"
+                onClick={() => navigate('/to-reply')}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-warning/10">
+                    <FileEdit className="h-4 w-4 text-warning" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-foreground">{stats.draftCount}</p>
+                    <p className="text-xs text-muted-foreground">Drafts Ready</p>
+                  </div>
+                </div>
+              </Card>
+
+              {/* Review Queue */}
+              <Card 
+                className="p-4 cursor-pointer hover:bg-accent/50 transition-colors"
+                onClick={() => navigate('/review')}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-purple-500/10">
+                    <Sparkles className="h-4 w-4 text-purple-500" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-foreground">{stats.reviewCount}</p>
+                    <p className="text-xs text-muted-foreground">Review</p>
+                  </div>
+                </div>
+              </Card>
+
+              {/* At Risk */}
+              <Card 
+                className="p-4 cursor-pointer hover:bg-accent/50 transition-colors"
+                onClick={() => navigate('/to-reply')}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-amber-500/10">
+                    <AlertTriangle className="h-4 w-4 text-amber-500" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-foreground">{stats.atRiskCount}</p>
+                    <p className="text-xs text-muted-foreground">At Risk</p>
+                  </div>
+                </div>
+              </Card>
+            </div>
+
+            {/* All caught up banner */}
+            {stats.toReplyCount === 0 && stats.reviewCount === 0 && stats.atRiskCount === 0 && (
+              <Card className="p-4 border-l-4 border-l-success bg-success/5">
+                <div className="flex items-center gap-3">
+                  <CheckCircle2 className="h-5 w-5 text-success" />
+                  <div>
                     <p className="font-medium text-foreground">You're all caught up!</p>
-                    <p className="text-sm text-muted-foreground">
-                      BizzyBee is handling your inbox
-                    </p>
+                    <p className="text-sm text-muted-foreground">BizzyBee is handling your inbox</p>
                   </div>
                 </div>
               </Card>
             )}
-          </div>
 
-          {/* Learning Metrics - QuickBooks-inspired */}
-          {(learningMetrics.rulesLearnedThisMonth > 0 || learningMetrics.totalReviewed > 0) && (
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Brain className="h-4 w-4" />
-                <span>BizzyBee is learning</span>
-              </div>
-              <div className="grid grid-cols-3 gap-3">
-                <div className="bg-muted/30 rounded-lg p-3 text-center">
-                  <div className="flex items-center justify-center gap-1 text-lg font-semibold text-foreground">
-                    <BookOpen className="h-4 w-4 text-purple-500" />
-                    {learningMetrics.rulesLearnedThisMonth}
-                  </div>
-                  <p className="text-xs text-muted-foreground">Rules learned</p>
+            {/* Main Content Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Drafts Section */}
+              <Card className="p-4">
+                <div className="flex items-center gap-2 mb-4">
+                  <FileEdit className="h-4 w-4 text-warning" />
+                  <h2 className="font-semibold text-foreground">Pending Drafts</h2>
                 </div>
-                {learningMetrics.totalReviewed > 0 && (
-                  <div className="bg-muted/30 rounded-lg p-3 text-center">
-                    <div className="flex items-center justify-center gap-1 text-lg font-semibold text-foreground">
-                      <TrendingUp className="h-4 w-4 text-green-500" />
-                      {learningMetrics.accuracyRate}%
+                <DraftMessages onNavigate={handleNavigate} maxItems={4} />
+              </Card>
+
+              {/* Activity Feed */}
+              <Card className="p-4">
+                <div className="flex items-center gap-2 mb-4">
+                  <Activity className="h-4 w-4 text-primary" />
+                  <h2 className="font-semibold text-foreground">Recent Activity</h2>
+                </div>
+                <ActivityFeed onNavigate={handleNavigate} />
+              </Card>
+
+              {/* Right Column: Learning + Activity Log */}
+              <div className="space-y-4">
+                {/* Learning Metrics */}
+                {(learningMetrics.rulesLearnedThisMonth > 0 || learningMetrics.totalReviewed > 0) && (
+                  <Card className="p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Brain className="h-4 w-4 text-purple-500" />
+                      <h2 className="font-semibold text-foreground">Learning</h2>
                     </div>
-                    <p className="text-xs text-muted-foreground">Accuracy</p>
-                  </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="bg-muted/30 rounded-lg p-2 text-center">
+                        <div className="flex items-center justify-center gap-1 text-lg font-semibold text-foreground">
+                          <BookOpen className="h-3.5 w-3.5 text-purple-500" />
+                          {learningMetrics.rulesLearnedThisMonth}
+                        </div>
+                        <p className="text-[10px] text-muted-foreground">Rules</p>
+                      </div>
+                      {learningMetrics.totalReviewed > 0 && (
+                        <div className="bg-muted/30 rounded-lg p-2 text-center">
+                          <div className="flex items-center justify-center gap-1 text-lg font-semibold text-foreground">
+                            <TrendingUp className="h-3.5 w-3.5 text-success" />
+                            {learningMetrics.accuracyRate}%
+                          </div>
+                          <p className="text-[10px] text-muted-foreground">Accuracy</p>
+                        </div>
+                      )}
+                      <div className="bg-muted/30 rounded-lg p-2 text-center">
+                        <div className="flex items-center justify-center gap-1 text-lg font-semibold text-foreground">
+                          <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+                          {learningMetrics.totalReviewed}
+                        </div>
+                        <p className="text-[10px] text-muted-foreground">Reviewed</p>
+                      </div>
+                    </div>
+                  </Card>
                 )}
-                <div className="bg-muted/30 rounded-lg p-3 text-center">
-                  <div className="flex items-center justify-center gap-1 text-lg font-semibold text-foreground">
-                    <Sparkles className="h-4 w-4 text-amber-500" />
-                    {learningMetrics.totalReviewed}
+
+                {/* Human + AI Activity Log */}
+                <Card className="p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Users className="h-4 w-4 text-success" />
+                    <h2 className="font-semibold text-foreground">Human + AI Log</h2>
                   </div>
-                  <p className="text-xs text-muted-foreground">Reviewed</p>
-                </div>
+                  <HumanAIActivityLog onNavigate={handleNavigate} maxItems={6} />
+                </Card>
               </div>
             </div>
-          )}
 
-          {/* System Status */}
-          <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-            <CheckCircle2 className="h-4 w-4 text-green-500" />
-            <span>System active</span>
-            <span className="text-muted-foreground/50">•</span>
-            <Clock className="h-4 w-4" />
-            <span>Checking every minute</span>
-          </div>
-        </div>
-      )}
-    </div>
+            {/* System Status Footer */}
+            <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground pt-4">
+              <CheckCircle2 className="h-3 w-3 text-success" />
+              <span>System active</span>
+              <span className="text-muted-foreground/50">•</span>
+              <Clock className="h-3 w-3" />
+              <span>Checking every minute</span>
+            </div>
+          </>
+        )}
+      </div>
+    </ScrollArea>
   );
 
   if (isMobile) {
