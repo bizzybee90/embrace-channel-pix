@@ -11,9 +11,9 @@ import {
   FileEdit, 
   ChevronRight,
   Loader2,
-  AlertCircle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { DraftPreviewSheet } from './DraftPreviewSheet';
 
 interface DraftMessage {
   id: string;
@@ -35,6 +35,7 @@ export function DraftMessages({ onNavigate, maxItems = 5 }: DraftMessagesProps) 
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [sending, setSending] = useState(false);
+  const [previewId, setPreviewId] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchDrafts = async () => {
@@ -263,7 +264,7 @@ export function DraftMessages({ onNavigate, maxItems = 5 }: DraftMessagesProps) 
               />
               <div 
                 className="flex-1 min-w-0"
-                onClick={() => onNavigate?.(`/to-reply?id=${draft.id}`)}
+                onClick={() => setPreviewId(draft.id)}
               >
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-sm font-medium text-foreground truncate">
@@ -294,6 +295,12 @@ export function DraftMessages({ onNavigate, maxItems = 5 }: DraftMessagesProps) 
           <ChevronRight className="h-4 w-4 ml-1" />
         </Button>
       )}
+
+      <DraftPreviewSheet
+        conversationId={previewId}
+        open={!!previewId}
+        onOpenChange={(open) => !open && setPreviewId(null)}
+      />
     </div>
   );
 }
