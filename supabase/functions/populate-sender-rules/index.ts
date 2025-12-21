@@ -9,6 +9,7 @@ const corsHeaders = {
 // ============================================
 // POPULATE SENDER RULES FROM HISTORICAL DATA
 // Seeds sender_rules table with known patterns
+// Uses ON CONFLICT to prevent duplicates
 // ============================================
 
 interface SenderPattern {
@@ -82,48 +83,49 @@ serve(async (req) => {
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
-    let insertedCount = 0;
+    let seededCount = 0;
     let skippedCount = 0;
+    let learnedCount = 0;
 
     if (mode === 'seed' || mode === 'both') {
-      // Seed known patterns
+      console.log(`[PopulateSenderRules] Seeding ${KNOWN_AUTO_HANDLED_PATTERNS.length} known patterns for workspace ${workspace_id}`);
+      
+      // Use upsert with onConflict to handle duplicates gracefully
       for (const pattern of KNOWN_AUTO_HANDLED_PATTERNS) {
-        // Check if rule already exists
-        const { data: existing } = await supabase
+        const { data, error } = await supabase
           .from('sender_rules')
-          .select('id')
-          .eq('workspace_id', workspace_id)
-          .eq('sender_pattern', pattern.pattern)
-          .maybeSingle();
-
-        if (existing) {
-          skippedCount++;
-          continue;
-        }
-
-        const { error } = await supabase
-          .from('sender_rules')
-          .insert({
+          .upsert({
             workspace_id,
             sender_pattern: pattern.pattern,
             default_classification: pattern.classification,
             default_requires_reply: pattern.requires_reply,
             is_active: true,
-          });
+          }, {
+            onConflict: 'workspace_id,sender_pattern',
+            ignoreDuplicates: true
+          })
+          .select('id');
 
-        if (!error) {
-          insertedCount++;
+        if (error) {
+          // If it's a duplicate error, count as skipped
+          if (error.code === '23505') {
+            skippedCount++;
+          } else {
+            console.error('[PopulateSenderRules] Error inserting:', pattern.pattern, error);
+          }
+        } else if (data && data.length > 0) {
+          seededCount++;
         } else {
-          console.error('[PopulateSenderRules] Error inserting:', pattern.pattern, error);
+          skippedCount++;
         }
       }
-      console.log(`[PopulateSenderRules] Seeded ${insertedCount} known patterns, skipped ${skippedCount} existing`);
+      
+      console.log(`[PopulateSenderRules] Seeded ${seededCount} new patterns, skipped ${skippedCount} existing`);
     }
 
-    let learnedCount = 0;
     if (mode === 'learn' || mode === 'both') {
       // Learn from historical conversations
-      // Find senders that are consistently auto_handled or quick_win
+      console.log(`[PopulateSenderRules] Learning from historical conversations for workspace ${workspace_id}`);
       
       const { data: bucketStats, error: statsError } = await supabase
         .from('messages')
@@ -169,29 +171,23 @@ serve(async (req) => {
         // Create rules for domains that are >80% auto-handled with >3 messages
         for (const [domain, stats] of Object.entries(domainStats)) {
           if (stats.total >= 3 && stats.auto / stats.total >= 0.8) {
-            // Check if rule already exists
-            const { data: existing } = await supabase
+            const { data, error } = await supabase
               .from('sender_rules')
-              .select('id')
-              .eq('workspace_id', workspace_id)
-              .ilike('sender_pattern', `%${domain}%`)
-              .maybeSingle();
+              .upsert({
+                workspace_id,
+                sender_pattern: `@${domain}`,
+                default_classification: 'automated_notification',
+                default_requires_reply: false,
+                is_active: true,
+              }, {
+                onConflict: 'workspace_id,sender_pattern',
+                ignoreDuplicates: true
+              })
+              .select('id');
 
-            if (!existing) {
-              const { error } = await supabase
-                .from('sender_rules')
-                .insert({
-                  workspace_id,
-                  sender_pattern: `@${domain}`,
-                  default_classification: 'automated_notification',
-                  default_requires_reply: false,
-                  is_active: true,
-                });
-
-              if (!error) {
-                learnedCount++;
-                console.log(`[PopulateSenderRules] Learned rule for @${domain} (${stats.auto}/${stats.total} auto-handled)`);
-              }
+            if (!error && data && data.length > 0) {
+              learnedCount++;
+              console.log(`[PopulateSenderRules] Learned rule for @${domain} (${stats.auto}/${stats.total} auto-handled)`);
             }
           }
         }
@@ -200,9 +196,9 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({
       success: true,
-      seeded_count: insertedCount,
-      skipped_count: skippedCount,
-      learned_count: learnedCount,
+      seeded: seededCount,
+      skipped: skippedCount,
+      learned: learnedCount,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });

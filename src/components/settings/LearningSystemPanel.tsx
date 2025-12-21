@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/hooks/useWorkspace';
@@ -16,8 +15,11 @@ import {
   AlertCircle,
   TrendingUp,
   Loader2,
-  Play
+  Play,
+  Zap,
+  Info
 } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface BootstrapStats {
   senderRulesCount: number;
@@ -25,6 +27,7 @@ interface BootstrapStats {
   triageCorrectionsCount: number;
   conversationsWithConfidence: number;
   totalConversations: number;
+  uniqueRulesCount: number;
 }
 
 export function LearningSystemPanel() {
@@ -34,8 +37,14 @@ export function LearningSystemPanel() {
   
   const [populatingRules, setPopulatingRules] = useState(false);
   const [computingStats, setComputingStats] = useState(false);
-  const [rulesPopulated, setRulesPopulated] = useState(0);
-  const [statsComputed, setStatsComputed] = useState(0);
+  const [applyingRules, setApplyingRules] = useState(false);
+  const [lastResult, setLastResult] = useState<{
+    seeded?: number;
+    learned?: number;
+    skipped?: number;
+    statsUpdated?: number;
+    retriaged?: number;
+  } | null>(null);
 
   // Fetch current stats
   const { data: stats, isLoading: loadingStats, refetch: refetchStats } = useQuery({
@@ -48,16 +57,20 @@ export function LearningSystemPanel() {
           triageCorrectionsCount: 0,
           conversationsWithConfidence: 0,
           totalConversations: 0,
+          uniqueRulesCount: 0,
         };
       }
 
       const [rulesRes, statsRes, correctionsRes, confidenceRes, totalRes] = await Promise.all([
-        supabase.from('sender_rules').select('id', { count: 'exact', head: true }).eq('workspace_id', workspace.id),
+        supabase.from('sender_rules').select('sender_pattern', { count: 'exact' }).eq('workspace_id', workspace.id),
         supabase.from('sender_behaviour_stats').select('id', { count: 'exact', head: true }).eq('workspace_id', workspace.id),
         supabase.from('triage_corrections').select('id', { count: 'exact', head: true }).eq('workspace_id', workspace.id),
         supabase.from('conversations').select('id', { count: 'exact', head: true }).eq('workspace_id', workspace.id).not('triage_confidence', 'is', null),
         supabase.from('conversations').select('id', { count: 'exact', head: true }).eq('workspace_id', workspace.id),
       ]);
+
+      // Count unique patterns
+      const uniquePatterns = new Set((rulesRes.data || []).map(r => r.sender_pattern));
 
       return {
         senderRulesCount: rulesRes.count || 0,
@@ -65,6 +78,7 @@ export function LearningSystemPanel() {
         triageCorrectionsCount: correctionsRes.count || 0,
         conversationsWithConfidence: confidenceRes.count || 0,
         totalConversations: totalRes.count || 0,
+        uniqueRulesCount: uniquePatterns.size,
       };
     },
     enabled: !!workspace?.id,
@@ -75,28 +89,32 @@ export function LearningSystemPanel() {
     if (!workspace?.id) return;
     
     setPopulatingRules(true);
-    setRulesPopulated(0);
+    setLastResult(null);
 
     try {
       const { data, error } = await supabase.functions.invoke('populate-sender-rules', {
         body: { 
           workspace_id: workspace.id, 
-          mode: 'both' // seed known patterns + learn from history
+          mode: 'both'
         }
       });
 
       if (error) throw error;
 
-      const totalAdded = (data?.seeded || 0) + (data?.learned || 0);
-      setRulesPopulated(totalAdded);
+      setLastResult({
+        seeded: data?.seeded || 0,
+        learned: data?.learned || 0,
+        skipped: data?.skipped || 0,
+      });
 
       toast({
-        title: 'Sender Rules Populated',
+        title: 'Sender Rules Updated',
         description: `Added ${data?.seeded || 0} known patterns, learned ${data?.learned || 0} from history. ${data?.skipped || 0} already existed.`,
       });
 
       refetchStats();
       queryClient.invalidateQueries({ queryKey: ['sender-rules'] });
+      queryClient.invalidateQueries({ queryKey: ['behavior-stats'] });
     } catch (error) {
       console.error('Error populating sender rules:', error);
       toast({
@@ -113,7 +131,6 @@ export function LearningSystemPanel() {
     if (!workspace?.id) return;
 
     setComputingStats(true);
-    setStatsComputed(0);
 
     try {
       const { data, error } = await supabase.functions.invoke('compute-sender-stats', {
@@ -122,7 +139,10 @@ export function LearningSystemPanel() {
 
       if (error) throw error;
 
-      setStatsComputed(data?.stats_updated || 0);
+      setLastResult(prev => ({
+        ...prev,
+        statsUpdated: data?.stats_updated || 0,
+      }));
 
       toast({
         title: 'Sender Stats Computed',
@@ -130,6 +150,7 @@ export function LearningSystemPanel() {
       });
 
       refetchStats();
+      queryClient.invalidateQueries({ queryKey: ['behavior-stats'] });
     } catch (error) {
       console.error('Error computing sender stats:', error);
       toast({
@@ -139,6 +160,46 @@ export function LearningSystemPanel() {
       });
     } finally {
       setComputingStats(false);
+    }
+  };
+
+  const handleApplyRulesToExisting = async () => {
+    if (!workspace?.id) return;
+
+    setApplyingRules(true);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('bulk-retriage-conversations', {
+        body: { 
+          workspace_id: workspace.id,
+          skipLLM: true, // Only apply sender rules, don't call AI
+          status: 'all'
+        }
+      });
+
+      if (error) throw error;
+
+      setLastResult(prev => ({
+        ...prev,
+        retriaged: data?.processed || 0,
+      }));
+
+      toast({
+        title: 'Rules Applied to Existing Emails',
+        description: `Re-sorted ${data?.processed || 0} existing emails using sender rules. ${data?.updated || 0} were updated.`,
+      });
+
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      refetchStats();
+    } catch (error) {
+      console.error('Error applying rules:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to apply rules to existing emails',
+        variant: 'destructive',
+      });
+    } finally {
+      setApplyingRules(false);
     }
   };
 
@@ -155,7 +216,7 @@ export function LearningSystemPanel() {
   const getHealthStatus = () => {
     if (!stats) return 'unknown';
     
-    const hasRules = stats.senderRulesCount > 0;
+    const hasRules = stats.uniqueRulesCount > 0;
     const hasStats = stats.senderStatsCount > 0;
     const hasConfidence = stats.conversationsWithConfidence > 0;
     
@@ -206,20 +267,63 @@ export function LearningSystemPanel() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* Last Result Summary */}
+        {lastResult && (
+          <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4 text-sm">
+            <h4 className="font-medium text-green-700 mb-2 flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4" />
+              Last Bootstrap Result
+            </h4>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-green-600">
+              {lastResult.seeded !== undefined && (
+                <span>✓ {lastResult.seeded} rules seeded</span>
+              )}
+              {lastResult.learned !== undefined && (
+                <span>✓ {lastResult.learned} patterns learned</span>
+              )}
+              {lastResult.skipped !== undefined && (
+                <span>○ {lastResult.skipped} already existed</span>
+              )}
+              {lastResult.statsUpdated !== undefined && (
+                <span>✓ {lastResult.statsUpdated} stats updated</span>
+              )}
+              {lastResult.retriaged !== undefined && (
+                <span>✓ {lastResult.retriaged} emails re-sorted</span>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Current Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-muted/50 rounded-lg p-4">
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
               <Database className="h-4 w-4" />
               Sender Rules
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="h-3 w-3 text-muted-foreground/50 cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="max-w-xs">Rules that automatically classify emails before AI runs. Emails from @stripe.com, @indeed.com, etc. are handled instantly.</p>
+                </TooltipContent>
+              </Tooltip>
             </div>
-            <p className="text-2xl font-semibold">{stats?.senderRulesCount || 0}</p>
+            <p className="text-2xl font-semibold">{stats?.uniqueRulesCount || 0}</p>
             <p className="text-xs text-muted-foreground">Layer A: Gatekeeper</p>
           </div>
           <div className="bg-muted/50 rounded-lg p-4">
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
               <TrendingUp className="h-4 w-4" />
               Behavior Stats
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="h-3 w-3 text-muted-foreground/50 cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="max-w-xs">Historical data about how you handle emails from each sender domain. Used to suggest new rules.</p>
+                </TooltipContent>
+              </Tooltip>
             </div>
             <p className="text-2xl font-semibold">{stats?.senderStatsCount || 0}</p>
             <p className="text-xs text-muted-foreground">Domains tracked</p>
@@ -228,6 +332,14 @@ export function LearningSystemPanel() {
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
               <Sparkles className="h-4 w-4" />
               Corrections
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="h-3 w-3 text-muted-foreground/50 cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="max-w-xs">When you reclassify an email, it creates a correction. After 3+ corrections for the same sender, a rule is auto-created.</p>
+                </TooltipContent>
+              </Tooltip>
             </div>
             <p className="text-2xl font-semibold">{stats?.triageCorrectionsCount || 0}</p>
             <p className="text-xs text-muted-foreground">User feedback</p>
@@ -247,6 +359,38 @@ export function LearningSystemPanel() {
               {stats?.conversationsWithConfidence || 0} / {stats?.totalConversations || 0}
             </p>
           </div>
+        </div>
+
+        {/* Apply Rules to Existing - Prominent */}
+        <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h4 className="font-medium flex items-center gap-2">
+                <Zap className="h-4 w-4 text-primary" />
+                Apply Rules to Existing Emails
+              </h4>
+              <p className="text-sm text-muted-foreground mt-1">
+                Re-sort all existing emails using your sender rules. This applies rules to emails that arrived before the rules existed.
+              </p>
+            </div>
+            <Button 
+              onClick={handleApplyRulesToExisting}
+              disabled={applyingRules || (stats?.uniqueRulesCount || 0) === 0}
+              variant="default"
+            >
+              {applyingRules ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Zap className="h-4 w-4 mr-2" />
+              )}
+              Apply Now
+            </Button>
+          </div>
+          {(stats?.uniqueRulesCount || 0) === 0 && (
+            <p className="text-xs text-amber-600 mt-2">
+              ⚠️ No sender rules configured. Click "Bootstrap Now" first to add rules.
+            </p>
+          )}
         </div>
 
         {/* Bootstrap Actions */}
@@ -286,11 +430,6 @@ export function LearningSystemPanel() {
                   </p>
                 </div>
               </div>
-              {rulesPopulated > 0 && (
-                <div className="text-sm text-green-600">
-                  ✓ Added {rulesPopulated} rules
-                </div>
-              )}
               <Button 
                 variant="outline" 
                 onClick={handlePopulateSenderRules}
@@ -319,11 +458,6 @@ export function LearningSystemPanel() {
                   </p>
                 </div>
               </div>
-              {statsComputed > 0 && (
-                <div className="text-sm text-green-600">
-                  ✓ Updated {statsComputed} domains
-                </div>
-              )}
               <Button 
                 variant="outline" 
                 onClick={handleComputeSenderStats}

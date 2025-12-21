@@ -18,6 +18,7 @@ import { BusinessContextPanel } from '@/components/settings/BusinessContextPanel
 import { SenderRulesPanel } from '@/components/settings/SenderRulesPanel';
 import { TriageLearningPanel } from '@/components/settings/TriageLearningPanel';
 import { LearningSystemPanel } from '@/components/settings/LearningSystemPanel';
+import { BehaviorStatsPanel } from '@/components/settings/BehaviorStatsPanel';
 import { Card } from '@/components/ui/card';
 import { TestMessageGenerator } from '@/components/TestMessageGenerator';
 import { RecentActivityWidget } from '@/components/dashboard/RecentActivityWidget';
@@ -108,6 +109,7 @@ export default function Settings() {
 
         <TabsContent value="email-triage" className="space-y-6">
           <LearningSystemPanel />
+          <BehaviorStatsPanel />
           <BusinessContextPanel />
           <SenderRulesPanel />
           <TriageLearningPanel />
