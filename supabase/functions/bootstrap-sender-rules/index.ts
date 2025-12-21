@@ -117,7 +117,7 @@ serve(async (req) => {
       const replyRate = stats.total > 0 ? (stats.replied / stats.total) * 100 : 0;
       const autoHandledRate = stats.total > 0 ? (stats.autoHandled / stats.total) * 100 : 0;
 
-      let suggestedBucket: 'auto_handled' | 'quick_win' | 'act_now' = 'quick_win';
+      let suggestedBucket: 'auto_handled' | 'quick_win' | 'act_now' | 'wait' = 'quick_win';
       let suggestedClassification = 'customer_inquiry';
       let requiresReply = true;
       let confidence = 50;
