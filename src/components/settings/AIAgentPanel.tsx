@@ -7,7 +7,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/hooks/useWorkspace';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Sparkles, Bot, Settings as SettingsIcon, Save, Trash2, Edit2, Route, MessageSquare, Calculator, RefreshCw, AlertTriangle } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
@@ -48,6 +48,7 @@ const agentTypeInfo: Record<string, { icon: any; label: string; description: str
 export const AIAgentPanel = () => {
   const { toast } = useToast();
   const { workspace } = useWorkspace();
+  const queryClient = useQueryClient();
   const [prompts, setPrompts] = useState<SystemPrompt[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingPrompt, setEditingPrompt] = useState<SystemPrompt | null>(null);
@@ -166,6 +167,8 @@ export const AIAgentPanel = () => {
           title: 'Re-analysis Complete',
           description: `Processed ${processedTotal} emails, ${changedTotal} updated`,
         });
+        // Refresh inbox views so the updated buckets/classifications show up immediately
+        await queryClient.invalidateQueries({ queryKey: ['conversations'] });
         refetchUntriaged();
       }
 
