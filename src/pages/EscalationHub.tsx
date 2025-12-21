@@ -201,20 +201,19 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
 
         {/* Right sidebar - Customer context & actions (when expanded) */}
         {!rightPanelCollapsed && (
-          <aside className="w-[340px] flex-shrink-0 border-l border-border bg-card/50 overflow-y-auto h-full transition-all duration-200">
-            {/* Collapse button in top-right */}
-<div className="flex justify-end p-2 border-b border-border/50">
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => setRightPanelCollapsed(true)}
-                className="h-8 w-8 bg-muted hover:bg-accent"
-                title="Hide customer panel"
-              >
-                <PanelRightClose className="h-4 w-4" />
-              </Button>
-            </div>
-            <div className="p-5 space-y-5">
+          <aside className="w-[340px] flex-shrink-0 border-l border-border bg-card/50 overflow-y-auto h-full transition-all duration-200 relative">
+            {/* Collapse button - fixed position in corner */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setRightPanelCollapsed(true)}
+              className="absolute top-2 right-2 z-10 h-8 px-2 bg-background/80 hover:bg-accent border border-border shadow-sm"
+              title="Hide customer panel"
+            >
+              <PanelRightClose className="h-4 w-4 mr-1" />
+              <span className="text-xs">Hide</span>
+            </Button>
+            <div className="p-5 pt-12 space-y-5">
               <CustomerContext key={selectedConversation.id} conversation={selectedConversation} onUpdate={handleUpdate} />
             </div>
           </aside>
