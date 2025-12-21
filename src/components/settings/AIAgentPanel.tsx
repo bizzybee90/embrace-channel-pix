@@ -7,10 +7,12 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/hooks/useWorkspace';
-import { Sparkles, Bot, Settings as SettingsIcon, Save, Trash2, Edit2, Route, MessageSquare, Calculator } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { Sparkles, Bot, Settings as SettingsIcon, Save, Trash2, Edit2, Route, MessageSquare, Calculator, RefreshCw, AlertTriangle } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Progress } from '@/components/ui/progress';
 
 interface AIModel {
   id: string;
@@ -54,6 +56,75 @@ export const AIAgentPanel = () => {
   const [selectedModel, setSelectedModel] = useState('claude-sonnet-4-20250514');
   const [selectedAgentType, setSelectedAgentType] = useState<'router' | 'customer_support' | 'quote' | 'triage'>('customer_support');
   const [isSaving, setIsSaving] = useState(false);
+  const [isReanalyzing, setIsReanalyzing] = useState(false);
+  const [reanalyzeProgress, setReanalyzeProgress] = useState(0);
+  const [reanalyzeStatus, setReanalyzeStatus] = useState<string | null>(null);
+
+  // Fetch count of untriaged conversations
+  const { data: untriagedCount = 0, refetch: refetchUntriaged } = useQuery({
+    queryKey: ['untriaged-count', workspace?.id],
+    queryFn: async () => {
+      if (!workspace?.id) return 0;
+      const { count } = await supabase
+        .from('conversations')
+        .select('id', { count: 'exact', head: true })
+        .eq('workspace_id', workspace.id)
+        .is('email_classification', null);
+      return count || 0;
+    },
+    enabled: !!workspace?.id,
+  });
+
+  const handleReanalyze = async (dryRun = false, skipLLM = false) => {
+    if (!workspace?.id) return;
+
+    setIsReanalyzing(true);
+    setReanalyzeProgress(0);
+    setReanalyzeStatus(dryRun ? 'Previewing changes...' : 'Analyzing emails...');
+
+    try {
+      const { data, error } = await supabase.functions.invoke('bulk-retriage-conversations', {
+        body: {
+          workspaceId: workspace.id,
+          limit: 100,
+          dryRun,
+          skipLLM,
+        },
+      });
+
+      if (error) throw error;
+
+      if (dryRun) {
+        toast({
+          title: 'Preview Complete',
+          description: `Would update ${data.processed || 0} conversations`,
+        });
+      } else {
+        toast({
+          title: 'Re-analysis Complete',
+          description: `Processed ${data.processed || 0} emails: ${data.updated || 0} updated, ${data.skipped || 0} skipped`,
+        });
+        refetchUntriaged();
+      }
+
+      setReanalyzeProgress(100);
+      setReanalyzeStatus('Complete!');
+    } catch (error: any) {
+      console.error('Re-analyze error:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to re-analyze inbox',
+        variant: 'destructive',
+      });
+      setReanalyzeStatus('Failed');
+    } finally {
+      setTimeout(() => {
+        setIsReanalyzing(false);
+        setReanalyzeProgress(0);
+        setReanalyzeStatus(null);
+      }, 2000);
+    }
+  };
 
   useEffect(() => {
     loadPrompts();
@@ -403,6 +474,64 @@ export const AIAgentPanel = () => {
               </Card>
             </TabsContent>
           </Tabs>
+        </CardContent>
+      </Card>
+
+      {/* Re-Analyze Inbox Section */}
+      <Card className="border-amber-500/20 bg-amber-500/5">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <RefreshCw className="h-5 w-5 text-amber-600" />
+            Re-Analyze Historical Emails
+          </CardTitle>
+          <CardDescription>
+            {untriagedCount > 0 ? (
+              <span className="flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-amber-500" />
+                {untriagedCount.toLocaleString()} emails haven't been properly analyzed yet
+              </span>
+            ) : (
+              'All emails have been analyzed'
+            )}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {isReanalyzing && (
+            <div className="space-y-2">
+              <Progress value={reanalyzeProgress} className="h-2" />
+              <p className="text-sm text-muted-foreground">{reanalyzeStatus}</p>
+            </div>
+          )}
+
+          <div className="flex flex-wrap gap-2">
+            <Button 
+              onClick={() => handleReanalyze(false, true)} 
+              disabled={isReanalyzing || untriagedCount === 0}
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${isReanalyzing ? 'animate-spin' : ''}`} />
+              {isReanalyzing ? 'Analyzing...' : 'Apply Sender Rules Only'}
+            </Button>
+            <Button 
+              variant="outline"
+              onClick={() => handleReanalyze(false, false)} 
+              disabled={isReanalyzing || untriagedCount === 0}
+            >
+              <Sparkles className="h-4 w-4 mr-2" />
+              Full AI Re-Analysis
+            </Button>
+            <Button 
+              variant="ghost"
+              onClick={() => handleReanalyze(true, false)} 
+              disabled={isReanalyzing || untriagedCount === 0}
+            >
+              Preview Changes
+            </Button>
+          </div>
+
+          <p className="text-xs text-muted-foreground">
+            <strong>Sender Rules Only:</strong> Fast - applies existing rules without AI calls<br />
+            <strong>Full AI Re-Analysis:</strong> Thorough - uses AI to classify each email (slower, uses API credits)
+          </p>
         </CardContent>
       </Card>
     </div>
