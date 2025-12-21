@@ -1005,6 +1005,104 @@ export type Database = {
           },
         ]
       }
+      notification_preferences: {
+        Row: {
+          created_at: string | null
+          id: string
+          summary_channels: string[] | null
+          summary_email: string | null
+          summary_enabled: boolean | null
+          summary_phone: string | null
+          summary_times: string[] | null
+          timezone: string | null
+          updated_at: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          summary_channels?: string[] | null
+          summary_email?: string | null
+          summary_enabled?: boolean | null
+          summary_phone?: string | null
+          summary_times?: string[] | null
+          timezone?: string | null
+          updated_at?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          summary_channels?: string[] | null
+          summary_email?: string | null
+          summary_enabled?: boolean | null
+          summary_phone?: string | null
+          summary_times?: string[] | null
+          timezone?: string | null
+          updated_at?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_preferences_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          body: string
+          created_at: string | null
+          id: string
+          is_read: boolean | null
+          metadata: Json | null
+          title: string
+          type: string
+          user_id: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          body: string
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          metadata?: Json | null
+          title: string
+          type?: string
+          user_id?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          body?: string
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          metadata?: Json | null
+          title?: string
+          type?: string
+          user_id?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       price_list: {
         Row: {
           affects_package: boolean | null

@@ -19,10 +19,11 @@ import { SenderRulesPanel } from '@/components/settings/SenderRulesPanel';
 import { TriageLearningPanel } from '@/components/settings/TriageLearningPanel';
 import { LearningSystemPanel } from '@/components/settings/LearningSystemPanel';
 import { BehaviorStatsPanel } from '@/components/settings/BehaviorStatsPanel';
+import { NotificationPreferencesPanel } from '@/components/settings/NotificationPreferencesPanel';
 import { Card } from '@/components/ui/card';
 import { TestMessageGenerator } from '@/components/TestMessageGenerator';
 import { RecentActivityWidget } from '@/components/dashboard/RecentActivityWidget';
-import { TestTube, Filter } from 'lucide-react';
+import { TestTube, Filter, Bell } from 'lucide-react';
 import { BackButton } from '@/components/shared/BackButton';
 
 export default function Settings() {
@@ -52,6 +53,10 @@ export default function Settings() {
             <TabsTrigger value="email-triage" className="flex items-center gap-2 text-xs md:text-sm">
               <Filter className="h-3 w-3 md:h-4 md:w-4" />
               Email Triage
+            </TabsTrigger>
+            <TabsTrigger value="notifications" className="flex items-center gap-2 text-xs md:text-sm">
+              <Bell className="h-3 w-3 md:h-4 md:w-4" />
+              Notifications
             </TabsTrigger>
             <TabsTrigger value="gdpr" className="text-xs md:text-sm">GDPR</TabsTrigger>
             <TabsTrigger value="cleanup" className="text-xs md:text-sm">Cleanup</TabsTrigger>
@@ -113,6 +118,10 @@ export default function Settings() {
           <BusinessContextPanel />
           <SenderRulesPanel />
           <TriageLearningPanel />
+        </TabsContent>
+
+        <TabsContent value="notifications">
+          <NotificationPreferencesPanel />
         </TabsContent>
 
         <TabsContent value="gdpr">

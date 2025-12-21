@@ -95,3 +95,9 @@ verify_jwt = false
 
 [functions.bootstrap-sender-rules]
 verify_jwt = false
+
+[functions.ai-inbox-summary]
+verify_jwt = false
+
+[functions.send-summary-notifications]
+verify_jwt = false
