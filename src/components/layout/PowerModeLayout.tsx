@@ -5,8 +5,9 @@ import { ConversationThread } from '@/components/conversations/ConversationThrea
 import { CustomerContext } from '@/components/context/CustomerContext';
 import { Conversation } from '@/lib/types';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
-import { PanelRightClose, PanelRightOpen } from 'lucide-react';
+import { ChevronLeft, PanelRightClose } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 
 interface PowerModeLayoutProps {
   filter?: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'awaiting-reply' | 'completed' | 'sent' | 'high-priority' | 'vip-customers' | 'escalations' | 'triaged' | 'needs-me' | 'snoozed' | 'cleared' | 'fyi';
@@ -97,17 +98,25 @@ export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerMod
                 collapsible={false}
                 className="hidden md:flex min-h-0"
               >
-                <div className="w-full h-full border-l border-border bg-muted/50 flex flex-col items-center pt-4">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setRightPanelCollapsed(false)}
-                    className="h-8 w-8 bg-muted hover:bg-accent"
-                    title="Show customer panel"
-                  >
-                    <PanelRightOpen className="h-4 w-4" />
-                  </Button>
-                </div>
+                <TooltipProvider>
+                  <div className="w-full h-full border-l border-border bg-muted/50 flex flex-col items-center pt-4 relative">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setRightPanelCollapsed(false)}
+                          className="h-8 w-8 bg-background/95 backdrop-blur hover:bg-accent transition-all duration-300"
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="left">
+                        <p>Show customer panel</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                </TooltipProvider>
               </ResizablePanel>
             </>
           )}
@@ -125,18 +134,26 @@ export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerMod
               >
                 <div className="flex-1 flex flex-col overflow-hidden bg-card/50 min-w-0">
                   {/* Fixed header with collapse button */}
-                  <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card shrink-0">
-                    <span className="text-sm font-medium text-muted-foreground">Customer Info</span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setRightPanelCollapsed(true)}
-                      className="h-7 w-7 hover:bg-accent"
-                      title="Hide customer panel"
-                    >
-                      <PanelRightClose className="h-4 w-4" />
-                    </Button>
-                  </div>
+                  <TooltipProvider>
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card shrink-0">
+                      <span className="text-sm font-medium text-muted-foreground">Customer Info</span>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setRightPanelCollapsed(true)}
+                            className="h-8 w-8 bg-background/95 backdrop-blur hover:bg-accent transition-all duration-300"
+                          >
+                            <PanelRightClose className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="left">
+                          <p>Hide customer panel</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </TooltipProvider>
                   {/* Scrollable content */}
                   <div className="flex-1 overflow-y-auto p-5">
                     <CustomerContext conversation={selectedConversation} onUpdate={handleUpdate} />
