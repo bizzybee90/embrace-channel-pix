@@ -4,7 +4,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Brain, ArrowRight, Zap, Loader2 } from 'lucide-react';
+import { Brain, ArrowRight, Zap, Loader2, TrendingUp, RefreshCw, Mail, CheckCircle } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
 
 interface CorrectionGroup {
   sender_domain: string;
@@ -13,14 +14,27 @@ interface CorrectionGroup {
   count: number;
 }
 
+interface SuggestedRule {
+  senderDomain: string;
+  totalEmails: number;
+  replyRate: number;
+  suggestedBucket: string;
+  suggestedClassification: string;
+  requiresReply: boolean;
+  confidence: number;
+}
+
 export function TriageLearningPanel() {
   const { toast } = useToast();
   const [corrections, setCorrections] = useState<CorrectionGroup[]>([]);
+  const [suggestions, setSuggestions] = useState<SuggestedRule[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [creatingRule, setCreatingRule] = useState<string | null>(null);
 
   useEffect(() => {
     fetchCorrections();
+    fetchSuggestions();
   }, []);
 
   const fetchCorrections = async () => {
@@ -58,6 +72,85 @@ export function TriageLearningPanel() {
       console.error('Error fetching corrections:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchSuggestions = async () => {
+    setLoadingSuggestions(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data: userData } = await supabase
+        .from('users')
+        .select('workspace_id')
+        .eq('id', user?.id)
+        .single();
+
+      if (!userData?.workspace_id) return;
+
+      const { data, error } = await supabase.functions.invoke('bootstrap-sender-rules', {
+        body: { workspaceId: userData.workspace_id, minEmailCount: 3 }
+      });
+
+      if (error) throw error;
+      setSuggestions(data?.suggestions || []);
+    } catch (error) {
+      console.error('Error fetching suggestions:', error);
+    } finally {
+      setLoadingSuggestions(false);
+    }
+  };
+
+  const createRuleFromSuggestion = async (suggestion: SuggestedRule) => {
+    setCreatingRule(suggestion.senderDomain);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data: userData } = await supabase
+        .from('users')
+        .select('workspace_id')
+        .eq('id', user?.id)
+        .single();
+
+      // Check if rule already exists
+      const { data: existingRule } = await supabase
+        .from('sender_rules')
+        .select('id')
+        .eq('sender_pattern', `@${suggestion.senderDomain}`)
+        .single();
+
+      if (existingRule) {
+        toast({ 
+          title: 'Rule already exists', 
+          description: `A rule for @${suggestion.senderDomain} already exists`,
+        });
+        return;
+      }
+
+      const { error } = await supabase
+        .from('sender_rules')
+        .insert({
+          workspace_id: userData?.workspace_id,
+          sender_pattern: `@${suggestion.senderDomain}`,
+          default_classification: suggestion.suggestedClassification,
+          default_requires_reply: suggestion.requiresReply,
+          is_active: true,
+        });
+
+      if (error) throw error;
+
+      toast({ 
+        title: 'Rule created',
+        description: `Emails from @${suggestion.senderDomain} will now be classified as ${suggestion.suggestedClassification.replace('_', ' ')}`,
+      });
+      
+      setSuggestions(suggestions.filter(s => s.senderDomain !== suggestion.senderDomain));
+    } catch (error) {
+      console.error('Error creating rule:', error);
+      toast({ 
+        title: 'Failed to create rule', 
+        variant: 'destructive' 
+      });
+    } finally {
+      setCreatingRule(null);
     }
   };
 
@@ -129,67 +222,168 @@ export function TriageLearningPanel() {
     );
   }
 
+  const getBucketColor = (bucket: string) => {
+    switch (bucket) {
+      case 'auto_handled': return 'bg-green-500/10 text-green-600 border-green-500/20';
+      case 'quick_win': return 'bg-blue-500/10 text-blue-600 border-blue-500/20';
+      case 'act_now': return 'bg-orange-500/10 text-orange-600 border-orange-500/20';
+      default: return 'bg-muted text-muted-foreground';
+    }
+  };
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Brain className="h-5 w-5" />
-          AI Learning Suggestions
-        </CardTitle>
-        <CardDescription>
-          Based on your corrections, the AI has identified patterns that could become rules.
-          Click "Create Rule" to automate future classifications.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {corrections.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-8">
-            No patterns detected yet. Keep correcting misclassified emails and suggestions will appear here.
-          </p>
-        ) : (
-          <div className="space-y-3">
-            {corrections.map((pattern) => (
-              <div
-                key={`${pattern.sender_domain}-${pattern.new_classification}`}
-                className="flex items-center justify-between bg-muted/50 rounded-lg px-4 py-3"
-              >
-                <div className="flex items-center gap-3">
-                  <div>
-                    <p className="font-mono text-sm">@{pattern.sender_domain}</p>
-                    <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                      <Badge variant="outline" className="text-xs">
-                        {pattern.original_classification.replace('_', ' ')}
-                      </Badge>
-                      <ArrowRight className="h-3 w-3" />
-                      <Badge variant="secondary" className="text-xs bg-primary/10 text-primary">
-                        {pattern.new_classification.replace('_', ' ')}
-                      </Badge>
-                      <span className="ml-2">
-                        ({pattern.count} corrections)
+    <div className="space-y-6">
+      {/* Historical Behavior Suggestions */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingUp className="h-5 w-5" />
+                Suggested Rules from Inbox Patterns
+              </CardTitle>
+              <CardDescription>
+                Based on your historical email patterns, these senders could be automated.
+              </CardDescription>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={fetchSuggestions}
+              disabled={loadingSuggestions}
+            >
+              {loadingSuggestions ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {loadingSuggestions ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : suggestions.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8">
+              No suggestions yet. Once you have more email history, patterns will appear here.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {suggestions.slice(0, 10).map((suggestion) => (
+                <div
+                  key={suggestion.senderDomain}
+                  className="flex items-center justify-between bg-muted/50 rounded-lg px-4 py-3"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <p className="font-mono text-sm truncate">@{suggestion.senderDomain}</p>
+                    </div>
+                    <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <span className="font-medium">{suggestion.totalEmails}</span> emails
                       </span>
+                      <span>•</span>
+                      <span className="flex items-center gap-1">
+                        <span className="font-medium">{Math.round(suggestion.replyRate * 100)}%</span> reply rate
+                      </span>
+                      <span>•</span>
+                      <Badge variant="outline" className={`text-xs ${getBucketColor(suggestion.suggestedBucket)}`}>
+                        {suggestion.suggestedBucket.replace('_', ' ')}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-2 mt-2">
+                      <span className="text-xs text-muted-foreground">Confidence:</span>
+                      <Progress value={suggestion.confidence * 100} className="h-1.5 w-20" />
+                      <span className="text-xs text-muted-foreground">{Math.round(suggestion.confidence * 100)}%</span>
                     </div>
                   </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => createRuleFromSuggestion(suggestion)}
+                    disabled={creatingRule === suggestion.senderDomain}
+                    className="ml-4 shrink-0"
+                  >
+                    {creatingRule === suggestion.senderDomain ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <>
+                        <CheckCircle className="h-4 w-4 mr-1" />
+                        Accept
+                      </>
+                    )}
+                  </Button>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => createRuleFromPattern(pattern)}
-                  disabled={creatingRule === pattern.sender_domain}
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Correction-Based Suggestions */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Brain className="h-5 w-5" />
+            AI Learning from Corrections
+          </CardTitle>
+          <CardDescription>
+            Based on your corrections, the AI has identified patterns that could become rules.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {corrections.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8">
+              No patterns detected yet. Keep correcting misclassified emails and suggestions will appear here.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {corrections.map((pattern) => (
+                <div
+                  key={`${pattern.sender_domain}-${pattern.new_classification}`}
+                  className="flex items-center justify-between bg-muted/50 rounded-lg px-4 py-3"
                 >
-                  {creatingRule === pattern.sender_domain ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <>
-                      <Zap className="h-4 w-4 mr-1" />
-                      Create Rule
-                    </>
-                  )}
-                </Button>
-              </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+                  <div className="flex items-center gap-3">
+                    <div>
+                      <p className="font-mono text-sm">@{pattern.sender_domain}</p>
+                      <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                        <Badge variant="outline" className="text-xs">
+                          {pattern.original_classification.replace('_', ' ')}
+                        </Badge>
+                        <ArrowRight className="h-3 w-3" />
+                        <Badge variant="secondary" className="text-xs bg-primary/10 text-primary">
+                          {pattern.new_classification.replace('_', ' ')}
+                        </Badge>
+                        <span className="ml-2">
+                          ({pattern.count} corrections)
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => createRuleFromPattern(pattern)}
+                    disabled={creatingRule === pattern.sender_domain}
+                  >
+                    {creatingRule === pattern.sender_domain ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <>
+                        <Zap className="h-4 w-4 mr-1" />
+                        Create Rule
+                      </>
+                    )}
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }
