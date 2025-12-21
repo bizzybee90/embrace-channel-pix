@@ -24,6 +24,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { ActivityFeed } from '@/components/dashboard/ActivityFeed';
 import { DraftMessages } from '@/components/dashboard/DraftMessages';
 import { HumanAIActivityLog } from '@/components/dashboard/HumanAIActivityLog';
+import { AIBriefingWidget } from '@/components/dashboard/AIBriefingWidget';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface HomeStats {
@@ -239,6 +240,9 @@ export const Home = () => {
                 </p>
               </div>
             </div>
+
+            {/* AI Briefing Widget */}
+            <AIBriefingWidget />
 
             {/* Quick Stats Row */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
