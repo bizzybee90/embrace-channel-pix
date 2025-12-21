@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Sidebar } from '@/components/sidebar/Sidebar';
@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ReviewQueueItem } from '@/components/review/ReviewQueueItem';
 import { ChannelIcon } from '@/components/shared/ChannelIcon';
+import { Checkbox } from '@/components/ui/checkbox';
 import { 
   ChevronDown, 
   ChevronRight, 
@@ -19,7 +20,9 @@ import {
   Bot,
   FileEdit,
   Eye,
-  Keyboard
+  Keyboard,
+  CheckCheck,
+  X
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
@@ -72,6 +75,9 @@ export default function Review() {
   const [automationLevel, setAutomationLevel] = useState<AutomationLevel>('auto');
   const [tonePreference, setTonePreference] = useState<TonePreference>('keep_current');
   const [reviewedIds, setReviewedIds] = useState<Set<string>>(new Set());
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [lastClickedIndex, setLastClickedIndex] = useState<number | null>(null);
+  const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { celebrateConfirmation, celebratePatternLearned, celebrateQueueComplete } = useReviewFeedback();
@@ -360,10 +366,178 @@ export default function Review() {
     },
   });
 
+  // Batch review mutation
+  const batchReviewMutation = useMutation({
+    mutationFn: async ({ 
+      conversationIds, 
+      outcome, 
+      newBucket 
+    }: { 
+      conversationIds: string[]; 
+      outcome: 'confirmed' | 'changed';
+      newBucket?: string;
+    }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const updates: Record<string, any> = {
+        reviewed_at: new Date().toISOString(),
+        reviewed_by: user.id,
+        review_outcome: outcome,
+        needs_review: false,
+      };
+
+      if (newBucket) {
+        updates.decision_bucket = newBucket;
+      }
+
+      const { error } = await supabase
+        .from('conversations')
+        .update(updates)
+        .in('id', conversationIds);
+
+      if (error) throw error;
+
+      return { count: conversationIds.length };
+    },
+    onSuccess: (result, variables) => {
+      // Mark all as reviewed locally
+      setReviewedIds(prev => {
+        const newSet = new Set(prev);
+        variables.conversationIds.forEach(id => newSet.add(id));
+        return newSet;
+      });
+      
+      // Clear selection
+      setSelectedIds(new Set());
+      setIsMultiSelectMode(false);
+      
+      queryClient.invalidateQueries({ queryKey: ['review-queue'] });
+      queryClient.invalidateQueries({ queryKey: ['sidebar-view-counts'] });
+
+      toast({
+        title: 'Batch review complete',
+        description: `${result.count} items reviewed`,
+      });
+    },
+    onError: () => {
+      toast({
+        title: 'Error',
+        description: 'Failed to batch review. Please try again.',
+        variant: 'destructive',
+      });
+    },
+  });
+
   const currentConversation = reviewQueue[currentIndex];
   const reviewedCount = reviewedIds.size;
   const totalCount = reviewQueue.length;
   const progress = totalCount > 0 ? (reviewedCount / totalCount) * 100 : 0;
+
+  // Get current domain for batch actions
+  const senderDomain = currentConversation?.customer?.email?.split('@')[1];
+
+  // Get all conversations from the same domain
+  const sameDomainConversations = useMemo(() => {
+    if (!senderDomain) return [];
+    return reviewQueue.filter(conv => 
+      conv.customer?.email?.endsWith(`@${senderDomain}`) && 
+      !reviewedIds.has(conv.id)
+    );
+  }, [reviewQueue, senderDomain, reviewedIds]);
+
+  // Handle multi-select click with shift support
+  const handleItemClick = useCallback((index: number, event: React.MouseEvent) => {
+    if (isMultiSelectMode) {
+      const convId = reviewQueue[index].id;
+      
+      if (event.shiftKey && lastClickedIndex !== null) {
+        // Shift-click: select range
+        const start = Math.min(lastClickedIndex, index);
+        const end = Math.max(lastClickedIndex, index);
+        setSelectedIds(prev => {
+          const newSet = new Set(prev);
+          for (let i = start; i <= end; i++) {
+            newSet.add(reviewQueue[i].id);
+          }
+          return newSet;
+        });
+      } else {
+        // Regular click: toggle selection
+        setSelectedIds(prev => {
+          const newSet = new Set(prev);
+          if (newSet.has(convId)) {
+            newSet.delete(convId);
+          } else {
+            newSet.add(convId);
+          }
+          return newSet;
+        });
+      }
+      setLastClickedIndex(index);
+    } else {
+      setCurrentIndex(index);
+      setShowChangePicker(false);
+    }
+  }, [isMultiSelectMode, lastClickedIndex, reviewQueue]);
+
+  // Toggle item selection
+  const toggleSelection = useCallback((convId: string) => {
+    setSelectedIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(convId)) {
+        newSet.delete(convId);
+      } else {
+        newSet.add(convId);
+      }
+      return newSet;
+    });
+  }, []);
+
+  // Select all unreviewed
+  const selectAll = useCallback(() => {
+    const unreviewedIds = reviewQueue
+      .filter(conv => !reviewedIds.has(conv.id))
+      .map(conv => conv.id);
+    setSelectedIds(new Set(unreviewedIds));
+  }, [reviewQueue, reviewedIds]);
+
+  // Clear selection
+  const clearSelection = useCallback(() => {
+    setSelectedIds(new Set());
+    setIsMultiSelectMode(false);
+  }, []);
+
+  // Batch approve all from same domain
+  const handleBatchApproveDomain = useCallback(() => {
+    if (sameDomainConversations.length === 0) return;
+    
+    batchReviewMutation.mutate({
+      conversationIds: sameDomainConversations.map(c => c.id),
+      outcome: 'confirmed',
+    });
+  }, [sameDomainConversations, batchReviewMutation]);
+
+  // Batch mark selected as specific bucket
+  const handleBatchAction = useCallback((bucket: string) => {
+    if (selectedIds.size === 0) return;
+    
+    batchReviewMutation.mutate({
+      conversationIds: Array.from(selectedIds),
+      outcome: 'changed',
+      newBucket: bucket,
+    });
+  }, [selectedIds, batchReviewMutation]);
+
+  // Batch confirm selected
+  const handleBatchConfirm = useCallback(() => {
+    if (selectedIds.size === 0) return;
+    
+    batchReviewMutation.mutate({
+      conversationIds: Array.from(selectedIds),
+      outcome: 'confirmed',
+    });
+  }, [selectedIds, batchReviewMutation]);
 
   const handleConfirm = useCallback(() => {
     if (!currentConversation) return;
@@ -397,8 +571,6 @@ export default function Review() {
       setShowTeachMore(false);
     }
   }, [currentIndex, reviewQueue.length]);
-
-  const senderDomain = currentConversation?.customer?.email?.split('@')[1];
 
   // Empty state
   if (!isLoading && reviewQueue.length === 0) {
@@ -448,11 +620,89 @@ export default function Review() {
         <div className="flex-1 flex overflow-hidden">
           {/* Left: Queue list */}
           <div className="w-72 border-r flex-shrink-0 flex flex-col bg-muted/20">
-            <div className="px-3 py-2 border-b bg-muted/30">
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Review Queue
-              </span>
+            {/* Queue header with batch actions */}
+            <div className="px-3 py-2 border-b bg-muted/30 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  Review Queue
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 text-xs"
+                  onClick={() => {
+                    setIsMultiSelectMode(!isMultiSelectMode);
+                    if (isMultiSelectMode) {
+                      setSelectedIds(new Set());
+                    }
+                  }}
+                >
+                  {isMultiSelectMode ? (
+                    <>
+                      <X className="h-3 w-3 mr-1" />
+                      Cancel
+                    </>
+                  ) : (
+                    <>
+                      <CheckCheck className="h-3 w-3 mr-1" />
+                      Select
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {/* Multi-select mode actions */}
+              {isMultiSelectMode && (
+                <div className="flex flex-wrap gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-6 px-2 text-xs"
+                    onClick={selectAll}
+                  >
+                    Select all
+                  </Button>
+                  {selectedIds.size > 0 && (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-6 px-2 text-xs bg-green-50 hover:bg-green-100 text-green-700 border-green-200"
+                        onClick={handleBatchConfirm}
+                        disabled={batchReviewMutation.isPending}
+                      >
+                        <Check className="h-3 w-3 mr-1" />
+                        Approve ({selectedIds.size})
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-6 px-2 text-xs"
+                        onClick={() => handleBatchAction('auto_handled')}
+                        disabled={batchReviewMutation.isPending}
+                      >
+                        Mark done ({selectedIds.size})
+                      </Button>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Domain batch action */}
+              {!isMultiSelectMode && senderDomain && sameDomainConversations.length > 1 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full h-7 text-xs justify-start"
+                  onClick={handleBatchApproveDomain}
+                  disabled={batchReviewMutation.isPending}
+                >
+                  <CheckCheck className="h-3 w-3 mr-1.5" />
+                  Approve all from @{senderDomain} ({sameDomainConversations.length})
+                </Button>
+              )}
             </div>
+
             <ScrollArea className="flex-1">
               {isLoading ? (
                 <div className="p-4 text-center text-muted-foreground animate-pulse">
@@ -463,12 +713,12 @@ export default function Review() {
                   <ReviewQueueItem
                     key={conv.id}
                     conversation={conv}
-                    isActive={idx === currentIndex}
+                    isActive={idx === currentIndex && !isMultiSelectMode}
                     isReviewed={reviewedIds.has(conv.id)}
-                    onClick={() => {
-                      setCurrentIndex(idx);
-                      setShowChangePicker(false);
-                    }}
+                    isSelected={selectedIds.has(conv.id)}
+                    isMultiSelectMode={isMultiSelectMode}
+                    onClick={(e) => handleItemClick(idx, e)}
+                    onToggleSelect={() => toggleSelection(conv.id)}
                   />
                 ))
               )}
