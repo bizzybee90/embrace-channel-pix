@@ -1,4 +1,5 @@
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ChannelIcon } from '@/components/shared/ChannelIcon';
@@ -13,7 +14,10 @@ interface ReviewQueueItemProps {
   };
   isActive: boolean;
   isReviewed: boolean;
-  onClick: () => void;
+  isSelected?: boolean;
+  isMultiSelectMode?: boolean;
+  onClick: (e: React.MouseEvent) => void;
+  onToggleSelect?: () => void;
 }
 
 const getStateBadge = (bucket: string) => {
@@ -31,7 +35,15 @@ const getStateBadge = (bucket: string) => {
   }
 };
 
-export const ReviewQueueItem = ({ conversation, isActive, isReviewed, onClick }: ReviewQueueItemProps) => {
+export const ReviewQueueItem = ({ 
+  conversation, 
+  isActive, 
+  isReviewed, 
+  isSelected = false,
+  isMultiSelectMode = false,
+  onClick,
+  onToggleSelect 
+}: ReviewQueueItemProps) => {
   const senderName = conversation.customer?.name || conversation.customer?.email?.split('@')[0] || 'Unknown';
 
   return (
@@ -40,25 +52,36 @@ export const ReviewQueueItem = ({ conversation, isActive, isReviewed, onClick }:
       className={cn(
         "px-3 py-2 cursor-pointer border-b border-border/30 transition-all",
         "hover:bg-muted/50",
-        isActive && "bg-primary/10 border-l-2 border-l-primary",
+        isActive && !isMultiSelectMode && "bg-primary/10 border-l-2 border-l-primary",
+        isSelected && "bg-primary/20 border-l-2 border-l-primary",
         isReviewed && "opacity-60"
       )}
     >
       <div className="flex items-center gap-2">
+        {/* Checkbox for multi-select mode */}
+        {isMultiSelectMode && (
+          <Checkbox
+            checked={isSelected}
+            onCheckedChange={() => onToggleSelect?.()}
+            onClick={(e) => e.stopPropagation()}
+            className="h-4 w-4 flex-shrink-0"
+          />
+        )}
+
         {/* Reviewed check */}
-        {isReviewed && (
+        {isReviewed && !isMultiSelectMode && (
           <Check className="h-3.5 w-3.5 text-green-600 flex-shrink-0" />
         )}
         
         {/* Channel icon */}
-        {conversation.channel && !isReviewed && (
+        {conversation.channel && !isReviewed && !isMultiSelectMode && (
           <ChannelIcon channel={conversation.channel} className="h-3 w-3 flex-shrink-0" />
         )}
 
         {/* Sender name */}
         <span className={cn(
           "text-sm truncate flex-1",
-          isActive ? "font-medium text-foreground" : "text-foreground/80"
+          isActive || isSelected ? "font-medium text-foreground" : "text-foreground/80"
         )}>
           {senderName}
         </span>
@@ -68,7 +91,10 @@ export const ReviewQueueItem = ({ conversation, isActive, isReviewed, onClick }:
       </div>
 
       {/* Subject - truncated */}
-      <p className="text-xs text-muted-foreground truncate mt-0.5 pl-5">
+      <p className={cn(
+        "text-xs text-muted-foreground truncate mt-0.5",
+        isMultiSelectMode ? "pl-6" : "pl-5"
+      )}>
         {conversation.title || 'No subject'}
       </p>
     </div>
