@@ -1,4 +1,4 @@
-import { Home, Mail, Info, CheckCircle2, Clock, ChevronDown, ChevronRight, PanelLeftClose, Send, Inbox, BarChart3, MessageSquare, Settings, ClipboardCheck } from 'lucide-react';
+import { Home, Mail, Info, CheckCircle2, Clock, ChevronDown, ChevronRight, ChevronLeft, Send, Inbox, BarChart3, MessageSquare, Settings, ClipboardCheck } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { Button } from '@/components/ui/button';
 import { useState, useEffect } from 'react';
@@ -99,7 +99,7 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
             onClick={() => setCollapsed(!collapsed)}
             className={`absolute top-4 z-10 h-8 w-8 bg-background/95 backdrop-blur hover:bg-accent transition-all duration-300 ${isCollapsed ? 'left-1/2 -translate-x-1/2' : 'right-2'}`}
           >
-            {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+            {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
           </Button>
         )}
 
