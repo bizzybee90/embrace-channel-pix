@@ -5,7 +5,7 @@ import { ConversationThread } from '@/components/conversations/ConversationThrea
 import { CustomerContext } from '@/components/context/CustomerContext';
 import { Conversation } from '@/lib/types';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
-import { ChevronLeft, PanelRightClose } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 
@@ -145,7 +145,7 @@ export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerMod
                             onClick={() => setRightPanelCollapsed(true)}
                             className="h-8 w-8 bg-background/95 backdrop-blur hover:bg-accent transition-all duration-300"
                           >
-                            <PanelRightClose className="h-4 w-4" />
+                            <ChevronRight className="h-4 w-4" />
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent side="left">
