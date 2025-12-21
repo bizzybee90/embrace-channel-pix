@@ -120,29 +120,83 @@ serve(async (req) => {
           whyText = 'Customer inquiry needs a reply';
         }
       } else if (!skipLLM) {
-        // TODO: Call email-triage-agent for full LLM analysis
-        // For now, use pattern matching
-        const lowerBody = messageBody.toLowerCase();
-        const lowerSubject = subject.toLowerCase();
+        // Call Lovable AI for full triage analysis
+        const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+        
+        if (LOVABLE_API_KEY && messageBody) {
+          try {
+            const triagePrompt = `Analyze this email and classify it. Reply ONLY with valid JSON.
 
-        // Pattern matching for common cases
-        if (lowerSubject.includes('payment') || lowerSubject.includes('receipt') || 
-            lowerSubject.includes('invoice paid') || lowerBody.includes('payment successful')) {
-          newBucket = 'auto_handled';
-          newClassification = 'receipt_confirmation';
-          newRequiresReply = false;
-          whyText = 'Payment/receipt notification - no action needed';
-        } else if (lowerSubject.includes('application') || lowerBody.includes('applied for') ||
-                   senderDomain === 'indeed.com' || senderDomain === 'linkedin.com') {
-          newBucket = 'auto_handled';
-          newClassification = 'recruitment_hr';
-          newRequiresReply = false;
-          whyText = 'Job application notification - filed for reference';
-        } else if (lowerBody.includes('unsubscribe') || lowerSubject.includes('newsletter')) {
-          newBucket = 'auto_handled';
-          newClassification = 'marketing_newsletter';
-          newRequiresReply = false;
-          whyText = 'Marketing/newsletter - auto-filed';
+SENDER: ${customerEmail || 'unknown'}
+SUBJECT: ${subject}
+BODY: ${messageBody.slice(0, 1500)}
+
+Classify into ONE bucket:
+- auto_handled: Receipts, newsletters, notifications, spam (no action needed ever)
+- quick_win: Simple reply needed, easy to handle
+- act_now: Urgent customer issue, complaint, or time-sensitive
+
+Reply with this exact JSON format:
+{"bucket":"auto_handled|quick_win|act_now","classification":"receipt_confirmation|marketing_newsletter|automated_notification|customer_inquiry|spam_phishing|recruitment_hr","requires_reply":true|false,"reason":"Brief explanation"}`;
+
+            const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                model: 'google/gemini-2.5-flash-lite',
+                messages: [
+                  { role: 'user', content: triagePrompt }
+                ],
+                max_tokens: 200,
+              }),
+            });
+
+            if (aiResponse.ok) {
+              const aiData = await aiResponse.json();
+              const content = aiData.choices?.[0]?.message?.content || '';
+              
+              // Extract JSON from response
+              const jsonMatch = content.match(/\{[\s\S]*\}/);
+              if (jsonMatch) {
+                const parsed = JSON.parse(jsonMatch[0]);
+                newBucket = parsed.bucket || newBucket;
+                newClassification = parsed.classification || newClassification;
+                newRequiresReply = parsed.requires_reply ?? newRequiresReply;
+                whyText = parsed.reason || null;
+              }
+            }
+          } catch (aiError) {
+            console.error(`[bulk-retriage] AI error for ${conv.id}:`, aiError);
+            // Fall through to pattern matching
+          }
+        }
+        
+        // Fallback pattern matching if AI didn't classify
+        if (!newClassification) {
+          const lowerBody = messageBody.toLowerCase();
+          const lowerSubject = subject.toLowerCase();
+
+          if (lowerSubject.includes('payment') || lowerSubject.includes('receipt') || 
+              lowerSubject.includes('invoice paid') || lowerBody.includes('payment successful')) {
+            newBucket = 'auto_handled';
+            newClassification = 'receipt_confirmation';
+            newRequiresReply = false;
+            whyText = 'Payment/receipt notification - no action needed';
+          } else if (lowerSubject.includes('application') || lowerBody.includes('applied for') ||
+                     senderDomain === 'indeed.com' || senderDomain === 'linkedin.com') {
+            newBucket = 'auto_handled';
+            newClassification = 'recruitment_hr';
+            newRequiresReply = false;
+            whyText = 'Job application notification - filed for reference';
+          } else if (lowerBody.includes('unsubscribe') || lowerSubject.includes('newsletter')) {
+            newBucket = 'auto_handled';
+            newClassification = 'marketing_newsletter';
+            newRequiresReply = false;
+            whyText = 'Marketing/newsletter - auto-filed';
+          }
         }
       }
 
