@@ -61,6 +61,12 @@ export const AIAgentPanel = () => {
   const [reanalyzeStatus, setReanalyzeStatus] = useState<string | null>(null);
   const [totalProcessed, setTotalProcessed] = useState(0);
   const [totalChanged, setTotalChanged] = useState(0);
+  const [changedEmails, setChangedEmails] = useState<Array<{
+    id: string;
+    originalBucket: string;
+    newBucket: string;
+    ruleApplied: string | null;
+  }>>([]);
 
   // Fetch count of untriaged conversations
   const { data: untriagedCount = 0, refetch: refetchUntriaged } = useQuery({
@@ -98,6 +104,7 @@ export const AIAgentPanel = () => {
     setReanalyzeProgress(0);
     setTotalProcessed(0);
     setTotalChanged(0);
+    setChangedEmails([]);
     setReanalyzeStatus(dryRun ? 'Previewing changes...' : 'Analyzing emails...');
 
     try {
@@ -106,6 +113,12 @@ export const AIAgentPanel = () => {
       let hasMore = true;
       let processedTotal = 0;
       let changedTotal = 0;
+      let allChangedEmails: Array<{
+        id: string;
+        originalBucket: string;
+        newBucket: string;
+        ruleApplied: string | null;
+      }> = [];
 
       while (hasMore) {
         const { data, error } = await supabase.functions.invoke('bulk-retriage-conversations', {
@@ -122,8 +135,15 @@ export const AIAgentPanel = () => {
 
         processedTotal += data.processed || 0;
         changedTotal += data.changed || 0;
+        
+        // Collect changed email details from results
+        if (data.results && Array.isArray(data.results)) {
+          allChangedEmails = [...allChangedEmails, ...data.results];
+        }
+        
         setTotalProcessed(processedTotal);
         setTotalChanged(changedTotal);
+        setChangedEmails(allChangedEmails);
         setReanalyzeProgress(Math.min(95, (processedTotal / Math.max(totalConversations, 1)) * 100));
         setReanalyzeStatus(`Processed ${processedTotal} emails...`);
 
@@ -160,12 +180,14 @@ export const AIAgentPanel = () => {
       });
       setReanalyzeStatus('Failed');
     } finally {
+      // Keep results visible longer, only clear progress state
       setTimeout(() => {
         setIsReanalyzing(false);
         setReanalyzeProgress(0);
         setReanalyzeStatus(null);
         setTotalProcessed(0);
         setTotalChanged(0);
+        // Keep changedEmails visible until next run
       }, 3000);
     }
   };
@@ -547,6 +569,43 @@ export const AIAgentPanel = () => {
               <p className="text-sm text-muted-foreground">
                 {reanalyzeStatus} {totalProcessed > 0 && `(${totalChanged} changed)`}
               </p>
+            </div>
+          )}
+
+          {/* Changed Emails List */}
+          {changedEmails.length > 0 && !isReanalyzing && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-foreground">
+                  {changedEmails.length} email{changedEmails.length !== 1 ? 's' : ''} updated:
+                </p>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setChangedEmails([])}
+                  className="text-xs"
+                >
+                  Clear
+                </Button>
+              </div>
+              <div className="max-h-[200px] overflow-y-auto space-y-1 border rounded-lg p-2 bg-muted/30">
+                {changedEmails.map((email) => (
+                  <div key={email.id} className="flex items-center gap-2 text-xs py-1 border-b border-border/50 last:border-0">
+                    <Badge variant="outline" className="text-[10px] shrink-0">
+                      {email.originalBucket || 'none'}
+                    </Badge>
+                    <span className="text-muted-foreground">→</span>
+                    <Badge className="text-[10px] shrink-0 bg-emerald-500/10 text-emerald-600 border-emerald-500/20">
+                      {email.newBucket}
+                    </Badge>
+                    {email.ruleApplied && (
+                      <span className="text-muted-foreground truncate">
+                        (rule: {email.ruleApplied})
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 

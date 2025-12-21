@@ -334,7 +334,8 @@ JSON schema:
         parsed: aiParsed,
         emptyBody: aiEmptyBody,
       },
-      results: dryRun ? results : results.slice(0, 10),
+      // Return all results so UI can display what changed
+      results: results,
     };
 
     console.log(`[bulk-retriage] Complete processed=${summary.processed} changed=${summary.changed} ai_attempted=${aiAttempted} ai_ok=${aiOk} ai_parsed=${aiParsed} emptyBody=${aiEmptyBody}`);
