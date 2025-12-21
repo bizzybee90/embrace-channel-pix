@@ -89,3 +89,9 @@ verify_jwt = false
 
 [functions.compute-sender-stats]
 verify_jwt = false
+
+[functions.bulk-retriage-conversations]
+verify_jwt = false
+
+[functions.bootstrap-sender-rules]
+verify_jwt = false
