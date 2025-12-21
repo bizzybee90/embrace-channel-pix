@@ -320,6 +320,7 @@ serve(async (req) => {
                 .from('conversations')
                 .update({
                   ai_confidence: aiOutput.confidence || 0,
+                  triage_confidence: aiOutput.confidence || null, // Also save to triage_confidence for Review queue
                   ai_sentiment: aiOutput.sentiment || 'neutral',
                   ai_reason_for_escalation: aiOutput.escalation_reason || null,
                   ai_draft_response: aiOutput.response || null,
@@ -332,6 +333,8 @@ serve(async (req) => {
                   resolved_at: !requiresReply ? new Date().toISOString() : null,
                   requires_reply: requiresReply,
                   email_classification: aiOutput.email_classification || null,
+                  // Route low-confidence items to review
+                  needs_review: (aiOutput.confidence || 0) < 0.8,
                 })
                 .eq('id', conversation.id);
               
@@ -348,6 +351,77 @@ serve(async (req) => {
                   email_classification: aiOutput.email_classification,
                   status: status,
                 });
+              }
+              
+              // Now call email-triage-agent for decision bucket routing
+              try {
+                console.log('Calling email-triage-agent for decision routing...');
+                const triageResponse = await supabase.functions.invoke('email-triage-agent', {
+                  body: {
+                    email: {
+                      from_email: fromEmail,
+                      from_name: fromName,
+                      subject: subject,
+                      body: body.substring(0, 5000),
+                      to_email: originalRecipient,
+                    },
+                    workspace_id: config.workspace_id,
+                  }
+                });
+                
+                if (triageResponse.data && !triageResponse.error) {
+                  const triageOutput = triageResponse.data;
+                  console.log('Triage decision:', {
+                    bucket: triageOutput.decision?.bucket,
+                    confidence: triageOutput.decision?.confidence,
+                    why: triageOutput.decision?.why_this_needs_you,
+                    needs_review: triageOutput.needs_review,
+                  });
+                  
+                  // Update conversation with decision bucket
+                  const { error: bucketError } = await supabase
+                    .from('conversations')
+                    .update({
+                      decision_bucket: triageOutput.decision?.bucket || 'wait',
+                      why_this_needs_you: triageOutput.decision?.why_this_needs_you || null,
+                      triage_confidence: triageOutput.decision?.confidence || null,
+                      triage_reasoning: triageOutput.reasoning || null,
+                      cognitive_load: triageOutput.risk?.cognitive_load || 'low',
+                      risk_level: triageOutput.risk?.level || 'none',
+                      needs_review: triageOutput.needs_review || (triageOutput.decision?.confidence || 0) < 0.85,
+                      urgency: triageOutput.priority?.urgency || 'medium',
+                      urgency_reason: triageOutput.priority?.urgency_reason || null,
+                    })
+                    .eq('id', conversation.id);
+                  
+                  if (bucketError) {
+                    console.error('Error updating conversation with triage data:', bucketError);
+                  } else {
+                    console.log('Updated conversation with decision bucket:', triageOutput.decision?.bucket);
+                  }
+                } else {
+                  console.error('Triage agent error:', triageResponse.error);
+                  // Set a default bucket on error
+                  await supabase
+                    .from('conversations')
+                    .update({
+                      decision_bucket: 'act_now', // Safe default
+                      why_this_needs_you: 'Triage failed - needs review',
+                      needs_review: true,
+                    })
+                    .eq('id', conversation.id);
+                }
+              } catch (triageError) {
+                console.error('Email triage call failed (non-blocking):', triageError);
+                // Set a default bucket on exception
+                await supabase
+                  .from('conversations')
+                  .update({
+                    decision_bucket: 'act_now',
+                    why_this_needs_you: 'Triage error - needs review',
+                    needs_review: true,
+                  })
+                  .eq('id', conversation.id);
               }
             } else {
               console.error('AI agent error:', aiResponse.error);
