@@ -102,7 +102,7 @@ export const AIAgentPanel = () => {
 
     try {
       let offset = 0;
-      const batchSize = skipLLM ? 100 : 10;
+      const batchSize = 50; // Use consistent batch size, Anthropic API handles it fine
       let hasMore = true;
       let processedTotal = 0;
       let changedTotal = 0;
