@@ -109,7 +109,14 @@ How much thinking does this require?
 
 3. Look for emotional signals: frustration, urgency, threats, or praise
 
-4. Consider the sender: known customer vs new lead vs supplier vs automated system`;
+4. Consider the sender: known customer vs new lead vs supplier vs automated system
+
+5. MISDIRECTED EMAILS: When an email is clearly intended for a different person or company:
+   - Use "misdirected" category
+   - Set requires_reply = TRUE (polite "wrong email" response needed)
+   - Set bucket = "quick_win" (simple template reply)
+   - Examples: Debt collection for unknown person, invoices for services you don't provide, legal notices addressed to wrong company
+   - This is NOT the same as spam/phishing - misdirected emails are legitimate but sent to the wrong recipient`;
 
 async function getTriagePrompt(supabase: any, workspaceId?: string): Promise<{ prompt: string; model: string }> {
   try {
@@ -202,9 +209,10 @@ const DECISION_ROUTER_TOOL = {
               "customer_inquiry", "customer_complaint", "customer_feedback",
               "lead_new", "lead_followup", "supplier_invoice", "supplier_urgent", "partner_request",
               "automated_notification", "receipt_confirmation", "marketing_newsletter",
-              "spam_phishing", "recruitment_hr", "internal_system", "informational_only"
+              "spam_phishing", "recruitment_hr", "internal_system", "informational_only",
+              "misdirected"
             ],
-            description: "The classification category (secondary to decision bucket)"
+            description: "The classification category. Use 'misdirected' for emails clearly intended for a different person or company (e.g., debt notices, invoices for services not provided by this business)."
           },
           requires_reply: {
             type: "boolean",
