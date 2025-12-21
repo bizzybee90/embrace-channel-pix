@@ -1,8 +1,9 @@
 import { memo } from 'react';
 import { Conversation, DecisionBucket } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { formatDistanceToNow } from 'date-fns';
-import { Clock, CheckCircle2, UserPlus, FileEdit, User, Bot, AlertTriangle, MessageSquare, Hourglass, Star, Mail, Ban, Megaphone, Briefcase, Receipt, Settings2, Zap, Users, Package, Info, ThumbsUp, MessageCircle, CircleAlert, CircleCheck, CirclePause, Timer } from 'lucide-react';
+import { Clock, CheckCircle2, UserPlus, FileEdit, User, Bot, AlertTriangle, MessageSquare, Hourglass, Star, Mail, Ban, Megaphone, Briefcase, Receipt, Settings2, Zap, Users, Package, Info, ThumbsUp, MessageCircle, CircleAlert, CircleCheck, CirclePause, Timer, RotateCcw, History } from 'lucide-react';
 import { ChannelIcon } from '../shared/ChannelIcon';
 import { cn } from '@/lib/utils';
 import { useIsTablet } from '@/hooks/use-tablet';
@@ -11,6 +12,7 @@ import { useState, useRef, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { TriageQuickActions } from './TriageQuickActions';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 // Decision bucket badge helper - PRIMARY display
 const getDecisionBucketBadge = (bucket: DecisionBucket | string | null | undefined) => {
@@ -86,6 +88,13 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
 
   const [hasDraft, setHasDraft] = useState(false);
   const [assignedUserName, setAssignedUserName] = useState<string | null>(null);
+  const [correction, setCorrection] = useState<{
+    original_classification: string | null;
+    new_classification: string | null;
+    original_requires_reply: boolean | null;
+    new_requires_reply: boolean | null;
+  } | null>(null);
+  const [isReopening, setIsReopening] = useState(false);
 
   useEffect(() => {
     const draftKey = `draft-${conversation.id}`;
@@ -113,6 +122,25 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
     
     fetchAssignedUser();
   }, [conversation.assigned_to]);
+
+  // Fetch correction history for this conversation
+  useEffect(() => {
+    const fetchCorrection = async () => {
+      const { data } = await supabase
+        .from('triage_corrections')
+        .select('original_classification, new_classification, original_requires_reply, new_requires_reply')
+        .eq('conversation_id', conversation.id)
+        .order('corrected_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      
+      if (data) {
+        setCorrection(data);
+      }
+    };
+    
+    fetchCorrection();
+  }, [conversation.id]);
 
   const [swipeDistance, setSwipeDistance] = useState(0);
   const [isSwiping, setIsSwiping] = useState(false);
@@ -213,6 +241,43 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
     } else {
       onUpdate?.();
     }
+  };
+
+  const handleReopen = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsReopening(true);
+    trigger('medium');
+    
+    const { error } = await supabase
+      .from('conversations')
+      .update({ 
+        status: 'open',
+        decision_bucket: 'quick_win',
+        requires_reply: true,
+        resolved_at: null
+      })
+      .eq('id', conversation.id);
+
+    if (error) {
+      toast({ 
+        title: "Failed to reopen", 
+        description: error.message, 
+        variant: "destructive" 
+      });
+      trigger('warning');
+    } else {
+      toast({ title: "Conversation reopened", description: "Moved to Needs Me queue" });
+      onUpdate?.();
+    }
+    setIsReopening(false);
+  };
+
+  // Helper to format classification for display
+  const formatClassification = (classification: string | null) => {
+    if (!classification) return 'Unknown';
+    return classification
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, l => l.toUpperCase());
   };
   
   const getBucketBarColor = (bucket: string | null | undefined) => {
@@ -381,16 +446,54 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
                   {assignedUserName || 'Assigned'}
                 </Badge>
               )}
+
+              {/* Correction badge - shows when this email was reclassified */}
+              {correction && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge variant="outline" className="rounded-full text-[11px] font-medium px-2.5 py-1 bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20 flex items-center gap-1 cursor-help">
+                      <History className="h-3 w-3" />
+                      Corrected
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs">
+                    <p className="text-xs">
+                      <span className="font-semibold">You corrected this:</span><br />
+                      {correction.original_classification && correction.new_classification && (
+                        <>Classification: {formatClassification(correction.original_classification)} → {formatClassification(correction.new_classification)}<br /></>
+                      )}
+                      {correction.original_requires_reply !== correction.new_requires_reply && (
+                        <>Reply needed: {correction.original_requires_reply ? 'Yes' : 'No'} → {correction.new_requires_reply ? 'Yes' : 'No'}</>
+                      )}
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              )}
             </div>
 
             <div className="flex items-center justify-between text-xs text-muted-foreground font-medium">
               <span className="uppercase tracking-wide text-[10px]">
                 {conversation.category?.replace(/_/g, ' ') || 'General'}
               </span>
-              <span className="flex items-center gap-1">
-                <Clock className="h-3 w-3" />
-                {formatDistanceToNow(new Date(conversation.updated_at || conversation.created_at!), { addSuffix: true })}
-              </span>
+              <div className="flex items-center gap-2">
+                {/* Reopen button for resolved/auto-handled conversations */}
+                {(conversation.status === 'resolved' || conversation.decision_bucket === 'auto_handled') && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleReopen}
+                    disabled={isReopening}
+                    className="h-6 px-2 text-[10px] text-muted-foreground hover:text-foreground"
+                  >
+                    <RotateCcw className="h-3 w-3 mr-1" />
+                    Reopen
+                  </Button>
+                )}
+                <span className="flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  {formatDistanceToNow(new Date(conversation.updated_at || conversation.created_at!), { addSuffix: true })}
+                </span>
+              </div>
             </div>
           
             {showTriageActions && (
@@ -521,6 +624,29 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
               Review
             </Badge>
           )}
+
+          {/* Correction badge - shows when this email was reclassified */}
+          {correction && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge variant="outline" className="rounded-full text-xs font-semibold px-3 py-1.5 bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20 flex items-center gap-1.5 cursor-help">
+                  <History className="h-3 w-3" />
+                  Corrected
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-xs">
+                <p className="text-xs">
+                  <span className="font-semibold">You corrected this:</span><br />
+                  {correction.original_classification && correction.new_classification && (
+                    <>Classification: {formatClassification(correction.original_classification)} → {formatClassification(correction.new_classification)}<br /></>
+                  )}
+                  {correction.original_requires_reply !== correction.new_requires_reply && (
+                    <>Reply needed: {correction.original_requires_reply ? 'Yes' : 'No'} → {correction.new_requires_reply ? 'Yes' : 'No'}</>
+                  )}
+                </p>
+              </TooltipContent>
+            </Tooltip>
+          )}
         </div>
 
         {/* Meta Row */}
@@ -528,10 +654,25 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
           <span className="uppercase tracking-wide text-[11px]">
             {conversation.category?.replace(/_/g, ' ') || 'General'}
           </span>
-          <span className="flex items-center gap-1.5">
-            <Clock className="h-3.5 w-3.5" />
-            {formatDistanceToNow(new Date(conversation.updated_at || conversation.created_at!), { addSuffix: true })}
-          </span>
+          <div className="flex items-center gap-2">
+            {/* Reopen button for resolved/auto-handled conversations */}
+            {(conversation.status === 'resolved' || conversation.decision_bucket === 'auto_handled') && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleReopen}
+                disabled={isReopening}
+                className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+              >
+                <RotateCcw className="h-3.5 w-3.5 mr-1" />
+                Reopen
+              </Button>
+            )}
+            <span className="flex items-center gap-1.5">
+              <Clock className="h-3.5 w-3.5" />
+              {formatDistanceToNow(new Date(conversation.updated_at || conversation.created_at!), { addSuffix: true })}
+            </span>
+          </div>
         </div>
         
         {showTriageActions && (
