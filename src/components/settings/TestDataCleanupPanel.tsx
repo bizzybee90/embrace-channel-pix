@@ -4,7 +4,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/hooks/useWorkspace';
-import { Trash2, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Trash2, AlertTriangle, RefreshCw, Loader2 } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,6 +23,7 @@ export const TestDataCleanupPanel = () => {
   const { workspace } = useWorkspace();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [resyncing, setResyncing] = useState(false);
   const [counts, setCounts] = useState<{conversations: number; messages: number; customers: number} | null>(null);
   const [deleteCustomers, setDeleteCustomers] = useState(false);
 
@@ -51,7 +52,6 @@ export const TestDataCleanupPanel = () => {
     
     setLoading(true);
     try {
-      // First, get all conversation IDs for this workspace
       const { data: conversations } = await supabase
         .from('conversations')
         .select('id')
@@ -59,7 +59,6 @@ export const TestDataCleanupPanel = () => {
 
       const conversationIds = conversations?.map(c => c.id) || [];
 
-      // Delete messages for those conversations
       if (conversationIds.length > 0) {
         const { error: msgError } = await supabase
           .from('messages')
@@ -69,7 +68,6 @@ export const TestDataCleanupPanel = () => {
         if (msgError) throw msgError;
       }
 
-      // Delete conversations
       const { error: convError } = await supabase
         .from('conversations')
         .delete()
@@ -77,7 +75,6 @@ export const TestDataCleanupPanel = () => {
 
       if (convError) throw convError;
 
-      // Optionally delete customers
       if (deleteCustomers) {
         const { error: custError } = await supabase
           .from('customers')
@@ -107,9 +104,132 @@ export const TestDataCleanupPanel = () => {
     }
   };
 
+  const handleResetAndResync = async () => {
+    if (!workspace?.id) return;
+    
+    setResyncing(true);
+    try {
+      // Step 1: Clear all conversations and messages
+      const { data: conversations } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('workspace_id', workspace.id);
+
+      const conversationIds = conversations?.map(c => c.id) || [];
+
+      if (conversationIds.length > 0) {
+        await supabase.from('messages').delete().in('conversation_id', conversationIds);
+      }
+      await supabase.from('conversations').delete().eq('workspace_id', workspace.id);
+
+      toast({
+        title: 'Step 1: Data cleared',
+        description: `Deleted ${conversationIds.length} conversations. Starting re-sync...`,
+      });
+
+      // Step 2: Find email config and trigger sync
+      const { data: emailConfigs } = await supabase
+        .from('email_provider_configs')
+        .select('id')
+        .eq('workspace_id', workspace.id)
+        .limit(1);
+
+      if (emailConfigs && emailConfigs.length > 0) {
+        const { error: syncError } = await supabase.functions.invoke('email-sync', {
+          body: {
+            configId: emailConfigs[0].id,
+            mode: 'all_historical_90_days',
+            maxMessages: 25,
+          }
+        });
+
+        if (syncError) {
+          console.error('Sync error:', syncError);
+          toast({
+            title: 'Re-sync started with issues',
+            description: 'Some emails may not have synced. Check Settings → Email to retry.',
+            variant: 'destructive',
+          });
+        } else {
+          toast({
+            title: 'Re-sync complete!',
+            description: 'Emails have been re-imported with your updated business context.',
+          });
+        }
+      } else {
+        toast({
+          title: 'No email account connected',
+          description: 'Connect an email account first, then try again.',
+          variant: 'destructive',
+        });
+      }
+
+      setCounts(null);
+    } catch (error) {
+      console.error('Error in reset and resync:', error);
+      toast({
+        title: 'Reset failed',
+        description: 'Something went wrong. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setResyncing(false);
+    }
+  };
+
   return (
     <Card className="p-6">
       <div className="space-y-6">
+        {/* Reset & Re-sync Section */}
+        <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg">
+          <div className="flex items-start gap-3">
+            <RefreshCw className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+            <div className="space-y-3 flex-1">
+              <div>
+                <h3 className="text-lg font-semibold">Reset & Re-sync Emails</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Clear all emails and re-import them with your current business context.
+                  This will re-triage everything using your company name and settings.
+                </p>
+              </div>
+
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button disabled={resyncing} className="gap-2">
+                    {resyncing ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-4 w-4" />
+                    )}
+                    {resyncing ? 'Re-syncing...' : 'Reset & Re-sync All Emails'}
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Reset and re-sync all emails?</AlertDialogTitle>
+                    <AlertDialogDescription className="space-y-2">
+                      <p>This will:</p>
+                      <ul className="list-disc list-inside text-sm">
+                        <li>Delete all current conversations and messages</li>
+                        <li>Re-import emails from the last 90 days</li>
+                        <li>Re-triage with your current business context (company name, etc.)</li>
+                      </ul>
+                      <p className="font-medium mt-2">Make sure you've set your company name in Settings first!</p>
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleResetAndResync}>
+                      Yes, reset and re-sync
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+          </div>
+        </div>
+
+        {/* Clear Test Data Section */}
         <div>
           <h3 className="text-lg font-semibold flex items-center gap-2">
             <Trash2 className="h-5 w-5 text-destructive" />
