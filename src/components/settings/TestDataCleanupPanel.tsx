@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/hooks/useWorkspace';
-import { Trash2, AlertTriangle, RefreshCw, Loader2 } from 'lucide-react';
+import { Trash2, AlertTriangle, RefreshCw, Loader2, Building2, ArrowRight } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,6 +27,71 @@ export const TestDataCleanupPanel = () => {
   const [resyncing, setResyncing] = useState(false);
   const [counts, setCounts] = useState<{conversations: number; messages: number; customers: number} | null>(null);
   const [deleteCustomers, setDeleteCustomers] = useState(false);
+  const [companyName, setCompanyName] = useState('');
+  const [savingContext, setSavingContext] = useState(false);
+
+  // Fetch existing business context
+  const fetchBusinessContext = async () => {
+    if (!workspace?.id) return;
+    
+    const { data } = await supabase
+      .from('business_context')
+      .select('custom_flags')
+      .eq('workspace_id', workspace.id)
+      .single();
+    
+    if (data?.custom_flags) {
+      const flags = data.custom_flags as Record<string, unknown>;
+      setCompanyName((flags.company_name as string) || '');
+    }
+  };
+
+  useEffect(() => {
+    fetchBusinessContext();
+  }, [workspace?.id]);
+
+  const saveCompanyName = async () => {
+    if (!workspace?.id || !companyName.trim()) return;
+    
+    setSavingContext(true);
+    try {
+      const { data: existing } = await supabase
+        .from('business_context')
+        .select('id, custom_flags')
+        .eq('workspace_id', workspace.id)
+        .single();
+
+      const updatedFlags = {
+        ...(existing?.custom_flags as Record<string, unknown> || {}),
+        company_name: companyName.trim()
+      };
+
+      if (existing) {
+        await supabase
+          .from('business_context')
+          .update({ custom_flags: updatedFlags })
+          .eq('id', existing.id);
+      } else {
+        await supabase
+          .from('business_context')
+          .insert({ workspace_id: workspace.id, custom_flags: updatedFlags });
+      }
+
+      toast({
+        title: 'Company name saved',
+        description: 'Your AI will now use this to classify emails correctly.',
+      });
+    } catch (error) {
+      console.error('Error saving company name:', error);
+      toast({
+        title: 'Failed to save',
+        description: 'Could not save company name.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSavingContext(false);
+    }
+  };
 
   const fetchCounts = async () => {
     if (!workspace?.id) return;
@@ -180,6 +246,43 @@ export const TestDataCleanupPanel = () => {
   return (
     <Card className="p-6">
       <div className="space-y-6">
+        {/* Business Context Quick Setup */}
+        <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+          <div className="flex items-start gap-3">
+            <Building2 className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+            <div className="space-y-3 flex-1">
+              <div>
+                <h3 className="text-lg font-semibold">Company Identity</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Set your company name so AI can correctly classify invoices TO you vs. misdirected ones.
+                </p>
+              </div>
+
+              <div className="flex gap-2">
+                <Input
+                  placeholder="e.g. MAC Cleaning"
+                  value={companyName}
+                  onChange={(e) => setCompanyName(e.target.value)}
+                  className="max-w-xs"
+                />
+                <Button 
+                  onClick={saveCompanyName} 
+                  disabled={savingContext || !companyName.trim()}
+                  variant="outline"
+                >
+                  {savingContext ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save'}
+                </Button>
+              </div>
+
+              {companyName && (
+                <p className="text-xs text-muted-foreground">
+                  ✓ AI will classify invoices addressed to "{companyName}" as legitimate.
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+
         {/* Reset & Re-sync Section */}
         <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg">
           <div className="flex items-start gap-3">
@@ -195,7 +298,7 @@ export const TestDataCleanupPanel = () => {
 
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <Button disabled={resyncing} className="gap-2">
+                  <Button disabled={resyncing || !companyName.trim()} className="gap-2">
                     {resyncing ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
@@ -214,7 +317,7 @@ export const TestDataCleanupPanel = () => {
                         <li>Re-import emails from the last 90 days</li>
                         <li>Re-triage with your current business context (company name, etc.)</li>
                       </ul>
-                      <p className="font-medium mt-2">Make sure you've set your company name in Settings first!</p>
+                      <p className="font-medium mt-2">Company: {companyName}</p>
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
@@ -225,6 +328,13 @@ export const TestDataCleanupPanel = () => {
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
+
+              {!companyName.trim() && (
+                <p className="text-xs text-amber-600 flex items-center gap-1">
+                  <ArrowRight className="h-3 w-3" />
+                  Set your company name above first
+                </p>
+              )}
             </div>
           </div>
         </div>
