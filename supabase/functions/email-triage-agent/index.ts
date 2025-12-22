@@ -459,11 +459,12 @@ serve(async (req) => {
 - Business type: ${enrichedBusinessContext.business_type || 'Service business'}
 - You ${enrichedBusinessContext.receives_invoices ? 'RECEIVE' : 'do NOT receive'} invoices from suppliers
 
-INVOICE CLASSIFICATION RULES:
-- Invoices TO ${enrichedBusinessContext.company_name || 'your company'} = supplier_invoice (legitimate, may need payment)
-- Invoices FROM ${enrichedBusinessContext.company_name || 'your company'} or ${enrichedBusinessContext.email_domain || 'your domain'} = receipt_confirmation (already sent)
-- Invoices for a DIFFERENT company entirely = misdirected (wrong recipient)
-- Check if the invoice mentions "${enrichedBusinessContext.company_name}" or services you provide before marking as misdirected`;
+INVOICE CLASSIFICATION RULES (IMPORTANT):
+- If an email is an invoice/bill AND it was sent to your email/domain (${enrichedBusinessContext.email_domain || 'your domain'}), assume it is a legitimate invoice TO you unless the invoice explicitly shows a different recipient.
+- supplier_invoice = invoices/bills that you (the business) may need to pay (even if the supplier name is different from your company name).
+- receipt_confirmation = confirmations/receipts for payments already made or invoices you already SENT to customers.
+- misdirected = ONLY when the invoice explicitly names a different recipient company/person in "Bill to / Customer / Account" AND does NOT mention ${enrichedBusinessContext.company_name || 'your company'} anywhere.
+- If unsure between supplier_invoice and misdirected, prefer supplier_invoice and set bucket=quick_win (so the owner can quickly verify).`;
     }
 
     if (enrichedBusinessContext.is_hiring) {
