@@ -1,35 +1,35 @@
-import { Inbox, UserCircle, FolderOpen, Menu, AlertTriangle, CheckCircle2, Clock } from 'lucide-react';
+import { Mail, Menu, ClipboardCheck, Clock, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useState, useEffect } from 'react';
 
 interface MobileBottomNavProps {
-  activeFilter: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'awaiting-reply' | 'completed' | 'sent' | 'high-priority' | 'vip-customers' | 'triaged';
-  onNavigate: (filter: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'awaiting-reply' | 'completed' | 'sent' | 'high-priority' | 'vip-customers' | 'triaged') => void;
+  activeFilter: string;
+  onNavigate: (filter: string) => void;
   onMenuClick: () => void;
 }
 
 const navItems = [
   { 
-    id: 'my-tickets' as const, 
-    icon: Inbox, 
-    label: 'My Tickets',
-    badgeBg: 'bg-primary/10',
-    iconColor: 'text-primary'
+    id: 'to-reply' as const, 
+    icon: Mail, 
+    label: 'To Reply',
+    badgeBg: 'bg-destructive/10',
+    iconColor: 'text-destructive'
   },
   { 
-    id: 'all-open' as const, 
-    icon: AlertTriangle, 
-    label: 'Action',
-    badgeBg: 'bg-blue-500/10',
-    iconColor: 'text-blue-500'
+    id: 'review' as const, 
+    icon: ClipboardCheck, 
+    label: 'Review',
+    badgeBg: 'bg-purple-500/10',
+    iconColor: 'text-purple-500'
   },
   { 
-    id: 'awaiting-reply' as const, 
+    id: 'snoozed' as const, 
     icon: Clock, 
-    label: 'Awaiting',
-    badgeBg: 'bg-yellow-500/10',
-    iconColor: 'text-yellow-500'
+    label: 'Snoozed',
+    badgeBg: 'bg-amber-500/10',
+    iconColor: 'text-amber-500'
   },
 ];
 

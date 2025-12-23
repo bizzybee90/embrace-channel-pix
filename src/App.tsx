@@ -56,19 +56,8 @@ const RouterContent = () => {
       {/* Redirect old needs-me route */}
       <Route path="/needs-me" element={<Navigate to="/to-reply" replace />} />
       
-      {/* FYI - Wait bucket (new view) */}
-      <Route 
-        path="/fyi" 
-        element={
-          <AuthGuard>
-            {isMobile ? (
-              <MobileEscalationHub filter="fyi" />
-            ) : (
-              <EscalationHub filter="fyi" />
-            )}
-          </AuthGuard>
-        } 
-      />
+      {/* FYI - Redirect to To Reply (removed view) */}
+      <Route path="/fyi" element={<Navigate to="/to-reply" replace />} />
       
       {/* Done - Auto-handled + resolved (renamed from cleared) */}
       <Route 

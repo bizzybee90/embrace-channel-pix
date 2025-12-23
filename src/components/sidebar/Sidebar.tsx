@@ -1,4 +1,4 @@
-import { Home, Mail, Info, CheckCircle2, Clock, ChevronDown, ChevronRight, ChevronLeft, Send, Inbox, BarChart3, MessageSquare, Settings, ClipboardCheck } from 'lucide-react';
+import { Home, Mail, CheckCircle2, Clock, ChevronDown, ChevronRight, ChevronLeft, Send, Inbox, BarChart3, MessageSquare, Settings, ClipboardCheck } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { Button } from '@/components/ui/button';
 import { useState, useEffect } from 'react';
@@ -25,7 +25,7 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
     queryKey: ['sidebar-view-counts'],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return { toReply: 0, fyi: 0, done: 0, snoozed: 0, review: 0 };
+      if (!user) return { toReply: 0, done: 0, snoozed: 0, review: 0 };
 
       const { data: userData } = await supabase
         .from('users')
@@ -33,12 +33,12 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
         .eq('id', user.id)
         .single();
 
-      if (!userData?.workspace_id) return { toReply: 0, fyi: 0, done: 0, snoozed: 0, review: 0 };
+      if (!userData?.workspace_id) return { toReply: 0, done: 0, snoozed: 0, review: 0 };
 
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      const [toReplyResult, fyiResult, doneResult, snoozedResult, reviewResult] = await Promise.all([
+      const [toReplyResult, doneResult, snoozedResult, reviewResult] = await Promise.all([
         // To Reply: act_now + quick_win
         supabase
           .from('conversations')
@@ -46,13 +46,6 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
           .eq('workspace_id', userData.workspace_id)
           .in('decision_bucket', ['act_now', 'quick_win'])
           .in('status', ['new', 'open', 'waiting_internal', 'ai_handling', 'escalated']),
-        // FYI: wait bucket
-        supabase
-          .from('conversations')
-          .select('id', { count: 'exact', head: true })
-          .eq('workspace_id', userData.workspace_id)
-          .eq('decision_bucket', 'wait')
-          .in('status', ['new', 'open', 'waiting_internal', 'ai_handling']),
         // Done: auto_handled or resolved (last 24h)
         supabase
           .from('conversations')
@@ -78,7 +71,6 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
 
       return {
         toReply: toReplyResult.count || 0,
-        fyi: fyiResult.count || 0,
         done: doneResult.count || 0,
         snoozed: snoozedResult.count || 0,
         review: reviewResult.count || 0,
@@ -182,22 +174,22 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
             )}
           </Tooltip>
 
-          {/* FYI */}
+          {/* Review - Always visible as trust gate */}
           <Tooltip>
             <TooltipTrigger asChild>
               <div>
                 <NavLink
-                  to="/fyi"
+                  to="/review"
                   onClick={onNavigate}
                   className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all`}
                   activeClassName="bg-accent text-accent-foreground font-medium"
                 >
-                  <Info className="h-5 w-5 text-blue-500" />
+                  <ClipboardCheck className="h-5 w-5 text-purple-500" />
                   {!isCollapsed && (
                     <span className="flex-1 flex items-center justify-between">
-                      <span>FYI</span>
-                      {viewCounts?.fyi ? (
-                        <span className="text-xs text-muted-foreground">{viewCounts.fyi}</span>
+                      <span>Review</span>
+                      {viewCounts?.review ? (
+                        <span className="text-xs font-semibold text-purple-500">{viewCounts.review}</span>
                       ) : null}
                     </span>
                   )}
@@ -206,7 +198,36 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
             </TooltipTrigger>
             {isCollapsed && (
               <TooltipContent side="right">
-                <p>FYI {viewCounts?.fyi ? `(${viewCounts.fyi})` : ''}</p>
+                <p>Review {viewCounts?.review ? `(${viewCounts.review})` : ''}</p>
+              </TooltipContent>
+            )}
+          </Tooltip>
+
+          {/* Snoozed */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div>
+                <NavLink
+                  to="/snoozed"
+                  onClick={onNavigate}
+                  className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all`}
+                  activeClassName="bg-accent text-accent-foreground font-medium"
+                >
+                  <Clock className="h-5 w-5 text-amber-500" />
+                  {!isCollapsed && (
+                    <span className="flex-1 flex items-center justify-between">
+                      <span>Snoozed</span>
+                      {viewCounts?.snoozed ? (
+                        <span className="text-xs text-muted-foreground">{viewCounts.snoozed}</span>
+                      ) : null}
+                    </span>
+                  )}
+                </NavLink>
+              </div>
+            </TooltipTrigger>
+            {isCollapsed && (
+              <TooltipContent side="right">
+                <p>Snoozed {viewCounts?.snoozed ? `(${viewCounts.snoozed})` : ''}</p>
               </TooltipContent>
             )}
           </Tooltip>
@@ -236,64 +257,6 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
             {isCollapsed && (
               <TooltipContent side="right">
                 <p>Done {viewCounts?.done ? `(${viewCounts.done})` : ''}</p>
-              </TooltipContent>
-            )}
-          </Tooltip>
-
-          {/* Review - only visible when count > 0 */}
-          {viewCounts?.review && viewCounts.review > 0 && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div>
-                  <NavLink
-                    to="/review"
-                    onClick={onNavigate}
-                    className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all`}
-                    activeClassName="bg-accent text-accent-foreground font-medium"
-                  >
-                    <ClipboardCheck className="h-5 w-5 text-purple-500" />
-                    {!isCollapsed && (
-                      <span className="flex-1 flex items-center justify-between">
-                        <span>Review</span>
-                        <span className="text-xs font-semibold text-purple-500">{viewCounts.review}</span>
-                      </span>
-                    )}
-                  </NavLink>
-                </div>
-              </TooltipTrigger>
-              {isCollapsed && (
-                <TooltipContent side="right">
-                  <p>Review ({viewCounts.review})</p>
-                </TooltipContent>
-              )}
-            </Tooltip>
-          )}
-
-          {/* Snoozed */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div>
-                <NavLink
-                  to="/snoozed"
-                  onClick={onNavigate}
-                  className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all`}
-                  activeClassName="bg-accent text-accent-foreground font-medium"
-                >
-                  <Clock className="h-5 w-5 text-amber-500" />
-                  {!isCollapsed && (
-                    <span className="flex-1 flex items-center justify-between">
-                      <span>Snoozed</span>
-                      {viewCounts?.snoozed ? (
-                        <span className="text-xs text-muted-foreground">{viewCounts.snoozed}</span>
-                      ) : null}
-                    </span>
-                  )}
-                </NavLink>
-              </div>
-            </TooltipTrigger>
-            {isCollapsed && (
-              <TooltipContent side="right">
-                <p>Snoozed {viewCounts?.snoozed ? `(${viewCounts.snoozed})` : ''}</p>
               </TooltipContent>
             )}
           </Tooltip>
