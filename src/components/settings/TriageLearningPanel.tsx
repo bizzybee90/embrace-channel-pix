@@ -4,8 +4,10 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Brain, ArrowRight, Zap, Loader2, TrendingUp, RefreshCw, Mail, CheckCircle } from 'lucide-react';
+import { Brain, ArrowRight, Zap, Loader2, TrendingUp, RefreshCw, Mail, CheckCircle, RotateCcw, AlertCircle } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
+import { Slider } from '@/components/ui/slider';
+import { Label } from '@/components/ui/label';
 
 interface CorrectionGroup {
   sender_domain: string;
@@ -24,6 +26,17 @@ interface SuggestedRule {
   confidence: number;
 }
 
+interface RetriagedResult {
+  id: string;
+  title: string;
+  originalBucket: string;
+  newBucket: string;
+  originalClassification: string;
+  newClassification: string;
+  originalConfidence: number;
+  newConfidence: number;
+}
+
 export function TriageLearningPanel() {
   const { toast } = useToast();
   const [corrections, setCorrections] = useState<CorrectionGroup[]>([]);
@@ -31,11 +44,94 @@ export function TriageLearningPanel() {
   const [loading, setLoading] = useState(true);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [creatingRule, setCreatingRule] = useState<string | null>(null);
+  
+  // Bulk re-triage state
+  const [isRetriaging, setIsRetriaging] = useState(false);
+  const [retriageResults, setRetriageResults] = useState<RetriagedResult[]>([]);
+  const [lowConfidenceCount, setLowConfidenceCount] = useState<number>(0);
+  const [confidenceThreshold, setConfidenceThreshold] = useState(0.85);
+  const [retriageLimit, setRetriageLimit] = useState(20);
 
   useEffect(() => {
     fetchCorrections();
     fetchSuggestions();
+    fetchLowConfidenceCount();
   }, []);
+
+  const fetchLowConfidenceCount = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data: userData } = await supabase
+        .from('users')
+        .select('workspace_id')
+        .eq('id', user?.id)
+        .single();
+
+      if (!userData?.workspace_id) return;
+
+      const { count } = await supabase
+        .from('conversations')
+        .select('id', { count: 'exact', head: true })
+        .eq('workspace_id', userData.workspace_id)
+        .eq('decision_bucket', 'auto_handled')
+        .or(`triage_confidence.lt.${confidenceThreshold},triage_confidence.is.null`);
+
+      setLowConfidenceCount(count || 0);
+    } catch (error) {
+      console.error('Error fetching low confidence count:', error);
+    }
+  };
+
+  const runBulkRetriage = async () => {
+    setIsRetriaging(true);
+    setRetriageResults([]);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data: userData } = await supabase
+        .from('users')
+        .select('workspace_id')
+        .eq('id', user?.id)
+        .single();
+
+      if (!userData?.workspace_id) return;
+
+      const { data, error } = await supabase.functions.invoke('bulk-retriage-conversations', {
+        body: { 
+          workspaceId: userData.workspace_id,
+          limit: retriageLimit,
+          confidenceThreshold,
+          dryRun: false,
+        }
+      });
+
+      if (error) throw error;
+
+      setRetriageResults(data?.results || []);
+      
+      if (data?.changed > 0) {
+        toast({
+          title: 'Re-triage complete',
+          description: `Updated ${data.changed} of ${data.processed} conversations`,
+        });
+      } else {
+        toast({
+          title: 'No changes needed',
+          description: `Reviewed ${data?.processed || 0} conversations, all classifications confirmed`,
+        });
+      }
+
+      // Refresh the count
+      fetchLowConfidenceCount();
+    } catch (error) {
+      console.error('Error running bulk re-triage:', error);
+      toast({
+        title: 'Re-triage failed',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsRetriaging(false);
+    }
+  };
 
   const fetchCorrections = async () => {
     try {
@@ -233,6 +329,114 @@ export function TriageLearningPanel() {
 
   return (
     <div className="space-y-6">
+      {/* Bulk Re-triage Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <RotateCcw className="h-5 w-5" />
+            Bulk Re-triage Low Confidence Emails
+          </CardTitle>
+          <CardDescription>
+            Re-classify auto-handled emails that had low AI confidence. These are most likely to be misclassified.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between bg-muted/50 rounded-lg p-4">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="h-5 w-5 text-amber-500" />
+              <div>
+                <p className="text-sm font-medium">
+                  {lowConfidenceCount} auto-handled emails with confidence below {Math.round(confidenceThreshold * 100)}%
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  These may include incorrectly classified invoices, receipts, or customer inquiries
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-sm">Confidence Threshold</Label>
+              <div className="flex items-center gap-3">
+                <Slider
+                  value={[confidenceThreshold * 100]}
+                  onValueChange={([v]) => setConfidenceThreshold(v / 100)}
+                  min={50}
+                  max={95}
+                  step={5}
+                  className="flex-1"
+                />
+                <span className="text-sm font-mono w-12">{Math.round(confidenceThreshold * 100)}%</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Emails with confidence below this will be re-triaged
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-sm">Batch Size</Label>
+              <div className="flex items-center gap-3">
+                <Slider
+                  value={[retriageLimit]}
+                  onValueChange={([v]) => setRetriageLimit(v)}
+                  min={5}
+                  max={50}
+                  step={5}
+                  className="flex-1"
+                />
+                <span className="text-sm font-mono w-12">{retriageLimit}</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Number of emails to process per batch
+              </p>
+            </div>
+          </div>
+
+          <Button
+            onClick={runBulkRetriage}
+            disabled={isRetriaging || lowConfidenceCount === 0}
+            className="w-full"
+          >
+            {isRetriaging ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Re-triaging...
+              </>
+            ) : (
+              <>
+                <RotateCcw className="h-4 w-4 mr-2" />
+                Re-triage {Math.min(retriageLimit, lowConfidenceCount)} Emails
+              </>
+            )}
+          </Button>
+
+          {retriageResults.length > 0 && (
+            <div className="mt-4 space-y-2">
+              <p className="text-sm font-medium">Changed Classifications:</p>
+              <div className="max-h-60 overflow-y-auto space-y-2">
+                {retriageResults.map((result) => (
+                  <div
+                    key={result.id}
+                    className="flex items-center justify-between bg-muted/30 rounded-lg px-3 py-2 text-sm"
+                  >
+                    <span className="truncate flex-1 mr-2">{result.title}</span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Badge variant="outline" className={`text-xs ${getBucketColor(result.originalBucket)}`}>
+                        {result.originalClassification.replace(/_/g, ' ')}
+                      </Badge>
+                      <ArrowRight className="h-3 w-3" />
+                      <Badge variant="outline" className={`text-xs ${getBucketColor(result.newBucket)}`}>
+                        {result.newClassification.replace(/_/g, ' ')}
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Historical Behavior Suggestions */}
       <Card>
         <CardHeader>
