@@ -1,7 +1,7 @@
 import { Message } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
-import { Bot, StickyNote, Paperclip, ChevronDown, ChevronUp, MessageCircle, Eye, EyeOff } from 'lucide-react';
+import { Bot, StickyNote, Paperclip, ChevronDown, ChevronUp, MessageCircle, Eye, EyeOff, FileText } from 'lucide-react';
 import { ChannelIcon } from '@/components/shared/ChannelIcon';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
@@ -10,6 +10,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { cleanEmailContent, hasSignificantCleaning } from '@/utils/emailParser';
 import { EmailThread } from './EmailThread';
+import { HtmlEmailViewer } from './HtmlEmailViewer';
 const getInitials = (name: string | null) => {
   if (!name) return '?';
   return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
@@ -26,6 +27,7 @@ export const MessageTimeline = ({ messages, defaultCollapsed = true }: MessageTi
   const [downloadingFile, setDownloadingFile] = useState<string | null>(null);
   const [isExpanded, setIsExpanded] = useState(!defaultCollapsed);
   const [showOriginalIds, setShowOriginalIds] = useState<Set<string>>(new Set());
+  const [htmlViewerMessage, setHtmlViewerMessage] = useState<Message | null>(null);
 
   const toggleShowOriginal = (messageId: string) => {
     setShowOriginalIds(prev => {
@@ -87,6 +89,11 @@ export const MessageTimeline = ({ messages, defaultCollapsed = true }: MessageTi
     const showOriginal = showOriginalIds.has(message.id);
     const displayBody = showOriginal ? message.body : cleanedBody;
     const canShowOriginal = isEmail && hasSignificantCleaning(message.body, cleanedBody);
+    
+    // Check if we have HTML content in raw_payload
+    const hasHtmlContent = isEmail && message.raw_payload?.body && 
+      typeof message.raw_payload.body === 'string' && 
+      message.raw_payload.body.includes('<');
 
     if (isInternal) {
       return (
@@ -178,24 +185,37 @@ export const MessageTimeline = ({ messages, defaultCollapsed = true }: MessageTi
             <p className="text-sm whitespace-pre-wrap leading-relaxed">{displayBody}</p>
           )}
           
-          {/* Show original toggle for email messages with significant cleaning */}
-          {canShowOriginal && (
-            <button
-              onClick={() => toggleShowOriginal(message.id)}
-              className="mt-2 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-            >
-              {showOriginal ? (
-                <>
-                  <EyeOff className="h-3 w-3" />
-                  Show threaded
-                </>
-              ) : (
-                <>
-                  <Eye className="h-3 w-3" />
-                  Show original
-                </>
+          {/* Email action buttons */}
+          {(canShowOriginal || hasHtmlContent) && (
+            <div className="mt-2 flex items-center gap-3">
+              {canShowOriginal && (
+                <button
+                  onClick={() => toggleShowOriginal(message.id)}
+                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showOriginal ? (
+                    <>
+                      <EyeOff className="h-3 w-3" />
+                      Show threaded
+                    </>
+                  ) : (
+                    <>
+                      <Eye className="h-3 w-3" />
+                      Show original
+                    </>
+                  )}
+                </button>
               )}
-            </button>
+              {hasHtmlContent && (
+                <button
+                  onClick={() => setHtmlViewerMessage(message)}
+                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <FileText className="h-3 w-3" />
+                  View formatted
+                </button>
+              )}
+            </div>
           )}
           
           {message.attachments && Array.isArray(message.attachments) && message.attachments.length > 0 && (
@@ -235,6 +255,15 @@ export const MessageTimeline = ({ messages, defaultCollapsed = true }: MessageTi
 
   return (
     <div className="space-y-4">
+      {/* HTML Email Viewer Modal */}
+      {htmlViewerMessage && (
+        <HtmlEmailViewer
+          htmlContent={htmlViewerMessage.raw_payload?.body || ''}
+          open={!!htmlViewerMessage}
+          onOpenChange={(open) => !open && setHtmlViewerMessage(null)}
+        />
+      )}
+      
       {/* Header with expand/collapse toggle */}
       <div className="flex items-center justify-between px-4 pt-2">
         <div className="flex items-center gap-2">
