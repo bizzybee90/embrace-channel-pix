@@ -6,7 +6,7 @@ import { ChannelIcon } from '@/components/shared/ChannelIcon';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
-import { useState, useEffect, useMemo } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { cleanEmailContent, hasSignificantCleaning } from '@/utils/emailParser';
 import { EmailThread } from './EmailThread';
@@ -29,25 +29,6 @@ export const MessageTimeline = ({ messages, defaultCollapsed = true }: MessageTi
   const [isExpanded, setIsExpanded] = useState(!defaultCollapsed);
   const [showOriginalIds, setShowOriginalIds] = useState<Set<string>>(new Set());
   const [htmlViewerMessage, setHtmlViewerMessage] = useState<Message | null>(null);
-  const [hasAutoOpened, setHasAutoOpened] = useState(false);
-
-  // Find the first email message with HTML content
-  const firstHtmlEmailMessage = useMemo(() => {
-    return messages.find(msg => 
-      msg.channel === 'email' && 
-      msg.raw_payload?.body && 
-      typeof msg.raw_payload.body === 'string' && 
-      msg.raw_payload.body.includes('<')
-    );
-  }, [messages]);
-
-  // Auto-open HTML viewer for the first email with HTML content
-  useEffect(() => {
-    if (firstHtmlEmailMessage && !hasAutoOpened) {
-      setHtmlViewerMessage(firstHtmlEmailMessage);
-      setHasAutoOpened(true);
-    }
-  }, [firstHtmlEmailMessage, hasAutoOpened]);
 
   const toggleShowOriginal = (messageId: string) => {
     setShowOriginalIds(prev => {

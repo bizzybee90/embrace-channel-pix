@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, Reply, FileText } from 'lucide-react';
 import { parseEmailThread, cleanEmailContent } from '@/utils/emailParser';
 import { HtmlEmailViewer } from '@/components/conversations/HtmlEmailViewer';
@@ -12,16 +12,9 @@ interface EmailPreviewProps {
 
 export function EmailPreview({ body, summary, maxLength = 500, rawHtmlBody }: EmailPreviewProps) {
   const [showQuoted, setShowQuoted] = useState(false);
+  const [showHtmlViewer, setShowHtmlViewer] = useState(false);
   
   const hasHtmlContent = rawHtmlBody && rawHtmlBody.includes('<');
-  const [showHtmlViewer, setShowHtmlViewer] = useState(hasHtmlContent);
-  
-  // Auto-open HTML viewer when HTML content becomes available
-  useEffect(() => {
-    if (hasHtmlContent) {
-      setShowHtmlViewer(true);
-    }
-  }, [hasHtmlContent]);
   
   const { mainContent, quotedContent, hasQuotes } = useMemo(() => {
     if (!body) {
