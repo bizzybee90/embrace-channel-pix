@@ -167,13 +167,28 @@ export function DraftPreviewSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-lg flex flex-col p-0">
         <SheetHeader className="px-6 py-4 border-b">
-          <SheetTitle className="flex items-center justify-between">
+          <SheetTitle className="flex items-center justify-between gap-2">
             <span className="truncate">{conversation?.title || 'Loading...'}</span>
-            {conversation?.urgency && (
-              <Badge variant={conversation.urgency === 'high' ? 'destructive' : 'secondary'}>
-                {conversation.urgency}
-              </Badge>
-            )}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {conversation?.email_classification && (
+                <Badge variant="outline" className={cn(
+                  "text-xs",
+                  conversation.email_classification.includes('payment') ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                  conversation.email_classification.includes('marketing') ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
+                  conversation.email_classification.includes('invoice') ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
+                  conversation.email_classification.includes('enquiry') ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400' :
+                  conversation.email_classification.includes('complaint') ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                  ''
+                )}>
+                  {conversation.email_classification.replace(/_/g, ' ')}
+                </Badge>
+              )}
+              {conversation?.urgency && (
+                <Badge variant={conversation.urgency === 'high' ? 'destructive' : 'secondary'}>
+                  {conversation.urgency}
+                </Badge>
+              )}
+            </div>
           </SheetTitle>
           {conversation?.customer && (
             <p className="text-sm text-muted-foreground">
