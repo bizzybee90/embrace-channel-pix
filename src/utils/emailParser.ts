@@ -2,13 +2,29 @@
  * Decodes HTML entities in text
  */
 function decodeHtmlEntities(text: string): string {
-  return text
-    .replace(/&zwnj;/g, '')              // Remove zero-width non-joiner
+  let result = text
+    // Zero-width and invisible characters
+    .replace(/&zwnj;/g, '')              // Zero-width non-joiner
     .replace(/&#8203;/g, '')             // Zero-width space
     .replace(/&#x200b;/g, '')            // Zero-width space (hex)
+    .replace(/&shy;/g, '')               // Soft hyphen (invisible)
+    .replace(/&#173;/g, '')              // Soft hyphen (numeric)
+    .replace(/&#8199;/g, ' ')            // Figure space
+    .replace(/&#8194;/g, ' ')            // En space
+    .replace(/&#8195;/g, ' ')            // Em space
+    .replace(/&#8201;/g, ' ')            // Thin space
+    .replace(/&#8202;/g, '')             // Hair space
+    .replace(/&#847;/g, '')              // Combining grapheme joiner
+    
+    // Regular spaces
     .replace(/&#160;/g, ' ')             // Non-breaking space (numeric)
     .replace(/&nbsp;/g, ' ')             // Non-breaking space (named)
     .replace(/&#xa0;/g, ' ')             // Non-breaking space (hex)
+    .replace(/&emsp;/g, ' ')             // Em space (named)
+    .replace(/&ensp;/g, ' ')             // En space (named)
+    .replace(/&thinsp;/g, ' ')           // Thin space (named)
+    
+    // Common punctuation and symbols
     .replace(/&amp;/g, '&')              // Ampersand
     .replace(/&lt;/g, '<')               // Less than
     .replace(/&gt;/g, '>')               // Greater than
@@ -16,9 +32,9 @@ function decodeHtmlEntities(text: string): string {
     .replace(/&#39;/g, "'")              // Apostrophe
     .replace(/&apos;/g, "'")             // Apostrophe (named)
     .replace(/&#34;/g, '"')              // Quote (numeric)
-    .replace(/&copy;/g, '©')             // Copyright
-    .replace(/&reg;/g, '®')              // Registered
-    .replace(/&trade;/g, '™')            // Trademark
+    .replace(/&copy;/g, '')              // Copyright - remove in cleanup
+    .replace(/&reg;/g, '')               // Registered - remove in cleanup
+    .replace(/&trade;/g, '')             // Trademark - remove in cleanup
     .replace(/&sup1;/g, '¹')             // Superscript 1
     .replace(/&sup2;/g, '²')             // Superscript 2
     .replace(/&sup3;/g, '³')             // Superscript 3
@@ -27,10 +43,25 @@ function decodeHtmlEntities(text: string): string {
     .replace(/&hellip;/g, '...')         // Ellipsis
     .replace(/&ndash;/g, '-')            // En dash
     .replace(/&mdash;/g, '—')            // Em dash
-    .replace(/&#\d+;/g, '')              // Remove any remaining numeric entities
-    .replace(/&[a-zA-Z]+;/g, '')         // Remove any remaining named entities
+    .replace(/&lsquo;/g, "'")            // Left single quote
+    .replace(/&rsquo;/g, "'")            // Right single quote
+    .replace(/&ldquo;/g, '"')            // Left double quote
+    .replace(/&rdquo;/g, '"')            // Right double quote
+    .replace(/&pound;/g, '£')            // Pound sign
+    .replace(/&euro;/g, '€')             // Euro sign
+    
+    // Remove any remaining numeric entities (&#xxxx;)
+    .replace(/&#\d+;/g, '')
+    // Remove any remaining named entities (&xxxx;)
+    .replace(/&[a-zA-Z]+;/g, '');
+  
+  // Clean up resulting whitespace
+  result = result
     .replace(/\s{3,}/g, ' ')             // Collapse excessive whitespace
+    .replace(/\n\s*\n\s*\n/g, '\n\n')    // Max 2 newlines
     .trim();
+    
+  return result;
 }
 
 /**
@@ -63,32 +94,60 @@ export function cleanEmailContent(rawContent: string): string {
   
   // Cut everything after these markers (inline or line-start) using indexOf
   const cutoffPatterns = [
+    // Generic email footers
     'Confidentiality Note:',
     'This e-mail and any attachments',
     'This email and any attachments',
     'This message is intended',
-    '#FollowUs',
-    'Follow us on',
     'Sent from my iPhone',
     'Sent from my Android',
     'Get Outlook for',
-    'Get Outlook for iOS',
-    'Get Outlook for Android',
     '-- \n',
-    '---',
-    '___',
-    // Payment/company footer patterns
-    'View in Dashboard',
-    'Visit our Support website',
-    'We are here to help.',
+    
+    // Social/marketing footers
+    '#FollowUs',
+    'Follow us on',
+    'Connect with us',
+    'Like us on Facebook',
+    'Was this email helpful?',
+    'Yes No',
+    
+    // Unsubscribe/preferences
+    'To unsubscribe',
+    'Unsubscribe',
+    'manage your communication preferences',
+    'Update your preferences',
+    'You are currently subscribed to',
+    'email preferences',
+    
+    // Company/legal footers
     'is a company registered in',
     'Registered number:',
     'Registered office:',
-    'To unsubscribe',
-    'manage your communication preferences',
-    'You are currently subscribed to',
-    'Stripe Payments UK Limited',
+    'Company Registration',
+    'VAT Registration',
+    
+    // Payment platforms
+    'View in Dashboard',
+    'Visit our Support website',
+    'We are here to help.',
     'Stripe Payments',
+    'PayPal',
+    
+    // Job boards/marketing platforms
+    'Help Centre',
+    'Help Center',
+    'Recruitment Resources',
+    'Post a job',
+    'Jobs Candidates',
+    'Indeed UK Operations',
+    'Indeed Ireland Operations',
+    'Indeed processes and analyses',
+    
+    // Address patterns (common in footers)
+    '| United Kingdom',
+    '| Ireland',
+    '| London',
   ];
   
   for (const pattern of cutoffPatterns) {
