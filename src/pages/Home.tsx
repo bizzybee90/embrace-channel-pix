@@ -267,7 +267,7 @@ export const Home = () => {
                   </div>
                   {stats.atRiskCount > 0 && (
                     <span className="text-xs font-medium text-destructive bg-destructive/10 px-2 py-1 rounded-full">
-                      SLA breaching
+                      Urgent reply needed
                     </span>
                   )}
                 </div>
