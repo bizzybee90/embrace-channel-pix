@@ -50,7 +50,7 @@ export function TriageLearningPanel() {
   const [retriageResults, setRetriageResults] = useState<RetriagedResult[]>([]);
   const [lowConfidenceCount, setLowConfidenceCount] = useState<number>(0);
   const [confidenceThreshold, setConfidenceThreshold] = useState(0.85);
-  const [retriageLimit, setRetriageLimit] = useState(20);
+  const [retriageLimit, setRetriageLimit] = useState(100);
 
   useEffect(() => {
     fetchCorrections();
@@ -380,9 +380,9 @@ export function TriageLearningPanel() {
                 <Slider
                   value={[retriageLimit]}
                   onValueChange={([v]) => setRetriageLimit(v)}
-                  min={5}
-                  max={50}
-                  step={5}
+                  min={10}
+                  max={200}
+                  step={10}
                   className="flex-1"
                 />
                 <span className="text-sm font-mono w-12">{retriageLimit}</span>

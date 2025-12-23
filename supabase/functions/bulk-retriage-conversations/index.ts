@@ -41,7 +41,8 @@ serve(async (req) => {
     }
 
     const workspaceId = body.workspaceId as string | undefined;
-    const limit = (body.limit as number) || 20;
+    // Default higher so older low-confidence items (often the “stuck” ones) get processed too.
+    const limit = (body.limit as number) || 100;
     const dryRun = (body.dryRun as boolean) || false;
     const confidenceThreshold = (body.confidenceThreshold as number) || 0.85;
     const targetBuckets = (body.targetBuckets as string[]) || ['auto_handled', 'quick_win', 'act_now', 'wait'];
@@ -74,6 +75,8 @@ serve(async (req) => {
       .eq('workspace_id', workspaceId)
       .in('decision_bucket', targetBuckets)
       .or(`triage_confidence.lt.${confidenceThreshold},triage_confidence.is.null`)
+      // Prioritize null/low-confidence items first so “stuck” misclassifications get processed.
+      .order('triage_confidence', { ascending: true, nullsFirst: true })
       .order('created_at', { ascending: false })
       .limit(limit);
 
