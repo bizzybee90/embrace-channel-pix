@@ -244,70 +244,126 @@ export const Home = () => {
             {/* AI Briefing Widget */}
             <AIBriefingWidget />
 
-            {/* Quick Stats Row */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {/* To Reply */}
+            {/* Action Cards - Priority order with visual hierarchy */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* At Risk - Most urgent, prominent styling */}
               <Card 
-                className="p-4 cursor-pointer hover:bg-accent/50 transition-colors"
+                className={`p-5 cursor-pointer transition-all hover:scale-[1.02] ${
+                  stats.atRiskCount > 0 
+                    ? 'bg-gradient-to-br from-destructive/10 via-destructive/5 to-background border-destructive/30 shadow-lg shadow-destructive/10' 
+                    : 'hover:bg-accent/50'
+                }`}
                 onClick={() => navigate('/to-reply')}
               >
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-destructive/10">
-                    <Mail className="h-4 w-4 text-destructive" />
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className={`p-3 rounded-xl ${stats.atRiskCount > 0 ? 'bg-destructive/20' : 'bg-destructive/10'}`}>
+                      <AlertTriangle className={`h-6 w-6 ${stats.atRiskCount > 0 ? 'text-destructive animate-pulse' : 'text-destructive/70'}`} />
+                    </div>
+                    <div>
+                      <p className="text-3xl font-bold text-foreground">{stats.atRiskCount}</p>
+                      <p className="text-sm font-medium text-muted-foreground">At Risk</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-2xl font-bold text-foreground">{stats.toReplyCount}</p>
-                    <p className="text-xs text-muted-foreground">To Reply</p>
-                  </div>
+                  {stats.atRiskCount > 0 && (
+                    <span className="text-xs font-medium text-destructive bg-destructive/10 px-2 py-1 rounded-full">
+                      SLA breaching
+                    </span>
+                  )}
                 </div>
+                <p className="text-xs text-muted-foreground mt-3">
+                  {stats.atRiskCount > 0 ? 'Needs immediate attention' : 'No SLA issues right now'}
+                </p>
               </Card>
 
-              {/* Drafts Ready */}
+              {/* Review - Trust gate, secondary urgency */}
               <Card 
-                className="p-4 cursor-pointer hover:bg-accent/50 transition-colors"
-                onClick={() => navigate('/to-reply')}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-warning/10">
-                    <FileEdit className="h-4 w-4 text-warning" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-foreground">{stats.draftCount}</p>
-                    <p className="text-xs text-muted-foreground">Drafts Ready</p>
-                  </div>
-                </div>
-              </Card>
-
-              {/* Review Queue */}
-              <Card 
-                className="p-4 cursor-pointer hover:bg-accent/50 transition-colors"
+                className={`p-5 cursor-pointer transition-all hover:scale-[1.02] ${
+                  stats.reviewCount > 0 
+                    ? 'bg-gradient-to-br from-purple-500/10 via-purple-500/5 to-background border-purple-500/30 shadow-lg shadow-purple-500/10' 
+                    : 'hover:bg-accent/50'
+                }`}
                 onClick={() => navigate('/review')}
               >
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-purple-500/10">
-                    <Sparkles className="h-4 w-4 text-purple-500" />
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className={`p-3 rounded-xl ${stats.reviewCount > 0 ? 'bg-purple-500/20' : 'bg-purple-500/10'}`}>
+                      <Sparkles className={`h-6 w-6 ${stats.reviewCount > 0 ? 'text-purple-500' : 'text-purple-500/70'}`} />
+                    </div>
+                    <div>
+                      <p className="text-3xl font-bold text-foreground">{stats.reviewCount}</p>
+                      <p className="text-sm font-medium text-muted-foreground">Review</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-2xl font-bold text-foreground">{stats.reviewCount}</p>
-                    <p className="text-xs text-muted-foreground">Review</p>
-                  </div>
+                  {stats.reviewCount > 0 && (
+                    <span className="text-xs font-medium text-purple-500 bg-purple-500/10 px-2 py-1 rounded-full">
+                      AI needs check
+                    </span>
+                  )}
                 </div>
+                <p className="text-xs text-muted-foreground mt-3">
+                  {stats.reviewCount > 0 ? 'Verify AI confidence on these' : 'AI is confident on all items'}
+                </p>
               </Card>
 
-              {/* At Risk */}
+              {/* To Reply - Primary work queue */}
               <Card 
-                className="p-4 cursor-pointer hover:bg-accent/50 transition-colors"
+                className={`p-5 cursor-pointer transition-all hover:scale-[1.02] ${
+                  stats.toReplyCount > 0 
+                    ? 'bg-gradient-to-br from-primary/10 via-primary/5 to-background border-primary/30' 
+                    : 'hover:bg-accent/50'
+                }`}
                 onClick={() => navigate('/to-reply')}
               >
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-amber-500/10">
-                    <AlertTriangle className="h-4 w-4 text-amber-500" />
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className={`p-3 rounded-xl ${stats.toReplyCount > 0 ? 'bg-primary/20' : 'bg-primary/10'}`}>
+                      <Mail className={`h-6 w-6 ${stats.toReplyCount > 0 ? 'text-primary' : 'text-primary/70'}`} />
+                    </div>
+                    <div>
+                      <p className="text-3xl font-bold text-foreground">{stats.toReplyCount}</p>
+                      <p className="text-sm font-medium text-muted-foreground">To Reply</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-2xl font-bold text-foreground">{stats.atRiskCount}</p>
-                    <p className="text-xs text-muted-foreground">At Risk</p>
-                  </div>
+                  {stats.toReplyCount > 0 && (
+                    <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-1 rounded-full">
+                      Waiting for you
+                    </span>
+                  )}
                 </div>
+                <p className="text-xs text-muted-foreground mt-3">
+                  {stats.toReplyCount > 0 ? 'Your primary work queue' : 'Inbox clear'}
+                </p>
+              </Card>
+
+              {/* Drafts Ready - Actionable, quick wins */}
+              <Card 
+                className={`p-5 cursor-pointer transition-all hover:scale-[1.02] ${
+                  stats.draftCount > 0 
+                    ? 'bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-background border-amber-500/30' 
+                    : 'hover:bg-accent/50'
+                }`}
+                onClick={() => navigate('/to-reply')}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className={`p-3 rounded-xl ${stats.draftCount > 0 ? 'bg-amber-500/20' : 'bg-amber-500/10'}`}>
+                      <FileEdit className={`h-6 w-6 ${stats.draftCount > 0 ? 'text-amber-500' : 'text-amber-500/70'}`} />
+                    </div>
+                    <div>
+                      <p className="text-3xl font-bold text-foreground">{stats.draftCount}</p>
+                      <p className="text-sm font-medium text-muted-foreground">Drafts Ready</p>
+                    </div>
+                  </div>
+                  {stats.draftCount > 0 && (
+                    <span className="text-xs font-medium text-amber-500 bg-amber-500/10 px-2 py-1 rounded-full">
+                      Ready to send
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-3">
+                  {stats.draftCount > 0 ? 'AI drafted, you approve' : 'No drafts pending'}
+                </p>
               </Card>
             </div>
 
