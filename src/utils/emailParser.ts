@@ -49,6 +49,18 @@ export function cleanEmailContent(rawContent: string): string {
   content = content.replace(/On \d{1,2} .{3,20} \d{4},? at \d{1,2}:\d{2}.*wrote:[\s\S]*/i, '');
   content = content.replace(/On .{10,60} wrote:[\s\S]*/i, '');
   
+  // Remove Stripe/payment metadata patterns
+  content = content.replace(/Metadata\s+customerId\s*[-—]\s*[a-zA-Z0-9-]+/gi, '');
+  content = content.replace(/invoiceId\s*[-—]\s*[a-zA-Z0-9-]+/gi, '');
+  content = content.replace(/paymentId\s*[-—]\s*[a-zA-Z0-9-]+/gi, '');
+  content = content.replace(/ownerEmail\s*[-—]\s*[^\s]+/gi, '');
+  content = content.replace(/Account ID:\s*[a-zA-Z0-9_]+/gi, '');
+  content = content.replace(/Payment ID\s+[a-zA-Z0-9_]+/gi, '');
+  content = content.replace(/Need to refer to this message\? Use this ID:\s*[^\s]+/gi, '');
+  
+  // Remove UUIDs and long IDs inline (like pi_3Sg1cgCqGkL450dp0geWNY0F)
+  content = content.replace(/\s*[-—]\s*[a-zA-Z0-9_]{20,}/g, '');
+  
   // Cut everything after these markers (inline or line-start) using indexOf
   const cutoffPatterns = [
     'Confidentiality Note:',
@@ -65,6 +77,18 @@ export function cleanEmailContent(rawContent: string): string {
     '-- \n',
     '---',
     '___',
+    // Payment/company footer patterns
+    'View in Dashboard',
+    'Visit our Support website',
+    'We are here to help.',
+    'is a company registered in',
+    'Registered number:',
+    'Registered office:',
+    'To unsubscribe',
+    'manage your communication preferences',
+    'You are currently subscribed to',
+    'Stripe Payments UK Limited',
+    'Stripe Payments',
   ];
   
   for (const pattern of cutoffPatterns) {
