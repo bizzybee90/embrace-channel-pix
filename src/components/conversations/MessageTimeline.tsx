@@ -9,7 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { cleanEmailContent, hasSignificantCleaning } from '@/utils/emailParser';
-
+import { EmailThread } from './EmailThread';
 const getInitials = (name: string | null) => {
   if (!name) return '?';
   return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
@@ -171,7 +171,12 @@ export const MessageTimeline = ({ messages, defaultCollapsed = true }: MessageTi
               {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
             </span>
           </div>
-          <p className="text-sm whitespace-pre-wrap leading-relaxed">{displayBody}</p>
+          {/* Use EmailThread for email messages, plain text for others */}
+          {isEmail && !showOriginal ? (
+            <EmailThread body={message.body} />
+          ) : (
+            <p className="text-sm whitespace-pre-wrap leading-relaxed">{displayBody}</p>
+          )}
           
           {/* Show original toggle for email messages with significant cleaning */}
           {canShowOriginal && (
@@ -182,7 +187,7 @@ export const MessageTimeline = ({ messages, defaultCollapsed = true }: MessageTi
               {showOriginal ? (
                 <>
                   <EyeOff className="h-3 w-3" />
-                  Show cleaned
+                  Show threaded
                 </>
               ) : (
                 <>
