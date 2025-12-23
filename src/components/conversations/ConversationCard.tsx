@@ -376,9 +376,9 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
           )}
 
           <div className="p-5">
-            {/* Decision Bucket Badge - FIRST AND PROMINENT */}
-            {bucketBadge && (
-              <div className="mb-3">
+            {/* Decision Bucket Badge + Category Label - FIRST AND PROMINENT */}
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              {bucketBadge && (
                 <Badge 
                   variant="outline" 
                   className={cn(
@@ -390,8 +390,20 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
                   <bucketBadge.icon className="h-4 w-4" />
                   {bucketBadge.label}
                 </Badge>
-              </div>
-            )}
+              )}
+              {/* Category label next to status */}
+              {(() => {
+                const classificationBadge = getClassificationBadge(conversation.email_classification);
+                if (!classificationBadge) return null;
+                const ClassIcon = classificationBadge.icon;
+                return (
+                  <Badge variant="outline" className={cn("rounded-full text-sm px-3 py-1.5 border flex items-center gap-1.5", classificationBadge.className)}>
+                    <ClassIcon className="h-3.5 w-3.5" />
+                    {classificationBadge.label}
+                  </Badge>
+                );
+              })()}
+            </div>
 
             {/* Title */}
             <h3 className={cn(
@@ -420,18 +432,6 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
                 {conversation.channel}
               </Badge>
 
-              {/* Classification badge - secondary */}
-              {(() => {
-                const classificationBadge = getClassificationBadge(conversation.email_classification);
-                if (!classificationBadge) return null;
-                const ClassIcon = classificationBadge.icon;
-                return (
-                  <Badge variant="outline" className={cn("rounded-full text-[11px] font-medium px-2.5 py-1 border flex items-center gap-1", classificationBadge.className)}>
-                    <ClassIcon className="h-3 w-3" />
-                    {classificationBadge.label}
-                  </Badge>
-                );
-              })()}
 
               {hasDraft && (
                 <Badge variant="secondary" className="rounded-full text-[11px] font-medium px-2.5 py-1 bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 flex items-center gap-1">
@@ -535,9 +535,9 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
       )}
 
       <div className="p-6">
-        {/* Decision Bucket Badge - FIRST AND PROMINENT */}
-        {bucketBadge && (
-          <div className="mb-3">
+        {/* Decision Bucket Badge + Category Label - FIRST AND PROMINENT */}
+        <div className="flex flex-wrap items-center gap-2 mb-3">
+          {bucketBadge && (
             <Badge 
               variant="outline" 
               className={cn(
@@ -549,8 +549,20 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
               <bucketBadge.icon className="h-4 w-4" />
               {bucketBadge.label}
             </Badge>
-          </div>
-        )}
+          )}
+          {/* Category label next to status */}
+          {(() => {
+            const classificationBadge = getClassificationBadge(conversation.email_classification);
+            if (!classificationBadge) return null;
+            const ClassIcon = classificationBadge.icon;
+            return (
+              <Badge variant="outline" className={cn("rounded-full text-sm px-3 py-1.5 border flex items-center gap-1.5", classificationBadge.className)}>
+                <ClassIcon className="h-3.5 w-3.5" />
+                {classificationBadge.label}
+              </Badge>
+            );
+          })()}
+        </div>
 
         {/* Title */}
         <h3 className={cn(
@@ -579,18 +591,6 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
             {conversation.channel}
           </Badge>
 
-          {/* Classification badge - secondary */}
-          {(() => {
-            const classificationBadge = getClassificationBadge(conversation.email_classification);
-            if (!classificationBadge) return null;
-            const ClassIcon = classificationBadge.icon;
-            return (
-              <Badge variant="outline" className={cn("rounded-full text-xs font-semibold px-3 py-1.5 border flex items-center gap-1.5", classificationBadge.className)}>
-                <ClassIcon className="h-3 w-3" />
-                {classificationBadge.label}
-              </Badge>
-            );
-          })()}
 
           {hasDraft && (
             <Badge variant="secondary" className="rounded-full text-xs font-semibold px-3 py-1.5 bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 flex items-center gap-1.5">
