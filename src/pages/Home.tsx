@@ -241,6 +241,37 @@ export const Home = () => {
               </div>
             </div>
 
+            {/* Summary Banner - Total items needing attention */}
+            {(() => {
+              const totalNeedingAttention = stats.atRiskCount + stats.reviewCount + stats.toReplyCount;
+              if (totalNeedingAttention > 0) {
+                return (
+                  <Card className="p-4 bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 border-primary/20">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-full bg-primary/20">
+                          <Mail className="h-5 w-5 text-primary" />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-foreground">
+                            {totalNeedingAttention} {totalNeedingAttention === 1 ? 'thing needs' : 'things need'} your attention
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {[
+                              stats.atRiskCount > 0 && `${stats.atRiskCount} urgent`,
+                              stats.reviewCount > 0 && `${stats.reviewCount} to review`,
+                              stats.toReplyCount > 0 && `${stats.toReplyCount} to reply`
+                            ].filter(Boolean).join(' • ')}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+                );
+              }
+              return null;
+            })()}
+
             {/* AI Briefing Widget */}
             <AIBriefingWidget />
 
