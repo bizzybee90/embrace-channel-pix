@@ -110,3 +110,156 @@ export function hasSignificantCleaning(rawContent: string, cleanedContent: strin
   // If we removed more than 20% of the content, it's significant
   return (rawLength - cleanedLength) / rawLength > 0.2;
 }
+
+/**
+ * Thread segment structure for email threading
+ */
+export interface ThreadSegment {
+  content: string;
+  isQuoted: boolean;
+  depth: number;
+  attribution?: {
+    sender: string;
+    date: string;
+  };
+}
+
+/**
+ * Parses email content into thread segments for threading display
+ */
+export function parseEmailThread(rawContent: string): ThreadSegment[] {
+  if (!rawContent) return [];
+  
+  const content = decodeHtmlEntities(rawContent);
+  const segments: ThreadSegment[] = [];
+  
+  // Pattern to match "On [date], [person] wrote:" variations
+  const quotePatterns = [
+    /On (.+?),?\s+(.+?) wrote:/gi,
+    /On (.+?) at (\d{1,2}:\d{2}),?\s+(.+?) wrote:/gi,
+    /From:\s*(.+?)[\r\n]/gi,
+    /^>+ ?/gm,
+  ];
+  
+  // Find the first quote marker
+  const quoteMatch = content.match(/On .+? wrote:/i);
+  const fromMatch = content.match(/From:\s*.+?[\r\n]/i);
+  const gtMatch = content.match(/^>+ ?/m);
+  
+  // Determine the earliest quote start
+  let quoteStart = -1;
+  let attribution: ThreadSegment['attribution'] | undefined;
+  
+  if (quoteMatch) {
+    const idx = content.indexOf(quoteMatch[0]);
+    if (quoteStart === -1 || idx < quoteStart) {
+      quoteStart = idx;
+      // Extract attribution
+      const attrMatch = quoteMatch[0].match(/On (.+?),?\s+(.+?) wrote:/i);
+      if (attrMatch) {
+        attribution = {
+          date: attrMatch[1].trim(),
+          sender: attrMatch[2].trim(),
+        };
+      }
+    }
+  }
+  
+  if (fromMatch) {
+    const idx = content.indexOf(fromMatch[0]);
+    if (quoteStart === -1 || idx < quoteStart) {
+      quoteStart = idx;
+      const senderMatch = fromMatch[0].match(/From:\s*(.+?)[\r\n]/i);
+      if (senderMatch) {
+        attribution = {
+          sender: senderMatch[1].trim(),
+          date: '',
+        };
+      }
+    }
+  }
+  
+  if (gtMatch) {
+    const idx = content.search(/^>+ ?/m);
+    if (quoteStart === -1 || idx < quoteStart) {
+      quoteStart = idx;
+      attribution = undefined;
+    }
+  }
+  
+  // If no quotes found, return single segment
+  if (quoteStart === -1) {
+    return [{
+      content: cleanEmailContent(content),
+      isQuoted: false,
+      depth: 0,
+    }];
+  }
+  
+  // Split into main content and quoted content
+  const mainContent = content.substring(0, quoteStart).trim();
+  const quotedContent = content.substring(quoteStart).trim();
+  
+  if (mainContent) {
+    segments.push({
+      content: cleanEmailContent(mainContent),
+      isQuoted: false,
+      depth: 0,
+    });
+  }
+  
+  // Parse quoted content recursively
+  if (quotedContent) {
+    // Clean the quoted content but preserve it
+    let cleanedQuote = quotedContent;
+    
+    // Remove the "On X wrote:" line itself from the display
+    cleanedQuote = cleanedQuote.replace(/^On .+? wrote:\s*/i, '');
+    cleanedQuote = cleanedQuote.replace(/^From:\s*.+?[\r\n]/i, '');
+    
+    // Remove > prefixes
+    cleanedQuote = cleanedQuote.replace(/^>+ ?/gm, '');
+    
+    // Check for nested quotes
+    const nestedQuoteMatch = cleanedQuote.match(/On .+? wrote:/i);
+    
+    if (nestedQuoteMatch) {
+      const nestedIdx = cleanedQuote.indexOf(nestedQuoteMatch[0]);
+      const firstQuotePart = cleanedQuote.substring(0, nestedIdx).trim();
+      const nestedPart = cleanedQuote.substring(nestedIdx);
+      
+      if (firstQuotePart) {
+        segments.push({
+          content: cleanEmailContent(firstQuotePart),
+          isQuoted: true,
+          depth: 1,
+          attribution,
+        });
+      }
+      
+      // Parse the nested part
+      const nestedAttrMatch = nestedQuoteMatch[0].match(/On (.+?),?\s+(.+?) wrote:/i);
+      let nestedQuoteContent = nestedPart.replace(/^On .+? wrote:\s*/i, '');
+      nestedQuoteContent = nestedQuoteContent.replace(/^>+ ?/gm, '');
+      
+      segments.push({
+        content: cleanEmailContent(nestedQuoteContent),
+        isQuoted: true,
+        depth: 2,
+        attribution: nestedAttrMatch ? {
+          date: nestedAttrMatch[1].trim(),
+          sender: nestedAttrMatch[2].trim(),
+        } : undefined,
+      });
+    } else {
+      segments.push({
+        content: cleanEmailContent(cleanedQuote),
+        isQuoted: true,
+        depth: 1,
+        attribution,
+      });
+    }
+  }
+  
+  return segments;
+}
