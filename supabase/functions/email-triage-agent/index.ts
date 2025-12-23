@@ -49,7 +49,7 @@ This is your DEFAULT bucket for noise. Use when:
 - Automated notifications (receipts, confirmations, alerts, job alerts)
 - Spam or phishing attempts
 - System notifications
-- Payment confirmations / receipts
+- Payment confirmations / receipts FROM payment processors (Stripe, PayPal, Square)
 - Shipping notifications
 - Social media notifications
 - Calendar invites that don't need response
@@ -66,7 +66,7 @@ This is your DEFAULT bucket for noise. Use when:
 - Examples: "Follow up next week", "Check if payment cleared in 3 days", "Review quote before sending"
 
 ❌ DO NOT use WAIT for:
-- Receipts (→ AUTO_HANDLED)
+- Receipts from payment processors (→ AUTO_HANDLED)
 - Notifications (→ AUTO_HANDLED)
 - Newsletters (→ AUTO_HANDLED)
 - FYI emails with no action (→ AUTO_HANDLED)
@@ -77,10 +77,80 @@ This is your DEFAULT bucket for noise. Use when:
 Every email MUST have a clear, human-readable explanation of why it landed in its bucket:
 - ACT_NOW: "Customer upset about [specific issue]" or "Payment at risk - [reason]"
 - QUICK_WIN: "Simple confirmation needed" or "Yes/no reply will resolve this"
-- AUTO_HANDLED: "Automated receipt - no action needed" or "Marketing newsletter"
+- AUTO_HANDLED: "Stripe payment receipt" or "Marketing newsletter from [sender]"
 - WAIT: "Follow up needed on [date] for [specific reason]"
 
 This field must NEVER be empty. It must be actionable and specific.
+
+## CLASSIFICATION RULES - READ CAREFULLY!
+
+### INVOICE CLASSIFICATION (CRITICAL - Common Mistakes!)
+
+⚠️ INVOICES ARE NOT SPAM! An invoice from a supplier/vendor is NEVER spam.
+
+**supplier_invoice** - Invoices/bills TO the business that may need payment:
+- Bills from suppliers, vendors, utility companies
+- Invoices for services rendered (water delivery, equipment, supplies)
+- Any email with invoice amounts, payment terms, due dates
+- Example: "Invoice #1234 from Spotless Water - £25.00 due"
+- Example: "Water delivery invoice - Oliver Pinnock"
+→ Bucket: QUICK_WIN (needs review for payment)
+
+**receipt_confirmation** - Confirmations of payments ALREADY made:
+- Payment processor receipts (Stripe, PayPal, Square, GoCardless)
+- "Your payment was successful" notifications
+- "Payment received" confirmations
+- Bank transfer confirmations
+→ Bucket: AUTO_HANDLED (no action needed)
+
+**spam_phishing** - Only use for ACTUAL spam:
+- Nigerian prince scams
+- "You've won a prize" emails
+- Phishing attempts with suspicious links
+- Unknown senders with no business context
+- NEVER for legitimate invoices or business communications
+→ Bucket: AUTO_HANDLED
+
+### CUSTOMER INQUIRY CLASSIFICATION (Be Specific!)
+
+Instead of generic "customer_inquiry", prefer these specific categories:
+
+**customer_inquiry** - Use for:
+- Questions about services, pricing, availability
+- Booking or scheduling requests
+- Quote requests
+- General "Can you help with X?" questions
+→ Be specific in why_this_needs_you: "Quote request for [service]" not just "inquiry"
+
+**customer_complaint** - Use for:
+- Dissatisfaction with service
+- Something went wrong
+- Request for refund or credit
+- Negative sentiment detected
+
+**customer_feedback** - Use for:
+- Positive reviews or praise
+- "Thank you" emails
+- Suggestions for improvement (non-complaints)
+
+**payment_confirmation** - Use for:
+- Customer saying "I've paid"
+- "Payment sent" from customer
+- Balance inquiries from customers
+→ Different from receipt_confirmation (which is from payment processors)
+
+### MARKETING vs LEGITIMATE BUSINESS
+
+**marketing_newsletter** - Only for:
+- Mass marketing emails
+- Promotional offers unrelated to your business operations
+- "10% off" campaigns
+- Blog digests, industry news
+
+**NOT marketing if:**
+- It's from a supplier you use
+- It contains invoice or payment information
+- It's from a customer
 
 ## Risk Assessment
 
@@ -208,11 +278,12 @@ const DECISION_ROUTER_TOOL = {
             enum: [
               "customer_inquiry", "customer_complaint", "customer_feedback",
               "lead_new", "lead_followup", "supplier_invoice", "supplier_urgent", "partner_request",
-              "automated_notification", "receipt_confirmation", "marketing_newsletter",
+              "automated_notification", "receipt_confirmation", "payment_confirmation", "marketing_newsletter",
               "spam_phishing", "recruitment_hr", "internal_system", "informational_only",
+              "booking_request", "quote_request", "cancellation_request", "reschedule_request",
               "misdirected"
             ],
-            description: "The classification category. Use 'misdirected' for emails clearly intended for a different person or company (e.g., debt notices, invoices for services not provided by this business)."
+            description: "The classification category. Be specific: use booking_request, quote_request, cancellation_request, reschedule_request instead of generic customer_inquiry when applicable. Use 'misdirected' for emails clearly intended for a different person or company."
           },
           requires_reply: {
             type: "boolean",
