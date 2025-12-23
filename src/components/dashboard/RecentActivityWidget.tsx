@@ -6,6 +6,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { formatDistanceToNow } from 'date-fns';
 import { ChannelIcon } from '@/components/shared/ChannelIcon';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useNavigate } from 'react-router-dom';
+import { cn } from '@/lib/utils';
 
 interface RecentActivity {
   id: string;
@@ -16,19 +18,24 @@ interface RecentActivity {
   channel: string;
   created_at: string;
   conversation_id: string;
+  category?: string;
 }
 
 export const RecentActivityWidget = () => {
+  const navigate = useNavigate();
   const [activities, setActivities] = useState<RecentActivity[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchRecentActivity = async () => {
     setLoading(true);
     
-    // Fetch recent outbound messages
+    // Fetch recent outbound messages with conversation data for category
     const { data: messages } = await supabase
       .from('messages')
-      .select('id, body, actor_name, actor_type, channel, created_at, conversation_id')
+      .select(`
+        id, body, actor_name, actor_type, channel, created_at, conversation_id,
+        conversations(email_classification)
+      `)
       .eq('direction', 'outbound')
       .eq('is_internal', false)
       .order('created_at', { ascending: false })
@@ -39,7 +46,7 @@ export const RecentActivityWidget = () => {
     today.setHours(0, 0, 0, 0);
     const { data: escalations } = await supabase
       .from('conversations')
-      .select('id, title, channel, escalated_at')
+      .select('id, title, channel, escalated_at, email_classification')
       .eq('is_escalated', true)
       .gte('escalated_at', today.toISOString())
       .order('escalated_at', { ascending: false })
@@ -48,7 +55,7 @@ export const RecentActivityWidget = () => {
     // Fetch recent resolutions (today)
     const { data: resolutions } = await supabase
       .from('conversations')
-      .select('id, title, channel, resolved_at')
+      .select('id, title, channel, resolved_at, email_classification')
       .eq('status', 'resolved')
       .gte('resolved_at', today.toISOString())
       .order('resolved_at', { ascending: false })
@@ -58,7 +65,8 @@ export const RecentActivityWidget = () => {
     const combined: RecentActivity[] = [
       ...(messages?.map(m => ({ 
         ...m, 
-        type: 'message' as const 
+        type: 'message' as const,
+        category: (m.conversations as any)?.email_classification
       })) || []),
       ...(escalations?.map(e => ({ 
         id: e.id, 
@@ -68,7 +76,8 @@ export const RecentActivityWidget = () => {
         actor_type: 'system',
         channel: e.channel,
         created_at: e.escalated_at!,
-        conversation_id: e.id
+        conversation_id: e.id,
+        category: e.email_classification
       })) || []),
       ...(resolutions?.map(r => ({ 
         id: r.id, 
@@ -78,7 +87,8 @@ export const RecentActivityWidget = () => {
         actor_type: 'system',
         channel: r.channel,
         created_at: r.resolved_at!,
-        conversation_id: r.id
+        conversation_id: r.id,
+        category: r.email_classification
       })) || [])
     ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
      .slice(0, 10);
@@ -186,6 +196,43 @@ export const RecentActivityWidget = () => {
     return 'Reply Sent';
   };
 
+  const getCategoryLabel = (category?: string) => {
+    if (!category) return null;
+    const labels: Record<string, { label: string; color: string }> = {
+      'payment_confirmation': { label: 'Payment', color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' },
+      'receipt': { label: 'Payment', color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' },
+      'marketing': { label: 'Marketing', color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' },
+      'newsletter': { label: 'Newsletter', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' },
+      'notification': { label: 'Notification', color: 'bg-muted text-muted-foreground' },
+      'automated_notification': { label: 'Automated', color: 'bg-muted text-muted-foreground' },
+      'recruitment': { label: 'Recruitment', color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' },
+      'hr': { label: 'HR', color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' },
+      'invoice': { label: 'Invoice', color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' },
+      'booking': { label: 'Booking', color: 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400' },
+      'enquiry': { label: 'Enquiry', color: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400' },
+      'complaint': { label: 'Complaint', color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' },
+      'cancellation': { label: 'Cancellation', color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' },
+      'fyi': { label: 'FYI', color: 'bg-muted text-muted-foreground' },
+    };
+    
+    const key = Object.keys(labels).find(k => 
+      category.toLowerCase().includes(k) || k.includes(category.toLowerCase())
+    );
+    
+    return key ? labels[key] : { label: category.replace(/_/g, ' '), color: 'bg-muted text-muted-foreground' };
+  };
+
+  const handleActivityClick = (activity: RecentActivity) => {
+    if (activity.conversation_id) {
+      // Navigate to the appropriate page with the conversation selected
+      if (activity.type === 'escalation') {
+        navigate(`/to-reply?id=${activity.conversation_id}`);
+      } else {
+        navigate(`/done?id=${activity.conversation_id}`);
+      }
+    }
+  };
+
   return (
     <Card className="col-span-2">
       <CardHeader>
@@ -218,16 +265,28 @@ export const RecentActivityWidget = () => {
               {activities.map((activity) => (
                 <div
                   key={activity.id}
-                  className="flex items-start gap-3 pb-3 border-b last:border-0"
+                  className={cn(
+                    "flex items-start gap-3 pb-3 border-b last:border-0 transition-colors rounded-lg p-2 -mx-2",
+                    activity.conversation_id && "cursor-pointer hover:bg-accent/50"
+                  )}
+                  onClick={() => handleActivityClick(activity)}
                 >
                   <div className="flex-shrink-0 mt-1">
                     {getActivityIcon(activity)}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <span className="text-xs font-medium text-muted-foreground">
                         {getActivityLabel(activity)}
                       </span>
+                      {activity.category && (() => {
+                        const categoryInfo = getCategoryLabel(activity.category);
+                        return categoryInfo ? (
+                          <span className={cn("text-xs px-1.5 py-0.5 rounded-full font-medium", categoryInfo.color)}>
+                            {categoryInfo.label}
+                          </span>
+                        ) : null;
+                      })()}
                       {activity.type === 'message' && (
                         <>
                           <span className="text-xs text-muted-foreground">•</span>
