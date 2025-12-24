@@ -112,8 +112,53 @@ serve(async (req) => {
   const startTime = Date.now();
 
   try {
-    const request: DraftRequest = await req.json();
-    const { email, customer, decision_context, workspace_id } = request;
+    const request: DraftRequest & { email_provider_id?: string } = await req.json();
+    const { email, customer, decision_context, workspace_id, email_provider_id } = request;
+
+    const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
+
+    // Check automation level for this email account
+    let automationLevel = 'draft_only'; // Default
+    if (email_provider_id) {
+      const { data: providerConfig } = await supabase
+        .from('email_provider_configs')
+        .select('automation_level')
+        .eq('id', email_provider_id)
+        .single();
+      
+      if (providerConfig?.automation_level) {
+        automationLevel = providerConfig.automation_level;
+      }
+    } else if (workspace_id) {
+      // Fallback to workspace channel config
+      const { data: channelConfig } = await supabase
+        .from('workspace_channels')
+        .select('automation_level')
+        .eq('workspace_id', workspace_id)
+        .eq('channel', 'email')
+        .single();
+      
+      if (channelConfig?.automation_level) {
+        automationLevel = channelConfig.automation_level;
+      }
+    }
+
+    console.log('[DraftAgent] Automation level:', automationLevel);
+
+    // If automation is disabled, skip draft generation
+    if (automationLevel === 'disabled') {
+      console.log('[DraftAgent] Automation disabled for this channel, skipping draft');
+      return new Response(JSON.stringify({
+        draft: null,
+        skipped: true,
+        reason: 'automation_disabled',
+        processing_time_ms: Date.now() - startTime
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
 
     console.log('[DraftAgent] Generating draft for:', email.from_email, 'subject:', email.subject);
 
@@ -121,10 +166,6 @@ serve(async (req) => {
     if (!ANTHROPIC_API_KEY) {
       throw new Error('ANTHROPIC_API_KEY not configured');
     }
-
-    const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
-    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
     const { prompt: draftPrompt, model: draftModel } = await getDraftPrompt(supabase, workspace_id);
 
@@ -192,10 +233,14 @@ ${email.body.substring(0, 4000)}
 
     console.log('[DraftAgent] Draft generated successfully, length:', draftText.length);
 
+    // Include automation level info for the caller to decide next steps
     return new Response(JSON.stringify({
       draft: draftText,
       model_used: draftModel,
-      processing_time_ms: processingTime
+      processing_time_ms: processingTime,
+      automation_level: automationLevel,
+      should_auto_send: automationLevel === 'automatic',
+      needs_review: automationLevel === 'review_required'
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });

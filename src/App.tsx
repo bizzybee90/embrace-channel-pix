@@ -20,6 +20,7 @@ import ChannelsDashboard from "./pages/ChannelsDashboard";
 import ChannelConversations from "./pages/ChannelConversations";
 import AnalyticsDashboard from "./pages/AnalyticsDashboard";
 import Review from "./pages/Review";
+import ActivityPage from "./pages/ActivityPage";
 
 
 const queryClient = new QueryClient();
@@ -250,6 +251,16 @@ const RouterContent = () => {
             <AnalyticsDashboard />
           </AuthGuard>
         } 
+      />
+
+      {/* Activity Page - Full activity timeline */}
+      <Route 
+        path="/activity" 
+        element={
+          <AuthGuard>
+            <ActivityPage />
+          </AuthGuard>
+        }
       />
 
       <Route
