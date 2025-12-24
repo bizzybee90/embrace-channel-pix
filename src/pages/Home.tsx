@@ -199,36 +199,13 @@ export const Home = () => {
               </div>
             </div>
 
-            {/* Summary Banner - Total items needing attention */}
-            {(() => {
-              const totalNeedingAttention = stats.atRiskCount + stats.reviewCount + stats.toReplyCount;
-              if (totalNeedingAttention > 0) {
-                return (
-                  <Card className="p-4 bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 border-primary/20">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-full bg-primary/20">
-                          <Mail className="h-5 w-5 text-primary" />
-                        </div>
-                        <div>
-                          <p className="font-semibold text-foreground">
-                            {totalNeedingAttention} {totalNeedingAttention === 1 ? 'thing needs' : 'things need'} your attention
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                          {[
-                              stats.atRiskCount > 0 && `${stats.atRiskCount} urgent`,
-                              stats.reviewCount > 0 && `${stats.reviewCount} training`,
-                              stats.toReplyCount > 0 && `${stats.toReplyCount} to reply`
-                            ].filter(Boolean).join(' • ')}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </Card>
-                );
-              }
-              return null;
-            })()}
+            {/* Summary Banner - Calm, structured framing */}
+            {(stats.atRiskCount > 0 || stats.reviewCount > 0 || stats.toReplyCount > 0 || stats.draftCount > 0) && (
+              <div className="text-sm text-muted-foreground">
+                <p className="font-medium text-foreground">Here's what BizzyBee has lined up for you</p>
+                <p>Sorted by urgency and effort</p>
+              </div>
+            )}
 
             {/* AI Briefing Widget */}
             <AIBriefingWidget />
@@ -261,7 +238,7 @@ export const Home = () => {
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground mt-3">
-                  {stats.atRiskCount > 0 ? 'Needs immediate attention' : 'No SLA issues right now'}
+                  {stats.atRiskCount > 0 ? 'Handle these first' : 'No SLA issues right now'}
                 </p>
               </Card>
 
@@ -286,12 +263,12 @@ export const Home = () => {
                   </div>
                   {stats.reviewCount > 0 && (
                     <span className="text-xs font-medium text-purple-500 bg-purple-500/10 px-2 py-1 rounded-full">
-                      Training in progress
+                      AI checking confidence
                     </span>
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground mt-3">
-                  {stats.reviewCount > 0 ? 'Help BizzyBee learn faster' : 'BizzyBee is confident on all items'}
+                  {stats.reviewCount > 0 ? 'Help BizzyBee learn new patterns' : 'BizzyBee is confident on all items'}
                 </p>
               </Card>
 
@@ -316,12 +293,12 @@ export const Home = () => {
                   </div>
                   {stats.toReplyCount > 0 && (
                     <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-1 rounded-full">
-                      Waiting for you
+                      Ready for you
                     </span>
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground mt-3">
-                  {stats.toReplyCount > 0 ? 'Your primary work queue' : 'Inbox clear'}
+                  {stats.toReplyCount > 0 ? "Clear these and you're done for today" : 'Inbox clear'}
                 </p>
               </Card>
 
