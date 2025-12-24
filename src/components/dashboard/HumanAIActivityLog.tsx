@@ -238,7 +238,7 @@ export function HumanAIActivityLog({ onNavigate, maxItems = 8 }: HumanAIActivity
           )}
           onClick={() => {
             if (log.conversationId && onNavigate) {
-              onNavigate(`/done?id=${log.conversationId}`);
+              onNavigate(`/conversation/${log.conversationId}`);
             }
           }}
         >
