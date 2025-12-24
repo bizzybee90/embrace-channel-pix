@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Sidebar } from '@/components/sidebar/Sidebar';
 import { Button } from '@/components/ui/button';
@@ -10,6 +11,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { ReviewQueueItem } from '@/components/review/ReviewQueueItem';
 import { ChannelIcon } from '@/components/shared/ChannelIcon';
 import { CategoryLabel } from '@/components/shared/CategoryLabel';
+import { BackButton } from '@/components/shared/BackButton';
 import { DraftReplyEditor } from '@/components/review/DraftReplyEditor';
 import { ReviewExplainer } from '@/components/review/ReviewExplainer';
 import { SmartBatchActions } from '@/components/review/SmartBatchActions';
@@ -28,7 +30,8 @@ import {
   Keyboard,
   CheckCheck,
   X,
-  Send
+  Send,
+  Home
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
@@ -590,19 +593,24 @@ export default function Review() {
     return (
       <div className="flex h-screen bg-background">
         <Sidebar />
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center max-w-md px-6">
-            <div className="w-20 h-20 bg-gradient-to-br from-green-100 to-emerald-100 dark:from-green-900/30 dark:to-emerald-900/30 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-green-500/10">
-              <Sparkles className="h-10 w-10 text-green-600" />
+        <div className="flex-1 flex flex-col">
+          <div className="p-4 border-b">
+            <BackButton to="/" label="Home" />
+          </div>
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center max-w-md px-6">
+              <div className="w-20 h-20 bg-gradient-to-br from-green-100 to-emerald-100 dark:from-green-900/30 dark:to-emerald-900/30 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-green-500/10">
+                <Sparkles className="h-10 w-10 text-green-600" />
+              </div>
+              <h2 className="text-2xl font-semibold mb-3">🎉 BizzyBee is confident!</h2>
+              <p className="text-muted-foreground mb-2">
+                There are no messages that need training right now.
+              </p>
+              <p className="text-sm text-muted-foreground">
+                BizzyBee is automatically handling routine emails based on what it has learned from you.
+                You'll only see messages here when BizzyBee wants to double-check something new.
+              </p>
             </div>
-            <h2 className="text-2xl font-semibold mb-3">🎉 BizzyBee is confident!</h2>
-            <p className="text-muted-foreground mb-2">
-              There are no messages that need training right now.
-            </p>
-            <p className="text-sm text-muted-foreground">
-              BizzyBee is automatically handling routine emails based on what it has learned from you.
-              You'll only see messages here when BizzyBee wants to double-check something new.
-            </p>
           </div>
         </div>
       </div>
@@ -617,6 +625,7 @@ export default function Review() {
         <div className="border-b px-6 py-4">
           <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-3">
+              <BackButton to="/" label="Home" />
               <Sparkles className="h-5 w-5 text-purple-500" />
               <div>
                 <h1 className="text-xl font-semibold">Teach BizzyBee ✨</h1>

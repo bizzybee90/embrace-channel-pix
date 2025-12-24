@@ -22,6 +22,7 @@ import AnalyticsDashboard from "./pages/AnalyticsDashboard";
 import Review from "./pages/Review";
 import ActivityPage from "./pages/ActivityPage";
 import Diagnostics from "./pages/Diagnostics";
+import LearningPage from "./pages/LearningPage";
 
 
 const queryClient = new QueryClient();
@@ -260,6 +261,16 @@ const RouterContent = () => {
         element={
           <AuthGuard>
             <ActivityPage />
+          </AuthGuard>
+        }
+      />
+
+      {/* Learning Page - AI training and patterns */}
+      <Route 
+        path="/learning" 
+        element={
+          <AuthGuard>
+            <LearningPage />
           </AuthGuard>
         }
       />
