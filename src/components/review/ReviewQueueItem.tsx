@@ -23,13 +23,13 @@ interface ReviewQueueItemProps {
 const getStateBadge = (bucket: string) => {
   switch (bucket) {
     case 'act_now':
-      return <Badge variant="destructive" className="text-[9px] px-1 py-0 h-4">Needs attention</Badge>;
+      return <Badge variant="destructive" className="text-[9px] px-1 py-0 h-4 flex-shrink-0 whitespace-nowrap">Urgent</Badge>;
     case 'quick_win':
-      return <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 text-[9px] px-1 py-0 h-4">Needs reply</Badge>;
+      return <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 text-[9px] px-1 py-0 h-4 flex-shrink-0 whitespace-nowrap">Reply</Badge>;
     case 'wait':
-      return <Badge className="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 text-[9px] px-1 py-0 h-4">FYI</Badge>;
+      return <Badge className="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 text-[9px] px-1 py-0 h-4 flex-shrink-0 whitespace-nowrap">FYI</Badge>;
     case 'auto_handled':
-      return <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 text-[9px] px-1 py-0 h-4">Done</Badge>;
+      return <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 text-[9px] px-1 py-0 h-4 flex-shrink-0 whitespace-nowrap">Done</Badge>;
     default:
       return null;
   }
