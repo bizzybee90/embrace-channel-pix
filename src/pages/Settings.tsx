@@ -25,6 +25,7 @@ import { LowConfidenceWizard } from '@/components/settings/LowConfidenceWizard';
 import { LearningAnalyticsDashboard } from '@/components/settings/LearningAnalyticsDashboard';
 import { TestMessageGenerator } from '@/components/TestMessageGenerator';
 import { BackButton } from '@/components/shared/BackButton';
+import { SettingsSection } from '@/components/settings/SettingsSection';
 import { Bot, Plug, Shield, Layout, Code, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -46,19 +47,34 @@ export default function Settings() {
       title: 'BizzyBee AI',
       description: 'Agent configuration, knowledge base, and learning',
       content: (
-        <div className="space-y-6">
-          <AIAgentPanel />
-          <KnowledgeBasePanel />
-          <LearningAnalyticsDashboard />
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Email Triage Settings</h3>
+        <div className="space-y-3">
+          <SettingsSection title="AI Agent" description="Configure prompts and models" defaultOpen>
+            <AIAgentPanel />
+          </SettingsSection>
+          <SettingsSection title="Knowledge Base" description="FAQs, pricing, and business facts">
+            <KnowledgeBasePanel />
+          </SettingsSection>
+          <SettingsSection title="Learning Analytics" description="Track AI improvement over time">
+            <LearningAnalyticsDashboard />
+          </SettingsSection>
+          <SettingsSection title="Low Confidence Wizard" description="Handle uncertain classifications">
             <LowConfidenceWizard />
+          </SettingsSection>
+          <SettingsSection title="Learning System" description="Autonomous learning settings">
             <LearningSystemPanel />
+          </SettingsSection>
+          <SettingsSection title="Behavior Stats" description="Sender behavior patterns">
             <BehaviorStatsPanel />
+          </SettingsSection>
+          <SettingsSection title="Business Context" description="Company-specific context">
             <BusinessContextPanel />
+          </SettingsSection>
+          <SettingsSection title="Sender Rules" description="Rules for specific senders">
             <SenderRulesPanel />
+          </SettingsSection>
+          <SettingsSection title="Triage Learning" description="Learn from corrections">
             <TriageLearningPanel />
-          </div>
+          </SettingsSection>
         </div>
       )
     },
@@ -68,11 +84,19 @@ export default function Settings() {
       title: 'Connections',
       description: 'Email accounts, channels, and integrations',
       content: (
-        <div className="space-y-6">
-          <EmailSettingsPanel />
-          <ChannelManagementPanel />
-          <IntegrationsPanel />
-          <DataSyncPanel />
+        <div className="space-y-3">
+          <SettingsSection title="Email Settings" description="Connected email accounts" defaultOpen>
+            <EmailSettingsPanel />
+          </SettingsSection>
+          <SettingsSection title="Channels" description="Manage communication channels">
+            <ChannelManagementPanel />
+          </SettingsSection>
+          <SettingsSection title="Integrations" description="Third-party connections">
+            <IntegrationsPanel />
+          </SettingsSection>
+          <SettingsSection title="Data Sync" description="External data sources">
+            <DataSyncPanel />
+          </SettingsSection>
         </div>
       )
     },
@@ -82,12 +106,22 @@ export default function Settings() {
       title: 'Data & Privacy',
       description: 'GDPR compliance, exports, and retention',
       content: (
-        <div className="space-y-6">
-          <GDPRDashboard />
-          <DataExportPanel />
-          <DataDeletionPanel />
-          <RetentionPolicyPanel />
-          <AuditLogPanel />
+        <div className="space-y-3">
+          <SettingsSection title="GDPR Dashboard" description="Compliance overview" defaultOpen>
+            <GDPRDashboard />
+          </SettingsSection>
+          <SettingsSection title="Data Export" description="Export customer data">
+            <DataExportPanel />
+          </SettingsSection>
+          <SettingsSection title="Data Deletion" description="Handle deletion requests">
+            <DataDeletionPanel />
+          </SettingsSection>
+          <SettingsSection title="Retention Policy" description="Data retention settings">
+            <RetentionPolicyPanel />
+          </SettingsSection>
+          <SettingsSection title="Audit Logs" description="Data access history">
+            <AuditLogPanel />
+          </SettingsSection>
         </div>
       )
     },
@@ -97,9 +131,13 @@ export default function Settings() {
       title: 'Display & Behavior',
       description: 'Ordering preferences and notifications',
       content: (
-        <div className="space-y-6">
-          <ConversationOrderingPanel />
-          <NotificationPreferencesPanel />
+        <div className="space-y-3">
+          <SettingsSection title="Conversation Ordering" description="Sort and prioritize conversations" defaultOpen>
+            <ConversationOrderingPanel />
+          </SettingsSection>
+          <SettingsSection title="Notifications" description="Notification preferences">
+            <NotificationPreferencesPanel />
+          </SettingsSection>
         </div>
       )
     },
@@ -109,16 +147,16 @@ export default function Settings() {
       title: 'Developer Tools',
       description: 'Testing, cleanup, and diagnostics',
       content: (
-        <div className="space-y-6">
-          <Card className="p-6">
-            <h2 className="text-xl font-semibold mb-4">Test Message Generator</h2>
-            <p className="text-sm text-muted-foreground mb-4">
-              Generate test messages across different channels to verify AI agent behavior and conversation handling.
-            </p>
+        <div className="space-y-3">
+          <SettingsSection title="Test Message Generator" description="Generate test messages" defaultOpen>
             <TestMessageGenerator />
-          </Card>
-          <TestDataCleanupPanel />
-          <CustomerMergePanel />
+          </SettingsSection>
+          <SettingsSection title="Test Data Cleanup" description="Remove test data">
+            <TestDataCleanupPanel />
+          </SettingsSection>
+          <SettingsSection title="Customer Merge" description="Merge duplicate customers">
+            <CustomerMergePanel />
+          </SettingsSection>
         </div>
       )
     }
@@ -179,7 +217,7 @@ export default function Settings() {
                 </CollapsibleTrigger>
                 <CollapsibleContent>
                   <CardContent className="pt-0 pb-6">
-                    <div className="border-t pt-6">
+                    <div className="border-t pt-4">
                       {category.content}
                     </div>
                   </CardContent>
