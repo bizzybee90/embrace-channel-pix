@@ -268,7 +268,7 @@ export const Home = () => {
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground mt-3">
-                  {stats.reviewCount > 0 ? 'Help BizzyBee learn new patterns' : 'BizzyBee is confident on all items'}
+                  {stats.reviewCount > 0 ? "Help BizzyBee learn new patterns — you'll see fewer each week" : 'BizzyBee is confident on all items'}
                 </p>
               </Card>
 

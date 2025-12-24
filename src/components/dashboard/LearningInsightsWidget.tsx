@@ -51,10 +51,10 @@ const getConfidenceState = (stats: LearningStats): ConfidenceState => {
   return 'learning';
 };
 
-const confidenceStateConfig: Record<ConfidenceState, { label: string; color: string; icon: typeof Brain }> = {
-  learning: { label: 'Learning', color: 'bg-amber-500/10 text-amber-600 border-amber-500/20', icon: Brain },
-  stabilising: { label: 'Stabilising', color: 'bg-purple-500/10 text-purple-600 border-purple-500/20', icon: Sparkles },
-  confident: { label: 'Confident', color: 'bg-green-500/10 text-green-600 border-green-500/20', icon: CheckCircle2 },
+const confidenceStateConfig: Record<ConfidenceState, { label: string; level: number; color: string; icon: typeof Brain }> = {
+  learning: { label: 'Learning', level: 1, color: 'bg-amber-500/10 text-amber-600 border-amber-500/20', icon: Brain },
+  stabilising: { label: 'Stabilising', level: 2, color: 'bg-purple-500/10 text-purple-600 border-purple-500/20', icon: Sparkles },
+  confident: { label: 'Confident', level: 3, color: 'bg-green-500/10 text-green-600 border-green-500/20', icon: CheckCircle2 },
 };
 
 export const LearningInsightsWidget = () => {
@@ -270,10 +270,10 @@ export const LearningInsightsWidget = () => {
           <h2 className="font-semibold text-foreground">Learning</h2>
         </div>
         <div className="flex items-center gap-2">
-          {/* Confidence State Badge */}
+          {/* Confidence State Badge with Level */}
           <Badge variant="outline" className={`text-[10px] px-2 py-0.5 ${stateConfig.color}`}>
             <StateIcon className="h-3 w-3 mr-1" />
-            {stateConfig.label}
+            Level {stateConfig.level}: {stateConfig.label}
             {stats.accuracyTrend === 'up' && <TrendingUp className="h-3 w-3 ml-1" />}
           </Badge>
           <ArrowUpRight className="h-4 w-4 text-muted-foreground" />
@@ -301,6 +301,9 @@ export const LearningInsightsWidget = () => {
             {stats.accuracyRate}%
           </div>
           <p className="text-[10px] text-muted-foreground">Confidence</p>
+          {stats.accuracyTrend === 'up' && (
+            <span className="text-[9px] text-green-600">↑ improving</span>
+          )}
         </div>
 
         <div className="text-center">
@@ -330,13 +333,14 @@ export const LearningInsightsWidget = () => {
         </div>
       )}
 
-      {/* Now handling categories */}
+      {/* Unlocked automations */}
       {stats.handlingCategories.length > 0 && (
         <div className="mb-3">
-          <p className="text-[10px] text-muted-foreground mb-1">Now handling automatically:</p>
+          <p className="text-[10px] text-muted-foreground mb-1">Unlocked automations</p>
           <div className="flex flex-wrap gap-1">
             {stats.handlingCategories.map(cat => (
-              <Badge key={cat} variant="secondary" className="text-[9px] px-1.5 py-0">
+              <Badge key={cat} variant="secondary" className="text-[9px] px-1.5 py-0 flex items-center gap-0.5">
+                <CheckCircle2 className="h-2.5 w-2.5 text-green-600" />
                 {formatClassification(cat)}
               </Badge>
             ))}
