@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Filter, Plus, Trash2, Loader2, Zap } from 'lucide-react';
+import { Filter, Plus, Trash2, Loader2, Zap, Pencil, Check, X } from 'lucide-react';
 
 interface SenderRule {
   id: string;
@@ -47,6 +47,11 @@ export function SenderRulesPanel() {
   const [newPattern, setNewPattern] = useState('');
   const [newClassification, setNewClassification] = useState('automated_notification');
   const [newRequiresReply, setNewRequiresReply] = useState(false);
+  
+  // Editing state
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editClassification, setEditClassification] = useState('');
+  const [editRequiresReply, setEditRequiresReply] = useState(false);
 
   useEffect(() => {
     fetchRules();
@@ -143,6 +148,44 @@ export function SenderRulesPanel() {
     }
   };
 
+  const startEditing = (rule: SenderRule) => {
+    setEditingId(rule.id);
+    setEditClassification(rule.default_classification);
+    setEditRequiresReply(rule.default_requires_reply);
+  };
+
+  const cancelEditing = () => {
+    setEditingId(null);
+    setEditClassification('');
+    setEditRequiresReply(false);
+  };
+
+  const saveEdit = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('sender_rules')
+        .update({ 
+          default_classification: editClassification,
+          default_requires_reply: editRequiresReply,
+          updated_at: new Date().toISOString() 
+        })
+        .eq('id', id);
+
+      if (error) throw error;
+      
+      setRules(rules.map(r => r.id === id ? { 
+        ...r, 
+        default_classification: editClassification,
+        default_requires_reply: editRequiresReply 
+      } : r));
+      setEditingId(null);
+      toast({ title: 'Rule updated' });
+    } catch (error) {
+      console.error('Error updating rule:', error);
+      toast({ title: 'Failed to update rule', variant: 'destructive' });
+    }
+  };
+
   if (loading) {
     return (
       <Card>
@@ -224,36 +267,94 @@ export function SenderRulesPanel() {
                   />
                   <div>
                     <p className="font-mono text-sm">{rule.sender_pattern}</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Badge variant="outline" className="text-xs">
-                        {CLASSIFICATIONS.find(c => c.value === rule.default_classification)?.label}
-                      </Badge>
-                      {rule.default_requires_reply ? (
-                        <Badge variant="secondary" className="text-xs bg-green-500/10 text-green-600">
-                          Needs Reply
-                        </Badge>
-                      ) : (
-                        <Badge variant="secondary" className="text-xs">
-                          Auto-triage
-                        </Badge>
-                      )}
-                      {rule.hit_count > 0 && (
+                    {editingId === rule.id ? (
+                      <div className="flex items-center gap-2 mt-2">
+                        <Select value={editClassification} onValueChange={setEditClassification}>
+                          <SelectTrigger className="h-8 text-xs w-[140px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {CLASSIFICATIONS.map((c) => (
+                              <SelectItem key={c.value} value={c.value}>
+                                {c.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <div className="flex items-center gap-1.5">
+                          <Switch
+                            checked={editRequiresReply}
+                            onCheckedChange={setEditRequiresReply}
+                            id={`edit-reply-${rule.id}`}
+                          />
+                          <label htmlFor={`edit-reply-${rule.id}`} className="text-xs">
+                            Reply
+                          </label>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 mt-1">
                         <Badge variant="outline" className="text-xs">
-                          <Zap className="h-3 w-3 mr-1" />
-                          {rule.hit_count} hits
+                          {CLASSIFICATIONS.find(c => c.value === rule.default_classification)?.label}
                         </Badge>
-                      )}
-                    </div>
+                        {rule.default_requires_reply ? (
+                          <Badge variant="secondary" className="text-xs bg-green-500/10 text-green-600">
+                            Needs Reply
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary" className="text-xs">
+                            Auto-triage
+                          </Badge>
+                        )}
+                        {rule.hit_count > 0 && (
+                          <Badge variant="outline" className="text-xs">
+                            <Zap className="h-3 w-3 mr-1" />
+                            {rule.hit_count} hits
+                          </Badge>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => deleteRule(rule.id)}
-                  className="text-destructive hover:text-destructive"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                <div className="flex items-center gap-1">
+                  {editingId === rule.id ? (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => saveEdit(rule.id)}
+                        className="text-green-600 hover:text-green-700"
+                      >
+                        <Check className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={cancelEditing}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => startEditing(rule)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => deleteRule(rule.id)}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </>
+                  )}
+                </div>
               </div>
             ))
           )}
