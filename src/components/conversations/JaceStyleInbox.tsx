@@ -25,7 +25,7 @@ interface GroupedConversations {
 }
 
 export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInboxProps) => {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const subFilter = searchParams.get('filter'); // 'at-risk', 'to-reply', 'drafts'
   
   const [searchQuery, setSearchQuery] = useState('');
@@ -317,7 +317,6 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
     );
   }
 
-  const [, setSearchParams] = useSearchParams();
   
   // Get title based on sub-filter
   const getFilterTitle = () => {
