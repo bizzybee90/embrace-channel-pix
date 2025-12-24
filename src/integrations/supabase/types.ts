@@ -145,6 +145,7 @@ export type Database = {
           assigned_to: string | null
           auto_handled_at: string | null
           auto_responded: boolean | null
+          batch_group: string | null
           category: string | null
           channel: string
           cognitive_load: string | null
@@ -159,13 +160,16 @@ export type Database = {
           email_classification: string | null
           embedding: string | null
           escalated_at: string | null
+          evidence: Json | null
           external_conversation_id: string | null
           extracted_entities: Json | null
           final_response: string | null
           first_response_at: string | null
+          flags: Json | null
           human_edited: boolean | null
           id: string
           is_escalated: boolean | null
+          lane: string | null
           led_to_booking: boolean | null
           message_count: number | null
           metadata: Json | null
@@ -206,6 +210,7 @@ export type Database = {
           assigned_to?: string | null
           auto_handled_at?: string | null
           auto_responded?: boolean | null
+          batch_group?: string | null
           category?: string | null
           channel: string
           cognitive_load?: string | null
@@ -220,13 +225,16 @@ export type Database = {
           email_classification?: string | null
           embedding?: string | null
           escalated_at?: string | null
+          evidence?: Json | null
           external_conversation_id?: string | null
           extracted_entities?: Json | null
           final_response?: string | null
           first_response_at?: string | null
+          flags?: Json | null
           human_edited?: boolean | null
           id?: string
           is_escalated?: boolean | null
+          lane?: string | null
           led_to_booking?: boolean | null
           message_count?: number | null
           metadata?: Json | null
@@ -267,6 +275,7 @@ export type Database = {
           assigned_to?: string | null
           auto_handled_at?: string | null
           auto_responded?: boolean | null
+          batch_group?: string | null
           category?: string | null
           channel?: string
           cognitive_load?: string | null
@@ -281,13 +290,16 @@ export type Database = {
           email_classification?: string | null
           embedding?: string | null
           escalated_at?: string | null
+          evidence?: Json | null
           external_conversation_id?: string | null
           extracted_entities?: Json | null
           final_response?: string | null
           first_response_at?: string | null
+          flags?: Json | null
           human_edited?: boolean | null
           id?: string
           is_escalated?: boolean | null
+          lane?: string | null
           led_to_booking?: boolean | null
           message_count?: number | null
           metadata?: Json | null
@@ -1270,6 +1282,7 @@ export type Database = {
           created_at: string | null
           created_from_correction: string | null
           default_classification: string
+          default_lane: string | null
           default_requires_reply: boolean | null
           hit_count: number | null
           id: string
@@ -1278,6 +1291,7 @@ export type Database = {
           override_keywords: string[] | null
           override_requires_reply: boolean | null
           sender_pattern: string
+          skip_llm: boolean | null
           tone_preference: string | null
           updated_at: string | null
           workspace_id: string | null
@@ -1288,6 +1302,7 @@ export type Database = {
           created_at?: string | null
           created_from_correction?: string | null
           default_classification: string
+          default_lane?: string | null
           default_requires_reply?: boolean | null
           hit_count?: number | null
           id?: string
@@ -1296,6 +1311,7 @@ export type Database = {
           override_keywords?: string[] | null
           override_requires_reply?: boolean | null
           sender_pattern: string
+          skip_llm?: boolean | null
           tone_preference?: string | null
           updated_at?: string | null
           workspace_id?: string | null
@@ -1306,6 +1322,7 @@ export type Database = {
           created_at?: string | null
           created_from_correction?: string | null
           default_classification?: string
+          default_lane?: string | null
           default_requires_reply?: boolean | null
           hit_count?: number | null
           id?: string
@@ -1314,6 +1331,7 @@ export type Database = {
           override_keywords?: string[] | null
           override_requires_reply?: boolean | null
           sender_pattern?: string
+          skip_llm?: boolean | null
           tone_preference?: string | null
           updated_at?: string | null
           workspace_id?: string | null
@@ -1733,31 +1751,43 @@ export type Database = {
           business_days: number[] | null
           business_hours_end: string | null
           business_hours_start: string | null
+          business_type: string | null
+          core_services: string[] | null
           created_at: string | null
+          hiring_mode: boolean | null
           id: string
           name: string
           slug: string
           timezone: string | null
+          vip_domains: string[] | null
         }
         Insert: {
           business_days?: number[] | null
           business_hours_end?: string | null
           business_hours_start?: string | null
+          business_type?: string | null
+          core_services?: string[] | null
           created_at?: string | null
+          hiring_mode?: boolean | null
           id?: string
           name: string
           slug: string
           timezone?: string | null
+          vip_domains?: string[] | null
         }
         Update: {
           business_days?: number[] | null
           business_hours_end?: string | null
           business_hours_start?: string | null
+          business_type?: string | null
+          core_services?: string[] | null
           created_at?: string | null
+          hiring_mode?: boolean | null
           id?: string
           name?: string
           slug?: string
           timezone?: string | null
+          vip_domains?: string[] | null
         }
         Relationships: []
       }

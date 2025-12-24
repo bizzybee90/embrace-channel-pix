@@ -6,252 +6,219 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Decision Router Prompt - Routes to ACTION, not categories
-const DEFAULT_TRIAGE_PROMPT = `You are an AI Operations Manager for a service business (window cleaning, home services, etc.). Your job is NOT to classify emails - it's to DECIDE what action the business owner should take.
+// ============================================================
+// DETERMINISTIC GATEKEEPER - Skip LLM for known patterns
+// ============================================================
 
-## CRITICAL: You Are a Decision Router, Not a Classifier
+const AUTO_DONE_DOMAINS = [
+  // Payment processors (receipts)
+  'stripe.com', 'gocardless.com', 'paypal.com', 'square.com',
+  'payments.amazon.co.uk', 'pay.amazon.co.uk', 'amazon.co.uk',
+  'xero.com', 'quickbooks.intuit.com', 'intuit.com',
+  
+  // Job boards
+  'indeed.com', 'linkedin.com', 'reed.co.uk', 'totaljobs.com',
+  'glassdoor.com', 'cv-library.co.uk', 'monster.com',
+  
+  // Social notifications
+  'facebookmail.com', 'twitter.com', 'instagram.com', 'x.com',
+  'notifications.google.com', 'youtube.com',
+  
+  // Newsletters/Marketing
+  'substack.com', 'mailchimp.com', 'sendgrid.net', 'mailgun.com',
+  'campaign-archive.com', 'list-manage.com',
+  
+  // Shipping
+  'royalmail.com', 'dpd.co.uk', 'hermes.com', 'ups.com', 'fedex.com',
+];
 
-For every email, you must answer ONE question:
-"What should the business owner DO about this?"
+const AUTO_DONE_SENDER_PATTERNS = [
+  /^noreply@/i,
+  /^no-reply@/i,
+  /^donotreply@/i,
+  /^notifications@/i,
+  /^mailer-daemon@/i,
+  /^postmaster@/i,
+  /^bounce@/i,
+  /^automated@/i,
+];
 
-## Distribution Guidance (IMPORTANT!)
-In a typical inbox, your decisions should roughly follow this distribution:
-- ACT_NOW: 5-10% (urgent, risky - use sparingly)
-- QUICK_WIN: 15-25% (fast to clear)
-- AUTO_HANDLED: 50-70% (noise, hidden from user - THIS IS THE DEFAULT SINK)
-- WAIT: 5-10% (RARE - only for specific deferred human action)
+const AUTO_DONE_SUBJECT_PATTERNS = [
+  /payment.*received/i,
+  /payment.*successful/i,
+  /your.*receipt/i,
+  /transaction.*confirmed/i,
+  /order.*confirmation/i,
+  /shipping.*notification/i,
+  /delivery.*update/i,
+  /someone.*applied.*position/i,
+  /new.*application.*received/i,
+  /weekly.*digest/i,
+  /newsletter/i,
+];
 
-⚠️ If more than 30% of messages go to WAIT, you are being too conservative.
-⚠️ AUTO_HANDLED should be your DEFAULT for anything the user won't act on.
+// Patterns that should escalate to REVIEW even if domain matches
+const ESCALATE_SUBJECT_PATTERNS = [
+  /payment.*failed/i,
+  /transaction.*declined/i,
+  /action.*required/i,
+  /urgent/i,
+  /error/i,
+  /problem.*with/i,
+  /suspended/i,
+  /cancelled/i,
+];
 
-## Decision Buckets (Pick ONE)
+// ============================================================
+// DECISION ROUTER PROMPT - Chief of Staff Architecture
+// ============================================================
 
-### 🔴 ACT_NOW - Needs immediate human attention (5-10% of emails)
-Use when:
+const DEFAULT_TRIAGE_PROMPT = `You are the AI Chief of Staff for a service business.
+Your goal is **Aggressive Inbox Zero**. You don't just label emails - you make executive decisions.
+
+## THE DECISION LANES
+
+You route emails into LANES (where user sees it) with FLAGS (how to handle it).
+
+### 🔴 TO_REPLY (Urgent) - < 10%
+Customer needs a response AND it's time-sensitive:
 - Customer is upset, frustrated, or complaining
-- Payment issue or financial risk
+- Payment issue or financial risk  
 - Service disruption or cancellation threat
 - Time-sensitive request (today/tomorrow)
 - Legal or reputation risk
-- Your confidence is below 70%
+- VIP domains (always prioritize)
 
-### 🟡 QUICK_WIN - Can be handled in under 30 seconds (15-25% of emails)
-Use when:
-- Simple yes/no reply needed
-- Straightforward confirmation
-- Template response will work
-- No complex thinking required
-- Your confidence is above 85%
+### 🟡 TO_REPLY (Standard) - 20-30%
+Customer needs a response, not urgent:
+- Quote requests, booking inquiries
+- Simple questions needing quick answers
+- Scheduling/rescheduling requests
+- Straightforward confirmations (template response works)
 
-### 🟢 AUTO_HANDLED - No human action EVER needed (50-70% of emails - DEFAULT!)
-This is your DEFAULT bucket for noise. Use when:
-- Marketing emails and newsletters (even from known senders)
-- Automated notifications (receipts, confirmations, alerts, job alerts)
-- Spam or phishing attempts
-- System notifications
-- Payment confirmations / receipts FROM payment processors (Stripe, PayPal, Square)
-- Shipping notifications
+### 🔵 REVIEW - 10-20%
+Needs human eyes but may not need reply:
+- LOW CONFIDENCE (< 80%) - uncertain, let human decide
+- First-time sender from unknown domain
+- Supplier invoices (verify before paying)
+- Edge cases requiring human judgment
+- Ambiguous requests
+
+### 🟢 DONE - 50-60%
+No human attention needed:
+- Receipts and payment confirmations (Stripe, PayPal, GoCardless)
+- Automated notifications (shipping, system alerts)
+- Marketing/newsletters
+- Job applications (when not hiring)
+- Spam and phishing
 - Social media notifications
-- Calendar invites that don't need response
-- The user will NEVER look at this again
-- Your confidence is above 90%
 
-⚠️ KEY RULE: If the user will NEVER come back to this email → AUTO_HANDLED, not WAIT
+## HARD RULES (Override Everything)
 
-### 🔵 WAIT - Human action needed LATER (5-10% of emails - USE SPARINGLY!)
-⚠️ WAIT is RARE. Only use when ALL of these are true:
-- The user WILL return to this later (not just "might be useful")
-- There is a SPECIFIC future action the user needs to take
-- It's not safe to auto-complete
-- Examples: "Follow up next week", "Check if payment cleared in 3 days", "Review quote before sending"
+1. **Receipt vs Invoice Rule**
+   - Receipt (money already paid to you) → DONE, reply_required=false
+   - Invoice (money YOU owe to supplier) → REVIEW, reply_required=false
+   - Invoice dispute → TO_REPLY, urgent=true
 
-❌ DO NOT use WAIT for:
-- Receipts from payment processors (→ AUTO_HANDLED)
-- Notifications (→ AUTO_HANDLED)
-- Newsletters (→ AUTO_HANDLED)
-- FYI emails with no action (→ AUTO_HANDLED)
-- "Might be useful later" (→ AUTO_HANDLED)
+2. **THE UNCERTAINTY RULE (CRITICAL!)**
+   - Low confidence (< 80%) → lane="review", NOT urgent
+   - Uncertainty ≠ Urgency. These are SEPARATE concepts.
+   - If you're unsure, put it in REVIEW so the user can teach you.
+   - NEVER route low confidence to urgent just because you're uncertain.
 
-## "Why This Needs You" - ALWAYS Explain (Required!)
+3. **The Reply Rule**
+   - DONE lane MUST have reply_required=false
+   - DONE lane MUST have suggested_reply=null (NEVER suggest replies for DONE)
+   - If a reply is genuinely needed, it cannot be DONE
 
-Every email MUST have a clear, human-readable explanation of why it landed in its bucket:
-- ACT_NOW: "Customer upset about [specific issue]" or "Payment at risk - [reason]"
-- QUICK_WIN: "Simple confirmation needed" or "Yes/no reply will resolve this"
-- AUTO_HANDLED: "Stripe payment receipt" or "Marketing newsletter from [sender]"
-- WAIT: "Follow up needed on [date] for [specific reason]"
+4. **Error/Failure Rule**
+   - System notification with "failed/error/down" → REVIEW with urgent=true
 
-This field must NEVER be empty. It must be actionable and specific.
+## BATCH CLUSTERING (For Bulk Processing)
 
-## CLASSIFICATION RULES - READ CAREFULLY!
+Assign batch_group for bulk actions:
+- BATCH_RECEIPTS: Payment confirmations (Stripe, PayPal, GoCardless)
+- BATCH_NEWSLETTERS: Marketing, Substack, webinars, industry news
+- BATCH_JOB_APPS: Applications from job boards (Indeed, LinkedIn)
+- BATCH_SPAM: Cold sales outreach, SEO offers, phishing
+- null: Anything unique requiring individual focus
 
-### INVOICE CLASSIFICATION (CRITICAL - Common Mistakes!)
+## EVIDENCE EXTRACTION
 
-⚠️ INVOICES ARE NOT SPAM! An invoice from a supplier/vendor is NEVER spam.
+For every decision, you MUST cite evidence from the email:
+- key_quote: The most important sentence that drove your decision
+- intent: What the sender wants (in 5 words or less)
 
-**supplier_invoice** - Invoices/bills TO the business that may need payment:
-- Bills from suppliers, vendors, utility companies
-- Invoices for services rendered (water delivery, equipment, supplies)
-- Any email with invoice amounts, payment terms, due dates
-- Example: "Invoice #1234 from Spotless Water - £25.00 due"
-- Example: "Water delivery invoice - Oliver Pinnock"
-→ Bucket: QUICK_WIN (needs review for payment)
+This grounds your decision and helps humans verify quickly.
 
-**receipt_confirmation** - Confirmations of payments ALREADY made:
-- Payment processor receipts (Stripe, PayPal, Square, GoCardless)
-- "Your payment was successful" notifications
-- "Payment received" confirmations
-- Bank transfer confirmations
-→ Bucket: AUTO_HANDLED (no action needed)
+## "Why This Needs You" - ALWAYS Explain
 
-**spam_phishing** - Only use for ACTUAL spam:
-- Nigerian prince scams
-- "You've won a prize" emails
-- Phishing attempts with suspicious links
-- Unknown senders with no business context
-- NEVER for legitimate invoices or business communications
-→ Bucket: AUTO_HANDLED
+Every email MUST have a clear, human-readable explanation:
+- TO_REPLY (urgent): "Customer upset about [specific issue]"
+- TO_REPLY (standard): "Quote request for 3-bed house in Luton"
+- REVIEW: "Low confidence (65%) - teach me"
+- DONE: "Stripe payment receipt - no action needed"
 
-### CUSTOMER INQUIRY CLASSIFICATION (Be Specific!)
+This field must NEVER be empty. Be specific, not generic.`;
 
-Instead of generic "customer_inquiry", prefer these specific categories:
+// ============================================================
+// DECISION ROUTER TOOL SCHEMA - Lanes + Flags Architecture
+// ============================================================
 
-**customer_inquiry** - Use for:
-- Questions about services, pricing, availability
-- Booking or scheduling requests
-- Quote requests
-- General "Can you help with X?" questions
-→ Be specific in why_this_needs_you: "Quote request for [service]" not just "inquiry"
-
-**customer_complaint** - Use for:
-- Dissatisfaction with service
-- Something went wrong
-- Request for refund or credit
-- Negative sentiment detected
-
-**customer_feedback** - Use for:
-- Positive reviews or praise
-- "Thank you" emails
-- Suggestions for improvement (non-complaints)
-
-**payment_confirmation** - Use for:
-- Customer saying "I've paid" (past tense, done)
-- "Payment sent" from customer
-- Balance inquiries from customers
-→ Different from receipt_confirmation (which is from payment processors)
-
-**payment_promise** - Use for:
-- Customer saying "I'll pay on Friday" or "will pay soon"
-- Promises or commitments to pay in the future
-- "I'll sort it out next week" type messages
-→ Different from payment_confirmation (which is for completed payments)
-→ Bucket: WAIT (follow up needed to confirm payment was made)
-
-### MARKETING vs LEGITIMATE BUSINESS
-
-**marketing_newsletter** - Only for:
-- Mass marketing emails
-- Promotional offers unrelated to your business operations
-- "10% off" campaigns
-- Blog digests, industry news
-
-**NOT marketing if:**
-- It's from a supplier you use
-- It contains invoice or payment information
-- It's from a customer
-
-## Risk Assessment
-
-Evaluate potential harm if this email is ignored:
-- financial: Could cost money (unpaid invoice, cancelled booking, refund demand)
-- retention: Could lose this customer (complaint, dissatisfaction)
-- reputation: Could damage business image (public review threat, social media)
-- legal: Could have legal implications (formal complaint, regulatory)
-- none: No significant risk
-
-## Cognitive Load Assessment
-
-How much thinking does this require?
-- high: Requires careful consideration, context, or complex response
-- low: Straightforward, template response works, minimal thinking
-
-## Important Context
-
-1. This is a SERVICE BUSINESS that RECEIVES invoices from suppliers (not just sends them)
-   - Invoices TO the business = supplier_invoice (may need payment)
-   - Invoices FROM the business = ignore (already sent)
-
-2. When in doubt between WAIT and AUTO_HANDLED → choose AUTO_HANDLED
-   - WAIT should be RARE (only when there's a specific future action)
-   - AUTO_HANDLED is for everything the user will never revisit
-
-3. Look for emotional signals: frustration, urgency, threats, or praise
-
-4. Consider the sender: known customer vs new lead vs supplier vs automated system
-
-5. MISDIRECTED EMAILS: When an email is clearly intended for a different person or company:
-   - Use "misdirected" category
-   - Set requires_reply = TRUE (polite "wrong email" response needed)
-   - Set bucket = "quick_win" (simple template reply)
-   - Examples: Debt collection for unknown person, invoices for services you don't provide, legal notices addressed to wrong company
-   - This is NOT the same as spam/phishing - misdirected emails are legitimate but sent to the wrong recipient`;
-
-async function getTriagePrompt(supabase: any, workspaceId?: string): Promise<{ prompt: string; model: string }> {
-  try {
-    if (workspaceId) {
-      const { data: wsPrompt } = await supabase
-        .from('system_prompts')
-        .select('prompt, model')
-        .eq('agent_type', 'triage')
-        .eq('workspace_id', workspaceId)
-        .eq('is_active', true)
-        .eq('is_default', true)
-        .single();
-      
-      if (wsPrompt?.prompt) {
-        console.log('Using workspace-specific triage prompt');
-        return { prompt: wsPrompt.prompt, model: wsPrompt.model || 'claude-3-5-haiku-20241022' };
-      }
-    }
-
-    const { data: globalPrompt } = await supabase
-      .from('system_prompts')
-      .select('prompt, model')
-      .eq('agent_type', 'triage')
-      .is('workspace_id', null)
-      .eq('is_active', true)
-      .eq('is_default', true)
-      .single();
-
-    if (globalPrompt?.prompt) {
-      console.log('Using global default triage prompt');
-      return { prompt: globalPrompt.prompt, model: globalPrompt.model || 'claude-3-5-haiku-20241022' };
-    }
-  } catch (error) {
-    console.error('Error fetching triage prompt:', error);
-  }
-
-  console.log('Using hardcoded fallback triage prompt');
-  return { prompt: DEFAULT_TRIAGE_PROMPT, model: 'claude-3-5-haiku-20241022' };
-}
-
-// Decision Router Tool - Focus on ACTION, not classification
 const DECISION_ROUTER_TOOL = {
   name: "route_email",
-  description: "Decide what action the business owner should take on this email",
+  description: "Route email to the appropriate lane with flags",
   input_schema: {
     type: "object",
     properties: {
+      // New lane-based routing
+      lane: {
+        type: "string",
+        enum: ["to_reply", "review", "done", "snoozed"],
+        description: "The routing lane: to_reply (needs response), review (needs human eyes), done (no action), snoozed (explicit future date)"
+      },
+      flags: {
+        type: "object",
+        properties: {
+          urgent: { type: "boolean", description: "Time-sensitive or angry customer (shows red indicator)" },
+          reply_required: { type: "boolean", description: "A reply email is actually needed" },
+          vip: { type: "boolean", description: "Sender is from VIP domain" },
+          first_time_sender: { type: "boolean", description: "No prior history with this sender" },
+          financial: { type: "boolean", description: "Involves money (invoice, payment, refund)" },
+          risk_type: { 
+            type: "string", 
+            enum: ["churn", "complaint", "financial", "legal", "none"],
+            description: "Type of risk if ignored"
+          }
+        },
+        required: ["urgent", "reply_required"]
+      },
+      evidence: {
+        type: "object",
+        properties: {
+          key_quote: { type: "string", description: "Most important sentence from email that drove decision" },
+          intent: { type: "string", description: "What the sender wants in 5 words or less" }
+        },
+        required: ["key_quote", "intent"]
+      },
+      batch_group: {
+        type: "string",
+        enum: ["BATCH_RECEIPTS", "BATCH_NEWSLETTERS", "BATCH_JOB_APPS", "BATCH_SPAM"],
+        description: "Group for bulk processing, or null for unique items"
+      },
+      
+      // Legacy bucket (for backward compatibility)
       decision: {
         type: "object",
         properties: {
           bucket: {
             type: "string",
             enum: ["act_now", "quick_win", "auto_handled", "wait"],
-            description: "The decision bucket: act_now (urgent), quick_win (fast to clear), auto_handled (no human needed), wait (defer)"
+            description: "Legacy bucket mapping"
           },
           why_this_needs_you: {
             type: "string",
-            description: "Human-readable explanation in 10 words or less. E.g., 'Customer upset about late delivery' or 'Automated receipt - no action needed'"
+            description: "Human-readable explanation in 15 words or less"
           },
           confidence: {
             type: "number",
@@ -265,20 +232,17 @@ const DECISION_ROUTER_TOOL = {
         properties: {
           level: {
             type: "string",
-            enum: ["financial", "retention", "reputation", "legal", "none"],
-            description: "Type of risk if this email is ignored"
+            enum: ["financial", "retention", "reputation", "legal", "none"]
           },
           cognitive_load: {
             type: "string",
-            enum: ["high", "low"],
-            description: "Whether this requires significant thinking (high) or is simple (low)"
+            enum: ["high", "low"]
           }
         },
         required: ["level", "cognitive_load"]
       },
       classification: {
         type: "object",
-        description: "Secondary classification metadata (for analytics)",
         properties: {
           category: {
             type: "string",
@@ -289,81 +253,60 @@ const DECISION_ROUTER_TOOL = {
               "spam_phishing", "recruitment_hr", "internal_system", "informational_only",
               "booking_request", "quote_request", "cancellation_request", "reschedule_request",
               "misdirected"
-            ],
-            description: "The classification category. Be specific: use payment_promise for future payment commitments vs payment_confirmation for completed payments. Use booking_request, quote_request, cancellation_request, reschedule_request instead of generic customer_inquiry when applicable."
+            ]
           },
-          requires_reply: {
-            type: "boolean",
-            description: "Whether this email requires a human response"
-          }
+          requires_reply: { type: "boolean" }
         },
         required: ["category", "requires_reply"]
       },
       priority: {
         type: "object",
         properties: {
-          urgency: {
-            type: "string",
-            enum: ["high", "medium", "low"],
-            description: "Urgency level"
-          },
-          urgency_reason: {
-            type: "string",
-            description: "Brief explanation for the urgency level"
-          }
+          urgency: { type: "string", enum: ["high", "medium", "low"] },
+          urgency_reason: { type: "string" }
         },
         required: ["urgency", "urgency_reason"]
       },
       sentiment: {
         type: "object",
         properties: {
-          tone: {
-            type: "string",
-            enum: ["angry", "frustrated", "concerned", "neutral", "positive"],
-            description: "Customer sentiment tone"
-          }
+          tone: { type: "string", enum: ["angry", "frustrated", "concerned", "neutral", "positive"] }
         },
         required: ["tone"]
       },
       entities: {
         type: "object",
         properties: {
-          customer_name: { type: "string", description: "Extracted customer name" },
-          phone_number: { type: "string", description: "Extracted phone number" },
-          address: { type: "string", description: "Extracted address or postcode" },
-          date_mentioned: { type: "string", description: "Any dates mentioned" },
-          order_id: { type: "string", description: "Order or booking reference" },
-          amount: { type: "string", description: "Monetary amounts mentioned" },
-          service_type: { type: "string", description: "Service being inquired about" }
+          customer_name: { type: "string" },
+          phone_number: { type: "string" },
+          address: { type: "string" },
+          date_mentioned: { type: "string" },
+          order_id: { type: "string" },
+          amount: { type: "string" },
+          service_type: { type: "string" }
         }
       },
       summary: {
         type: "object",
         properties: {
-          one_line: {
-            type: "string",
-            description: "One-line summary (max 100 chars)"
-          },
-          key_points: {
-            type: "array",
-            items: { type: "string" },
-            description: "Key points (max 3)"
-          }
+          one_line: { type: "string", description: "One-line summary (max 100 chars)" },
+          key_points: { type: "array", items: { type: "string" }, description: "Key points (max 3)" }
         },
         required: ["one_line", "key_points"]
       },
       suggested_reply: {
         type: "string",
-        description: "For QUICK_WIN only: A suggested reply that could resolve this in seconds. Leave empty for other buckets."
+        description: "ONLY for lane=to_reply: A suggested reply. MUST be null/empty for lane=done or lane=review."
       },
-      reasoning: {
-        type: "string",
-        description: "Brief explanation of the decision"
-      }
+      reasoning: { type: "string" }
     },
-    required: ["decision", "risk", "classification", "priority", "sentiment", "summary", "reasoning"]
+    required: ["lane", "flags", "evidence", "decision", "risk", "classification", "priority", "sentiment", "summary", "reasoning"]
   }
 };
+
+// ============================================================
+// TYPES
+// ============================================================
 
 interface TriageRequest {
   email: {
@@ -384,6 +327,8 @@ interface TriageRequest {
     default_requires_reply: boolean;
     override_classification?: string;
     override_requires_reply?: boolean;
+    default_lane?: string;
+    skip_llm?: boolean;
   };
   sender_behaviour?: {
     reply_rate?: number;
@@ -397,7 +342,8 @@ interface TriageRequest {
   };
 }
 
-// Valid buckets and classifications for strict validation
+// Valid enums for strict validation
+const VALID_LANES = ['to_reply', 'review', 'done', 'snoozed'] as const;
 const VALID_BUCKETS = ['act_now', 'quick_win', 'auto_handled', 'wait'] as const;
 const VALID_CLASSIFICATIONS = [
   'customer_inquiry', 'customer_complaint', 'customer_feedback',
@@ -408,33 +354,210 @@ const VALID_CLASSIFICATIONS = [
   'misdirected'
 ] as const;
 const VALID_RISK_LEVELS = ['financial', 'retention', 'reputation', 'legal', 'none'] as const;
-const VALID_URGENCIES = ['high', 'medium', 'low'] as const;
-const VALID_SENTIMENTS = ['angry', 'frustrated', 'concerned', 'neutral', 'positive'] as const;
+const VALID_BATCH_GROUPS = ['BATCH_RECEIPTS', 'BATCH_NEWSLETTERS', 'BATCH_JOB_APPS', 'BATCH_SPAM'] as const;
 
-// Strict type guard and normalizer for model output
+// ============================================================
+// HELPER FUNCTIONS
+// ============================================================
+
+function extractEmailString(emailValue: unknown): string {
+  if (typeof emailValue === 'string') return emailValue;
+  if (emailValue && typeof emailValue === 'object') {
+    const obj = emailValue as Record<string, unknown>;
+    return String(obj.email || obj.address || obj.value || 'unknown@unknown.com');
+  }
+  return 'unknown@unknown.com';
+}
+
+function getSenderDomain(email: string): string {
+  return email.split('@')[1]?.toLowerCase() || '';
+}
+
+// Map lanes to legacy buckets for backward compatibility
+function laneToBucket(lane: string, urgent: boolean): string {
+  switch (lane) {
+    case 'to_reply': return urgent ? 'act_now' : 'quick_win';
+    case 'review': return 'quick_win'; // Review shows in review queue
+    case 'done': return 'auto_handled';
+    case 'snoozed': return 'wait';
+    default: return 'quick_win';
+  }
+}
+
+// Map legacy buckets to lanes
+function bucketToLane(bucket: string): { lane: string; urgent: boolean } {
+  switch (bucket) {
+    case 'act_now': return { lane: 'to_reply', urgent: true };
+    case 'quick_win': return { lane: 'to_reply', urgent: false };
+    case 'auto_handled': return { lane: 'done', urgent: false };
+    case 'wait': return { lane: 'review', urgent: false };
+    default: return { lane: 'review', urgent: false };
+  }
+}
+
+// ============================================================
+// DETERMINISTIC GATEKEEPER CHECK
+// ============================================================
+
+interface GatekeeperResult {
+  skip_llm: boolean;
+  lane: string;
+  bucket: string;
+  batch_group: string | null;
+  classification: string;
+  why: string;
+  confidence: number;
+}
+
+function checkGatekeeper(fromEmail: string, subject: string): GatekeeperResult | null {
+  const senderDomain = getSenderDomain(fromEmail);
+  const fromLower = fromEmail.toLowerCase();
+  
+  // Check for escalation patterns first (override auto-done)
+  if (ESCALATE_SUBJECT_PATTERNS.some(p => p.test(subject))) {
+    console.log(`[gatekeeper] Escalation pattern matched in subject: ${subject}`);
+    return {
+      skip_llm: false, // Let LLM handle escalations
+      lane: 'review',
+      bucket: 'quick_win',
+      batch_group: null,
+      classification: 'automated_notification',
+      why: 'System alert - may need attention',
+      confidence: 0.7
+    };
+  }
+  
+  // Check auto-done domains
+  if (AUTO_DONE_DOMAINS.includes(senderDomain)) {
+    console.log(`[gatekeeper] Auto-done domain match: ${senderDomain}`);
+    
+    // Determine batch group based on domain
+    let batchGroup = null;
+    let classification = 'automated_notification';
+    
+    if (['stripe.com', 'gocardless.com', 'paypal.com', 'square.com'].includes(senderDomain)) {
+      batchGroup = 'BATCH_RECEIPTS';
+      classification = 'receipt_confirmation';
+    } else if (['indeed.com', 'linkedin.com', 'reed.co.uk', 'totaljobs.com', 'glassdoor.com'].includes(senderDomain)) {
+      batchGroup = 'BATCH_JOB_APPS';
+      classification = 'recruitment_hr';
+    } else if (['substack.com', 'mailchimp.com', 'sendgrid.net'].includes(senderDomain)) {
+      batchGroup = 'BATCH_NEWSLETTERS';
+      classification = 'marketing_newsletter';
+    }
+    
+    return {
+      skip_llm: true,
+      lane: 'done',
+      bucket: 'auto_handled',
+      batch_group: batchGroup,
+      classification,
+      why: `Known ${senderDomain} notification - no action needed`,
+      confidence: 0.99
+    };
+  }
+  
+  // Check auto-done sender patterns
+  if (AUTO_DONE_SENDER_PATTERNS.some(p => p.test(fromLower))) {
+    console.log(`[gatekeeper] Auto-done sender pattern match: ${fromEmail}`);
+    return {
+      skip_llm: true,
+      lane: 'done',
+      bucket: 'auto_handled',
+      batch_group: null,
+      classification: 'automated_notification',
+      why: 'Automated sender - no action needed',
+      confidence: 0.95
+    };
+  }
+  
+  // Check auto-done subject patterns
+  if (AUTO_DONE_SUBJECT_PATTERNS.some(p => p.test(subject))) {
+    console.log(`[gatekeeper] Auto-done subject pattern match: ${subject}`);
+    
+    let batchGroup = null;
+    let classification = 'automated_notification';
+    
+    if (/receipt|payment.*received|transaction.*confirmed/i.test(subject)) {
+      batchGroup = 'BATCH_RECEIPTS';
+      classification = 'receipt_confirmation';
+    } else if (/newsletter|digest/i.test(subject)) {
+      batchGroup = 'BATCH_NEWSLETTERS';
+      classification = 'marketing_newsletter';
+    } else if (/applied|application/i.test(subject)) {
+      batchGroup = 'BATCH_JOB_APPS';
+      classification = 'recruitment_hr';
+    }
+    
+    return {
+      skip_llm: true,
+      lane: 'done',
+      bucket: 'auto_handled',
+      batch_group: batchGroup,
+      classification,
+      why: 'Automated notification pattern - no action needed',
+      confidence: 0.92
+    };
+  }
+  
+  return null; // No gatekeeper match, proceed to LLM
+}
+
+// ============================================================
+// NORMALIZE AND VALIDATE LLM OUTPUT
+// ============================================================
+
 function normalizeTriageOutput(raw: any): any {
-  // Ensure we have a valid object
   if (!raw || typeof raw !== 'object') {
-    console.error('[triage] Invalid raw output - not an object:', typeof raw);
+    console.error('[triage] Invalid raw output - not an object');
     return null;
   }
 
-  // Normalize decision bucket with strict validation
-  const rawBucket = raw.decision?.bucket;
-  let bucket: string = 'quick_win'; // safe default
-  if (typeof rawBucket === 'string' && VALID_BUCKETS.includes(rawBucket as any)) {
-    bucket = rawBucket;
-  } else {
-    console.warn(`[triage] Invalid bucket "${rawBucket}", defaulting to quick_win`);
+  // Normalize lane (new)
+  let lane = 'review';
+  if (typeof raw.lane === 'string' && VALID_LANES.includes(raw.lane as any)) {
+    lane = raw.lane;
+  } else if (raw.decision?.bucket) {
+    // Derive from legacy bucket
+    const mapped = bucketToLane(raw.decision.bucket);
+    lane = mapped.lane;
   }
 
-  // Normalize classification category
-  const rawCategory = raw.classification?.category;
-  let category: string = 'customer_inquiry'; // safe default
-  if (typeof rawCategory === 'string' && VALID_CLASSIFICATIONS.includes(rawCategory as any)) {
-    category = rawCategory;
+  // Normalize flags (new)
+  const flags = {
+    urgent: raw.flags?.urgent === true || raw.decision?.bucket === 'act_now',
+    reply_required: raw.flags?.reply_required ?? raw.classification?.requires_reply ?? true,
+    vip: raw.flags?.vip === true,
+    first_time_sender: raw.flags?.first_time_sender === true,
+    financial: raw.flags?.financial === true,
+    risk_type: raw.flags?.risk_type || raw.risk?.level || 'none',
+  };
+
+  // Normalize evidence (new)
+  const evidence = {
+    key_quote: typeof raw.evidence?.key_quote === 'string' ? raw.evidence.key_quote : '',
+    intent: typeof raw.evidence?.intent === 'string' ? raw.evidence.intent : '',
+  };
+
+  // Normalize batch_group (new)
+  let batchGroup = null;
+  if (typeof raw.batch_group === 'string' && VALID_BATCH_GROUPS.includes(raw.batch_group as any)) {
+    batchGroup = raw.batch_group;
+  }
+
+  // Normalize legacy bucket
+  let bucket = 'quick_win';
+  if (typeof raw.decision?.bucket === 'string' && VALID_BUCKETS.includes(raw.decision.bucket as any)) {
+    bucket = raw.decision.bucket;
   } else {
-    console.warn(`[triage] Invalid classification "${rawCategory}", defaulting to customer_inquiry`);
+    // Derive from lane
+    bucket = laneToBucket(lane, flags.urgent);
+  }
+
+  // Normalize classification
+  let category = 'customer_inquiry';
+  if (typeof raw.classification?.category === 'string' && VALID_CLASSIFICATIONS.includes(raw.classification.category as any)) {
+    category = raw.classification.category;
   }
 
   // Normalize confidence
@@ -444,33 +567,31 @@ function normalizeTriageOutput(raw: any): any {
   }
 
   // Normalize requires_reply
-  let requiresReply = true;
+  let requiresReply = flags.reply_required;
   if (typeof raw.classification?.requires_reply === 'boolean') {
     requiresReply = raw.classification.requires_reply;
   }
 
   // Normalize risk level
-  const rawRiskLevel = raw.risk?.level;
   let riskLevel = 'none';
-  if (typeof rawRiskLevel === 'string' && VALID_RISK_LEVELS.includes(rawRiskLevel as any)) {
-    riskLevel = rawRiskLevel;
+  if (typeof raw.risk?.level === 'string' && VALID_RISK_LEVELS.includes(raw.risk.level as any)) {
+    riskLevel = raw.risk.level;
   }
 
-  // Normalize cognitive load
   const cognitiveLoad = raw.risk?.cognitive_load === 'high' ? 'high' : 'low';
 
   // Normalize urgency
-  const rawUrgency = raw.priority?.urgency;
+  const validUrgencies = ['high', 'medium', 'low'];
   let urgency = 'medium';
-  if (typeof rawUrgency === 'string' && VALID_URGENCIES.includes(rawUrgency as any)) {
-    urgency = rawUrgency;
+  if (typeof raw.priority?.urgency === 'string' && validUrgencies.includes(raw.priority.urgency)) {
+    urgency = raw.priority.urgency;
   }
 
   // Normalize sentiment
-  const rawSentiment = raw.sentiment?.tone;
+  const validSentiments = ['angry', 'frustrated', 'concerned', 'neutral', 'positive'];
   let sentiment = 'neutral';
-  if (typeof rawSentiment === 'string' && VALID_SENTIMENTS.includes(rawSentiment as any)) {
-    sentiment = rawSentiment;
+  if (typeof raw.sentiment?.tone === 'string' && validSentiments.includes(raw.sentiment.tone)) {
+    sentiment = raw.sentiment.tone;
   }
 
   // Normalize why_this_needs_you
@@ -488,11 +609,13 @@ function normalizeTriageOutput(raw: any): any {
       : [];
   }
 
-  // Normalize entities
   const entities = raw.entities && typeof raw.entities === 'object' ? raw.entities : {};
 
-  // Return normalized result
   return {
+    lane,
+    flags,
+    evidence,
+    batch_group: batchGroup,
     decision: {
       bucket,
       why_this_needs_you: whyThisNeedsYou,
@@ -520,58 +643,153 @@ function normalizeTriageOutput(raw: any): any {
   };
 }
 
-// LLM Output Validator - catches invalid/conflicting outputs
 function validateTriageResult(result: any): { valid: boolean; issues: string[] } {
   const issues: string[] = [];
   
-  if (!result?.decision?.bucket) {
-    issues.push('Missing decision bucket');
-    return { valid: false, issues };
+  if (!result?.lane) {
+    issues.push('Missing lane');
   }
 
-  // Rule 1: AUTO_HANDLED cannot require reply
-  if (result.decision.bucket === 'auto_handled' && result.classification?.requires_reply) {
+  // Rule 1: DONE lane cannot require reply
+  if (result.lane === 'done' && result.flags?.reply_required) {
+    issues.push('DONE + reply_required conflict');
+  }
+
+  // Rule 2: DONE lane cannot have suggested_reply
+  if (result.lane === 'done' && result.suggested_reply && result.suggested_reply.length > 0) {
+    issues.push('DONE + suggested_reply conflict');
+  }
+
+  // Rule 3: AUTO_HANDLED cannot require reply (legacy)
+  if (result.decision?.bucket === 'auto_handled' && result.classification?.requires_reply) {
     issues.push('AUTO_HANDLED + requires_reply conflict');
   }
-  
-  // Rule 2: why_this_needs_you must be specific (not generic)
+
+  // Rule 4: why_this_needs_you must be specific
   const genericPhrases = ['needs a response', 'requires attention', 'action needed', 'needs human'];
-  const why = result.decision.why_this_needs_you?.toLowerCase() || '';
+  const why = result.decision?.why_this_needs_you?.toLowerCase() || '';
   if (genericPhrases.some(p => why.includes(p)) && why.length < 30) {
     issues.push('Generic why_this_needs_you');
   }
-  
-  // Rule 3: Empty why_this_needs_you is invalid
-  if (!result.decision.why_this_needs_you || result.decision.why_this_needs_you.length < 5) {
+
+  // Rule 5: Empty why_this_needs_you is invalid
+  if (!result.decision?.why_this_needs_you || result.decision.why_this_needs_you.length < 5) {
     issues.push('Empty or too short why_this_needs_you');
   }
-  
-  // Rule 4: High-risk categories cannot have no risk
-  const highRiskCategories = ['supplier_invoice', 'customer_complaint', 'supplier_urgent'];
-  if (highRiskCategories.includes(result.classification?.category) && result.risk?.level === 'none') {
-    issues.push('High-risk category with no risk assessment');
-  }
 
-  // Rule 5: WAIT bucket should be rare - flag if confidence is high
-  if (result.decision.bucket === 'wait' && result.decision.confidence > 0.9) {
-    issues.push('WAIT with very high confidence - likely should be AUTO_HANDLED');
-  }
-
-  // Rule 6: Misdirected emails should be quick_win with requires_reply
+  // Rule 6: Misdirected should be to_reply with reply_required
   if (result.classification?.category === 'misdirected') {
-    if (result.decision.bucket !== 'quick_win') {
-      issues.push('Misdirected should be quick_win');
+    if (result.lane !== 'to_reply') {
+      issues.push('Misdirected should be to_reply');
     }
-    if (!result.classification?.requires_reply) {
+    if (!result.flags?.reply_required) {
       issues.push('Misdirected should require reply');
     }
   }
 
-  // Rule 7: supplier_invoice should not be spam_phishing
-  // This is a guardrail against LLM misclassification
-  
   return { valid: issues.length === 0, issues };
 }
+
+// ============================================================
+// PROMPT LOADING
+// ============================================================
+
+async function getTriagePrompt(supabase: any, workspaceId?: string): Promise<{ prompt: string; model: string }> {
+  try {
+    if (workspaceId) {
+      const { data: wsPrompt } = await supabase
+        .from('system_prompts')
+        .select('prompt, model')
+        .eq('agent_type', 'triage')
+        .eq('workspace_id', workspaceId)
+        .eq('is_active', true)
+        .eq('is_default', true)
+        .single();
+      
+      if (wsPrompt?.prompt) {
+        console.log('[triage] Using workspace-specific prompt');
+        return { prompt: wsPrompt.prompt, model: wsPrompt.model || 'claude-3-5-haiku-20241022' };
+      }
+    }
+
+    const { data: globalPrompt } = await supabase
+      .from('system_prompts')
+      .select('prompt, model')
+      .eq('agent_type', 'triage')
+      .is('workspace_id', null)
+      .eq('is_active', true)
+      .eq('is_default', true)
+      .single();
+
+    if (globalPrompt?.prompt) {
+      console.log('[triage] Using global default prompt');
+      return { prompt: globalPrompt.prompt, model: globalPrompt.model || 'claude-3-5-haiku-20241022' };
+    }
+  } catch (error) {
+    console.error('[triage] Error fetching prompt:', error);
+  }
+
+  console.log('[triage] Using hardcoded fallback prompt');
+  return { prompt: DEFAULT_TRIAGE_PROMPT, model: 'claude-3-5-haiku-20241022' };
+}
+
+// ============================================================
+// BUSINESS CONTEXT INJECTION
+// ============================================================
+
+async function buildBusinessContext(supabase: any, workspaceId: string, existingContext: any): Promise<string> {
+  let contextPrompt = '';
+  
+  try {
+    // Fetch workspace settings
+    const { data: workspace } = await supabase
+      .from('workspaces')
+      .select('business_type, core_services, vip_domains, hiring_mode, name')
+      .eq('id', workspaceId)
+      .single();
+    
+    if (workspace) {
+      contextPrompt += `\n\n## BUSINESS CONTEXT (Injected)`;
+      if (workspace.name) contextPrompt += `\nBusiness: ${workspace.name}`;
+      if (workspace.business_type) contextPrompt += `\nType: ${workspace.business_type}`;
+      if (workspace.core_services?.length) contextPrompt += `\nServices: ${workspace.core_services.join(', ')}`;
+      if (workspace.hiring_mode) contextPrompt += `\n⚠️ Currently hiring - job applications → REVIEW`;
+      if (workspace.vip_domains?.length) contextPrompt += `\nVIP Domains: ${workspace.vip_domains.join(', ')}`;
+    }
+    
+    // Fetch business facts for additional context
+    const { data: facts } = await supabase
+      .from('business_facts')
+      .select('category, fact_key, fact_value')
+      .eq('workspace_id', workspaceId)
+      .limit(20);
+    
+    if (facts?.length) {
+      const services = facts.filter((f: any) => f.category === 'services').map((f: any) => f.fact_value);
+      const coverage = facts.filter((f: any) => f.category === 'coverage').map((f: any) => f.fact_value);
+      
+      if (services.length) contextPrompt += `\nOffered services: ${services.join(', ')}`;
+      if (coverage.length) contextPrompt += `\nService areas: ${coverage.join(', ')}`;
+    }
+    
+    // Add existing context overrides
+    if (existingContext?.is_hiring) {
+      contextPrompt += '\n⚠️ Currently hiring - job applications may need attention';
+    }
+    if (existingContext?.active_dispute) {
+      contextPrompt += '\n⚠️ Active payment dispute - payment processor emails = urgent';
+    }
+    
+  } catch (error) {
+    console.error('[triage] Error building business context:', error);
+  }
+  
+  return contextPrompt;
+}
+
+// ============================================================
+// MAIN HANDLER
+// ============================================================
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -579,175 +797,122 @@ serve(async (req) => {
   }
 
   const startTime = Date.now();
-  const MAX_RETRIES = 1;
-
-  // Helper to safely extract email string from various formats
-  const extractEmailString = (emailValue: unknown): string => {
-    if (typeof emailValue === 'string') {
-      return emailValue;
-    }
-    if (emailValue && typeof emailValue === 'object') {
-      // Handle object formats like { email: "...", name: "..." } or { address: "..." }
-      const obj = emailValue as Record<string, unknown>;
-      return String(obj.email || obj.address || obj.value || 'unknown@unknown.com');
-    }
-    return 'unknown@unknown.com';
-  };
 
   try {
     const request: TriageRequest = await req.json();
     const { email, workspace_id, business_context, sender_rule, sender_behaviour, pre_triage_hints } = request;
 
-    // Normalize the from_email to always be a string
     const fromEmailString = extractEmailString(email.from_email);
+    const senderDomain = getSenderDomain(fromEmailString);
 
-    console.log('Decision router processing email from:', fromEmailString, 'subject:', email.subject);
+    console.log(`[triage] Processing: ${fromEmailString} | Subject: ${email.subject}`);
 
-    // Fetch business context from database if not provided
-    let enrichedBusinessContext: any = business_context || {};
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabaseClient = createClient(supabaseUrl, supabaseKey);
+    const supabase = createClient(supabaseUrl, supabaseKey);
 
-    if (workspace_id) {
-      const { data: dbContext } = await supabaseClient
-        .from('business_context')
-        .select('*')
-        .eq('workspace_id', workspace_id)
-        .single();
-
-      if (dbContext) {
-        const customFlags = dbContext.custom_flags as Record<string, any> || {};
-        enrichedBusinessContext = {
-          ...enrichedBusinessContext,
-          is_hiring: dbContext.is_hiring || enrichedBusinessContext.is_hiring,
-          active_dispute: dbContext.active_stripe_case || enrichedBusinessContext.active_dispute,
-          company_name: customFlags.company_name || '',
-          email_domain: customFlags.email_domain || '',
-          receives_invoices: customFlags.receives_invoices ?? true,
-          business_type: customFlags.business_type || '',
-        };
-        console.log('Loaded business context:', enrichedBusinessContext);
-      }
-    }
-
-    // If sender rule exists, apply it directly with decision bucket mapping
-    if (sender_rule) {
-      const classification = sender_rule.override_classification || sender_rule.default_classification;
-      const requires_reply = sender_rule.override_requires_reply ?? sender_rule.default_requires_reply;
+    // ============================================================
+    // STEP 1: Check sender rule (deterministic override)
+    // ============================================================
+    if (sender_rule?.skip_llm) {
+      const lane = sender_rule.default_lane || (sender_rule.default_requires_reply ? 'to_reply' : 'done');
+      const bucket = sender_rule.default_requires_reply ? 'quick_win' : 'auto_handled';
       
-      // Map classification to decision bucket
-      const bucket = requires_reply ? 'quick_win' : 'auto_handled';
-      const why_this_needs_you = requires_reply 
-        ? 'Matched sender rule - review needed' 
-        : 'Matched sender rule - no action needed';
-      
-      console.log('Applying sender rule:', classification, 'bucket:', bucket);
+      console.log(`[triage] Sender rule skip_llm: ${lane}`);
       
       return new Response(JSON.stringify({
+        lane,
+        flags: { urgent: false, reply_required: sender_rule.default_requires_reply, financial: false, risk_type: 'none' },
+        evidence: { key_quote: 'Matched sender rule', intent: 'Known pattern' },
+        batch_group: null,
         decision: {
           bucket,
-          why_this_needs_you,
+          why_this_needs_you: `Sender rule: ${sender_rule.default_classification}`,
           confidence: 0.99
         },
-        risk: {
-          level: 'none',
-          cognitive_load: 'low'
-        },
+        risk: { level: 'none', cognitive_load: 'low' },
         classification: {
-          category: classification,
-          requires_reply: requires_reply
+          category: sender_rule.override_classification || sender_rule.default_classification,
+          requires_reply: sender_rule.default_requires_reply
         },
-        priority: {
-          urgency: requires_reply ? 'medium' : 'low',
-          urgency_reason: 'Classified by sender rule'
-        },
-        sentiment: {
-          tone: 'neutral'
-        },
+        priority: { urgency: 'low', urgency_reason: 'Sender rule applied' },
+        sentiment: { tone: 'neutral' },
         entities: {},
-        summary: {
-          one_line: `Email from ${email.from_email} - classified by sender rule`,
-          key_points: ['Matched sender rule pattern']
-        },
-        reasoning: `Classified by sender rule as ${classification}`,
+        summary: { one_line: `${senderDomain} - sender rule applied`, key_points: [] },
+        suggested_reply: null,
+        reasoning: 'Deterministic sender rule match',
         applied_rule: true,
         processing_time_ms: Date.now() - startTime
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Build context-aware prompt with company identity
-    let contextualPrompt = '';
+    // ============================================================
+    // STEP 2: Deterministic gatekeeper (skip LLM for known patterns)
+    // ============================================================
+    const gatekeeperResult = checkGatekeeper(fromEmailString, email.subject);
     
-    // Add company identity if available
-    if (enrichedBusinessContext.company_name || enrichedBusinessContext.email_domain) {
-      contextualPrompt += `\n\nCOMPANY IDENTITY:
-- Your company name: ${enrichedBusinessContext.company_name || 'Unknown'}
-- Your email domain: ${enrichedBusinessContext.email_domain || 'Unknown'}
-- Business type: ${enrichedBusinessContext.business_type || 'Service business'}
-- You ${enrichedBusinessContext.receives_invoices ? 'RECEIVE' : 'do NOT receive'} invoices from suppliers
-
-INVOICE CLASSIFICATION RULES (IMPORTANT):
-- If an email is an invoice/bill AND it was sent to your email/domain (${enrichedBusinessContext.email_domain || 'your domain'}), assume it is a legitimate invoice TO you unless the invoice explicitly shows a different recipient.
-- supplier_invoice = invoices/bills that you (the business) may need to pay (even if the supplier name is different from your company name).
-- receipt_confirmation = confirmations/receipts for payments already made or invoices you already SENT to customers.
-- misdirected = ONLY when the invoice explicitly names a different recipient company/person in "Bill to / Customer / Account" AND does NOT mention ${enrichedBusinessContext.company_name || 'your company'} anywhere.
-- If unsure between supplier_invoice and misdirected, prefer supplier_invoice and set bucket=quick_win (so the owner can quickly verify).`;
+    if (gatekeeperResult?.skip_llm) {
+      console.log(`[triage] Gatekeeper match: ${gatekeeperResult.why}`);
+      
+      return new Response(JSON.stringify({
+        lane: gatekeeperResult.lane,
+        flags: { 
+          urgent: false, 
+          reply_required: false, 
+          financial: gatekeeperResult.classification === 'receipt_confirmation',
+          risk_type: 'none'
+        },
+        evidence: { key_quote: `From ${senderDomain}`, intent: 'Automated notification' },
+        batch_group: gatekeeperResult.batch_group,
+        decision: {
+          bucket: gatekeeperResult.bucket,
+          why_this_needs_you: gatekeeperResult.why,
+          confidence: gatekeeperResult.confidence
+        },
+        risk: { level: 'none', cognitive_load: 'low' },
+        classification: {
+          category: gatekeeperResult.classification,
+          requires_reply: false
+        },
+        priority: { urgency: 'low', urgency_reason: 'Automated system' },
+        sentiment: { tone: 'neutral' },
+        entities: {},
+        summary: { one_line: gatekeeperResult.why, key_points: [] },
+        suggested_reply: null, // HARD RULE: DONE never has suggested_reply
+        reasoning: 'Deterministic gatekeeper match',
+        gatekeeper_match: true,
+        processing_time_ms: Date.now() - startTime
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    if (enrichedBusinessContext.is_hiring) {
-      contextualPrompt += '\n\nCONTEXT: The business is currently hiring. Job applications should go to WAIT bucket unless urgent.';
-    }
-    if (enrichedBusinessContext.active_dispute) {
-      contextualPrompt += '\n\nCONTEXT: There is an active payment dispute. Payment processor emails = ACT_NOW with financial risk.';
-    }
-    if (enrichedBusinessContext.vip_domains && enrichedBusinessContext.vip_domains.length > 0) {
-      const senderDomain = fromEmailString.split('@')[1]?.toLowerCase();
-      if (enrichedBusinessContext.vip_domains.includes(senderDomain)) {
-        contextualPrompt += '\n\nCONTEXT: This sender is from a VIP customer domain. Treat as ACT_NOW with retention risk.';
-      }
-    }
-
-    // Add sender behaviour priors for personalization
+    // ============================================================
+    // STEP 3: Build context and call LLM
+    // ============================================================
+    const businessContextPrompt = await buildBusinessContext(supabase, workspace_id, business_context);
+    
+    // Add sender behaviour context
+    let senderContextPrompt = '';
     if (sender_behaviour) {
-      const { reply_rate, ignored_rate, vip_score, suggested_bucket } = sender_behaviour;
-      contextualPrompt += '\n\nSENDER HISTORY:';
-      if (reply_rate !== undefined) {
-        contextualPrompt += `\n- This sender's emails are replied to ${Math.round((reply_rate || 0) * 100)}% of the time.`;
-        if (reply_rate > 0.8) {
-          contextualPrompt += ' (High engagement - consider QUICK_WIN or ACT_NOW)';
-        } else if (reply_rate < 0.2) {
-          contextualPrompt += ' (Usually ignored - consider AUTO_HANDLED)';
-        }
+      senderContextPrompt = '\n\n## SENDER HISTORY';
+      if (sender_behaviour.reply_rate !== undefined) {
+        senderContextPrompt += `\n- Reply rate: ${Math.round((sender_behaviour.reply_rate || 0) * 100)}%`;
+        if (sender_behaviour.reply_rate > 0.8) senderContextPrompt += ' (high engagement)';
+        else if (sender_behaviour.reply_rate < 0.2) senderContextPrompt += ' (usually ignored)';
       }
-      if (vip_score !== undefined && vip_score > 50) {
-        contextualPrompt += `\n- VIP Score: ${vip_score}/100 - treat as important.`;
-      }
-      if (suggested_bucket) {
-        contextualPrompt += `\n- Historical suggestion: ${suggested_bucket}`;
+      if (sender_behaviour.vip_score && sender_behaviour.vip_score > 50) {
+        senderContextPrompt += `\n- VIP Score: ${sender_behaviour.vip_score}/100`;
       }
     }
 
-    // Add pre-triage hints if available
-    if (pre_triage_hints?.likely_bucket) {
-      contextualPrompt += `\n\nPRE-TRIAGE HINT: Pattern matching suggests "${pre_triage_hints.likely_bucket}" bucket. Validate with content analysis.`;
+    // Add VIP domain check
+    if (business_context?.vip_domains?.includes(senderDomain)) {
+      senderContextPrompt += '\n⚠️ VIP DOMAIN - prioritize this sender';
     }
-
-    const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
-    if (!ANTHROPIC_API_KEY) {
-      throw new Error('ANTHROPIC_API_KEY not configured');
-    }
-
-    const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
-    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
     const { prompt: triagePrompt, model: triageModel } = await getTriagePrompt(supabase, workspace_id);
 
     const emailContent = `
-FROM: ${email.from_name} <${email.from_email}>
+FROM: ${email.from_name} <${fromEmailString}>
 TO: ${email.to_email || 'Unknown'}
 SUBJECT: ${email.subject}
 
@@ -755,7 +920,10 @@ BODY:
 ${email.body.substring(0, 5000)}
 `;
 
-    console.log('Calling Claude with decision router tool...');
+    const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
+    if (!ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY not configured');
+
+    console.log('[triage] Calling Claude...');
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -767,250 +935,187 @@ ${email.body.substring(0, 5000)}
       body: JSON.stringify({
         model: triageModel,
         max_tokens: 1024,
-        system: triagePrompt + contextualPrompt,
+        system: triagePrompt + businessContextPrompt + senderContextPrompt,
         tools: [DECISION_ROUTER_TOOL],
         tool_choice: { type: 'tool', name: 'route_email' },
-        messages: [
-          {
-            role: 'user',
-            content: `Route this email to the appropriate decision bucket:\n\n${emailContent}`
-          }
-        ]
+        messages: [{ role: 'user', content: `Route this email:\n\n${emailContent}` }]
       })
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Claude API error:', response.status, errorText);
+      console.error('[triage] Claude API error:', response.status, errorText);
       throw new Error(`Claude API error: ${response.status}`);
     }
 
     const result = await response.json();
-    console.log('Claude decision response received');
-
     const toolUse = result.content?.find((c: any) => c.type === 'tool_use');
+    
     if (!toolUse || toolUse.name !== 'route_email') {
-      console.error('No valid tool use in response');
-      // Safe default: ACT_NOW when uncertain
+      console.error('[triage] No valid tool use in response');
+      // Safe default: REVIEW when uncertain
       return new Response(JSON.stringify({
-        decision: {
-          bucket: 'act_now',
-          why_this_needs_you: 'Could not auto-classify - needs review',
-          confidence: 0.3
-        },
-        risk: {
-          level: 'none',
-          cognitive_load: 'high'
-        },
-        classification: {
-          category: 'customer_inquiry',
-          requires_reply: true
-        },
-        priority: {
-          urgency: 'medium',
-          urgency_reason: 'Could not classify - defaulting to medium'
-        },
-        sentiment: {
-          tone: 'neutral'
-        },
+        lane: 'review',
+        flags: { urgent: false, reply_required: true, risk_type: 'none' },
+        evidence: { key_quote: '', intent: 'Unknown' },
+        batch_group: null,
+        decision: { bucket: 'quick_win', why_this_needs_you: 'Could not auto-classify - needs review', confidence: 0.3 },
+        risk: { level: 'none', cognitive_load: 'high' },
+        classification: { category: 'customer_inquiry', requires_reply: true },
+        priority: { urgency: 'medium', urgency_reason: 'Classification failed' },
+        sentiment: { tone: 'neutral' },
         entities: {},
-        summary: {
-          one_line: email.subject,
-          key_points: []
-        },
+        summary: { one_line: email.subject, key_points: [] },
         reasoning: 'Classification failed - requires manual review',
         needs_human_review: true,
         processing_time_ms: Date.now() - startTime
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // STRICT NORMALIZATION: Ensure valid output structure before any processing
+    // ============================================================
+    // STEP 4: Normalize and validate output
+    // ============================================================
     let routeResult = normalizeTriageOutput(toolUse.input);
     
     if (!routeResult) {
-      console.error('[triage] Failed to normalize output, using safe default');
+      console.error('[triage] Failed to normalize output');
       return new Response(JSON.stringify({
-        decision: {
-          bucket: 'quick_win',
-          why_this_needs_you: 'Could not parse model output - needs review',
-          confidence: 0.3
-        },
-        risk: {
-          level: 'none',
-          cognitive_load: 'high'
-        },
-        classification: {
-          category: 'customer_inquiry',
-          requires_reply: true
-        },
-        priority: {
-          urgency: 'medium',
-          urgency_reason: 'Parse failed - defaulting to medium'
-        },
-        sentiment: {
-          tone: 'neutral'
-        },
+        lane: 'review',
+        flags: { urgent: false, reply_required: true, risk_type: 'none' },
+        evidence: { key_quote: '', intent: '' },
+        batch_group: null,
+        decision: { bucket: 'quick_win', why_this_needs_you: 'Parse error - needs review', confidence: 0.3 },
+        risk: { level: 'none', cognitive_load: 'high' },
+        classification: { category: 'customer_inquiry', requires_reply: true },
+        priority: { urgency: 'medium', urgency_reason: 'Parse failed' },
+        sentiment: { tone: 'neutral' },
         entities: {},
-        summary: {
-          one_line: email.subject,
-          key_points: []
-        },
-        reasoning: 'Normalization failed - requires manual review',
+        summary: { one_line: email.subject, key_points: [] },
+        reasoning: 'Normalization failed',
         needs_human_review: true,
         processing_time_ms: Date.now() - startTime
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    const processingTime = Date.now() - startTime;
-
-    console.log('Normalized decision routing:', {
-      bucket: routeResult.decision.bucket,
-      why_this_needs_you: routeResult.decision.why_this_needs_you,
-      confidence: routeResult.decision.confidence,
-      classification: routeResult.classification.category,
-    });
-
-    // ============================================================
-    // VALIDATION + AUTO-CORRECTION: Fix conflicting outputs
-    // ============================================================
     const validation = validateTriageResult(routeResult);
     
+    // ============================================================
+    // STEP 5: Apply auto-corrections
+    // ============================================================
     if (!validation.valid) {
       console.log('[triage] Validation issues:', validation.issues);
       
-      // Auto-correct: AUTO_HANDLED + requires_reply conflict
+      // DONE + reply_required conflict
+      if (validation.issues.includes('DONE + reply_required conflict')) {
+        routeResult.lane = 'to_reply';
+        routeResult.decision.bucket = 'quick_win';
+        routeResult.flags.reply_required = true;
+        console.log('[triage] Corrected: DONE → TO_REPLY (reply needed)');
+      }
+      
+      // DONE + suggested_reply conflict
+      if (validation.issues.includes('DONE + suggested_reply conflict')) {
+        routeResult.suggested_reply = null;
+        console.log('[triage] Corrected: Cleared suggested_reply for DONE');
+      }
+      
+      // AUTO_HANDLED + requires_reply conflict
       if (validation.issues.includes('AUTO_HANDLED + requires_reply conflict')) {
         routeResult.decision.bucket = 'quick_win';
-        routeResult.decision.why_this_needs_you = routeResult.decision.why_this_needs_you || 'Needs simple reply';
-        console.log('[triage] Auto-corrected: AUTO_HANDLED → QUICK_WIN');
+        routeResult.lane = 'to_reply';
+        console.log('[triage] Corrected: AUTO_HANDLED → QUICK_WIN');
       }
       
-      // Auto-correct: Misdirected should be quick_win with requires_reply
-      if (validation.issues.includes('Misdirected should be quick_win')) {
+      // Misdirected corrections
+      if (validation.issues.includes('Misdirected should be to_reply')) {
+        routeResult.lane = 'to_reply';
         routeResult.decision.bucket = 'quick_win';
-        console.log('[triage] Auto-corrected: misdirected → quick_win bucket');
       }
       if (validation.issues.includes('Misdirected should require reply')) {
+        routeResult.flags.reply_required = true;
         routeResult.classification.requires_reply = true;
-        console.log('[triage] Auto-corrected: misdirected → requires_reply=true');
       }
       
-      // Auto-correct: Generic/empty why_this_needs_you
+      // Generic why_this_needs_you
       if (validation.issues.includes('Generic why_this_needs_you') || validation.issues.includes('Empty or too short why_this_needs_you')) {
-        const bucket = routeResult.decision.bucket;
+        const lane = routeResult.lane;
         const category = routeResult.classification.category;
-        
         const betterWhys: Record<string, string> = {
-          'act_now': `Urgent ${category.replace(/_/g, ' ')} - review needed`,
-          'quick_win': `Quick ${category.replace(/_/g, ' ')} - template reply likely`,
-          'auto_handled': `Automated ${category.replace(/_/g, ' ')} - no action needed`,
-          'wait': `Deferred ${category.replace(/_/g, ' ')} - check back later`,
+          'to_reply': `${category.replace(/_/g, ' ')} - reply needed`,
+          'review': `${category.replace(/_/g, ' ')} - needs review`,
+          'done': `${category.replace(/_/g, ' ')} - no action needed`,
+          'snoozed': `${category.replace(/_/g, ' ')} - follow up later`,
         };
-        
-        routeResult.decision.why_this_needs_you = betterWhys[bucket] || `${category.replace(/_/g, ' ')} - review`;
-        console.log('[triage] Auto-corrected why_this_needs_you:', routeResult.decision.why_this_needs_you);
-      }
-      
-      // Auto-correct: High confidence WAIT should be AUTO_HANDLED
-      if (validation.issues.includes('WAIT with very high confidence - likely should be AUTO_HANDLED')) {
-        if (!routeResult.classification.requires_reply) {
-          routeResult.decision.bucket = 'auto_handled';
-          routeResult.decision.why_this_needs_you = 'No action required - informational only';
-          console.log('[triage] Auto-corrected: WAIT → AUTO_HANDLED');
-        }
+        routeResult.decision.why_this_needs_you = betterWhys[lane] || `${category.replace(/_/g, ' ')}`;
       }
     }
 
-    // Apply confidence-based overrides
+    // ============================================================
+    // STEP 6: Apply confidence-based routing (THE FIX!)
+    // ============================================================
     const confidence = routeResult.decision.confidence;
     
-    // Low confidence = force to ACT_NOW for safety
-    if (confidence < 0.7 && routeResult.decision.bucket !== 'act_now') {
-      console.log('Low confidence override: moving to act_now');
-      routeResult.decision.bucket = 'act_now';
-      routeResult.decision.why_this_needs_you = `Low confidence (${Math.round(confidence * 100)}%) - needs review`;
-      routeResult.risk.cognitive_load = 'high';
+    // LOW CONFIDENCE → REVIEW (NOT ACT_NOW!)
+    // This is the critical fix from the architectural recommendations
+    if (confidence < 0.80) {
+      console.log(`[triage] Low confidence (${Math.round(confidence * 100)}%) → REVIEW (not urgent)`);
+      routeResult.lane = 'review';
+      routeResult.flags.urgent = false; // NOT urgent, just uncertain
+      routeResult.flags.first_time_sender = true;
+      routeResult.decision.bucket = 'quick_win'; // Shows in review queue
+      routeResult.decision.why_this_needs_you = `Low confidence (${Math.round(confidence * 100)}%) - teach me`;
     }
     
-    // Very high confidence auto_handled can stay
-    // Medium confidence quick_win should have suggested reply
-    if (routeResult.decision.bucket === 'quick_win' && !routeResult.suggested_reply) {
-      routeResult.decision.bucket = 'act_now';
-      routeResult.decision.why_this_needs_you = 'No quick reply available - needs attention';
+    // HARD RULE: DONE lane never has suggested_reply
+    if (routeResult.lane === 'done' || routeResult.decision.bucket === 'auto_handled') {
+      routeResult.suggested_reply = null;
+      routeResult.flags.reply_required = false;
+      routeResult.classification.requires_reply = false;
     }
 
-    // Determine if this needs review (for reconciliation flow)
-    const senderDomain = fromEmailString.split('@')[1]?.toLowerCase();
+    // Determine if this needs review
     const needsReview = 
-      // Low-medium confidence (< 85%)
-      (routeResult.decision.confidence < 0.85 && routeResult.decision.bucket !== 'auto_handled') ||
-      // First-time sender domain (no prior history)
-      (!sender_behaviour && !sender_rule) ||
-      // Low confidence even for auto_handled
-      (routeResult.decision.bucket === 'auto_handled' && routeResult.decision.confidence < 0.9);
+      routeResult.lane === 'review' ||
+      (routeResult.decision.confidence < 0.85 && routeResult.lane !== 'done') ||
+      (!sender_behaviour && !sender_rule); // First-time sender
 
-    console.log('Final decision:', {
+    console.log('[triage] Final decision:', {
+      lane: routeResult.lane,
       bucket: routeResult.decision.bucket,
-      why_this_needs_you: routeResult.decision.why_this_needs_you,
       confidence: routeResult.decision.confidence,
-      risk_level: routeResult.risk?.level,
-      category: routeResult.classification?.category,
+      why: routeResult.decision.why_this_needs_you,
+      batch_group: routeResult.batch_group,
       needs_review: needsReview,
-      processing_time_ms: processingTime,
-      validation_issues: validation.issues,
     });
 
     return new Response(JSON.stringify({
       ...routeResult,
       needs_review: needsReview,
       validation_issues: validation.issues.length > 0 ? validation.issues : undefined,
-      processing_time_ms: processingTime
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+      processing_time_ms: Date.now() - startTime
+    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error('Error in email-triage-agent:', error);
+    console.error('[triage] Error:', error);
     
-    // Safe default on error: ACT_NOW
+    // Safe default: REVIEW (not ACT_NOW) on error
     return new Response(JSON.stringify({
-      decision: {
-        bucket: 'act_now',
-        why_this_needs_you: 'System error - needs manual review',
-        confidence: 0
-      },
-      risk: {
-        level: 'none',
-        cognitive_load: 'high'
-      },
-      classification: {
-        category: 'customer_inquiry',
-        requires_reply: true
-      },
-      priority: {
-        urgency: 'high',
-        urgency_reason: 'Classification error - requires immediate review'
-      },
-      sentiment: {
-        tone: 'neutral'
-      },
+      lane: 'review',
+      flags: { urgent: false, reply_required: true, risk_type: 'none' },
+      evidence: { key_quote: '', intent: '' },
+      batch_group: null,
+      decision: { bucket: 'quick_win', why_this_needs_you: 'System error - needs review', confidence: 0 },
+      risk: { level: 'none', cognitive_load: 'high' },
+      classification: { category: 'customer_inquiry', requires_reply: true },
+      priority: { urgency: 'medium', urgency_reason: 'Error during classification' },
+      sentiment: { tone: 'neutral' },
       entities: {},
-      summary: {
-        one_line: 'Classification failed',
-        key_points: []
-      },
-      reasoning: `Error during classification: ${errorMessage}`,
+      summary: { one_line: 'Classification failed', key_points: [] },
+      reasoning: `Error: ${errorMessage}`,
       needs_human_review: true,
       error: errorMessage,
       processing_time_ms: Date.now()
-    }), {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+    }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 });
