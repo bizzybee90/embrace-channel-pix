@@ -250,7 +250,7 @@ function validateClassification(category: unknown): string {
   const validCategories = [
     'customer_inquiry', 'customer_complaint', 'customer_feedback',
     'lead_new', 'lead_followup', 'supplier_invoice', 'supplier_urgent', 'partner_request',
-    'automated_notification', 'receipt_confirmation', 'payment_confirmation', 'marketing_newsletter',
+    'automated_notification', 'receipt_confirmation', 'payment_confirmation', 'payment_promise', 'marketing_newsletter',
     'spam_phishing', 'recruitment_hr', 'internal_system', 'informational_only',
     'booking_request', 'quote_request', 'cancellation_request', 'reschedule_request',
     'misdirected'

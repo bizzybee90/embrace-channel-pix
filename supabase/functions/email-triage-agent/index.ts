@@ -134,10 +134,17 @@ Instead of generic "customer_inquiry", prefer these specific categories:
 - Suggestions for improvement (non-complaints)
 
 **payment_confirmation** - Use for:
-- Customer saying "I've paid"
+- Customer saying "I've paid" (past tense, done)
 - "Payment sent" from customer
 - Balance inquiries from customers
 → Different from receipt_confirmation (which is from payment processors)
+
+**payment_promise** - Use for:
+- Customer saying "I'll pay on Friday" or "will pay soon"
+- Promises or commitments to pay in the future
+- "I'll sort it out next week" type messages
+→ Different from payment_confirmation (which is for completed payments)
+→ Bucket: WAIT (follow up needed to confirm payment was made)
 
 ### MARKETING vs LEGITIMATE BUSINESS
 
@@ -278,12 +285,12 @@ const DECISION_ROUTER_TOOL = {
             enum: [
               "customer_inquiry", "customer_complaint", "customer_feedback",
               "lead_new", "lead_followup", "supplier_invoice", "supplier_urgent", "partner_request",
-              "automated_notification", "receipt_confirmation", "payment_confirmation", "marketing_newsletter",
+              "automated_notification", "receipt_confirmation", "payment_confirmation", "payment_promise", "marketing_newsletter",
               "spam_phishing", "recruitment_hr", "internal_system", "informational_only",
               "booking_request", "quote_request", "cancellation_request", "reschedule_request",
               "misdirected"
             ],
-            description: "The classification category. Be specific: use booking_request, quote_request, cancellation_request, reschedule_request instead of generic customer_inquiry when applicable. Use 'misdirected' for emails clearly intended for a different person or company."
+            description: "The classification category. Be specific: use payment_promise for future payment commitments vs payment_confirmation for completed payments. Use booking_request, quote_request, cancellation_request, reschedule_request instead of generic customer_inquiry when applicable."
           },
           requires_reply: {
             type: "boolean",
@@ -395,7 +402,7 @@ const VALID_BUCKETS = ['act_now', 'quick_win', 'auto_handled', 'wait'] as const;
 const VALID_CLASSIFICATIONS = [
   'customer_inquiry', 'customer_complaint', 'customer_feedback',
   'lead_new', 'lead_followup', 'supplier_invoice', 'supplier_urgent', 'partner_request',
-  'automated_notification', 'receipt_confirmation', 'payment_confirmation', 'marketing_newsletter',
+  'automated_notification', 'receipt_confirmation', 'payment_confirmation', 'payment_promise', 'marketing_newsletter',
   'spam_phishing', 'recruitment_hr', 'internal_system', 'informational_only',
   'booking_request', 'quote_request', 'cancellation_request', 'reschedule_request',
   'misdirected'

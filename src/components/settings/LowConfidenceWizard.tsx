@@ -211,7 +211,13 @@ export function LowConfidenceWizard() {
     return 'text-red-600';
   };
 
-  const changedResults = results.filter(r => r.status === 'success');
+  // Filter results: only show as "Updated" if the CLASSIFICATION actually changed
+  const classificationChangedResults = results.filter(r => 
+    r.status === 'success' && r.originalClassification !== r.newClassification
+  );
+  const bucketOnlyChangedResults = results.filter(r => 
+    r.status === 'success' && r.originalClassification === r.newClassification
+  );
   const unchangedResults = results.filter(r => r.status === 'unchanged');
   const errorResults = results.filter(r => r.status === 'error');
 
@@ -337,10 +343,14 @@ export function LowConfidenceWizard() {
 
         {step === 'review' && (
           <div className="space-y-4">
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-4 gap-3">
               <div className="bg-green-500/10 rounded-lg p-3 text-center border border-green-500/20">
-                <p className="text-2xl font-bold text-green-600">{changedResults.length}</p>
-                <p className="text-xs text-muted-foreground">Updated</p>
+                <p className="text-2xl font-bold text-green-600">{classificationChangedResults.length}</p>
+                <p className="text-xs text-muted-foreground">Reclassified</p>
+              </div>
+              <div className="bg-blue-500/10 rounded-lg p-3 text-center border border-blue-500/20">
+                <p className="text-2xl font-bold text-blue-600">{bucketOnlyChangedResults.length}</p>
+                <p className="text-xs text-muted-foreground">Bucket Changed</p>
               </div>
               <div className="bg-muted/50 rounded-lg p-3 text-center">
                 <p className="text-2xl font-bold text-muted-foreground">{unchangedResults.length}</p>
@@ -352,15 +362,15 @@ export function LowConfidenceWizard() {
               </div>
             </div>
 
-            {changedResults.length > 0 && (
+            {classificationChangedResults.length > 0 && (
               <div className="space-y-2">
                 <p className="text-sm font-medium flex items-center gap-2">
                   <CheckCircle2 className="h-4 w-4 text-green-500" />
-                  Updated Classifications
+                  Reclassified ({classificationChangedResults.length})
                 </p>
-                <ScrollArea className="h-48 border rounded-lg">
+                <ScrollArea className="h-36 border rounded-lg">
                   <div className="p-2 space-y-1">
-                    {changedResults.map((result) => (
+                    {classificationChangedResults.map((result) => (
                       <div
                         key={result.id}
                         className="flex items-center justify-between text-sm py-2 px-2 rounded hover:bg-muted/50 group cursor-pointer"
@@ -378,6 +388,39 @@ export function LowConfidenceWizard() {
                             {result.newClassification?.replace(/_/g, ' ')}
                           </Badge>
                           <Eye className="h-4 w-4 opacity-0 group-hover:opacity-50" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </div>
+            )}
+
+            {bucketOnlyChangedResults.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium flex items-center gap-2">
+                  <ArrowRight className="h-4 w-4 text-blue-500" />
+                  Bucket Changed Only ({bucketOnlyChangedResults.length})
+                </p>
+                <ScrollArea className="h-28 border rounded-lg">
+                  <div className="p-2 space-y-1">
+                    {bucketOnlyChangedResults.map((result) => (
+                      <div
+                        key={result.id}
+                        className="flex items-center justify-between text-sm py-2 px-2 rounded hover:bg-muted/50 group cursor-pointer"
+                        onClick={() => navigate(`/conversation/${result.id}`)}
+                      >
+                        <span className="truncate flex-1 mr-2 group-hover:text-primary">
+                          {result.title}
+                        </span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <Badge variant="outline" className={getBucketColor(result.originalBucket)}>
+                            {result.originalBucket?.replace(/_/g, ' ') || 'unknown'}
+                          </Badge>
+                          <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                          <Badge variant="outline" className={getBucketColor(result.newBucket)}>
+                            {result.newBucket?.replace(/_/g, ' ')}
+                          </Badge>
                         </div>
                       </div>
                     ))}
