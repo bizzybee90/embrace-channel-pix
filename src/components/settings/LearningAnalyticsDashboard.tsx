@@ -379,69 +379,88 @@ export function LearningAnalyticsDashboard() {
         <TabsContent value="overview" className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             {/* Automation Trend */}
-            <Card>
+            <Card className="overflow-hidden">
               <CardHeader>
                 <CardTitle className="text-base">Automation Over Time</CardTitle>
                 <CardDescription>Daily automated vs corrected emails</CardDescription>
               </CardHeader>
-              <CardContent>
-                <ChartContainer config={chartConfig} className="h-[300px]">
-                  <AreaChart data={trendData}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis 
-                      dataKey="date" 
-                      tickFormatter={(val) => new Date(val).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                      className="text-xs"
-                    />
-                    <YAxis className="text-xs" />
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <Area 
-                      type="monotone" 
-                      dataKey="automated" 
-                      stackId="1"
-                      stroke="hsl(var(--primary))" 
-                      fill="hsl(var(--primary))" 
-                      fillOpacity={0.3}
-                    />
-                    <Area 
-                      type="monotone" 
-                      dataKey="corrections" 
-                      stackId="2"
-                      stroke="hsl(var(--destructive))" 
-                      fill="hsl(var(--destructive))" 
-                      fillOpacity={0.3}
-                    />
-                  </AreaChart>
-                </ChartContainer>
+              <CardContent className="overflow-hidden">
+                <div className="h-[300px] w-full">
+                  <ChartContainer config={chartConfig} className="h-full w-full">
+                    <AreaChart data={trendData}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                      <XAxis 
+                        dataKey="date" 
+                        tickFormatter={(val) => new Date(val).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        className="text-xs"
+                      />
+                      <YAxis className="text-xs" />
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <Area 
+                        type="monotone" 
+                        dataKey="automated" 
+                        stackId="1"
+                        stroke="hsl(var(--primary))" 
+                        fill="hsl(var(--primary))" 
+                        fillOpacity={0.3}
+                      />
+                      <Area 
+                        type="monotone" 
+                        dataKey="corrections" 
+                        stackId="2"
+                        stroke="hsl(var(--destructive))" 
+                        fill="hsl(var(--destructive))" 
+                        fillOpacity={0.3}
+                      />
+                    </AreaChart>
+                  </ChartContainer>
+                </div>
               </CardContent>
             </Card>
 
             {/* Classification Distribution */}
-            <Card>
+            <Card className="overflow-hidden">
               <CardHeader>
                 <CardTitle className="text-base">Email Distribution</CardTitle>
                 <CardDescription>By classification type</CardDescription>
               </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={classificationData.slice(0, 8)}
-                      dataKey="value"
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={100}
-                      label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
-                      labelLine={false}
-                    >
-                      {classificationData.slice(0, 8).map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
+              <CardContent className="overflow-hidden">
+                <div className="h-[300px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={classificationData.slice(0, 6)}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={50}
+                        outerRadius={80}
+                        paddingAngle={2}
+                      >
+                        {classificationData.slice(0, 6).map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip 
+                        formatter={(value: number, name: string) => [`${value} emails`, name]}
+                        contentStyle={{ 
+                          backgroundColor: 'hsl(var(--popover))', 
+                          border: '1px solid hsl(var(--border))',
+                          borderRadius: '8px',
+                          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                        }}
+                      />
+                      <Legend 
+                        layout="vertical" 
+                        align="right" 
+                        verticalAlign="middle"
+                        wrapperStyle={{ fontSize: '12px', paddingLeft: '10px' }}
+                        formatter={(value) => <span className="text-xs text-foreground">{value}</span>}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -590,53 +609,57 @@ export function LearningAnalyticsDashboard() {
         {/* Learning Tab */}
         <TabsContent value="learning" className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
-            <Card>
+            <Card className="overflow-hidden">
               <CardHeader>
                 <CardTitle className="text-base">Confidence Trend</CardTitle>
                 <CardDescription>Is the AI getting more confident over time?</CardDescription>
               </CardHeader>
-              <CardContent>
-                <ChartContainer config={chartConfig} className="h-[250px]">
-                  <LineChart data={trendData}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis 
-                      dataKey="date" 
-                      tickFormatter={(val) => new Date(val).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                      className="text-xs"
-                    />
-                    <YAxis domain={[0, 100]} className="text-xs" />
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <Line 
-                      type="monotone" 
-                      dataKey="confidence" 
-                      stroke="hsl(var(--chart-3))" 
-                      strokeWidth={2}
-                      dot={false}
-                    />
-                  </LineChart>
-                </ChartContainer>
+              <CardContent className="overflow-hidden">
+                <div className="h-[250px] w-full">
+                  <ChartContainer config={chartConfig} className="h-full w-full">
+                    <LineChart data={trendData}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                      <XAxis 
+                        dataKey="date" 
+                        tickFormatter={(val) => new Date(val).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        className="text-xs"
+                      />
+                      <YAxis domain={[0, 100]} className="text-xs" />
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <Line 
+                        type="monotone" 
+                        dataKey="confidence" 
+                        stroke="hsl(var(--chart-3))" 
+                        strokeWidth={2}
+                        dot={false}
+                      />
+                    </LineChart>
+                  </ChartContainer>
+                </div>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="overflow-hidden">
               <CardHeader>
                 <CardTitle className="text-base">Corrections Over Time</CardTitle>
                 <CardDescription>Are you correcting the AI less over time?</CardDescription>
               </CardHeader>
-              <CardContent>
-                <ChartContainer config={chartConfig} className="h-[250px]">
-                  <BarChart data={trendData}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis 
-                      dataKey="date" 
-                      tickFormatter={(val) => new Date(val).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                      className="text-xs"
-                    />
-                    <YAxis className="text-xs" />
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <Bar dataKey="corrections" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ChartContainer>
+              <CardContent className="overflow-hidden">
+                <div className="h-[250px] w-full">
+                  <ChartContainer config={chartConfig} className="h-full w-full">
+                    <BarChart data={trendData}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                      <XAxis 
+                        dataKey="date" 
+                        tickFormatter={(val) => new Date(val).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        className="text-xs"
+                      />
+                      <YAxis className="text-xs" />
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <Bar dataKey="corrections" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ChartContainer>
+                </div>
               </CardContent>
             </Card>
           </div>
