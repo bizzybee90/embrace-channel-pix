@@ -134,6 +134,39 @@ No human attention needed:
 4. **Error/Failure Rule**
    - System notification with "failed/error/down" → REVIEW with urgent=true
 
+## CLASSIFICATION RULES (IMPORTANT - READ CAREFULLY!)
+
+### "misdirected" is EXTREMELY RARE - Only use when:
+- The email is CLEARLY addressed to a different person by name (wrong recipient)
+- The content has NOTHING to do with this business AND appears sent in error
+- Example: "Hi John, here's the quote for your bathroom tiles" sent to a window cleaning company
+
+### DO NOT classify as "misdirected":
+- Marketing emails from other companies → use "marketing_newsletter"
+- Supplier invoices/bills (they're sending YOU a bill) → use "supplier_invoice"
+- Order confirmations from suppliers → use "automated_notification"
+- Job board notifications (Indeed, LinkedIn) → use "recruitment_hr"
+- Newsletters from any business → use "marketing_newsletter"
+- B2B sales outreach → use "marketing_newsletter" or "spam_phishing"
+- Emails from companies you buy from → NOT misdirected, they're your suppliers
+
+### The "misdirected" test:
+Ask yourself: "Is this email actually meant for someone ELSE at a DIFFERENT company?"
+- If NO → It's not misdirected, classify correctly
+- If YES → It's misdirected
+
+## TITLE GENERATION RULES
+
+The title should be descriptive and NEVER say "misdirected" unless truly misdirected:
+- For receipts: "Stripe payment £30 from customer@email.com"
+- For supplier invoices: "Invoice from [Supplier Name] - £X due"
+- For quote requests: "Quote request - 3 bed house in Luton"
+- For Indeed/LinkedIn: "Indeed weekly job summary" or "LinkedIn notification"
+- For marketing: "Marketing from [Company]" or "[Company] newsletter"
+- For customer inquiry: "Customer inquiry - [topic]"
+
+NEVER put "misdirected" in the title unless it's genuinely sent to the wrong person.
+
 ## BATCH CLUSTERING (For Bulk Processing)
 
 Assign batch_group for bulk actions:
@@ -677,13 +710,32 @@ function validateTriageResult(result: any): { valid: boolean; issues: string[] }
     issues.push('Empty or too short why_this_needs_you');
   }
 
-  // Rule 6: Misdirected should be to_reply with reply_required
+  // Rule 6: Smart misdirected handling - most "misdirected" are actually marketing/newsletters
+  // Only TRUE misdirected (wrong recipient) should be to_reply
   if (result.classification?.category === 'misdirected') {
-    if (result.lane !== 'to_reply') {
-      issues.push('Misdirected should be to_reply');
-    }
-    if (!result.flags?.reply_required) {
-      issues.push('Misdirected should require reply');
+    const summary = (result.summary?.one_line || '').toLowerCase();
+    const reasoning = (result.reasoning || '').toLowerCase();
+    const why = (result.decision?.why_this_needs_you || '').toLowerCase();
+    const combined = `${summary} ${reasoning} ${why}`;
+    
+    // Check if this looks like marketing/newsletter/notification that was wrongly labeled misdirected
+    const marketingIndicators = [
+      'newsletter', 'marketing', 'webinar', 'promotion', 'offer',
+      'subscription', 'unsubscribe', 'weekly digest', 'monthly update',
+      'indeed', 'linkedin', 'job', 'application', 'glassdoor',
+      'substack', 'mailchimp', 'campaign'
+    ];
+    
+    const isLikelyMarketing = marketingIndicators.some(indicator => combined.includes(indicator));
+    
+    if (isLikelyMarketing) {
+      // This is NOT misdirected, it's marketing - will be auto-corrected
+      issues.push('Misdirected_is_actually_marketing');
+    } else {
+      // True misdirected - should go to to_reply so user can forward/respond
+      if (result.lane !== 'to_reply') {
+        issues.push('True_misdirected_should_be_to_reply');
+      }
     }
   }
 
@@ -1026,14 +1078,31 @@ ${email.body.substring(0, 5000)}
         console.log('[triage] Corrected: AUTO_HANDLED → QUICK_WIN');
       }
       
-      // Misdirected corrections
-      if (validation.issues.includes('Misdirected should be to_reply')) {
+      // Misdirected that's actually marketing → reclassify as marketing_newsletter and DONE
+      if (validation.issues.includes('Misdirected_is_actually_marketing')) {
+        routeResult.classification.category = 'marketing_newsletter';
+        routeResult.lane = 'done';
+        routeResult.decision.bucket = 'auto_handled';
+        routeResult.flags.reply_required = false;
+        routeResult.classification.requires_reply = false;
+        routeResult.batch_group = 'BATCH_NEWSLETTERS';
+        // Fix the title/summary to not say "misdirected"
+        if (routeResult.summary?.one_line?.toLowerCase().includes('misdirected')) {
+          routeResult.summary.one_line = routeResult.summary.one_line
+            .replace(/misdirected\s*/gi, '')
+            .replace(/^\s*-\s*/, '')
+            .trim() || 'Newsletter/marketing email';
+        }
+        console.log('[triage] Corrected: Misdirected → marketing_newsletter (DONE)');
+      }
+      
+      // True misdirected should go to to_reply
+      if (validation.issues.includes('True_misdirected_should_be_to_reply')) {
         routeResult.lane = 'to_reply';
         routeResult.decision.bucket = 'quick_win';
-      }
-      if (validation.issues.includes('Misdirected should require reply')) {
         routeResult.flags.reply_required = true;
         routeResult.classification.requires_reply = true;
+        console.log('[triage] Corrected: True misdirected → TO_REPLY');
       }
       
       // Generic why_this_needs_you

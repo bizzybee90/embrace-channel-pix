@@ -332,6 +332,122 @@ export function TriageLearningPanel() {
 
   return (
     <div className="space-y-6">
+      {/* Bulk Re-Triage Section - Prominent at top */}
+      <Card className="border-primary/30 bg-primary/5">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <RotateCcw className="h-5 w-5 text-primary" />
+                Re-Triage All Conversations
+              </CardTitle>
+              <CardDescription>
+                Re-run the improved AI triage on existing conversations to fix classifications.
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {lowConfidenceCount > 0 && (
+            <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+              <AlertCircle className="h-5 w-5 text-amber-600 shrink-0" />
+              <span className="text-sm text-amber-700 dark:text-amber-300">
+                <span className="font-semibold">{lowConfidenceCount}</span> conversations have low confidence (below {Math.round(confidenceThreshold * 100)}%) and could benefit from re-triaging.
+              </span>
+            </div>
+          )}
+          
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label className="text-sm text-muted-foreground">
+                Confidence Threshold: {Math.round(confidenceThreshold * 100)}%
+              </Label>
+              <Slider
+                value={[confidenceThreshold * 100]}
+                onValueChange={(value) => {
+                  setConfidenceThreshold(value[0] / 100);
+                  fetchLowConfidenceCount();
+                }}
+                max={100}
+                min={50}
+                step={5}
+                className="py-2"
+              />
+              <p className="text-xs text-muted-foreground">
+                Only conversations below this confidence will be re-triaged
+              </p>
+            </div>
+            
+            <div className="space-y-2">
+              <Label className="text-sm text-muted-foreground">
+                Batch Size: {retriageLimit}
+              </Label>
+              <Slider
+                value={[retriageLimit]}
+                onValueChange={(value) => setRetriageLimit(value[0])}
+                max={500}
+                min={10}
+                step={10}
+                className="py-2"
+              />
+              <p className="text-xs text-muted-foreground">
+                Number of conversations to process at once
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-3 pt-2">
+            <Button
+              onClick={runBulkRetriage}
+              disabled={isRetriaging}
+              className="min-w-[160px]"
+            >
+              {isRetriaging ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Re-triaging...
+                </>
+              ) : (
+                <>
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  Re-Triage Now
+                </>
+              )}
+            </Button>
+            <span className="text-xs text-muted-foreground">
+              This will update classifications using the improved AI logic
+            </span>
+          </div>
+          
+          {retriageResults.length > 0 && (
+            <div className="mt-4 space-y-2">
+              <h4 className="text-sm font-medium flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-green-600" />
+                Re-Triage Results
+              </h4>
+              <div className="max-h-48 overflow-y-auto space-y-2">
+                {retriageResults.map((r) => (
+                  <div 
+                    key={r.id}
+                    className="flex items-center justify-between p-2 bg-muted/50 rounded text-sm"
+                  >
+                    <span className="truncate flex-1 mr-4">{r.title}</span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Badge variant="outline" className="text-xs">
+                        {r.originalClassification?.replace(/_/g, ' ')}
+                      </Badge>
+                      <ArrowRight className="h-3 w-3" />
+                      <Badge variant="secondary" className="text-xs bg-primary/10 text-primary">
+                        {r.newClassification?.replace(/_/g, ' ')}
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
       {/* Historical Behavior Suggestions */}
       <Card>
         <CardHeader>
