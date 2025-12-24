@@ -5,7 +5,7 @@ import { Conversation } from '@/lib/types';
 import { SearchInput } from './SearchInput';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, Sparkles, RefreshCw } from 'lucide-react';
+import { Loader2, Sparkles, RefreshCw, ArrowLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, isToday, isYesterday } from 'date-fns';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -317,6 +317,8 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
     );
   }
 
+  const [, setSearchParams] = useSearchParams();
+  
   // Get title based on sub-filter
   const getFilterTitle = () => {
     if (subFilter === 'at-risk') return 'At Risk';
@@ -327,12 +329,33 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
     return 'To Reply';
   };
 
+  const clearSubFilter = () => {
+    setSearchParams({});
+  };
+
   return (
     <div className="flex flex-col h-full bg-background">
       {/* Header with title and metrics */}
       <div className="px-6 py-4 bg-gradient-to-r from-primary/5 to-transparent border-b border-border/50">
         <div className="flex items-center justify-between">
-          <h1 className="text-lg font-semibold text-foreground">{getFilterTitle()}</h1>
+          <div className="flex items-center gap-2">
+            {subFilter && (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={clearSubFilter}
+                className="h-8 px-2 text-muted-foreground hover:text-foreground"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            )}
+            <h1 className="text-lg font-semibold text-foreground">{getFilterTitle()}</h1>
+            {subFilter && (
+              <span className="text-sm text-muted-foreground">
+                ({filteredConversations.length})
+              </span>
+            )}
+          </div>
           {filter === 'needs-me' && autoHandledCount > 0 && !subFilter && (
             <div className="flex items-center gap-2 text-sm">
               <Sparkles className="h-4 w-4 text-primary" />
@@ -343,7 +366,7 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
           )}
         </div>
         {subFilter && (
-          <p className="text-xs text-muted-foreground mt-1">
+          <p className="text-xs text-muted-foreground mt-1 ml-10">
             {subFilter === 'at-risk' && 'Conversations with SLA warnings or breaches'}
             {subFilter === 'drafts' && 'AI drafted responses ready for your review'}
             {subFilter === 'to-reply' && 'Conversations needing your attention'}
