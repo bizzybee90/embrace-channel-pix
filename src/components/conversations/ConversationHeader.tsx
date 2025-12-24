@@ -10,6 +10,7 @@ interface ConversationHeaderProps {
   conversation: Conversation;
   onUpdate: () => void;
   onBack?: () => void;
+  hideBackButton?: boolean;
 }
 
 const getListName = (pathname: string): string => {
@@ -23,7 +24,7 @@ const getListName = (pathname: string): string => {
   return 'Conversations';
 };
 
-export const ConversationHeader = ({ conversation, onUpdate, onBack }: ConversationHeaderProps) => {
+export const ConversationHeader = ({ conversation, onUpdate, onBack, hideBackButton = false }: ConversationHeaderProps) => {
   const location = useLocation();
   const listName = getListName(location.pathname);
   const [showTeachModal, setShowTeachModal] = useState(false);
@@ -33,7 +34,7 @@ export const ConversationHeader = ({ conversation, onUpdate, onBack }: Conversat
       <div className="border-b border-border/30 p-3 bg-card/95 backdrop-blur-lg shadow-sm sticky top-0 z-20">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0 flex-1">
-            {onBack && (
+            {onBack && !hideBackButton && (
               <Button
                 variant="ghost"
                 size="sm"
