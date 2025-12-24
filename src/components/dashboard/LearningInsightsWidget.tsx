@@ -262,7 +262,7 @@ export const LearningInsightsWidget = () => {
   return (
     <Card 
       className="p-4 cursor-pointer hover:bg-accent/50 transition-colors"
-      onClick={() => navigate('/settings?tab=learning')}
+      onClick={() => navigate('/learning')}
     >
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">

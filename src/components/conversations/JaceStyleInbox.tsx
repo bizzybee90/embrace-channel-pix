@@ -339,7 +339,8 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
   };
 
   const clearSubFilter = () => {
-    setSearchParams({});
+    // Navigate back to home page
+    window.location.href = '/';
   };
 
   return (
