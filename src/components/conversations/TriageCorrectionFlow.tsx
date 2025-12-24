@@ -31,31 +31,59 @@ import {
 } from 'lucide-react';
 import { Conversation } from '@/lib/types';
 
-// Extended classifications matching the email-triage-agent
+// Extended classifications matching all email types
 const CLASSIFICATIONS = [
+  // Customer inquiries - require reply
   { value: 'customer_inquiry', label: 'Customer Inquiry', requiresReply: true, category: 'inquiry' },
   { value: 'booking_request', label: 'Booking Request', requiresReply: true, category: 'inquiry' },
   { value: 'quote_request', label: 'Quote Request', requiresReply: true, category: 'inquiry' },
   { value: 'reschedule_request', label: 'Reschedule Request', requiresReply: true, category: 'inquiry' },
   { value: 'cancellation_request', label: 'Cancellation Request', requiresReply: true, category: 'inquiry' },
-  { value: 'complaint_dispute', label: 'Complaint/Dispute', requiresReply: true, category: 'inquiry' },
+  { value: 'complaint_dispute', label: 'Complaint/Dispute', requiresReply: true, category: 'complaint' },
+  { value: 'customer_complaint', label: 'Customer Complaint', requiresReply: true, category: 'complaint' },
+  { value: 'customer_feedback', label: 'Customer Feedback', requiresReply: false, category: 'feedback' },
+  
+  // Leads & follow-ups
+  { value: 'lead_new', label: 'New Lead', requiresReply: true, category: 'lead' },
+  { value: 'lead_followup', label: 'Lead Follow-up', requiresReply: true, category: 'lead' },
+  
+  // Misdirected - wrong recipient
+  { value: 'misdirected', label: 'Misdirected Email', requiresReply: false, category: 'misdirected' },
+  
+  // Financial - typically no reply
   { value: 'supplier_invoice', label: 'Supplier Invoice', requiresReply: false, category: 'financial' },
+  { value: 'supplier_urgent', label: 'Supplier Urgent', requiresReply: true, category: 'financial' },
   { value: 'payment_confirmation', label: 'Payment Confirmation', requiresReply: false, category: 'financial' },
-  { value: 'receipt_confirmation', label: 'Receipt/Confirmation', requiresReply: false, category: 'notification' },
-  { value: 'automated_notification', label: 'Auto Notification', requiresReply: false, category: 'notification' },
+  { value: 'receipt_confirmation', label: 'Receipt/Confirmation', requiresReply: false, category: 'financial' },
+  
+  // Partner & Business
+  { value: 'partner_request', label: 'Partner Request', requiresReply: true, category: 'partner' },
+  
+  // Automated/System
+  { value: 'automated_notification', label: 'Auto Notification', requiresReply: false, category: 'system' },
+  { value: 'internal_system', label: 'Internal System', requiresReply: false, category: 'system' },
+  { value: 'informational_only', label: 'Info Only (FYI)', requiresReply: false, category: 'system' },
+  
+  // Marketing/Spam
   { value: 'marketing_newsletter', label: 'Marketing/Newsletter', requiresReply: false, category: 'marketing' },
   { value: 'spam_phishing', label: 'Spam/Phishing', requiresReply: false, category: 'spam' },
-  { value: 'recruitment_hr', label: 'Recruitment/HR', requiresReply: false, category: 'internal' },
-  { value: 'internal_system', label: 'Internal System', requiresReply: false, category: 'internal' },
+  
+  // HR/Recruitment
+  { value: 'recruitment_hr', label: 'Recruitment/HR', requiresReply: false, category: 'recruitment' },
 ];
 
 const CATEGORY_COLORS: Record<string, string> = {
   inquiry: 'bg-blue-500/10 text-blue-600 border-blue-500/20',
-  financial: 'bg-green-500/10 text-green-600 border-green-500/20',
-  notification: 'bg-amber-500/10 text-amber-600 border-amber-500/20',
-  marketing: 'bg-purple-500/10 text-purple-600 border-purple-500/20',
+  complaint: 'bg-red-500/10 text-red-600 border-red-500/20',
+  feedback: 'bg-green-500/10 text-green-600 border-green-500/20',
+  lead: 'bg-amber-500/10 text-amber-600 border-amber-500/20',
+  misdirected: 'bg-orange-500/10 text-orange-600 border-orange-500/20',
+  financial: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20',
+  partner: 'bg-indigo-500/10 text-indigo-600 border-indigo-500/20',
+  system: 'bg-slate-500/10 text-slate-600 border-slate-500/20',
+  marketing: 'bg-pink-500/10 text-pink-600 border-pink-500/20',
   spam: 'bg-red-500/10 text-red-600 border-red-500/20',
-  internal: 'bg-muted text-muted-foreground border-border',
+  recruitment: 'bg-purple-500/10 text-purple-600 border-purple-500/20',
 };
 
 interface TriageCorrectionFlowProps {
