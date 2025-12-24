@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Brain, ArrowRight, Zap, Loader2, TrendingUp, RefreshCw, Mail, CheckCircle, RotateCcw, AlertCircle, ExternalLink } from 'lucide-react';
@@ -51,8 +52,10 @@ export function TriageLearningPanel() {
   const [isRetriaging, setIsRetriaging] = useState(false);
   const [retriageResults, setRetriageResults] = useState<RetriagedResult[]>([]);
   const [lowConfidenceCount, setLowConfidenceCount] = useState<number>(0);
+  const [totalConversationCount, setTotalConversationCount] = useState<number>(0);
   const [confidenceThreshold, setConfidenceThreshold] = useState(0.85);
   const [retriageLimit, setRetriageLimit] = useState(100);
+  const [retriageAll, setRetriageAll] = useState(false);
 
   useEffect(() => {
     fetchCorrections();
@@ -71,15 +74,21 @@ export function TriageLearningPanel() {
 
       if (!userData?.workspace_id) return;
 
-      // Count across all buckets, not just auto_handled
-      const { count } = await supabase
+      // Count low confidence conversations
+      const { count: lowCount } = await supabase
         .from('conversations')
         .select('id', { count: 'exact', head: true })
         .eq('workspace_id', userData.workspace_id)
-        .in('decision_bucket', ['auto_handled', 'quick_win', 'act_now', 'wait'])
         .or(`triage_confidence.lt.${confidenceThreshold},triage_confidence.is.null`);
 
-      setLowConfidenceCount(count || 0);
+      // Count total conversations
+      const { count: totalCount } = await supabase
+        .from('conversations')
+        .select('id', { count: 'exact', head: true })
+        .eq('workspace_id', userData.workspace_id);
+
+      setLowConfidenceCount(lowCount || 0);
+      setTotalConversationCount(totalCount || 0);
     } catch (error) {
       console.error('Error fetching low confidence count:', error);
     }
@@ -102,7 +111,7 @@ export function TriageLearningPanel() {
         body: { 
           workspaceId: userData.workspace_id,
           limit: retriageLimit,
-          confidenceThreshold,
+          confidenceThreshold: retriageAll ? 1.0 : confidenceThreshold, // 1.0 means all conversations
           dryRun: false,
         }
       });
@@ -348,7 +357,21 @@ export function TriageLearningPanel() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {lowConfidenceCount > 0 && (
+          {/* Re-triage ALL toggle */}
+          <div className="flex items-center justify-between p-4 bg-primary/10 rounded-lg border border-primary/20">
+            <div className="space-y-1">
+              <Label className="text-base font-medium">Re-triage ALL conversations</Label>
+              <p className="text-sm text-muted-foreground">
+                Apply the new misdirected fix to every email ({totalConversationCount} total)
+              </p>
+            </div>
+            <Switch
+              checked={retriageAll}
+              onCheckedChange={setRetriageAll}
+            />
+          </div>
+
+          {!retriageAll && lowConfidenceCount > 0 && (
             <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
               <AlertCircle className="h-5 w-5 text-amber-600 shrink-0" />
               <span className="text-sm text-amber-700 dark:text-amber-300">
@@ -357,30 +380,51 @@ export function TriageLearningPanel() {
             </div>
           )}
           
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label className="text-sm text-muted-foreground">
-                Confidence Threshold: {Math.round(confidenceThreshold * 100)}%
-              </Label>
-              <Slider
-                value={[confidenceThreshold * 100]}
-                onValueChange={(value) => {
-                  setConfidenceThreshold(value[0] / 100);
-                  fetchLowConfidenceCount();
-                }}
-                max={100}
-                min={50}
-                step={5}
-                className="py-2"
-              />
-              <p className="text-xs text-muted-foreground">
-                Only conversations below this confidence will be re-triaged
-              </p>
+          {!retriageAll && (
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground">
+                  Confidence Threshold: {Math.round(confidenceThreshold * 100)}%
+                </Label>
+                <Slider
+                  value={[confidenceThreshold * 100]}
+                  onValueChange={(value) => {
+                    setConfidenceThreshold(value[0] / 100);
+                    fetchLowConfidenceCount();
+                  }}
+                  max={100}
+                  min={50}
+                  step={5}
+                  className="py-2"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Only conversations below this confidence will be re-triaged
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground">
+                  Batch Size: {retriageLimit}
+                </Label>
+                <Slider
+                  value={[retriageLimit]}
+                  onValueChange={(value) => setRetriageLimit(value[0])}
+                  max={500}
+                  min={10}
+                  step={10}
+                  className="py-2"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Number of conversations to process at once
+                </p>
+              </div>
             </div>
-            
+          )}
+
+          {retriageAll && (
             <div className="space-y-2">
               <Label className="text-sm text-muted-foreground">
-                Batch Size: {retriageLimit}
+                Batch Size: {retriageLimit} (of {totalConversationCount} total)
               </Label>
               <Slider
                 value={[retriageLimit]}
@@ -391,16 +435,17 @@ export function TriageLearningPanel() {
                 className="py-2"
               />
               <p className="text-xs text-muted-foreground">
-                Number of conversations to process at once
+                You may need to run multiple batches to process all conversations
               </p>
             </div>
-          </div>
+          )}
           
           <div className="flex items-center gap-3 pt-2">
             <Button
               onClick={runBulkRetriage}
               disabled={isRetriaging}
               className="min-w-[160px]"
+              variant={retriageAll ? "default" : "secondary"}
             >
               {isRetriaging ? (
                 <>
@@ -410,12 +455,14 @@ export function TriageLearningPanel() {
               ) : (
                 <>
                   <RotateCcw className="h-4 w-4 mr-2" />
-                  Re-Triage Now
+                  {retriageAll ? `Re-Triage All (${Math.min(retriageLimit, totalConversationCount)})` : 'Re-Triage Now'}
                 </>
               )}
             </Button>
             <span className="text-xs text-muted-foreground">
-              This will update classifications using the improved AI logic
+              {retriageAll 
+                ? 'All conversations will be re-classified with the improved logic' 
+                : 'This will update classifications using the improved AI logic'}
             </span>
           </div>
           
