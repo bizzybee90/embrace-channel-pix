@@ -4,8 +4,9 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Mail, RefreshCw, Trash2, Clock, CheckCircle, Plus, X } from 'lucide-react';
+import { Mail, RefreshCw, Trash2, Clock, CheckCircle, Plus, X, Loader2, Rocket, Pencil, Eye, Pause, ChevronDown } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import {
   AlertDialog,
@@ -23,6 +24,13 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface EmailConfig {
   id: string;
@@ -33,6 +41,7 @@ interface EmailConfig {
   connected_at: string;
   workspace_id: string;
   aliases?: string[];
+  automation_level?: string;
 }
 
 interface EmailAccountCardProps {
@@ -55,6 +64,37 @@ const providerLabels: Record<string, string> = {
   'IMAP': 'IMAP',
 };
 
+const AUTOMATION_LEVELS = [
+  { 
+    value: 'automatic', 
+    label: 'Automatic', 
+    icon: Rocket, 
+    description: 'AI drafts and sends automatically',
+    color: 'text-green-600 bg-green-500/10 border-green-500/30'
+  },
+  { 
+    value: 'draft_only', 
+    label: 'Draft Only', 
+    icon: Pencil, 
+    description: 'AI drafts, you click to send',
+    color: 'text-blue-600 bg-blue-500/10 border-blue-500/30'
+  },
+  { 
+    value: 'review_required', 
+    label: 'Review Mode', 
+    icon: Eye, 
+    description: 'All responses go to review queue',
+    color: 'text-amber-600 bg-amber-500/10 border-amber-500/30'
+  },
+  { 
+    value: 'disabled', 
+    label: 'Manual', 
+    icon: Pause, 
+    description: 'No AI assistance',
+    color: 'text-muted-foreground bg-muted border-border'
+  },
+];
+
 export const EmailAccountCard = ({ config, onDisconnect, onUpdate }: EmailAccountCardProps) => {
   const { toast } = useToast();
   const [syncing, setSyncing] = useState(false);
@@ -62,8 +102,10 @@ export const EmailAccountCard = ({ config, onDisconnect, onUpdate }: EmailAccoun
   const [aliasesOpen, setAliasesOpen] = useState(false);
   const [newAlias, setNewAlias] = useState('');
   const [addingAlias, setAddingAlias] = useState(false);
+  const [updatingAutomation, setUpdatingAutomation] = useState(false);
 
   const aliases = config.aliases || [];
+  const currentLevel = AUTOMATION_LEVELS.find(l => l.value === (config.automation_level || 'draft_only')) || AUTOMATION_LEVELS[1];
 
   const handleSync = async () => {
     setSyncing(true);
@@ -170,131 +212,201 @@ export const EmailAccountCard = ({ config, onDisconnect, onUpdate }: EmailAccoun
     }
   };
 
+  const handleAutomationChange = async (level: string) => {
+    setUpdatingAutomation(true);
+    try {
+      const { error } = await supabase
+        .from('email_provider_configs')
+        .update({ automation_level: level })
+        .eq('id', config.id);
+
+      if (error) throw error;
+      
+      const levelInfo = AUTOMATION_LEVELS.find(l => l.value === level);
+      toast({ 
+        title: 'Automation mode updated',
+        description: `${config.email_address} is now in ${levelInfo?.label} mode`
+      });
+      onUpdate();
+    } catch (error) {
+      console.error('Update automation error:', error);
+      toast({ title: 'Failed to update automation level', variant: 'destructive' });
+    } finally {
+      setUpdatingAutomation(false);
+    }
+  };
+
   return (
     <Card className="p-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-primary/10 text-primary">
-            <Mail className="h-5 w-5" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-medium">{config.email_address}</span>
-              <Badge variant="secondary" className="text-xs">
-                {providerIcons[config.provider] || '📧'} {providerLabels[config.provider] || config.provider}
-              </Badge>
-              <Badge variant="outline" className="text-xs text-green-600">
-                <CheckCircle className="h-3 w-3 mr-1" />
-                Connected
-              </Badge>
+      <div className="space-y-4">
+        {/* Header Row */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-primary/10 text-primary">
+              <Mail className="h-5 w-5" />
             </div>
-            <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
-              <span className="flex items-center gap-1">
-                <Clock className="h-3 w-3" />
-                Connected {formatDistanceToNow(new Date(config.connected_at), { addSuffix: true })}
-              </span>
-              {config.last_sync_at && (
-                <span>
-                  Last synced {formatDistanceToNow(new Date(config.last_sync_at), { addSuffix: true })}
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-        
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleSync}
-            disabled={syncing}
-          >
-            <RefreshCw className={`h-4 w-4 mr-1 ${syncing ? 'animate-spin' : ''}`} />
-            {syncing ? 'Syncing...' : 'Sync'}
-          </Button>
-          
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="outline" size="sm" className="text-destructive hover:text-destructive">
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Disconnect email account?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This will remove {config.email_address} from your workspace. 
-                  You won't receive new emails from this account, but existing conversations will be preserved.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={handleDisconnect}
-                  disabled={disconnecting}
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                >
-                  {disconnecting ? 'Disconnecting...' : 'Disconnect'}
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </div>
-      </div>
-
-      {/* Aliases Section */}
-      <Collapsible open={aliasesOpen} onOpenChange={setAliasesOpen} className="mt-4">
-        <CollapsibleTrigger asChild>
-          <Button variant="ghost" size="sm" className="w-full justify-between text-muted-foreground">
-            <span className="flex items-center gap-2">
-              <Mail className="h-4 w-4" />
-              Email Aliases ({aliases.length})
-            </span>
-            <span className="text-xs">{aliasesOpen ? 'Hide' : 'Manage'}</span>
-          </Button>
-        </CollapsibleTrigger>
-        <CollapsibleContent className="mt-3 space-y-3">
-          <p className="text-xs text-muted-foreground">
-            Add email aliases that route to this account. Replies will be sent from the address the customer originally emailed.
-          </p>
-          
-          {/* Existing aliases */}
-          {aliases.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {aliases.map((alias) => (
-                <Badge key={alias} variant="secondary" className="flex items-center gap-1 pr-1">
-                  {alias}
-                  <button
-                    onClick={() => handleRemoveAlias(alias)}
-                    className="ml-1 p-0.5 rounded-full hover:bg-destructive/20 text-muted-foreground hover:text-destructive"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-medium">{config.email_address}</span>
+                <Badge variant="secondary" className="text-xs">
+                  {providerIcons[config.provider] || '📧'} {providerLabels[config.provider] || config.provider}
                 </Badge>
-              ))}
+                <Badge variant="outline" className="text-xs text-green-600">
+                  <CheckCircle className="h-3 w-3 mr-1" />
+                  Connected
+                </Badge>
+              </div>
+              <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
+                <span className="flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  Connected {formatDistanceToNow(new Date(config.connected_at), { addSuffix: true })}
+                </span>
+                {config.last_sync_at && (
+                  <span>
+                    Last synced {formatDistanceToNow(new Date(config.last_sync_at), { addSuffix: true })}
+                  </span>
+                )}
+              </div>
             </div>
-          )}
-          
-          {/* Add new alias */}
-          <div className="flex gap-2">
-            <Input
-              placeholder="Enter alias email (e.g., info@maccleaning.uk)"
-              value={newAlias}
-              onChange={(e) => setNewAlias(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleAddAlias()}
-              className="flex-1"
-            />
-            <Button
-              size="sm"
-              onClick={handleAddAlias}
-              disabled={addingAlias || !newAlias.trim()}
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              Add
-            </Button>
           </div>
-        </CollapsibleContent>
-      </Collapsible>
+          
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSync}
+              disabled={syncing}
+            >
+              <RefreshCw className={`h-4 w-4 mr-1 ${syncing ? 'animate-spin' : ''}`} />
+              {syncing ? 'Syncing...' : 'Sync'}
+            </Button>
+            
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" size="sm" className="text-destructive hover:text-destructive">
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Disconnect email account?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will remove {config.email_address} from your workspace. 
+                    You won't receive new emails from this account, but existing conversations will be preserved.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleDisconnect}
+                    disabled={disconnecting}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    {disconnecting ? 'Disconnecting...' : 'Disconnect'}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        </div>
+
+        {/* Automation Level Selector */}
+        <div className="p-3 bg-muted/50 rounded-lg border">
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <Label className="text-sm font-medium">AI Automation Mode</Label>
+              <p className="text-xs text-muted-foreground">
+                How should AI handle responses?
+              </p>
+            </div>
+            <Select 
+              value={config.automation_level || 'draft_only'} 
+              onValueChange={handleAutomationChange}
+              disabled={updatingAutomation}
+            >
+              <SelectTrigger className={`w-[180px] ${currentLevel.color}`}>
+                {updatingAutomation ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <SelectValue>
+                    <div className="flex items-center gap-2">
+                      <currentLevel.icon className="h-4 w-4" />
+                      {currentLevel.label}
+                    </div>
+                  </SelectValue>
+                )}
+              </SelectTrigger>
+              <SelectContent>
+                {AUTOMATION_LEVELS.map((level) => (
+                  <SelectItem key={level.value} value={level.value}>
+                    <div className="flex items-center gap-2">
+                      <level.icon className="h-4 w-4" />
+                      <div>
+                        <div className="font-medium">{level.label}</div>
+                        <div className="text-xs text-muted-foreground">{level.description}</div>
+                      </div>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* Aliases Section */}
+        <Collapsible open={aliasesOpen} onOpenChange={setAliasesOpen}>
+          <CollapsibleTrigger asChild>
+            <Button variant="ghost" size="sm" className="w-full justify-between text-muted-foreground">
+              <span className="flex items-center gap-2">
+                <Mail className="h-4 w-4" />
+                Email Aliases ({aliases.length})
+              </span>
+              <ChevronDown className={`h-4 w-4 transition-transform ${aliasesOpen ? 'rotate-180' : ''}`} />
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="mt-3 space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Add email aliases that route to this account. Replies will be sent from the address the customer originally emailed.
+            </p>
+            
+            {/* Existing aliases */}
+            {aliases.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {aliases.map((alias) => (
+                  <Badge key={alias} variant="secondary" className="flex items-center gap-1 pr-1">
+                    {alias}
+                    <button
+                      onClick={() => handleRemoveAlias(alias)}
+                      className="ml-1 p-0.5 rounded-full hover:bg-destructive/20 text-muted-foreground hover:text-destructive"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+            )}
+            
+            {/* Add new alias */}
+            <div className="flex gap-2">
+              <Input
+                placeholder="Enter alias email (e.g., info@maccleaning.uk)"
+                value={newAlias}
+                onChange={(e) => setNewAlias(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAddAlias()}
+                className="flex-1"
+              />
+              <Button
+                size="sm"
+                onClick={handleAddAlias}
+                disabled={addingAlias || !newAlias.trim()}
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Add
+              </Button>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+      </div>
     </Card>
   );
 };

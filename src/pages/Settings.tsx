@@ -21,10 +21,11 @@ import { LearningSystemPanel } from '@/components/settings/LearningSystemPanel';
 import { BehaviorStatsPanel } from '@/components/settings/BehaviorStatsPanel';
 import { NotificationPreferencesPanel } from '@/components/settings/NotificationPreferencesPanel';
 import { LowConfidenceWizard } from '@/components/settings/LowConfidenceWizard';
+import { LearningAnalyticsDashboard } from '@/components/settings/LearningAnalyticsDashboard';
 import { Card } from '@/components/ui/card';
 import { TestMessageGenerator } from '@/components/TestMessageGenerator';
 import { RecentActivityWidget } from '@/components/dashboard/RecentActivityWidget';
-import { TestTube, Filter, Bell } from 'lucide-react';
+import { TestTube, Filter, Bell, BarChart3 } from 'lucide-react';
 import { BackButton } from '@/components/shared/BackButton';
 
 export default function Settings() {
@@ -58,6 +59,10 @@ export default function Settings() {
             <TabsTrigger value="notifications" className="flex items-center gap-2 text-xs md:text-sm">
               <Bell className="h-3 w-3 md:h-4 md:w-4" />
               Notifications
+            </TabsTrigger>
+            <TabsTrigger value="learning-analytics" className="flex items-center gap-2 text-xs md:text-sm">
+              <BarChart3 className="h-3 w-3 md:h-4 md:w-4" />
+              Learning Analytics
             </TabsTrigger>
             <TabsTrigger value="gdpr" className="text-xs md:text-sm">GDPR</TabsTrigger>
             <TabsTrigger value="cleanup" className="text-xs md:text-sm">Cleanup</TabsTrigger>
@@ -124,6 +129,10 @@ export default function Settings() {
 
         <TabsContent value="notifications">
           <NotificationPreferencesPanel />
+        </TabsContent>
+
+        <TabsContent value="learning-analytics">
+          <LearningAnalyticsDashboard />
         </TabsContent>
 
         <TabsContent value="gdpr">

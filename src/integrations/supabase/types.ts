@@ -649,6 +649,7 @@ export type Database = {
           access_token: string
           account_id: string
           aliases: string[] | null
+          automation_level: string | null
           connected_at: string | null
           created_at: string | null
           email_address: string
@@ -663,6 +664,7 @@ export type Database = {
           access_token: string
           account_id: string
           aliases?: string[] | null
+          automation_level?: string | null
           connected_at?: string | null
           created_at?: string | null
           email_address: string
@@ -677,6 +679,7 @@ export type Database = {
           access_token?: string
           account_id?: string
           aliases?: string[] | null
+          automation_level?: string | null
           connected_at?: string | null
           created_at?: string | null
           email_address?: string
@@ -1710,6 +1713,7 @@ export type Database = {
       }
       workspace_channels: {
         Row: {
+          automation_level: string | null
           channel: string
           config: Json | null
           created_at: string | null
@@ -1719,6 +1723,7 @@ export type Database = {
           workspace_id: string | null
         }
         Insert: {
+          automation_level?: string | null
           channel: string
           config?: Json | null
           created_at?: string | null
@@ -1728,6 +1733,7 @@ export type Database = {
           workspace_id?: string | null
         }
         Update: {
+          automation_level?: string | null
           channel?: string
           config?: Json | null
           created_at?: string | null
