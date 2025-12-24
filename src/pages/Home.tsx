@@ -25,6 +25,7 @@ import { DraftMessages } from '@/components/dashboard/DraftMessages';
 import { HumanAIActivityLog } from '@/components/dashboard/HumanAIActivityLog';
 import { AIBriefingWidget } from '@/components/dashboard/AIBriefingWidget';
 import { LearningInsightsWidget } from '@/components/dashboard/LearningInsightsWidget';
+import { LiveAISummaryWidget } from '@/components/dashboard/LiveAISummaryWidget';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface HomeStats {
@@ -179,6 +180,9 @@ export const Home = () => {
           </div>
         ) : (
           <>
+            {/* Persistent Live AI Summary */}
+            <LiveAISummaryWidget />
+
             {/* Header with greeting */}
             <div className="flex items-center gap-4">
               <img src={beeLogo} alt="BizzyBee" className="h-12 w-12 rounded-xl" />
