@@ -21,6 +21,7 @@ import ChannelConversations from "./pages/ChannelConversations";
 import AnalyticsDashboard from "./pages/AnalyticsDashboard";
 import Review from "./pages/Review";
 import ActivityPage from "./pages/ActivityPage";
+import Diagnostics from "./pages/Diagnostics";
 
 
 const queryClient = new QueryClient();
@@ -289,6 +290,14 @@ const RouterContent = () => {
         } 
       />
       <Route path="/privacy" element={<Privacy />} />
+      <Route 
+        path="/diagnostics" 
+        element={
+          <AuthGuard>
+            <Diagnostics />
+          </AuthGuard>
+        } 
+      />
       <Route 
         path="/ai-test" 
         element={

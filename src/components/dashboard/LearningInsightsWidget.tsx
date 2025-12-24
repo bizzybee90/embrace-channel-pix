@@ -148,14 +148,14 @@ export const LearningInsightsWidget = () => {
             .eq('workspace_id', workspace.id)
             .eq('needs_review', true)
             .is('reviewed_at', null),
-          // Categories being handled automatically
+          // Categories with active automation rules (skip_llm = true means fully automated)
           supabase
-            .from('conversations')
-            .select('email_classification')
+            .from('sender_rules')
+            .select('default_classification')
             .eq('workspace_id', workspace.id)
-            .eq('decision_bucket', 'auto_handled')
-            .gte('created_at', weekAgo.toISOString())
-            .limit(100)
+            .eq('is_active', true)
+            .eq('skip_llm', true)
+            .limit(10)
         ]);
 
         // Calculate this month accuracy
@@ -202,10 +202,10 @@ export const LearningInsightsWidget = () => {
         // Estimate time saved (assume 2 min per auto-handled email)
         const timeSavedMinutes = autoHandled * 2;
 
-        // Get unique categories being handled
+        // Get unique categories with full automation from sender_rules
         const handledCategories = [...new Set(
           (handledCategoriesResult.data || [])
-            .map(c => c.email_classification)
+            .map(c => c.default_classification)
             .filter(Boolean)
         )].slice(0, 3) as string[];
 
