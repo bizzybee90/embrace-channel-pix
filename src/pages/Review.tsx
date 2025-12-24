@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Sidebar } from '@/components/sidebar/Sidebar';
+import { MobileHeader } from '@/components/sidebar/MobileHeader';
+import { MobileSidebarSheet } from '@/components/sidebar/MobileSidebarSheet';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -17,6 +19,8 @@ import { ReviewExplainer } from '@/components/review/ReviewExplainer';
 import { SmartBatchActions } from '@/components/review/SmartBatchActions';
 import { EmailPreview } from '@/components/review/EmailPreview';
 import { TriageCorrectionFlow } from '@/components/conversations/TriageCorrectionFlow';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { cn } from '@/lib/utils';
 import { 
   ChevronDown, 
   ChevronRight, 
@@ -81,6 +85,9 @@ type AutomationLevel = 'auto' | 'draft_first' | 'always_review';
 type TonePreference = 'keep_current' | 'more_formal' | 'more_brief';
 
 export default function Review() {
+  const navigate = useNavigate();
+  const isMobile = useIsMobile();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showChangePicker, setShowChangePicker] = useState(false);
   const [showTeachMore, setShowTeachMore] = useState(false);
@@ -590,6 +597,38 @@ export default function Review() {
 
   // Empty state - Celebration when training is complete
   if (!isLoading && reviewQueue.length === 0) {
+    if (isMobile) {
+      return (
+        <div className="flex flex-col min-h-screen bg-background">
+          <MobileHeader 
+            onMenuClick={() => setSidebarOpen(true)}
+            showBackButton
+            onBackClick={() => navigate('/')}
+            backToText="Home"
+          />
+          <MobileSidebarSheet
+            open={sidebarOpen}
+            onOpenChange={setSidebarOpen}
+            onNavigate={() => setSidebarOpen(false)}
+          />
+          <div className="flex-1 flex items-center justify-center p-6">
+            <div className="text-center max-w-md">
+              <div className="w-16 h-16 bg-gradient-to-br from-green-100 to-emerald-100 dark:from-green-900/30 dark:to-emerald-900/30 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg shadow-green-500/10">
+                <Sparkles className="h-8 w-8 text-green-600" />
+              </div>
+              <h2 className="text-xl font-semibold mb-2">🎉 BizzyBee is confident!</h2>
+              <p className="text-sm text-muted-foreground mb-2">
+                No messages need training right now.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                BizzyBee is handling emails automatically based on what it learned from you.
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="flex h-screen bg-background">
         <Sidebar />
@@ -617,6 +656,90 @@ export default function Review() {
     );
   }
 
+  // Mobile layout
+  if (isMobile) {
+    return (
+      <div className="flex flex-col min-h-screen bg-background">
+        <MobileHeader 
+          onMenuClick={() => setSidebarOpen(true)}
+          showBackButton
+          onBackClick={() => navigate('/')}
+          backToText="Home"
+        />
+        <MobileSidebarSheet
+          open={sidebarOpen}
+          onOpenChange={setSidebarOpen}
+          onNavigate={() => setSidebarOpen(false)}
+        />
+        
+        {/* Mobile Header */}
+        <div className="p-4 border-b">
+          <div className="flex items-center gap-2 mb-2">
+            <Sparkles className="h-5 w-5 text-purple-500" />
+            <h1 className="text-lg font-semibold">Teach BizzyBee</h1>
+          </div>
+          <Progress value={progress} className="h-2" />
+          <p className="text-xs text-muted-foreground mt-1">
+            {totalCount - reviewedCount} examples remaining
+          </p>
+        </div>
+
+        {/* Mobile Queue List */}
+        <ScrollArea className="flex-1">
+          <div className="p-4 space-y-3">
+            {reviewQueue.map((conv, idx) => (
+              <Card 
+                key={conv.id}
+                className={cn(
+                  "p-4 cursor-pointer transition-all",
+                  currentIndex === idx && "ring-2 ring-primary",
+                  reviewedIds.has(conv.id) && "opacity-50"
+                )}
+                onClick={() => setCurrentIndex(idx)}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm truncate">{conv.customer?.name || 'Unknown'}</p>
+                    <p className="text-xs text-muted-foreground truncate">{conv.title}</p>
+                  </div>
+                  <Badge variant="outline" className="text-xs shrink-0">
+                    {Math.round((conv.triage_confidence || 0) * 100)}%
+                  </Badge>
+                </div>
+                
+                {currentIndex === idx && (
+                  <div className="mt-3 pt-3 border-t space-y-2">
+                    <p className="text-xs text-muted-foreground">{conv.why_this_needs_you}</p>
+                    <div className="flex gap-2">
+                      <Button 
+                        size="sm" 
+                        className="flex-1"
+                        onClick={(e) => { e.stopPropagation(); handleConfirm(); }}
+                        disabled={reviewMutation.isPending}
+                      >
+                        <Check className="h-4 w-4 mr-1" />
+                        Confirm
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        className="flex-1"
+                        onClick={(e) => { e.stopPropagation(); setShowChangePicker(true); }}
+                      >
+                        Change
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </Card>
+            ))}
+          </div>
+        </ScrollArea>
+      </div>
+    );
+  }
+
+  // Desktop layout
   return (
     <div className="flex h-screen bg-background">
       <Sidebar />
@@ -633,7 +756,7 @@ export default function Review() {
               </div>
               <ReviewExplainer />
             </div>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
               <Keyboard className="h-3.5 w-3.5" />
               <span>↑↓ navigate • L confirm • H change • S skip</span>
             </div>
