@@ -119,18 +119,19 @@ export function LowConfidenceWizard() {
       if (error) throw error;
 
       const changed = data?.changed || false;
-      const result = data?.result;
+      // Edge function returns updated.classification and updated.bucket, not result
+      const updated = data?.updated;
 
       return {
         id: conv.id,
         title: conv.title || 'Untitled',
         status: changed ? 'success' : 'unchanged',
-        originalBucket: conv.decision_bucket,
-        newBucket: result?.decision_bucket || conv.decision_bucket,
-        originalClassification: conv.email_classification,
-        newClassification: result?.email_classification || conv.email_classification,
-        originalConfidence: conv.triage_confidence,
-        newConfidence: result?.triage_confidence || conv.triage_confidence,
+        originalBucket: data?.original?.bucket || conv.decision_bucket,
+        newBucket: updated?.bucket || conv.decision_bucket,
+        originalClassification: data?.original?.classification || conv.email_classification,
+        newClassification: updated?.classification || conv.email_classification,
+        originalConfidence: data?.original?.confidence || conv.triage_confidence,
+        newConfidence: updated?.confidence || conv.triage_confidence,
       };
     } catch (error) {
       console.error('Error processing conversation:', conv.id, error);
