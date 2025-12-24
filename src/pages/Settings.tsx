@@ -20,6 +20,7 @@ import { TriageLearningPanel } from '@/components/settings/TriageLearningPanel';
 import { LearningSystemPanel } from '@/components/settings/LearningSystemPanel';
 import { BehaviorStatsPanel } from '@/components/settings/BehaviorStatsPanel';
 import { NotificationPreferencesPanel } from '@/components/settings/NotificationPreferencesPanel';
+import { LowConfidenceWizard } from '@/components/settings/LowConfidenceWizard';
 import { Card } from '@/components/ui/card';
 import { TestMessageGenerator } from '@/components/TestMessageGenerator';
 import { RecentActivityWidget } from '@/components/dashboard/RecentActivityWidget';
@@ -113,6 +114,7 @@ export default function Settings() {
         </TabsContent>
 
         <TabsContent value="email-triage" className="space-y-6">
+          <LowConfidenceWizard />
           <LearningSystemPanel />
           <BehaviorStatsPanel />
           <BusinessContextPanel />
