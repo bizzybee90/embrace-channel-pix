@@ -18,7 +18,8 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
   const [collapsed, setCollapsed] = useState(true);
   const [moreOpen, setMoreOpen] = useState(false);
   
-  const isCollapsed = forceCollapsed || collapsed;
+  // In mobile drawer mode, never collapse - always show full sidebar with labels
+  const isCollapsed = isMobileDrawer ? false : (forceCollapsed || collapsed);
 
   // Fetch view counts
   const { data: viewCounts } = useQuery({

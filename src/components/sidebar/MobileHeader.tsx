@@ -19,15 +19,15 @@ export const MobileHeader = ({ onMenuClick, showBackButton, onBackClick, backToT
             variant="ghost"
             size="sm"
             onClick={onBackClick}
-            className="gap-1 text-foreground hover:bg-accent"
+            className="gap-1 text-foreground hover:bg-accent -ml-2"
           >
             <ChevronLeft className="h-4 w-4" />
             <span className="text-sm font-medium">{backToText}</span>
           </Button>
         ) : (
-          <div className="flex items-center gap-2 bg-background/95 backdrop-blur-sm px-3 py-1.5 rounded-full border border-border/50 shadow-sm">
-            <img src={beeLogo} alt="BizzyBee" className="h-6 w-6" />
-            <span className="text-sm font-semibold text-foreground">BizzyBee</span>
+          <div className="flex items-center gap-2">
+            <img src={beeLogo} alt="BizzyBee" className="h-7 w-7" />
+            <span className="text-base font-semibold text-foreground">BizzyBee</span>
           </div>
         )}
 
