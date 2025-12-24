@@ -101,3 +101,6 @@ verify_jwt = false
 
 [functions.send-summary-notifications]
 verify_jwt = false
+
+[functions.retriage-conversation]
+verify_jwt = false

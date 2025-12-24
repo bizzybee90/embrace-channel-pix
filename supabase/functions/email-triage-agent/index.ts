@@ -390,6 +390,129 @@ interface TriageRequest {
   };
 }
 
+// Valid buckets and classifications for strict validation
+const VALID_BUCKETS = ['act_now', 'quick_win', 'auto_handled', 'wait'] as const;
+const VALID_CLASSIFICATIONS = [
+  'customer_inquiry', 'customer_complaint', 'customer_feedback',
+  'lead_new', 'lead_followup', 'supplier_invoice', 'supplier_urgent', 'partner_request',
+  'automated_notification', 'receipt_confirmation', 'payment_confirmation', 'marketing_newsletter',
+  'spam_phishing', 'recruitment_hr', 'internal_system', 'informational_only',
+  'booking_request', 'quote_request', 'cancellation_request', 'reschedule_request',
+  'misdirected'
+] as const;
+const VALID_RISK_LEVELS = ['financial', 'retention', 'reputation', 'legal', 'none'] as const;
+const VALID_URGENCIES = ['high', 'medium', 'low'] as const;
+const VALID_SENTIMENTS = ['angry', 'frustrated', 'concerned', 'neutral', 'positive'] as const;
+
+// Strict type guard and normalizer for model output
+function normalizeTriageOutput(raw: any): any {
+  // Ensure we have a valid object
+  if (!raw || typeof raw !== 'object') {
+    console.error('[triage] Invalid raw output - not an object:', typeof raw);
+    return null;
+  }
+
+  // Normalize decision bucket with strict validation
+  const rawBucket = raw.decision?.bucket;
+  let bucket: string = 'quick_win'; // safe default
+  if (typeof rawBucket === 'string' && VALID_BUCKETS.includes(rawBucket as any)) {
+    bucket = rawBucket;
+  } else {
+    console.warn(`[triage] Invalid bucket "${rawBucket}", defaulting to quick_win`);
+  }
+
+  // Normalize classification category
+  const rawCategory = raw.classification?.category;
+  let category: string = 'customer_inquiry'; // safe default
+  if (typeof rawCategory === 'string' && VALID_CLASSIFICATIONS.includes(rawCategory as any)) {
+    category = rawCategory;
+  } else {
+    console.warn(`[triage] Invalid classification "${rawCategory}", defaulting to customer_inquiry`);
+  }
+
+  // Normalize confidence
+  let confidence = 0.5;
+  if (typeof raw.decision?.confidence === 'number') {
+    confidence = Math.max(0, Math.min(1, raw.decision.confidence));
+  }
+
+  // Normalize requires_reply
+  let requiresReply = true;
+  if (typeof raw.classification?.requires_reply === 'boolean') {
+    requiresReply = raw.classification.requires_reply;
+  }
+
+  // Normalize risk level
+  const rawRiskLevel = raw.risk?.level;
+  let riskLevel = 'none';
+  if (typeof rawRiskLevel === 'string' && VALID_RISK_LEVELS.includes(rawRiskLevel as any)) {
+    riskLevel = rawRiskLevel;
+  }
+
+  // Normalize cognitive load
+  const cognitiveLoad = raw.risk?.cognitive_load === 'high' ? 'high' : 'low';
+
+  // Normalize urgency
+  const rawUrgency = raw.priority?.urgency;
+  let urgency = 'medium';
+  if (typeof rawUrgency === 'string' && VALID_URGENCIES.includes(rawUrgency as any)) {
+    urgency = rawUrgency;
+  }
+
+  // Normalize sentiment
+  const rawSentiment = raw.sentiment?.tone;
+  let sentiment = 'neutral';
+  if (typeof rawSentiment === 'string' && VALID_SENTIMENTS.includes(rawSentiment as any)) {
+    sentiment = rawSentiment;
+  }
+
+  // Normalize why_this_needs_you
+  let whyThisNeedsYou = raw.decision?.why_this_needs_you;
+  if (typeof whyThisNeedsYou !== 'string' || whyThisNeedsYou.length < 5) {
+    whyThisNeedsYou = `${category.replace(/_/g, ' ')} - review needed`;
+  }
+
+  // Normalize summary
+  let summary = { one_line: '', key_points: [] as string[] };
+  if (raw.summary && typeof raw.summary === 'object') {
+    summary.one_line = typeof raw.summary.one_line === 'string' ? raw.summary.one_line : '';
+    summary.key_points = Array.isArray(raw.summary.key_points) 
+      ? raw.summary.key_points.filter((kp: any) => typeof kp === 'string').slice(0, 3)
+      : [];
+  }
+
+  // Normalize entities
+  const entities = raw.entities && typeof raw.entities === 'object' ? raw.entities : {};
+
+  // Return normalized result
+  return {
+    decision: {
+      bucket,
+      why_this_needs_you: whyThisNeedsYou,
+      confidence,
+    },
+    risk: {
+      level: riskLevel,
+      cognitive_load: cognitiveLoad,
+    },
+    classification: {
+      category,
+      requires_reply: requiresReply,
+    },
+    priority: {
+      urgency,
+      urgency_reason: typeof raw.priority?.urgency_reason === 'string' ? raw.priority.urgency_reason : '',
+    },
+    sentiment: {
+      tone: sentiment,
+    },
+    entities,
+    summary,
+    suggested_reply: typeof raw.suggested_reply === 'string' ? raw.suggested_reply : '',
+    reasoning: typeof raw.reasoning === 'string' ? raw.reasoning : '',
+  };
+}
+
 // LLM Output Validator - catches invalid/conflicting outputs
 function validateTriageResult(result: any): { valid: boolean; issues: string[] } {
   const issues: string[] = [];
@@ -426,6 +549,19 @@ function validateTriageResult(result: any): { valid: boolean; issues: string[] }
   if (result.decision.bucket === 'wait' && result.decision.confidence > 0.9) {
     issues.push('WAIT with very high confidence - likely should be AUTO_HANDLED');
   }
+
+  // Rule 6: Misdirected emails should be quick_win with requires_reply
+  if (result.classification?.category === 'misdirected') {
+    if (result.decision.bucket !== 'quick_win') {
+      issues.push('Misdirected should be quick_win');
+    }
+    if (!result.classification?.requires_reply) {
+      issues.push('Misdirected should require reply');
+    }
+  }
+
+  // Rule 7: supplier_invoice should not be spam_phishing
+  // This is a guardrail against LLM misclassification
   
   return { valid: issues.length === 0, issues };
 }
@@ -667,35 +803,83 @@ ${email.body.substring(0, 5000)}
       });
     }
 
-    let routeResult = toolUse.input;
+    // STRICT NORMALIZATION: Ensure valid output structure before any processing
+    let routeResult = normalizeTriageOutput(toolUse.input);
+    
+    if (!routeResult) {
+      console.error('[triage] Failed to normalize output, using safe default');
+      return new Response(JSON.stringify({
+        decision: {
+          bucket: 'quick_win',
+          why_this_needs_you: 'Could not parse model output - needs review',
+          confidence: 0.3
+        },
+        risk: {
+          level: 'none',
+          cognitive_load: 'high'
+        },
+        classification: {
+          category: 'customer_inquiry',
+          requires_reply: true
+        },
+        priority: {
+          urgency: 'medium',
+          urgency_reason: 'Parse failed - defaulting to medium'
+        },
+        sentiment: {
+          tone: 'neutral'
+        },
+        entities: {},
+        summary: {
+          one_line: email.subject,
+          key_points: []
+        },
+        reasoning: 'Normalization failed - requires manual review',
+        needs_human_review: true,
+        processing_time_ms: Date.now() - startTime
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
     const processingTime = Date.now() - startTime;
 
-    console.log('Initial decision routing:', {
+    console.log('Normalized decision routing:', {
       bucket: routeResult.decision.bucket,
       why_this_needs_you: routeResult.decision.why_this_needs_you,
       confidence: routeResult.decision.confidence,
+      classification: routeResult.classification.category,
     });
 
     // ============================================================
-    // VALIDATION + AUTO-RETRY: Catch invalid/conflicting outputs
+    // VALIDATION + AUTO-CORRECTION: Fix conflicting outputs
     // ============================================================
     const validation = validateTriageResult(routeResult);
     
     if (!validation.valid) {
-      console.log('Validation failed:', validation.issues);
+      console.log('[triage] Validation issues:', validation.issues);
       
-      // Try to auto-correct common issues instead of re-calling LLM
+      // Auto-correct: AUTO_HANDLED + requires_reply conflict
       if (validation.issues.includes('AUTO_HANDLED + requires_reply conflict')) {
-        // If auto_handled but requires reply, move to quick_win
         routeResult.decision.bucket = 'quick_win';
         routeResult.decision.why_this_needs_you = routeResult.decision.why_this_needs_you || 'Needs simple reply';
-        console.log('Auto-corrected: AUTO_HANDLED → QUICK_WIN due to requires_reply');
+        console.log('[triage] Auto-corrected: AUTO_HANDLED → QUICK_WIN');
       }
       
+      // Auto-correct: Misdirected should be quick_win with requires_reply
+      if (validation.issues.includes('Misdirected should be quick_win')) {
+        routeResult.decision.bucket = 'quick_win';
+        console.log('[triage] Auto-corrected: misdirected → quick_win bucket');
+      }
+      if (validation.issues.includes('Misdirected should require reply')) {
+        routeResult.classification.requires_reply = true;
+        console.log('[triage] Auto-corrected: misdirected → requires_reply=true');
+      }
+      
+      // Auto-correct: Generic/empty why_this_needs_you
       if (validation.issues.includes('Generic why_this_needs_you') || validation.issues.includes('Empty or too short why_this_needs_you')) {
-        // Generate a better why based on bucket
         const bucket = routeResult.decision.bucket;
-        const category = routeResult.classification?.category || 'unknown';
+        const category = routeResult.classification.category;
         
         const betterWhys: Record<string, string> = {
           'act_now': `Urgent ${category.replace(/_/g, ' ')} - review needed`,
@@ -705,15 +889,15 @@ ${email.body.substring(0, 5000)}
         };
         
         routeResult.decision.why_this_needs_you = betterWhys[bucket] || `${category.replace(/_/g, ' ')} - review`;
-        console.log('Auto-corrected why_this_needs_you:', routeResult.decision.why_this_needs_you);
+        console.log('[triage] Auto-corrected why_this_needs_you:', routeResult.decision.why_this_needs_you);
       }
       
+      // Auto-correct: High confidence WAIT should be AUTO_HANDLED
       if (validation.issues.includes('WAIT with very high confidence - likely should be AUTO_HANDLED')) {
-        // High confidence WAIT is often wrong - check if it's really actionable
-        if (!routeResult.classification?.requires_reply) {
+        if (!routeResult.classification.requires_reply) {
           routeResult.decision.bucket = 'auto_handled';
           routeResult.decision.why_this_needs_you = 'No action required - informational only';
-          console.log('Auto-corrected: WAIT → AUTO_HANDLED (no reply needed)');
+          console.log('[triage] Auto-corrected: WAIT → AUTO_HANDLED');
         }
       }
     }
