@@ -334,6 +334,7 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
     if (subFilter === 'to-reply') return 'To Reply';
     if (filter === 'cleared') return 'Done';
     if (filter === 'snoozed') return 'Snoozed';
+    if (filter === 'sent') return 'Sent';
     return 'To Reply';
   };
 
