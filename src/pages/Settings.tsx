@@ -1,4 +1,6 @@
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useState } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { DataExportPanel } from '@/components/settings/DataExportPanel';
 import { DataDeletionPanel } from '@/components/settings/DataDeletionPanel';
 import { AuditLogPanel } from '@/components/settings/AuditLogPanel';
@@ -7,7 +9,6 @@ import { TestDataCleanupPanel } from '@/components/settings/TestDataCleanupPanel
 import { GDPRDashboard } from '@/components/settings/GDPRDashboard';
 import { CustomerMergePanel } from '@/components/settings/CustomerMergePanel';
 import { ChannelManagementPanel } from '@/components/settings/ChannelManagementPanel';
-import { AIActivityWidget } from '@/components/dashboard/AIActivityWidget';
 import { AIAgentPanel } from '@/components/settings/AIAgentPanel';
 import { ConversationOrderingPanel } from '@/components/settings/ConversationOrderingPanel';
 import { KnowledgeBasePanel } from '@/components/settings/KnowledgeBasePanel';
@@ -22,73 +23,93 @@ import { BehaviorStatsPanel } from '@/components/settings/BehaviorStatsPanel';
 import { NotificationPreferencesPanel } from '@/components/settings/NotificationPreferencesPanel';
 import { LowConfidenceWizard } from '@/components/settings/LowConfidenceWizard';
 import { LearningAnalyticsDashboard } from '@/components/settings/LearningAnalyticsDashboard';
-import { Card } from '@/components/ui/card';
 import { TestMessageGenerator } from '@/components/TestMessageGenerator';
-import { RecentActivityWidget } from '@/components/dashboard/RecentActivityWidget';
-import { TestTube, Filter, Bell, BarChart3 } from 'lucide-react';
 import { BackButton } from '@/components/shared/BackButton';
+import { Bot, Plug, Shield, Layout, Code, ChevronRight } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+interface SettingsCategory {
+  id: string;
+  icon: React.ElementType;
+  title: string;
+  description: string;
+  content: React.ReactNode;
+}
 
 export default function Settings() {
-  return (
-    <div className="container mx-auto py-4 md:py-6 px-4 max-w-6xl">
-      <div className="mb-4 md:mb-6">
-        <BackButton to="/" label="Back to Dashboard" />
-        <h1 className="text-2xl md:text-3xl font-bold mt-2">Settings</h1>
-        <p className="text-sm md:text-base text-muted-foreground mt-1 md:mt-2">Manage your workspace settings, GDPR compliance, and data policies.</p>
-      </div>
+  const [openCategory, setOpenCategory] = useState<string | null>(null);
 
-      <Tabs defaultValue="dashboard" className="space-y-4 md:space-y-6">
-        <div className="overflow-x-auto pb-2 -mx-4 px-4">
-          <TabsList className="inline-flex w-auto min-w-full">
-            <TabsTrigger value="dashboard" className="text-xs md:text-sm">Dashboard</TabsTrigger>
-            <TabsTrigger value="ordering" className="text-xs md:text-sm">Ordering</TabsTrigger>
-            <TabsTrigger value="ai-agent" className="text-xs md:text-sm">AI Agent</TabsTrigger>
-            <TabsTrigger value="testing" className="flex items-center gap-2 text-xs md:text-sm">
-              <TestTube className="h-3 w-3 md:h-4 md:w-4" />
-              Testing
-            </TabsTrigger>
-            <TabsTrigger value="knowledge-base" className="text-xs md:text-sm">Knowledge Base</TabsTrigger>
-            <TabsTrigger value="data-sync" className="text-xs md:text-sm">Data Sync</TabsTrigger>
-            <TabsTrigger value="integrations" className="text-xs md:text-sm">Integrations</TabsTrigger>
-            <TabsTrigger value="channels" className="text-xs md:text-sm">Channels</TabsTrigger>
-            <TabsTrigger value="email-settings" className="text-xs md:text-sm">Email</TabsTrigger>
-            <TabsTrigger value="email-triage" className="flex items-center gap-2 text-xs md:text-sm">
-              <Filter className="h-3 w-3 md:h-4 md:w-4" />
-              Email Triage
-            </TabsTrigger>
-            <TabsTrigger value="notifications" className="flex items-center gap-2 text-xs md:text-sm">
-              <Bell className="h-3 w-3 md:h-4 md:w-4" />
-              Notifications
-            </TabsTrigger>
-            <TabsTrigger value="learning-analytics" className="flex items-center gap-2 text-xs md:text-sm">
-              <BarChart3 className="h-3 w-3 md:h-4 md:w-4" />
-              Learning Analytics
-            </TabsTrigger>
-            <TabsTrigger value="gdpr" className="text-xs md:text-sm">GDPR</TabsTrigger>
-            <TabsTrigger value="cleanup" className="text-xs md:text-sm">Cleanup</TabsTrigger>
-            <TabsTrigger value="export" className="text-xs md:text-sm">Data Export</TabsTrigger>
-            <TabsTrigger value="deletion" className="text-xs md:text-sm">Data Deletion</TabsTrigger>
-            <TabsTrigger value="retention" className="text-xs md:text-sm">Retention</TabsTrigger>
-            <TabsTrigger value="audit" className="text-xs md:text-sm">Audit Logs</TabsTrigger>
-          </TabsList>
-        </div>
-
-        <TabsContent value="dashboard" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            <AIActivityWidget />
-            <RecentActivityWidget />
-          </div>
-        </TabsContent>
-
-        <TabsContent value="ordering">
-          <ConversationOrderingPanel />
-        </TabsContent>
-
-        <TabsContent value="ai-agent">
+  const settingsCategories: SettingsCategory[] = [
+    {
+      id: 'ai',
+      icon: Bot,
+      title: 'BizzyBee AI',
+      description: 'Agent configuration, knowledge base, and learning',
+      content: (
+        <div className="space-y-6">
           <AIAgentPanel />
-        </TabsContent>
-
-        <TabsContent value="testing" className="space-y-6">
+          <KnowledgeBasePanel />
+          <LearningAnalyticsDashboard />
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold">Email Triage Settings</h3>
+            <LowConfidenceWizard />
+            <LearningSystemPanel />
+            <BehaviorStatsPanel />
+            <BusinessContextPanel />
+            <SenderRulesPanel />
+            <TriageLearningPanel />
+          </div>
+        </div>
+      )
+    },
+    {
+      id: 'connections',
+      icon: Plug,
+      title: 'Connections',
+      description: 'Email accounts, channels, and integrations',
+      content: (
+        <div className="space-y-6">
+          <EmailSettingsPanel />
+          <ChannelManagementPanel />
+          <IntegrationsPanel />
+          <DataSyncPanel />
+        </div>
+      )
+    },
+    {
+      id: 'data',
+      icon: Shield,
+      title: 'Data & Privacy',
+      description: 'GDPR compliance, exports, and retention',
+      content: (
+        <div className="space-y-6">
+          <GDPRDashboard />
+          <DataExportPanel />
+          <DataDeletionPanel />
+          <RetentionPolicyPanel />
+          <AuditLogPanel />
+        </div>
+      )
+    },
+    {
+      id: 'display',
+      icon: Layout,
+      title: 'Display & Behavior',
+      description: 'Ordering preferences and notifications',
+      content: (
+        <div className="space-y-6">
+          <ConversationOrderingPanel />
+          <NotificationPreferencesPanel />
+        </div>
+      )
+    },
+    {
+      id: 'developer',
+      icon: Code,
+      title: 'Developer Tools',
+      description: 'Testing, cleanup, and diagnostics',
+      content: (
+        <div className="space-y-6">
           <Card className="p-6">
             <h2 className="text-xl font-semibold mb-4">Test Message Generator</h2>
             <p className="text-sm text-muted-foreground mb-4">
@@ -96,70 +117,78 @@ export default function Settings() {
             </p>
             <TestMessageGenerator />
           </Card>
-        </TabsContent>
-
-        <TabsContent value="knowledge-base">
-          <KnowledgeBasePanel />
-        </TabsContent>
-
-        <TabsContent value="data-sync">
-          <DataSyncPanel />
-        </TabsContent>
-
-        <TabsContent value="integrations">
-          <IntegrationsPanel />
-        </TabsContent>
-
-        <TabsContent value="channels">
-          <ChannelManagementPanel />
-        </TabsContent>
-
-        <TabsContent value="email-settings">
-          <EmailSettingsPanel />
-        </TabsContent>
-
-        <TabsContent value="email-triage" className="space-y-6">
-          <LowConfidenceWizard />
-          <LearningSystemPanel />
-          <BehaviorStatsPanel />
-          <BusinessContextPanel />
-          <SenderRulesPanel />
-          <TriageLearningPanel />
-        </TabsContent>
-
-        <TabsContent value="notifications">
-          <NotificationPreferencesPanel />
-        </TabsContent>
-
-        <TabsContent value="learning-analytics">
-          <LearningAnalyticsDashboard />
-        </TabsContent>
-
-        <TabsContent value="gdpr">
-          <GDPRDashboard />
-        </TabsContent>
-
-        <TabsContent value="cleanup" className="space-y-6">
           <TestDataCleanupPanel />
           <CustomerMergePanel />
-        </TabsContent>
+        </div>
+      )
+    }
+  ];
 
-        <TabsContent value="export">
-          <DataExportPanel />
-        </TabsContent>
+  const handleToggle = (categoryId: string) => {
+    setOpenCategory(openCategory === categoryId ? null : categoryId);
+  };
 
-        <TabsContent value="deletion">
-          <DataDeletionPanel />
-        </TabsContent>
+  return (
+    <div className="container mx-auto py-4 md:py-6 px-4 max-w-3xl">
+      <div className="mb-6">
+        <BackButton to="/" label="Back to Dashboard" />
+        <h1 className="text-2xl md:text-3xl font-bold mt-2">Settings</h1>
+        <p className="text-sm md:text-base text-muted-foreground mt-1">
+          Manage your workspace configuration and preferences.
+        </p>
+      </div>
 
-        <TabsContent value="retention">
-          <RetentionPolicyPanel />
-        </TabsContent>
-
-        <TabsContent value="audit">
-          <AuditLogPanel />
-        </TabsContent>
-      </Tabs>
+      <div className="space-y-3">
+        {settingsCategories.map((category) => {
+          const Icon = category.icon;
+          const isOpen = openCategory === category.id;
+          
+          return (
+            <Collapsible
+              key={category.id}
+              open={isOpen}
+              onOpenChange={() => handleToggle(category.id)}
+            >
+              <Card className={cn(
+                "transition-all duration-200",
+                isOpen && "ring-2 ring-primary/20"
+              )}>
+                <CollapsibleTrigger className="w-full text-left">
+                  <CardHeader className="flex flex-row items-center justify-between py-4">
+                    <div className="flex items-center gap-4">
+                      <div className={cn(
+                        "p-2 rounded-lg",
+                        isOpen ? "bg-primary text-primary-foreground" : "bg-muted"
+                      )}>
+                        <Icon className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-base font-medium">
+                          {category.title}
+                        </CardTitle>
+                        <CardDescription className="text-sm">
+                          {category.description}
+                        </CardDescription>
+                      </div>
+                    </div>
+                    <ChevronRight className={cn(
+                      "h-5 w-5 text-muted-foreground transition-transform duration-200",
+                      isOpen && "rotate-90"
+                    )} />
+                  </CardHeader>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <CardContent className="pt-0 pb-6">
+                    <div className="border-t pt-6">
+                      {category.content}
+                    </div>
+                  </CardContent>
+                </CollapsibleContent>
+              </Card>
+            </Collapsible>
+          );
+        })}
+      </div>
     </div>
   );
 }
