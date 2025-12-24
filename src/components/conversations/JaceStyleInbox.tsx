@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Conversation } from '@/lib/types';
 import { SearchInput } from './SearchInput';
@@ -24,6 +25,9 @@ interface GroupedConversations {
 }
 
 export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInboxProps) => {
+  const [searchParams] = useSearchParams();
+  const subFilter = searchParams.get('filter'); // 'at-risk', 'to-reply', 'drafts'
+  
   const [searchQuery, setSearchQuery] = useState('');
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [correctionOpen, setCorrectionOpen] = useState(false);
@@ -53,8 +57,27 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
       .eq('workspace_id', userData.workspace_id)
       .order('updated_at', { ascending: false });
 
-    // Apply view filter
-    if (filter === 'needs-me') {
+    // Apply sub-filter from URL query params (at-risk, to-reply, drafts)
+    if (subFilter === 'at-risk') {
+      // At Risk: SLA breached or warning
+      query = query
+        .in('sla_status', ['warning', 'breached'])
+        .in('status', ['new', 'open', 'waiting_internal', 'ai_handling', 'escalated']);
+    } else if (subFilter === 'drafts') {
+      // Drafts Ready: Has AI draft, no final response, requires reply
+      query = query
+        .not('ai_draft_response', 'is', null)
+        .is('final_response', null)
+        .in('status', ['new', 'open', 'ai_handling'])
+        .in('decision_bucket', ['quick_win', 'act_now'])
+        .eq('requires_reply', true);
+    } else if (subFilter === 'to-reply') {
+      // To Reply: ACT_NOW + QUICK_WIN buckets
+      query = query
+        .in('decision_bucket', ['act_now', 'quick_win'])
+        .in('status', ['new', 'open', 'waiting_internal', 'ai_handling', 'escalated']);
+    } else if (filter === 'needs-me') {
+      // Default needs-me filter (no sub-filter)
       query = query
         .in('decision_bucket', ['act_now', 'quick_win'])
         .in('status', ['new', 'open', 'waiting_internal', 'ai_handling', 'escalated']);
@@ -94,7 +117,7 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
   });
 
   const { data: conversations = [], isLoading, isFetching } = useQuery({
-    queryKey: ['jace-inbox', filter],
+    queryKey: ['jace-inbox', filter, subFilter],
     queryFn: async () => {
       const result = await fetchConversations();
       setLastUpdated(new Date());
@@ -294,19 +317,39 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
     );
   }
 
+  // Get title based on sub-filter
+  const getFilterTitle = () => {
+    if (subFilter === 'at-risk') return 'At Risk';
+    if (subFilter === 'drafts') return 'Drafts Ready';
+    if (subFilter === 'to-reply') return 'To Reply';
+    if (filter === 'cleared') return 'Done';
+    if (filter === 'snoozed') return 'Snoozed';
+    return 'To Reply';
+  };
+
   return (
     <div className="flex flex-col h-full bg-background">
-      {/* Header with metrics */}
-      {filter === 'needs-me' && autoHandledCount > 0 && (
-        <div className="px-6 py-4 bg-gradient-to-r from-primary/5 to-transparent border-b border-border/50">
-          <div className="flex items-center gap-2 text-sm">
-            <Sparkles className="h-4 w-4 text-primary" />
-            <span className="text-foreground/80">
-              🐝 BizzyBee cleared <span className="font-semibold text-primary">{autoHandledCount}</span> messages for you today
-            </span>
-          </div>
+      {/* Header with title and metrics */}
+      <div className="px-6 py-4 bg-gradient-to-r from-primary/5 to-transparent border-b border-border/50">
+        <div className="flex items-center justify-between">
+          <h1 className="text-lg font-semibold text-foreground">{getFilterTitle()}</h1>
+          {filter === 'needs-me' && autoHandledCount > 0 && !subFilter && (
+            <div className="flex items-center gap-2 text-sm">
+              <Sparkles className="h-4 w-4 text-primary" />
+              <span className="text-foreground/80">
+                🐝 BizzyBee cleared <span className="font-semibold text-primary">{autoHandledCount}</span> today
+              </span>
+            </div>
+          )}
         </div>
-      )}
+        {subFilter && (
+          <p className="text-xs text-muted-foreground mt-1">
+            {subFilter === 'at-risk' && 'Conversations with SLA warnings or breaches'}
+            {subFilter === 'drafts' && 'AI drafted responses ready for your review'}
+            {subFilter === 'to-reply' && 'Conversations needing your attention'}
+          </p>
+        )}
+      </div>
 
       {/* Search bar */}
       <div className="px-6 py-4 border-b border-border/50">
