@@ -16,6 +16,7 @@ import {
   Settings2,
   Info,
   LucideIcon,
+  Pencil,
 } from 'lucide-react';
 
 interface CategoryConfig {
@@ -29,6 +30,7 @@ const categoryConfigs: Record<string, CategoryConfig> = {
   customer_inquiry: { icon: Mail, label: 'Inquiry', className: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20' },
   customer_complaint: { icon: AlertTriangle, label: 'Complaint', className: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20' },
   customer_feedback: { icon: ThumbsUp, label: 'Feedback', className: 'bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20' },
+  complaint_dispute: { icon: AlertTriangle, label: 'Complaint', className: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20' },
   
   // Specific request types
   booking_request: { icon: MessageCircle, label: 'Booking', className: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20' },
@@ -125,13 +127,17 @@ interface CategoryLabelProps {
   size?: 'xs' | 'sm' | 'md';
   showIcon?: boolean;
   className?: string;
+  editable?: boolean;
+  onClick?: (e: React.MouseEvent) => void;
 }
 
 export const CategoryLabel = ({ 
   classification, 
   size = 'sm', 
   showIcon = true,
-  className 
+  className,
+  editable = false,
+  onClick
 }: CategoryLabelProps) => {
   const config = getCategoryConfig(classification);
   if (!config) return null;
@@ -150,6 +156,13 @@ export const CategoryLabel = ({
     md: 'h-3.5 w-3.5',
   };
 
+  const handleClick = (e: React.MouseEvent) => {
+    if (editable && onClick) {
+      e.stopPropagation();
+      onClick(e);
+    }
+  };
+
   return (
     <Badge 
       variant="outline" 
@@ -157,11 +170,19 @@ export const CategoryLabel = ({
         "rounded-full border flex items-center gap-1 font-medium",
         sizeClasses[size],
         config.className,
+        editable && "cursor-pointer hover:ring-2 hover:ring-primary/20 transition-all group",
         className
       )}
+      onClick={handleClick}
     >
       {showIcon && <Icon className={iconSizes[size]} />}
       {config.label}
+      {editable && (
+        <Pencil className={cn(
+          iconSizes[size], 
+          "ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+        )} />
+      )}
     </Badge>
   );
 };

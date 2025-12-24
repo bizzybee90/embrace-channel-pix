@@ -10,6 +10,7 @@ import { format, isToday, isYesterday } from 'date-fns';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChannelIcon } from '@/components/shared/ChannelIcon';
 import { CategoryLabel } from '@/components/shared/CategoryLabel';
+import { TriageCorrectionFlow } from './TriageCorrectionFlow';
 
 interface JaceStyleInboxProps {
   onSelect: (conversation: Conversation) => void;
@@ -25,6 +26,8 @@ interface GroupedConversations {
 export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInboxProps) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [correctionOpen, setCorrectionOpen] = useState(false);
+  const [selectedForCorrection, setSelectedForCorrection] = useState<Conversation | null>(null);
   const queryClient = useQueryClient();
   const PAGE_SIZE = 50;
 
@@ -142,7 +145,15 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
     return `${minutes}m ago`;
   };
 
-  // Channel icon is now handled by ChannelIcon component
+  const handleCategoryClick = (conversation: Conversation, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedForCorrection(conversation);
+    setCorrectionOpen(true);
+  };
+
+  const handleCorrectionUpdate = () => {
+    queryClient.invalidateQueries({ queryKey: ['jace-inbox'] });
+  };
 
   // Fixed width for all status badges to ensure consistent alignment
   const BADGE_CLASS = "text-[10px] px-2 py-0 h-5 min-w-[90px] text-center justify-center";
@@ -235,7 +246,12 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
 
         {/* Category + State badge */}
         <div className="flex items-center gap-1.5 flex-shrink-0">
-          <CategoryLabel classification={conv.email_classification} size="xs" />
+          <CategoryLabel 
+            classification={conv.email_classification} 
+            size="xs" 
+            editable={true}
+            onClick={(e) => handleCategoryClick(conversation, e)}
+          />
           {stateConfig.badge}
         </div>
 
@@ -333,6 +349,16 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
           </>
         )}
       </div>
+
+      {/* Triage Correction Dialog */}
+      {selectedForCorrection && (
+        <TriageCorrectionFlow
+          conversation={selectedForCorrection}
+          open={correctionOpen}
+          onOpenChange={setCorrectionOpen}
+          onUpdate={handleCorrectionUpdate}
+        />
+      )}
     </div>
   );
 };
