@@ -55,6 +55,19 @@ export function LowConfidenceWizard() {
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
 
   useEffect(() => {
+    const saved = localStorage.getItem('low-confidence-wizard-state');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved) as { step?: 'overview' | 'processing' | 'review'; results?: ProcessedResult[] };
+        if (parsed.step === 'review' && Array.isArray(parsed.results) && parsed.results.length > 0) {
+          setStep('review');
+          setResults(parsed.results);
+        }
+      } catch {
+        // ignore
+      }
+    }
+
     fetchLowConfidenceEmails();
   }, []);
 
@@ -137,16 +150,28 @@ export function LowConfidenceWizard() {
   }, [workspaceId]);
 
   const startProcessing = async () => {
+    if (!workspaceId) {
+      toast({
+        title: 'Workspace not ready',
+        description: 'Please wait a moment and try again.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setStep('processing');
     setProcessing(true);
     setResults([]);
     setCurrentIndex(0);
 
+    const collected: ProcessedResult[] = [];
+
     for (let i = 0; i < conversations.length; i++) {
       setCurrentIndex(i);
       const result = await processConversation(conversations[i]);
-      setResults(prev => [...prev, result]);
-      
+      collected.push(result);
+      setResults([...collected]);
+
       // Small delay to avoid overwhelming the API
       if (i < conversations.length - 1) {
         await new Promise(resolve => setTimeout(resolve, 500));
@@ -155,8 +180,13 @@ export function LowConfidenceWizard() {
 
     setProcessing(false);
     setStep('review');
-    
-    const successCount = results.filter(r => r.status === 'success').length;
+
+    localStorage.setItem(
+      'low-confidence-wizard-state',
+      JSON.stringify({ step: 'review', results: collected, ranAt: new Date().toISOString() })
+    );
+
+    const successCount = collected.filter(r => r.status === 'success').length;
     toast({
       title: 'Processing complete',
       description: `${successCount} classifications updated out of ${conversations.length} emails`,
@@ -333,7 +363,7 @@ export function LowConfidenceWizard() {
                       <div
                         key={result.id}
                         className="flex items-center justify-between text-sm py-2 px-2 rounded hover:bg-muted/50 group cursor-pointer"
-                        onClick={() => navigate(`/inbox/${result.id}`)}
+                        onClick={() => navigate(`/conversation/${result.id}`)}
                       >
                         <span className="truncate flex-1 mr-2 group-hover:text-primary">
                           {result.title}
@@ -369,7 +399,7 @@ export function LowConfidenceWizard() {
                 Run Again
               </Button>
               <Button
-                onClick={() => navigate('/inbox')}
+                onClick={() => navigate('/all-open')}
                 className="flex-1"
               >
                 <Eye className="h-4 w-4 mr-2" />

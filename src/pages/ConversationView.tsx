@@ -1,0 +1,74 @@
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { ConversationThread } from "@/components/conversations/ConversationThread";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Loader2 } from "lucide-react";
+import type { Conversation } from "@/lib/types";
+
+export default function ConversationView() {
+  const navigate = useNavigate();
+  const { id } = useParams<{ id: string }>();
+
+  const [conversation, setConversation] = useState<Conversation | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const conversationId = useMemo(() => id ?? "", [id]);
+
+  useEffect(() => {
+    document.title = "Conversation • Inbox";
+  }, []);
+
+  useEffect(() => {
+    const run = async () => {
+      if (!conversationId) {
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("conversations")
+        .select("*")
+        .eq("id", conversationId)
+        .single();
+
+      if (!error && data) {
+        setConversation(data as Conversation);
+      }
+
+      setLoading(false);
+    };
+
+    run();
+  }, [conversationId]);
+
+  if (loading) {
+    return (
+      <div className="h-screen w-full bg-background flex items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!conversation) {
+    return (
+      <div className="h-screen w-full bg-background flex items-center justify-center p-6">
+        <Card className="w-full max-w-lg p-6 space-y-3">
+          <h1 className="text-lg font-semibold">Conversation not found</h1>
+          <p className="text-sm text-muted-foreground">
+            This conversation may have been removed or you may not have access.
+          </p>
+          <Button onClick={() => navigate(-1)}>Go back</Button>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-screen w-full bg-background">
+      <ConversationThread conversation={conversation} onUpdate={() => {}} onBack={() => navigate(-1)} />
+    </div>
+  );
+}

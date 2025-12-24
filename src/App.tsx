@@ -12,6 +12,7 @@ import Privacy from "./pages/Privacy";
 import Escalations from "./pages/Escalations";
 import { EscalationHub } from "./pages/EscalationHub";
 import { MobileEscalationHub } from "./pages/mobile/MobileEscalationHub";
+import ConversationView from "./pages/ConversationView";
 import { AuthGuard } from "./components/AuthGuard";
 import { useIsMobile } from "./hooks/use-mobile";
 import Home from "./pages/Home";
@@ -19,6 +20,7 @@ import ChannelsDashboard from "./pages/ChannelsDashboard";
 import ChannelConversations from "./pages/ChannelConversations";
 import AnalyticsDashboard from "./pages/AnalyticsDashboard";
 import Review from "./pages/Review";
+
 
 const queryClient = new QueryClient();
 
@@ -249,6 +251,16 @@ const RouterContent = () => {
           </AuthGuard>
         } 
       />
+
+      <Route
+        path="/conversation/:id"
+        element={
+          <AuthGuard>
+            <ConversationView />
+          </AuthGuard>
+        }
+      />
+
       <Route 
         path="/settings"
         element={
