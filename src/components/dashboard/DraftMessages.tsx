@@ -288,18 +288,6 @@ export function DraftMessages({ onNavigate, maxItems = 5 }: DraftMessagesProps) 
         ))}
       </div>
 
-      {drafts.length >= maxItems && (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="w-full text-muted-foreground"
-          onClick={() => onNavigate?.('/to-reply')}
-        >
-          View all drafts
-          <ChevronRight className="h-4 w-4 ml-1" />
-        </Button>
-      )}
-
       <DraftPreviewSheet
         conversationId={previewId}
         open={!!previewId}

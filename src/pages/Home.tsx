@@ -14,8 +14,10 @@ import {
   Sparkles,
   Activity,
   FileEdit,
-  Users
+  Users,
+  ChevronRight
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import beeLogo from '@/assets/bee-logo.png';
 import { formatDistanceToNow } from 'date-fns';
 import { ActivityFeed } from '@/components/dashboard/ActivityFeed';
@@ -240,7 +242,7 @@ export const Home = () => {
                     ? 'bg-gradient-to-br from-destructive/10 via-destructive/5 to-background border-destructive/30 shadow-lg shadow-destructive/10' 
                     : 'hover:bg-accent/50'
                 }`}
-                onClick={() => navigate('/to-reply')}
+                onClick={() => navigate('/to-reply?filter=at-risk')}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-4">
@@ -300,7 +302,7 @@ export const Home = () => {
                     ? 'bg-gradient-to-br from-primary/10 via-primary/5 to-background border-primary/30' 
                     : 'hover:bg-accent/50'
                 }`}
-                onClick={() => navigate('/to-reply')}
+                onClick={() => navigate('/to-reply?filter=to-reply')}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-4">
@@ -330,7 +332,7 @@ export const Home = () => {
                     ? 'bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-background border-amber-500/30' 
                     : 'hover:bg-accent/50'
                 }`}
-                onClick={() => navigate('/to-reply')}
+                onClick={() => navigate('/to-reply?filter=drafts')}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-4">
@@ -376,6 +378,15 @@ export const Home = () => {
                   <h2 className="font-semibold text-foreground">Pending Drafts</h2>
                 </div>
                 <DraftMessages onNavigate={handleNavigate} maxItems={4} />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full text-muted-foreground mt-2"
+                  onClick={() => navigate('/to-reply?filter=drafts')}
+                >
+                  View all drafts
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
               </Card>
 
               {/* Activity Feed */}
@@ -385,6 +396,15 @@ export const Home = () => {
                   <h2 className="font-semibold text-foreground">Recent Activity</h2>
                 </div>
                 <ActivityFeed onNavigate={handleNavigate} />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full text-muted-foreground mt-2"
+                  onClick={() => navigate('/activity')}
+                >
+                  View all activity
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
               </Card>
 
               {/* Right Column: Learning + Activity Log */}

@@ -278,6 +278,88 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const sendRequest: SendRequest = await req.json();
 
+    // Get conversation to check automation level
+    const { data: conversation } = await supabase
+      .from('conversations')
+      .select('workspace_id, customer_id')
+      .eq('id', sendRequest.conversationId)
+      .single();
+
+    if (!conversation) {
+      throw new Error('Conversation not found');
+    }
+
+    // Check automation level for this channel
+    let automationLevel = 'draft_only'; // Default
+    
+    if (sendRequest.channel === 'email') {
+      // Check email provider config first
+      const { data: emailConfig } = await supabase
+        .from('email_provider_configs')
+        .select('automation_level')
+        .eq('workspace_id', conversation.workspace_id)
+        .limit(1)
+        .maybeSingle();
+      
+      if (emailConfig?.automation_level) {
+        automationLevel = emailConfig.automation_level;
+      }
+    } else {
+      // Check workspace channel config for SMS/WhatsApp
+      const { data: channelConfig } = await supabase
+        .from('workspace_channels')
+        .select('automation_level')
+        .eq('workspace_id', conversation.workspace_id)
+        .eq('channel', sendRequest.channel)
+        .maybeSingle();
+      
+      if (channelConfig?.automation_level) {
+        automationLevel = channelConfig.automation_level;
+      }
+    }
+
+    console.log('[SendResponse] Channel:', sendRequest.channel, 'Automation level:', automationLevel);
+
+    // If review_required, route to review queue instead of sending
+    if (automationLevel === 'review_required' && !sendRequest.metadata?.bypassReview) {
+      console.log('[SendResponse] Review required - routing to review queue');
+      
+      await supabase
+        .from('conversations')
+        .update({
+          needs_review: true,
+          ai_draft_response: sendRequest.message,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', sendRequest.conversationId);
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          routed_to_review: true,
+          message: 'Message routed to review queue'
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        }
+      );
+    }
+
+    // If disabled, reject the send
+    if (automationLevel === 'disabled' && !sendRequest.metadata?.manualSend) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Automation is disabled for this channel'
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400,
+        }
+      );
+    }
+
     console.log('Sending message:', {
       channel: sendRequest.channel,
       to: sendRequest.to,
@@ -412,17 +494,6 @@ serve(async (req) => {
       console.log('Message sent via Twilio:', messageId);
     }
 
-    // Get conversation to find customer
-    const { data: conversation } = await supabase
-      .from('conversations')
-      .select('customer_id')
-      .eq('id', sendRequest.conversationId)
-      .single();
-
-    if (!conversation) {
-      throw new Error('Conversation not found');
-    }
-
     // Log the outbound message to database (skip if frontend already saved it)
     if (!sendRequest.skipMessageLog) {
       const { error: messageError } = await supabase
@@ -438,7 +509,8 @@ serve(async (req) => {
           raw_payload: {
             ...sendRequest.metadata,
             messageId: messageId,
-            messageStatus: messageStatus
+            messageStatus: messageStatus,
+            automation_level: automationLevel
           }
         });
 
