@@ -11,10 +11,8 @@ import WebhookLogs from "./pages/WebhookLogs";
 import Privacy from "./pages/Privacy";
 import Escalations from "./pages/Escalations";
 import { EscalationHub } from "./pages/EscalationHub";
-import { MobileEscalationHub } from "./pages/mobile/MobileEscalationHub";
 import ConversationView from "./pages/ConversationView";
 import { AuthGuard } from "./components/AuthGuard";
-import { useIsMobile } from "./hooks/use-mobile";
 import Home from "./pages/Home";
 import ChannelsDashboard from "./pages/ChannelsDashboard";
 import ChannelConversations from "./pages/ChannelConversations";
@@ -28,8 +26,6 @@ import LearningPage from "./pages/LearningPage";
 const queryClient = new QueryClient();
 
 const RouterContent = () => {
-  const isMobile = useIsMobile();
-
   return (
     <Routes>
       <Route path="/auth" element={<Auth />} />
@@ -44,16 +40,12 @@ const RouterContent = () => {
         } 
       />
       
-      {/* To Reply - Primary view (renamed from needs-me) */}
+      {/* To Reply - Primary view */}
       <Route 
         path="/to-reply" 
         element={
           <AuthGuard>
-            {isMobile ? (
-              <MobileEscalationHub filter="needs-me" />
-            ) : (
-              <EscalationHub filter="needs-me" />
-            )}
+            <EscalationHub filter="needs-me" />
           </AuthGuard>
         } 
       />
@@ -61,17 +53,12 @@ const RouterContent = () => {
       {/* Redirect old needs-me route */}
       <Route path="/needs-me" element={<Navigate to="/to-reply" replace />} />
       
-      
-      {/* Done - Auto-handled + resolved (renamed from cleared) */}
+      {/* Done - Auto-handled + resolved */}
       <Route 
         path="/done" 
         element={
           <AuthGuard>
-            {isMobile ? (
-              <MobileEscalationHub filter="cleared" />
-            ) : (
-              <EscalationHub filter="cleared" />
-            )}
+            <EscalationHub filter="cleared" />
           </AuthGuard>
         } 
       />
@@ -94,11 +81,7 @@ const RouterContent = () => {
         path="/snoozed" 
         element={
           <AuthGuard>
-            {isMobile ? (
-              <MobileEscalationHub filter="snoozed" />
-            ) : (
-              <EscalationHub filter="snoozed" />
-            )}
+            <EscalationHub filter="snoozed" />
           </AuthGuard>
         } 
       />
@@ -108,39 +91,27 @@ const RouterContent = () => {
         path="/sent" 
         element={
           <AuthGuard>
-            {isMobile ? (
-              <MobileEscalationHub filter="sent" />
-            ) : (
-              <EscalationHub filter="sent" />
-            )}
+            <EscalationHub filter="sent" />
           </AuthGuard>
         } 
       />
       
-      {/* All Open (Inbox All) - Hidden under More */}
+      {/* All Open (Inbox All) */}
       <Route 
         path="/all-open" 
         element={
           <AuthGuard>
-            {isMobile ? (
-              <MobileEscalationHub filter="all-open" />
-            ) : (
-              <EscalationHub filter="all-open" />
-            )}
+            <EscalationHub filter="all-open" />
           </AuthGuard>
         } 
       />
       
-      {/* Legacy routes - redirect or keep for backwards compatibility */}
+      {/* Legacy routes */}
       <Route 
         path="/my-tickets" 
         element={
           <AuthGuard>
-            {isMobile ? (
-              <MobileEscalationHub filter="my-tickets" />
-            ) : (
-              <EscalationHub filter="my-tickets" />
-            )}
+            <EscalationHub filter="my-tickets" />
           </AuthGuard>
         } 
       />
@@ -148,11 +119,7 @@ const RouterContent = () => {
         path="/unassigned" 
         element={
           <AuthGuard>
-            {isMobile ? (
-              <MobileEscalationHub filter="unassigned" />
-            ) : (
-              <EscalationHub filter="unassigned" />
-            )}
+            <EscalationHub filter="unassigned" />
           </AuthGuard>
         } 
       />
@@ -160,11 +127,7 @@ const RouterContent = () => {
         path="/sla-risk" 
         element={
           <AuthGuard>
-            {isMobile ? (
-              <MobileEscalationHub filter="sla-risk" />
-            ) : (
-              <EscalationHub filter="sla-risk" />
-            )}
+            <EscalationHub filter="sla-risk" />
           </AuthGuard>
         } 
       />
@@ -172,11 +135,7 @@ const RouterContent = () => {
         path="/awaiting-reply" 
         element={
           <AuthGuard>
-            {isMobile ? (
-              <MobileEscalationHub filter="awaiting-reply" />
-            ) : (
-              <EscalationHub filter="awaiting-reply" />
-            )}
+            <EscalationHub filter="awaiting-reply" />
           </AuthGuard>
         } 
       />
@@ -184,11 +143,7 @@ const RouterContent = () => {
         path="/triaged" 
         element={
           <AuthGuard>
-            {isMobile ? (
-              <MobileEscalationHub filter="triaged" />
-            ) : (
-              <EscalationHub filter="triaged" />
-            )}
+            <EscalationHub filter="triaged" />
           </AuthGuard>
         } 
       />
@@ -196,11 +151,7 @@ const RouterContent = () => {
         path="/high-priority"
         element={
           <AuthGuard>
-            {isMobile ? (
-              <MobileEscalationHub filter="high-priority" />
-            ) : (
-              <EscalationHub filter="high-priority" />
-            )}
+            <EscalationHub filter="high-priority" />
           </AuthGuard>
         } 
       />
@@ -208,11 +159,7 @@ const RouterContent = () => {
         path="/vip-customers" 
         element={
           <AuthGuard>
-            {isMobile ? (
-              <MobileEscalationHub filter="vip-customers" />
-            ) : (
-              <EscalationHub filter="vip-customers" />
-            )}
+            <EscalationHub filter="vip-customers" />
           </AuthGuard>
         } 
       />

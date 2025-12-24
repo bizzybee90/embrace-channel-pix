@@ -1,11 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { PowerModeLayout } from '@/components/layout/PowerModeLayout';
 import { TabletLayout } from '@/components/layout/TabletLayout';
 import { MobileSidebarSheet } from '@/components/sidebar/MobileSidebarSheet';
 import { MobileHeader } from '@/components/sidebar/MobileHeader';
-import { MobileQuickActions } from '@/components/conversations/MobileQuickActions';
-import { MobileConversationList } from '@/components/conversations/mobile/MobileConversationList';
-import { MobileConversationView } from '@/components/conversations/mobile/MobileConversationView';
+import { JaceStyleInbox } from '@/components/conversations/JaceStyleInbox';
+import { ConversationThread } from '@/components/conversations/ConversationThread';
 import { Conversation } from '@/lib/types';
 import { useSLANotifications } from '@/hooks/useSLANotifications';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -18,14 +17,6 @@ interface EscalationHubProps {
 export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [statusFilter, setStatusFilter] = useState<string[]>([]);
-  const [priorityFilter, setPriorityFilter] = useState<string[]>([]);
-  const [channelFilter, setChannelFilter] = useState<string[]>([]);
-  const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
-  const [sortBy, setSortBy] = useState<string>(() => {
-    return localStorage.getItem('conversation-sort') || 'sla_urgent';
-  });
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const isMobile = useIsMobile();
   const isTablet = useIsTablet();
@@ -44,31 +35,12 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
     setSelectedConversation(conversation);
   };
 
-  const getFilterTitle = () => {
-    switch (filter) {
-      case 'needs-me': return 'To Reply';
-      case 'fyi': return 'FYI';
-      case 'cleared': return 'Done';
-      case 'snoozed': return 'Snoozed';
-      case 'sent': return 'Sent';
-      case 'my-tickets': return 'My Tickets';
-      case 'unassigned': return 'Unassigned';
-      case 'sla-risk': return 'SLA Risk';
-      case 'all-open': return 'Inbox (All)';
-      case 'awaiting-reply': return 'Awaiting Reply';
-      case 'completed': return 'Completed';
-      case 'high-priority': return 'High Priority';
-      case 'vip-customers': return 'VIP Customers';
-      default: return 'Conversations';
-    }
-  };
-
   // Tablet view (768px-1024px)
   if (isTablet) {
     return <TabletLayout filter={filter} />;
   }
 
-  // Mobile view
+  // Mobile view - Uses same Jace layout as desktop
   if (isMobile) {
     return (
       <div className="flex flex-col h-screen bg-background">
@@ -82,38 +54,19 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
           onOpenChange={setSidebarOpen}
           onNavigate={handleClose}
         />
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-hidden">
           {!selectedConversation ? (
-            <MobileConversationList
-              conversations={conversations}
+            <JaceStyleInbox
+              filter={filter}
               onSelect={handleSelectConversation}
-              filterTitle={getFilterTitle()}
-              statusFilter={statusFilter}
-              priorityFilter={priorityFilter}
-              channelFilter={channelFilter}
-              categoryFilter={categoryFilter}
-              sortBy={sortBy}
-              onStatusFilterChange={setStatusFilter}
-              onPriorityFilterChange={setPriorityFilter}
-              onChannelFilterChange={setChannelFilter}
-              onCategoryFilterChange={setCategoryFilter}
-              onSortByChange={setSortBy}
-              onRefresh={handleUpdate}
             />
           ) : (
-            <>
-              <MobileConversationView
-                conversation={selectedConversation}
-                messages={[]}
-                onUpdate={handleUpdate}
-                onBack={handleClose}
-              />
-              <MobileQuickActions 
-                conversation={selectedConversation}
-                onUpdate={handleUpdate}
-                onClose={handleClose}
-              />
-            </>
+            <ConversationThread
+              key={refreshKey}
+              conversation={selectedConversation}
+              onUpdate={handleUpdate}
+              onBack={handleClose}
+            />
           )}
         </div>
       </div>

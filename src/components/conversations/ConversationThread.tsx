@@ -5,8 +5,6 @@ import { ConversationHeader } from './ConversationHeader';
 import { AIContextPanel } from './AIContextPanel';
 import { MessageTimeline } from './MessageTimeline';
 import { ReplyArea } from './ReplyArea';
-import { MobileConversationView } from './mobile/MobileConversationView';
-import { useIsMobile } from '@/hooks/use-mobile';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -21,7 +19,6 @@ export const ConversationThread = ({ conversation, onUpdate, onBack }: Conversat
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [draftText, setDraftText] = useState<string>('');  // Only for AI-generated drafts
-  const isMobile = useIsMobile();
   const { toast } = useToast();
   const draftSaveTimeoutRef = useRef<NodeJS.Timeout>();
 
@@ -273,49 +270,6 @@ export const ConversationThread = ({ conversation, onUpdate, onBack }: Conversat
       </div>
     );
   }
-
-  // Mobile layout with tabs
-  if (isMobile) {
-    return (
-      <div className="flex flex-col h-full">
-        <ConversationHeader conversation={conversation} onUpdate={onUpdate} onBack={onBack} />
-        
-        <MobileConversationView 
-          conversation={conversation}
-          messages={messages}
-          onUpdate={onUpdate}
-          onBack={onBack || (() => {})}
-        />
-
-      {!isCompleted && (
-        <ReplyArea
-          conversationId={conversation.id}
-          channel={conversation.channel}
-          aiDraftResponse={conversation.metadata?.ai_draft_response as string}
-          onSend={handleReply}
-          externalDraftText={draftText}  // Only pass draftText from AI, not replyText
-          onDraftTextCleared={() => setDraftText('')}
-          onDraftChange={(text) => {
-            // Only save when text is being typed, not when cleared
-            if (text) {
-              localStorage.setItem(`draft-${conversation.id}`, text);
-            }
-          }}
-        />
-      )}
-
-        {isCompleted && (
-          <div className="border-t border-border p-4 bg-muted/30">
-            <Button onClick={handleReopen} className="w-full">
-              Reopen Ticket
-            </Button>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  // Desktop layout - uses mobile scroll pattern
   return (
     <div className="flex flex-col h-full min-h-0 overflow-hidden">
       <div className="flex-shrink-0 bg-background border-b border-border">

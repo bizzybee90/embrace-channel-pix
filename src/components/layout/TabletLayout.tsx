@@ -18,7 +18,7 @@
 import { useState, useEffect } from "react";
 import { Sidebar } from "@/components/sidebar/Sidebar";
 import { JaceStyleInbox } from "@/components/conversations/JaceStyleInbox";
-import { MobileConversationView } from "@/components/conversations/mobile/MobileConversationView";
+import { ConversationThread } from "@/components/conversations/ConversationThread";
 import { Conversation, Message } from "@/lib/types";
 import { supabase } from "@/integrations/supabase/client";
 import { useHaptics } from "@/hooks/useHaptics";
@@ -129,10 +129,9 @@ export const TabletLayout = ({ filter = "all-open" }: TabletLayoutProps) => {
             filter={filter}
           />
         ) : (
-          // STATE 2: Conversation View - Using MobileConversationView pattern for reliable scrolling
-          <MobileConversationView
+          // STATE 2: Conversation View
+          <ConversationThread
             conversation={selectedConversation}
-            messages={messages}
             onBack={handleBackToList}
             onUpdate={handleUpdate}
           />
