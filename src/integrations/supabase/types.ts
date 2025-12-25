@@ -769,6 +769,7 @@ export type Database = {
           responded_at: string | null
           status: Database["public"]["Enums"]["message_status"] | null
           updated_at: string | null
+          workspace_id: string | null
         }
         Insert: {
           channel: Database["public"]["Enums"]["message_channel"]
@@ -785,6 +786,7 @@ export type Database = {
           responded_at?: string | null
           status?: Database["public"]["Enums"]["message_status"] | null
           updated_at?: string | null
+          workspace_id?: string | null
         }
         Update: {
           channel?: Database["public"]["Enums"]["message_channel"]
@@ -801,8 +803,17 @@ export type Database = {
           responded_at?: string | null
           status?: Database["public"]["Enums"]["message_status"] | null
           updated_at?: string | null
+          workspace_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "escalated_messages_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       faq_database: {
         Row: {
