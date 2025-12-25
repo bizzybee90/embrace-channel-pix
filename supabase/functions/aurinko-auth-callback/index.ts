@@ -245,12 +245,9 @@ serve(async (req) => {
 
     console.log('Email provider config saved successfully with', aliases.length, 'aliases');
 
-    // Redirect to settings page with success status
-    return redirectTo(appOrigin, '/settings', { 
-      tab: 'channels',
-      email_connected: 'true',
-      email: emailAddress 
-    });
+    // Return success HTML that posts message to opener window
+    // This allows the onboarding flow to continue seamlessly
+    return new Response(getStyledHTML('success'), { status: 200, headers: htmlHeaders });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('Error in aurinko-auth-callback:', error);

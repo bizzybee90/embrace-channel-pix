@@ -1,11 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { CardTitle, CardDescription } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Mail, CheckCircle2, Loader2, RefreshCw } from 'lucide-react';
+import { Mail, CheckCircle2, Loader2, RefreshCw, ArrowRight } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
+import { Progress } from '@/components/ui/progress';
 
 interface EmailConnectionStepProps {
   workspaceId: string;
@@ -88,6 +89,11 @@ export function EmailConnectionStep({
   const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null);
   const [importMode, setImportMode] = useState<ImportMode>('last_1000');
   const [checkingConnection, setCheckingConnection] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<{
+    status: string;
+    progress: number;
+    total: number;
+  } | null>(null);
 
   const handleConnect = async (provider: Provider) => {
     setIsConnecting(true);
@@ -149,7 +155,7 @@ export function EmailConnectionStep({
     try {
       const { data, error } = await supabase
         .from('email_provider_configs')
-        .select('email_address')
+        .select('email_address, sync_status, sync_progress, sync_total')
         .eq('workspace_id', workspaceId)
         .order('created_at', { ascending: false })
         .limit(1)
@@ -158,7 +164,19 @@ export function EmailConnectionStep({
       if (data?.email_address) {
         setConnectedEmail(data.email_address);
         onEmailConnected(data.email_address);
-        toast.success(`Connected to ${data.email_address}`);
+        
+        // Update sync status
+        if (data.sync_status) {
+          setSyncStatus({
+            status: data.sync_status,
+            progress: data.sync_progress || 0,
+            total: data.sync_total || 0,
+          });
+        }
+        
+        if (!connectedEmail) {
+          toast.success(`Connected to ${data.email_address}`);
+        }
         localStorage.removeItem('onboarding_email_pending');
         localStorage.removeItem('onboarding_workspace_id');
       }
@@ -169,12 +187,52 @@ export function EmailConnectionStep({
     }
   };
 
-  // Check on mount if we have a pending connection
-  useState(() => {
+  // Check on mount and poll for sync progress
+  useEffect(() => {
     if (localStorage.getItem('onboarding_email_pending') === 'true') {
       checkEmailConnection();
     }
-  });
+    
+    // Poll for sync progress when connected
+    if (connectedEmail) {
+      const interval = setInterval(async () => {
+        const { data } = await supabase
+          .from('email_provider_configs')
+          .select('sync_status, sync_progress, sync_total')
+          .eq('workspace_id', workspaceId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+        
+        if (data) {
+          setSyncStatus({
+            status: data.sync_status || 'pending',
+            progress: data.sync_progress || 0,
+            total: data.sync_total || 0,
+          });
+          
+          // Stop polling when complete
+          if (data.sync_status === 'completed' || data.sync_status === 'error') {
+            clearInterval(interval);
+          }
+        }
+      }, 3000);
+      
+      return () => clearInterval(interval);
+    }
+  }, [connectedEmail, workspaceId]);
+
+  // Listen for OAuth completion message from popup
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'aurinko-auth-success') {
+        checkEmailConnection();
+      }
+    };
+    
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -195,12 +253,46 @@ export function EmailConnectionStep({
             </div>
           </div>
 
+          {/* Sync Progress Indicator */}
+          {syncStatus && syncStatus.status !== 'completed' && (
+            <div className="space-y-3 p-4 bg-muted/50 rounded-lg border">
+              <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                  <span className="font-medium">Importing emails...</span>
+                </div>
+                <span className="text-muted-foreground">
+                  {syncStatus.total > 0 
+                    ? `${syncStatus.progress} / ${syncStatus.total}`
+                    : 'Starting...'}
+                </span>
+              </div>
+              {syncStatus.total > 0 && (
+                <Progress 
+                  value={(syncStatus.progress / syncStatus.total) * 100} 
+                  className="h-2"
+                />
+              )}
+              <p className="text-xs text-muted-foreground">
+                You can continue while we import your emails in the background.
+              </p>
+            </div>
+          )}
+
+          {syncStatus?.status === 'completed' && (
+            <div className="flex items-center justify-center gap-2 p-3 bg-success/5 rounded-lg border border-success/20 text-success text-sm">
+              <CheckCircle2 className="h-4 w-4" />
+              <span>Import complete! {syncStatus.progress} emails imported.</span>
+            </div>
+          )}
+
           <div className="flex gap-3">
             <Button variant="outline" onClick={onBack} className="flex-1">
               Back
             </Button>
-            <Button onClick={onNext} className="flex-1">
+            <Button onClick={onNext} className="flex-1 gap-2">
               Continue
+              <ArrowRight className="h-4 w-4" />
             </Button>
           </div>
         </div>

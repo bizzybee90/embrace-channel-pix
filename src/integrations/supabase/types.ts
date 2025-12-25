@@ -688,6 +688,12 @@ export type Database = {
           provider: string
           subscription_expires_at: string | null
           subscription_id: string | null
+          sync_completed_at: string | null
+          sync_error: string | null
+          sync_progress: number | null
+          sync_started_at: string | null
+          sync_status: string | null
+          sync_total: number | null
           updated_at: string | null
           workspace_id: string
         }
@@ -707,6 +713,12 @@ export type Database = {
           provider: string
           subscription_expires_at?: string | null
           subscription_id?: string | null
+          sync_completed_at?: string | null
+          sync_error?: string | null
+          sync_progress?: number | null
+          sync_started_at?: string | null
+          sync_status?: string | null
+          sync_total?: number | null
           updated_at?: string | null
           workspace_id: string
         }
@@ -726,6 +738,12 @@ export type Database = {
           provider?: string
           subscription_expires_at?: string | null
           subscription_id?: string | null
+          sync_completed_at?: string | null
+          sync_error?: string | null
+          sync_progress?: number | null
+          sync_started_at?: string | null
+          sync_status?: string | null
+          sync_total?: number | null
           updated_at?: string | null
           workspace_id?: string
         }

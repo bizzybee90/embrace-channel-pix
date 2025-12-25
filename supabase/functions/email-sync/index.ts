@@ -41,6 +41,16 @@ serve(async (req) => {
     const maxToProcess = typeof maxMessages === 'number' && maxMessages > 0 ? Math.min(maxMessages, 25) : 10;
     let messagesProcessed = 0;
 
+    // Update sync status to 'syncing'
+    await supabase
+      .from('email_provider_configs')
+      .update({ 
+        sync_status: 'syncing',
+        sync_started_at: new Date().toISOString(),
+        sync_error: null
+      })
+      .eq('id', configId);
+
     // Determine date filter based on mode
     let afterDate: Date | null = null;
     if (syncMode === 'all_historical_90_days') {
@@ -86,7 +96,17 @@ serve(async (req) => {
     }
 
     const messagesData = await messagesResponse.json();
-    console.log('Fetched', messagesData.records?.length || 0, 'messages from list API');
+    const totalMessages = messagesData.records?.length || 0;
+    console.log('Fetched', totalMessages, 'messages from list API');
+
+    // Update total count for progress tracking
+    await supabase
+      .from('email_provider_configs')
+      .update({ 
+        sync_total: Math.min(totalMessages, maxToProcess),
+        sync_progress: 0
+      })
+      .eq('id', configId);
 
     // Process each message (hard-capped to keep sync responsive)
     for (const messageSummary of messagesData.records || []) {
@@ -280,6 +300,12 @@ serve(async (req) => {
         messagesProcessed++;
         console.log('Processed message:', subject, 'body length:', body.length);
 
+        // Update progress
+        await supabase
+          .from('email_provider_configs')
+          .update({ sync_progress: messagesProcessed })
+          .eq('id', configId);
+
         // Trigger AI agent for analysis
         if (body.length > 0) {
           try {
@@ -441,10 +467,15 @@ serve(async (req) => {
       }
     }
 
-    // Update last_sync_at
+    // Update last_sync_at and sync status
     await supabase
       .from('email_provider_configs')
-      .update({ last_sync_at: new Date().toISOString() })
+      .update({ 
+        last_sync_at: new Date().toISOString(),
+        sync_status: 'completed',
+        sync_completed_at: new Date().toISOString(),
+        sync_progress: messagesProcessed
+      })
       .eq('id', configId);
 
     console.log('Sync complete. Processed', messagesProcessed, 'messages');
@@ -460,6 +491,26 @@ serve(async (req) => {
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('Error in email-sync:', error);
+    
+    // Update sync status to error if we have a configId
+    try {
+      const { configId } = await req.json().catch(() => ({}));
+      if (configId) {
+        const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+        const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+        const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+        await supabase
+          .from('email_provider_configs')
+          .update({ 
+            sync_status: 'error',
+            sync_error: errorMessage
+          })
+          .eq('id', configId);
+      }
+    } catch (e) {
+      console.error('Failed to update error status:', e);
+    }
+    
     return new Response(JSON.stringify({ error: errorMessage }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
