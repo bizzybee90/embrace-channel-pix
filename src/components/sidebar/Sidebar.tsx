@@ -97,7 +97,7 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
         )}
 
         {/* Logo Section */}
-        <div className={`flex items-center ${isCollapsed ? 'justify-center mt-16 mb-4' : isMobileDrawer ? 'gap-3 mb-6' : 'gap-3 mb-6 mt-0'}`}>
+        <div className={`flex items-center ${isCollapsed ? 'justify-center mt-10 mb-2' : isMobileDrawer ? 'gap-3 mb-6' : 'gap-3 mb-6 mt-0'}`}>
           {isCollapsed ? (
             <Tooltip>
               <TooltipTrigger asChild>
@@ -105,7 +105,7 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
                   <img 
                     src={bizzybeelogo} 
                     alt="BizzyBee" 
-                    className="h-36 w-36 object-contain"
+                    className="h-10 w-10 object-contain"
                   />
                 </div>
               </TooltipTrigger>
