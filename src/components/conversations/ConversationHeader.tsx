@@ -5,6 +5,7 @@ import { SLABadge } from '../sla/SLABadge';
 import { ChevronLeft, Sparkles } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { TeachModal } from './TeachModal';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface ConversationHeaderProps {
   conversation: Conversation;
@@ -28,13 +29,17 @@ export const ConversationHeader = ({ conversation, onUpdate, onBack, hideBackBut
   const location = useLocation();
   const listName = getListName(location.pathname);
   const [showTeachModal, setShowTeachModal] = useState(false);
+  const isMobile = useIsMobile();
+
+  // On mobile, back button is handled by MobileHeader at the layout level
+  const showBackButton = onBack && !hideBackButton && !isMobile;
 
   return (
     <>
       <div className="border-b border-border/30 p-3 bg-card/95 backdrop-blur-lg shadow-sm sticky top-0 z-20">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0 flex-1">
-            {onBack && !hideBackButton && (
+            {showBackButton && (
               <Button
                 variant="ghost"
                 size="sm"

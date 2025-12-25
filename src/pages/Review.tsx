@@ -44,6 +44,15 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 
+// Helper to strip HTML tags and get plain text
+const stripHtml = (html: string): string => {
+  if (!html) return '';
+  // Create a temporary div to decode HTML entities and strip tags
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+  return tmp.textContent || tmp.innerText || '';
+};
+
 interface ReviewConversation {
   id: string;
   title: string;
@@ -654,7 +663,8 @@ export default function Review() {
   // Mobile layout
   if (isMobile) {
     const conv = currentConversation;
-    const emailBody = conv?.messages?.[0]?.raw_payload?.body || conv?.messages?.[0]?.body || '';
+    const rawEmailBody = conv?.messages?.[0]?.raw_payload?.body || conv?.messages?.[0]?.body || '';
+    const emailBody = stripHtml(rawEmailBody);
     
     // Mobile Detail View
     if (mobileShowDetail && conv) {
