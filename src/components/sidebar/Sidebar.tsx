@@ -97,7 +97,7 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
         )}
 
         {/* Logo Section */}
-        <div className={`flex items-center ${isCollapsed ? 'justify-center mt-10 mb-2' : isMobileDrawer ? 'gap-3 mb-6' : 'gap-3 mb-6 mt-0'}`}>
+        <div className={`flex items-center ${isCollapsed ? 'justify-center mt-14 mb-2' : isMobileDrawer ? 'gap-3 mb-6' : 'gap-3 mb-6 mt-0'}`}>
           {isCollapsed ? (
             <Tooltip>
               <TooltipTrigger asChild>
