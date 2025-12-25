@@ -101,13 +101,11 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
           {isCollapsed ? (
             <Tooltip>
               <TooltipTrigger asChild>
-                <div className="flex-shrink-0 cursor-pointer h-10 w-10 overflow-hidden rounded-lg hover:scale-110 transition-transform">
-                  {/* CSS crop to show only the bee icon (top portion) */}
+                <div className="flex-shrink-0 cursor-pointer hover:scale-110 transition-transform">
                   <img 
                     src={bizzybeelogo} 
                     alt="BizzyBee" 
-                    className="w-10 h-auto object-cover object-top"
-                    style={{ marginTop: '-2px' }}
+                    className="h-8 w-auto"
                   />
                 </div>
               </TooltipTrigger>
@@ -116,13 +114,11 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
               </TooltipContent>
             </Tooltip>
           ) : (
-            <div className="flex items-center">
-              <img 
-                src={bizzybeelogo} 
-                alt="BizzyBee" 
-                className="h-10 w-auto"
-              />
-            </div>
+            <img 
+              src={bizzybeelogo} 
+              alt="BizzyBee" 
+              className="h-10 w-auto"
+            />
           )}
         </div>
 
