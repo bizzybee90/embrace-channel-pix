@@ -21,6 +21,7 @@ import Review from "./pages/Review";
 import ActivityPage from "./pages/ActivityPage";
 import Diagnostics from "./pages/Diagnostics";
 import LearningPage from "./pages/LearningPage";
+import GDPRPortal from "./pages/GDPRPortal";
 
 
 const queryClient = new QueryClient();
@@ -242,7 +243,12 @@ const RouterContent = () => {
         } 
       />
       <Route path="/privacy" element={<Privacy />} />
-      <Route 
+      
+      {/* Public GDPR Self-Service Portal */}
+      <Route path="/gdpr-portal" element={<GDPRPortal />} />
+      <Route path="/gdpr-portal/:workspaceSlug" element={<GDPRPortal />} />
+      
+      <Route
         path="/diagnostics" 
         element={
           <AuthGuard>
