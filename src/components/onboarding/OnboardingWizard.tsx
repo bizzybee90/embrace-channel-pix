@@ -109,11 +109,11 @@ export function OnboardingWizard({ workspaceId, onComplete }: OnboardingWizardPr
       <Card className={`w-full max-w-2xl shadow-lg shadow-black/5 border-border/50 ${currentStep === 'welcome' ? 'p-10' : ''}`}>
         <CardHeader className="text-center pb-2">
           {/* Logo - Emotional anchor, hero element */}
-          <div className={`flex justify-center ${currentStep === 'welcome' ? 'mb-12' : 'mb-8'}`}>
+          <div className={`flex justify-center ${currentStep === 'welcome' ? 'pt-4 mb-14' : 'mb-8'}`}>
             <img 
               src={bizzybeelogo} 
               alt="BizzyBee" 
-              className={currentStep === 'welcome' ? 'h-40 w-auto' : 'h-20 w-auto'}
+              className={currentStep === 'welcome' ? 'h-44 w-auto' : 'h-20 w-auto'}
             />
           </div>
           {currentStep !== 'welcome' && currentStep !== 'complete' && (
@@ -140,7 +140,7 @@ export function OnboardingWizard({ workspaceId, onComplete }: OnboardingWizardPr
                 size="lg" 
                 className="px-14 py-7 text-base font-medium rounded-2xl bg-primary hover:bg-primary/90 shadow-md shadow-primary/20 transition-all hover:shadow-lg hover:shadow-primary/25"
               >
-                Let's go
+                Get started
               </Button>
             </div>
           )}
