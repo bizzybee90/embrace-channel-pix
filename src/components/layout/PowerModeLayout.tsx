@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Sidebar } from '@/components/sidebar/Sidebar';
 import { JaceStyleInbox } from '@/components/conversations/JaceStyleInbox';
 import { ConversationThread } from '@/components/conversations/ConversationThread';
@@ -11,6 +12,7 @@ import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/comp
 import { useIsMobile } from '@/hooks/use-mobile';
 import { MobileHeader } from '@/components/sidebar/MobileHeader';
 import { MobileSidebarSheet } from '@/components/sidebar/MobileSidebarSheet';
+import { supabase } from '@/integrations/supabase/client';
 
 interface PowerModeLayoutProps {
   filter?: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'awaiting-reply' | 'completed' | 'sent' | 'high-priority' | 'vip-customers' | 'escalations' | 'triaged' | 'needs-me' | 'snoozed' | 'cleared' | 'fyi';
@@ -18,6 +20,7 @@ interface PowerModeLayoutProps {
 }
 
 export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerModeLayoutProps) => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -26,6 +29,26 @@ export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerMod
     return localStorage.getItem('customerPanelCollapsed') === 'true';
   });
 
+  // Handle conversation query parameter to auto-select
+  useEffect(() => {
+    const conversationId = searchParams.get('conversation');
+    if (conversationId && !selectedConversation) {
+      // Fetch the conversation and auto-select it
+      const fetchConversation = async () => {
+        const { data } = await supabase
+          .from('conversations')
+          .select('*, customer:customers(*), assigned_user:users!conversations_assigned_to_fkey(*)')
+          .eq('id', conversationId)
+          .single();
+        
+        if (data) {
+          setSelectedConversation(data as Conversation);
+        }
+      };
+      fetchConversation();
+    }
+  }, [searchParams, selectedConversation]);
+
   // Persist right panel preference
   useEffect(() => {
     localStorage.setItem('customerPanelCollapsed', rightPanelCollapsed.toString());
@@ -33,6 +56,22 @@ export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerMod
 
   const handleUpdate = () => {
     setRefreshKey(prev => prev + 1);
+  };
+
+  const handleSelectConversation = (conversation: Conversation) => {
+    setSelectedConversation(conversation);
+    // Update URL with selected conversation
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set('conversation', conversation.id);
+    setSearchParams(newParams, { replace: true });
+  };
+
+  const handleBack = () => {
+    setSelectedConversation(null);
+    // Remove conversation from URL
+    const newParams = new URLSearchParams(searchParams);
+    newParams.delete('conversation');
+    setSearchParams(newParams, { replace: true });
   };
 
   return (
@@ -58,7 +97,7 @@ export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerMod
           <div className="h-full w-full border-r border-border/30 bg-card overflow-hidden min-w-0">
             <JaceStyleInbox
               filter={filter}
-              onSelect={setSelectedConversation}
+              onSelect={handleSelectConversation}
             />
           </div>
         </main>
@@ -76,7 +115,7 @@ export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerMod
             <div className="flex-1 flex flex-col border-r border-border/30 bg-card w-full overflow-hidden min-w-0">
               <JaceStyleInbox
                 filter={filter}
-                onSelect={setSelectedConversation}
+                onSelect={handleSelectConversation}
               />
             </div>
           </ResizablePanel>
@@ -96,7 +135,7 @@ export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerMod
                 key={refreshKey}
                 conversation={selectedConversation}
                 onUpdate={handleUpdate}
-                onBack={() => setSelectedConversation(null)}
+                onBack={handleBack}
               />
             </div>
           </ResizablePanel>

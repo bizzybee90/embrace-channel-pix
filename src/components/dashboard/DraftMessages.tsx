@@ -13,7 +13,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { DraftPreviewSheet } from './DraftPreviewSheet';
+import { useNavigate } from 'react-router-dom';
 import { CategoryLabel } from '@/components/shared/CategoryLabel';
 
 interface DraftMessage {
@@ -32,11 +32,11 @@ interface DraftMessagesProps {
 
 export function DraftMessages({ onNavigate, maxItems = 5 }: DraftMessagesProps) {
   const { workspace } = useWorkspace();
+  const navigate = useNavigate();
   const [drafts, setDrafts] = useState<DraftMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [sending, setSending] = useState(false);
-  const [previewId, setPreviewId] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchDrafts = async () => {
@@ -265,7 +265,7 @@ export function DraftMessages({ onNavigate, maxItems = 5 }: DraftMessagesProps) 
               />
               <div 
                 className="flex-1 min-w-0"
-                onClick={() => setPreviewId(draft.id)}
+                onClick={() => navigate(`/to-reply?filter=drafts&conversation=${draft.id}`)}
               >
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-sm font-medium text-foreground truncate">
@@ -287,12 +287,6 @@ export function DraftMessages({ onNavigate, maxItems = 5 }: DraftMessagesProps) 
           </Card>
         ))}
       </div>
-
-      <DraftPreviewSheet
-        conversationId={previewId}
-        open={!!previewId}
-        onOpenChange={(open) => !open && setPreviewId(null)}
-      />
     </div>
   );
 }
