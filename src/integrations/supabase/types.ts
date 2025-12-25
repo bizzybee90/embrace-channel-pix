@@ -370,7 +370,9 @@ export type Database = {
           created_at: string | null
           customer_id: string | null
           id: string
+          lawful_basis: string | null
           notes: string | null
+          purpose: string | null
           updated_at: string | null
           withdrawn_date: string | null
         }
@@ -382,7 +384,9 @@ export type Database = {
           created_at?: string | null
           customer_id?: string | null
           id?: string
+          lawful_basis?: string | null
           notes?: string | null
+          purpose?: string | null
           updated_at?: string | null
           withdrawn_date?: string | null
         }
@@ -394,7 +398,9 @@ export type Database = {
           created_at?: string | null
           customer_id?: string | null
           id?: string
+          lawful_basis?: string | null
           notes?: string | null
+          purpose?: string | null
           updated_at?: string | null
           withdrawn_date?: string | null
         }
@@ -500,6 +506,8 @@ export type Database = {
           id: string
           ip_address: string | null
           metadata: Json | null
+          new_value: Json | null
+          previous_value: Json | null
           user_agent: string | null
           user_id: string | null
         }
@@ -511,6 +519,8 @@ export type Database = {
           id?: string
           ip_address?: string | null
           metadata?: Json | null
+          new_value?: Json | null
+          previous_value?: Json | null
           user_agent?: string | null
           user_id?: string | null
         }
@@ -522,6 +532,8 @@ export type Database = {
           id?: string
           ip_address?: string | null
           metadata?: Json | null
+          new_value?: Json | null
+          previous_value?: Json | null
           user_agent?: string | null
           user_id?: string | null
         }
@@ -1242,6 +1254,78 @@ export type Database = {
           },
         ]
       }
+      security_incidents: {
+        Row: {
+          affected_customers: Json | null
+          affected_records_count: number | null
+          created_at: string | null
+          description: string | null
+          detected_at: string | null
+          id: string
+          incident_type: string
+          notification_sent_at: string | null
+          remediation_steps: string | null
+          reported_at: string | null
+          reported_by: string | null
+          resolved_at: string | null
+          severity: string | null
+          status: string | null
+          updated_at: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          affected_customers?: Json | null
+          affected_records_count?: number | null
+          created_at?: string | null
+          description?: string | null
+          detected_at?: string | null
+          id?: string
+          incident_type: string
+          notification_sent_at?: string | null
+          remediation_steps?: string | null
+          reported_at?: string | null
+          reported_by?: string | null
+          resolved_at?: string | null
+          severity?: string | null
+          status?: string | null
+          updated_at?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          affected_customers?: Json | null
+          affected_records_count?: number | null
+          created_at?: string | null
+          description?: string | null
+          detected_at?: string | null
+          id?: string
+          incident_type?: string
+          notification_sent_at?: string | null
+          remediation_steps?: string | null
+          reported_at?: string | null
+          reported_by?: string | null
+          resolved_at?: string | null
+          severity?: string | null
+          status?: string | null
+          updated_at?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "security_incidents_reported_by_fkey"
+            columns: ["reported_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "security_incidents_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sender_behaviour_stats: {
         Row: {
           avg_response_time_minutes: number | null
@@ -1773,6 +1857,132 @@ export type Database = {
             foreignKeyName: "workspace_channels_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workspace_deletion_requests: {
+        Row: {
+          completed_at: string | null
+          confirmed_at: string | null
+          created_at: string | null
+          export_completed: boolean | null
+          export_url: string | null
+          id: string
+          reason: string | null
+          requested_at: string | null
+          requested_by: string
+          scheduled_for: string | null
+          status: string | null
+          updated_at: string | null
+          workspace_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          confirmed_at?: string | null
+          created_at?: string | null
+          export_completed?: boolean | null
+          export_url?: string | null
+          id?: string
+          reason?: string | null
+          requested_at?: string | null
+          requested_by: string
+          scheduled_for?: string | null
+          status?: string | null
+          updated_at?: string | null
+          workspace_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          confirmed_at?: string | null
+          created_at?: string | null
+          export_completed?: boolean | null
+          export_url?: string | null
+          id?: string
+          reason?: string | null
+          requested_at?: string | null
+          requested_by?: string
+          scheduled_for?: string | null
+          status?: string | null
+          updated_at?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_deletion_requests_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workspace_deletion_requests_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workspace_gdpr_settings: {
+        Row: {
+          company_address: string | null
+          company_legal_name: string | null
+          created_at: string | null
+          custom_privacy_policy: string | null
+          data_protection_officer_email: string | null
+          dpa_accepted_at: string | null
+          dpa_accepted_by: string | null
+          dpa_version: string | null
+          id: string
+          privacy_policy_url: string | null
+          sub_processors: Json | null
+          updated_at: string | null
+          workspace_id: string
+        }
+        Insert: {
+          company_address?: string | null
+          company_legal_name?: string | null
+          created_at?: string | null
+          custom_privacy_policy?: string | null
+          data_protection_officer_email?: string | null
+          dpa_accepted_at?: string | null
+          dpa_accepted_by?: string | null
+          dpa_version?: string | null
+          id?: string
+          privacy_policy_url?: string | null
+          sub_processors?: Json | null
+          updated_at?: string | null
+          workspace_id: string
+        }
+        Update: {
+          company_address?: string | null
+          company_legal_name?: string | null
+          created_at?: string | null
+          custom_privacy_policy?: string | null
+          data_protection_officer_email?: string | null
+          dpa_accepted_at?: string | null
+          dpa_accepted_by?: string | null
+          dpa_version?: string | null
+          id?: string
+          privacy_policy_url?: string | null
+          sub_processors?: Json | null
+          updated_at?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_gdpr_settings_dpa_accepted_by_fkey"
+            columns: ["dpa_accepted_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workspace_gdpr_settings_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
             referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
