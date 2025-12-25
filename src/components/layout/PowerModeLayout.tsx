@@ -8,6 +8,9 @@ import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/componen
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { MobileHeader } from '@/components/sidebar/MobileHeader';
+import { MobileSidebarSheet } from '@/components/sidebar/MobileSidebarSheet';
 
 interface PowerModeLayoutProps {
   filter?: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'awaiting-reply' | 'completed' | 'sent' | 'high-priority' | 'vip-customers' | 'escalations' | 'triaged' | 'needs-me' | 'snoozed' | 'cleared' | 'fyi';
@@ -17,6 +20,8 @@ interface PowerModeLayoutProps {
 export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerModeLayoutProps) => {
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const isMobile = useIsMobile();
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(() => {
     return localStorage.getItem('customerPanelCollapsed') === 'true';
   });
@@ -31,11 +36,20 @@ export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerMod
   };
 
   return (
-    <div className="flex h-screen w-full bg-background overflow-hidden">
-      {/* Sidebar - width controlled by Sidebar component itself (hidden on mobile) */}
-      <aside className="hidden md:flex border-r border-border bg-card flex-shrink-0">
-        <Sidebar />
-      </aside>
+    <div className="flex flex-col h-screen w-full bg-background overflow-hidden">
+      {/* Mobile Header */}
+      {isMobile && (
+        <>
+          <MobileHeader onMenuClick={() => setSidebarOpen(true)} />
+          <MobileSidebarSheet open={sidebarOpen} onOpenChange={setSidebarOpen} />
+        </>
+      )}
+      
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        {/* Sidebar - width controlled by Sidebar component itself (hidden on mobile) */}
+        <aside className="hidden md:flex border-r border-border bg-card flex-shrink-0">
+          <Sidebar />
+        </aside>
 
       {/* Main Content */}
       {!selectedConversation ? (
@@ -164,6 +178,7 @@ export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerMod
           )}
         </ResizablePanelGroup>
       )}
+      </div>
     </div>
   );
 };

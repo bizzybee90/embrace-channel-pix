@@ -13,8 +13,6 @@ import { ChannelIcon } from '@/components/shared/ChannelIcon';
 import { CategoryLabel } from '@/components/shared/CategoryLabel';
 import { TriageCorrectionFlow } from './TriageCorrectionFlow';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { MobileHeader } from '@/components/sidebar/MobileHeader';
-import { MobileSidebarSheet } from '@/components/sidebar/MobileSidebarSheet';
 
 interface JaceStyleInboxProps {
   onSelect: (conversation: Conversation) => void;
@@ -36,7 +34,6 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [correctionOpen, setCorrectionOpen] = useState(false);
   const [selectedForCorrection, setSelectedForCorrection] = useState<Conversation | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
   const PAGE_SIZE = 50;
@@ -397,15 +394,11 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
 
   return (
     <div className="flex flex-col h-full bg-background">
-      {/* Mobile Header */}
-      {isMobile && (
-        <>
-          <MobileHeader onMenuClick={() => setSidebarOpen(true)} />
-          <MobileSidebarSheet open={sidebarOpen} onOpenChange={setSidebarOpen} />
-        </>
-      )}
       {/* Header with title and metrics */}
-      <div className="px-6 py-4 bg-gradient-to-r from-primary/5 to-transparent border-b border-border/50">
+      <div className={cn(
+        "bg-gradient-to-r from-primary/5 to-transparent border-b border-border/50",
+        isMobile ? "px-4 py-3" : "px-6 py-4"
+      )}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             {subFilter && (
