@@ -599,12 +599,9 @@ export default function Review() {
   if (!isLoading && reviewQueue.length === 0) {
     if (isMobile) {
       return (
-        <div className="flex flex-col min-h-screen bg-background">
+        <div className="flex flex-col h-screen bg-background overflow-hidden">
           <MobileHeader 
             onMenuClick={() => setSidebarOpen(true)}
-            showBackButton
-            onBackClick={() => navigate('/')}
-            backToText="Home"
           />
           <MobileSidebarSheet
             open={sidebarOpen}
@@ -612,16 +609,13 @@ export default function Review() {
             onNavigate={() => setSidebarOpen(false)}
           />
           <div className="flex-1 flex items-center justify-center p-6">
-            <div className="text-center max-w-md">
+            <div className="text-center max-w-xs">
               <div className="w-16 h-16 bg-gradient-to-br from-green-100 to-emerald-100 dark:from-green-900/30 dark:to-emerald-900/30 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg shadow-green-500/10">
                 <Sparkles className="h-8 w-8 text-green-600" />
               </div>
-              <h2 className="text-xl font-semibold mb-2">🎉 BizzyBee is confident!</h2>
-              <p className="text-sm text-muted-foreground mb-2">
-                No messages need training right now.
-              </p>
-              <p className="text-xs text-muted-foreground">
-                BizzyBee is handling emails automatically based on what it learned from you.
+              <h2 className="text-lg font-semibold mb-2">BizzyBee is confident!</h2>
+              <p className="text-sm text-muted-foreground break-words">
+                No messages need training right now. BizzyBee is handling emails automatically.
               </p>
             </div>
           </div>
@@ -659,12 +653,9 @@ export default function Review() {
   // Mobile layout
   if (isMobile) {
     return (
-      <div className="flex flex-col min-h-screen bg-background">
+      <div className="flex flex-col h-screen bg-background overflow-hidden">
         <MobileHeader 
           onMenuClick={() => setSidebarOpen(true)}
-          showBackButton
-          onBackClick={() => navigate('/')}
-          backToText="Home"
         />
         <MobileSidebarSheet
           open={sidebarOpen}
@@ -672,69 +663,113 @@ export default function Review() {
           onNavigate={() => setSidebarOpen(false)}
         />
         
-        {/* Mobile Header */}
-        <div className="p-4 border-b">
-          <div className="flex items-center gap-2 mb-2">
-            <Sparkles className="h-5 w-5 text-purple-500" />
-            <h1 className="text-lg font-semibold">Teach BizzyBee</h1>
+        {/* Mobile Header with progress */}
+        <div className="px-4 py-3 border-b bg-card/50 flex-shrink-0">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="p-2 rounded-xl bg-purple-500/10 flex-shrink-0">
+              <Sparkles className="h-5 w-5 text-purple-500" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h1 className="text-base font-semibold truncate">Teach BizzyBee</h1>
+              <p className="text-xs text-muted-foreground">
+                {totalCount - reviewedCount} examples remaining
+              </p>
+            </div>
           </div>
-          <Progress value={progress} className="h-2" />
-          <p className="text-xs text-muted-foreground mt-1">
-            {totalCount - reviewedCount} examples remaining
-          </p>
+          <Progress value={progress} className="h-1.5" />
         </div>
 
         {/* Mobile Queue List */}
-        <ScrollArea className="flex-1">
-          <div className="p-4 space-y-3">
-            {reviewQueue.map((conv, idx) => (
-              <Card 
-                key={conv.id}
-                className={cn(
-                  "p-4 cursor-pointer transition-all",
-                  currentIndex === idx && "ring-2 ring-primary",
-                  reviewedIds.has(conv.id) && "opacity-50"
-                )}
-                onClick={() => setCurrentIndex(idx)}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm truncate">{conv.customer?.name || 'Unknown'}</p>
-                    <p className="text-xs text-muted-foreground truncate">{conv.title}</p>
-                  </div>
-                  <Badge variant="outline" className="text-xs shrink-0">
-                    {Math.round((conv.triage_confidence || 0) * 100)}%
-                  </Badge>
-                </div>
-                
-                {currentIndex === idx && (
-                  <div className="mt-3 pt-3 border-t space-y-2">
-                    <p className="text-xs text-muted-foreground">{conv.why_this_needs_you}</p>
-                    <div className="flex gap-2">
-                      <Button 
-                        size="sm" 
-                        className="flex-1"
-                        onClick={(e) => { e.stopPropagation(); handleConfirm(); }}
-                        disabled={reviewMutation.isPending}
-                      >
-                        <Check className="h-4 w-4 mr-1" />
-                        Confirm
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        className="flex-1"
-                        onClick={(e) => { e.stopPropagation(); setShowChangePicker(true); }}
-                      >
-                        Change
-                      </Button>
+        <div className="flex-1 overflow-y-auto">
+          <div className="p-3 space-y-2">
+            {reviewQueue.map((conv, idx) => {
+              const isSelected = currentIndex === idx;
+              const isReviewed = reviewedIds.has(conv.id);
+              
+              return (
+                <Card 
+                  key={conv.id}
+                  className={cn(
+                    "p-3 cursor-pointer transition-all border",
+                    isSelected && "ring-2 ring-primary border-primary/50 bg-primary/5",
+                    isReviewed && "opacity-50 bg-muted/30"
+                  )}
+                  onClick={() => setCurrentIndex(idx)}
+                >
+                  {/* Header row */}
+                  <div className="flex items-start gap-2 mb-1">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm break-words">
+                        {conv.customer?.name || conv.customer?.email || 'Unknown'}
+                      </p>
+                      <p className="text-xs text-muted-foreground break-words line-clamp-2 mt-0.5">
+                        {conv.title || conv.summary_for_human}
+                      </p>
                     </div>
                   </div>
-                )}
-              </Card>
-            ))}
+                  
+                  {/* Expanded content when selected */}
+                  {isSelected && (
+                    <div className="mt-3 pt-3 border-t border-border/50 space-y-3">
+                      {conv.why_this_needs_you && (
+                        <p className="text-xs text-muted-foreground break-words leading-relaxed">
+                          {conv.why_this_needs_you}
+                        </p>
+                      )}
+                      <div className="flex gap-2">
+                        <Button 
+                          size="sm" 
+                          className="flex-1 h-9"
+                          onClick={(e) => { e.stopPropagation(); handleConfirm(); }}
+                          disabled={reviewMutation.isPending}
+                        >
+                          <Check className="h-4 w-4 mr-1.5" />
+                          Confirm
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          className="flex-1 h-9"
+                          onClick={(e) => { e.stopPropagation(); setShowChangePicker(true); }}
+                        >
+                          Change
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </Card>
+              );
+            })}
           </div>
-        </ScrollArea>
+        </div>
+        
+        {/* Change picker bottom sheet */}
+        {showChangePicker && currentConversation && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-end" onClick={() => setShowChangePicker(false)}>
+            <div 
+              className="bg-background w-full rounded-t-2xl p-4 space-y-3 max-h-[60vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="font-semibold">Change classification</h3>
+                <Button variant="ghost" size="sm" onClick={() => setShowChangePicker(false)}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              {Object.entries(bucketLabels).map(([bucket, label]) => (
+                <Button
+                  key={bucket}
+                  variant="outline"
+                  className="w-full justify-start h-12"
+                  onClick={() => handleChange(bucket)}
+                  disabled={reviewMutation.isPending}
+                >
+                  <Badge className={cn("mr-2", bucketColors[bucket])}>{label}</Badge>
+                </Button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     );
   }
