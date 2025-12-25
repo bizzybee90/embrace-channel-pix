@@ -647,12 +647,14 @@ export type Database = {
       email_provider_configs: {
         Row: {
           access_token: string
+          access_token_encrypted: string | null
           account_id: string
           aliases: string[] | null
           automation_level: string | null
           connected_at: string | null
           created_at: string | null
           email_address: string
+          encryption_key_id: string | null
           id: string
           import_mode: string | null
           last_sync_at: string | null
@@ -662,12 +664,14 @@ export type Database = {
         }
         Insert: {
           access_token: string
+          access_token_encrypted?: string | null
           account_id: string
           aliases?: string[] | null
           automation_level?: string | null
           connected_at?: string | null
           created_at?: string | null
           email_address: string
+          encryption_key_id?: string | null
           id?: string
           import_mode?: string | null
           last_sync_at?: string | null
@@ -677,12 +681,14 @@ export type Database = {
         }
         Update: {
           access_token?: string
+          access_token_encrypted?: string | null
           account_id?: string
           aliases?: string[] | null
           automation_level?: string | null
           connected_at?: string | null
           created_at?: string | null
           email_address?: string
+          encryption_key_id?: string | null
           id?: string
           import_mode?: string | null
           last_sync_at?: string | null
@@ -883,14 +889,17 @@ export type Database = {
       gmail_channel_configs: {
         Row: {
           access_token: string
+          access_token_encrypted: string | null
           connected_at: string | null
           created_at: string | null
           email_address: string
+          encryption_key_id: string | null
           history_id: string | null
           id: string
           import_mode: string | null
           last_sync_at: string | null
           refresh_token: string
+          refresh_token_encrypted: string | null
           token_expires_at: string | null
           updated_at: string | null
           watch_expiration: string | null
@@ -898,14 +907,17 @@ export type Database = {
         }
         Insert: {
           access_token: string
+          access_token_encrypted?: string | null
           connected_at?: string | null
           created_at?: string | null
           email_address: string
+          encryption_key_id?: string | null
           history_id?: string | null
           id?: string
           import_mode?: string | null
           last_sync_at?: string | null
           refresh_token: string
+          refresh_token_encrypted?: string | null
           token_expires_at?: string | null
           updated_at?: string | null
           watch_expiration?: string | null
@@ -913,14 +925,17 @@ export type Database = {
         }
         Update: {
           access_token?: string
+          access_token_encrypted?: string | null
           connected_at?: string | null
           created_at?: string | null
           email_address?: string
+          encryption_key_id?: string | null
           history_id?: string | null
           id?: string
           import_mode?: string | null
           last_sync_at?: string | null
           refresh_token?: string
+          refresh_token_encrypted?: string | null
           token_expires_at?: string | null
           updated_at?: string | null
           watch_expiration?: string | null
@@ -1813,6 +1828,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      decrypt_token: {
+        Args: { encrypted_token: string; secret: string }
+        Returns: string
+      }
+      encrypt_token: {
+        Args: { secret: string; token: string }
+        Returns: string
+      }
       get_my_workspace_id: { Args: never; Returns: string }
       get_sent_conversations: {
         Args: { p_limit?: number; p_offset?: number; p_user_id: string }
