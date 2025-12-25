@@ -27,7 +27,7 @@ const emailProviders = [
   { 
     id: 'outlook' as Provider, 
     name: 'Outlook', 
-    icon: null, // Will use Lucide icon
+    icon: null,
     iconColor: 'text-blue-600',
     available: true 
   },
@@ -35,9 +35,8 @@ const emailProviders = [
     id: 'icloud' as Provider, 
     name: 'iCloud Mail', 
     icon: null,
-    iconColor: 'text-gray-600',
-    available: false,
-    comingSoon: true
+    iconColor: 'text-sky-500',
+    available: true  // Aurinko supports iCloud!
   },
   { 
     id: 'yahoo' as Provider, 
