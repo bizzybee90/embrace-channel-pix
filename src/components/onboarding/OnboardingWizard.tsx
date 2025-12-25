@@ -105,11 +105,16 @@ export function OnboardingWizard({ workspaceId, onComplete }: OnboardingWizardPr
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-6">
-      <Card className="w-full max-w-2xl">
+    <div className="min-h-screen bg-muted/30 flex items-center justify-center p-6">
+      <Card className={`w-full max-w-2xl shadow-lg shadow-black/5 border-border/50 ${currentStep === 'welcome' ? 'p-8' : ''}`}>
         <CardHeader className="text-center pb-2">
-          <div className="flex justify-center mb-6">
-            <img src={bizzybeelogo} alt="BizzyBee" className="h-24 w-auto" />
+          {/* Logo - Hero element with generous spacing */}
+          <div className="flex justify-center mb-8">
+            <img 
+              src={bizzybeelogo} 
+              alt="BizzyBee" 
+              className={currentStep === 'welcome' ? 'h-32 w-auto' : 'h-20 w-auto'}
+            />
           </div>
           {currentStep !== 'welcome' && currentStep !== 'complete' && (
             <Progress value={progress} className="h-2 mb-4" />
@@ -118,16 +123,25 @@ export function OnboardingWizard({ workspaceId, onComplete }: OnboardingWizardPr
 
         <CardContent className="space-y-6">
           {currentStep === 'welcome' && (
-            <div className="text-center space-y-6 py-8">
-              <div className="space-y-2">
-                <CardTitle className="text-2xl">Welcome to BizzyBee</CardTitle>
-                <CardDescription className="text-base">
-                  Let's set things up so BizzyBee learns how YOU handle your inbox.
-                  <br />This takes about 3 minutes.
-                </CardDescription>
+            <div className="text-center space-y-8 py-4">
+              {/* Headline - Confident and clear */}
+              <div className="space-y-4">
+                <CardTitle className="text-3xl font-semibold tracking-tight text-foreground">
+                  Welcome to BizzyBee
+                </CardTitle>
+                {/* Supporting copy - Lighter weight, constrained width */}
+                <p className="text-base text-muted-foreground max-w-md mx-auto leading-relaxed">
+                  Let's set things up so BizzyBee learns how you handle your inbox.
+                  <span className="block mt-1 text-sm">This takes about 3 minutes.</span>
+                </p>
               </div>
-              <Button onClick={handleNext} size="lg" className="px-8">
-                Let's Go
+              {/* CTA - Prominent, warm accent */}
+              <Button 
+                onClick={handleNext} 
+                size="lg" 
+                className="px-10 py-6 text-base font-medium rounded-xl bg-primary hover:bg-primary/90 shadow-md shadow-primary/20"
+              >
+                Let's go
               </Button>
             </div>
           )}
