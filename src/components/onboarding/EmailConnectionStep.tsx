@@ -14,8 +14,40 @@ interface EmailConnectionStepProps {
   onEmailConnected: (email: string) => void;
 }
 
-type Provider = 'gmail' | 'outlook';
+type Provider = 'gmail' | 'outlook' | 'icloud' | 'yahoo';
 type ImportMode = 'new_only' | 'unread_only' | 'all_historical_90_days';
+
+const emailProviders = [
+  { 
+    id: 'gmail' as Provider, 
+    name: 'Gmail', 
+    icon: 'https://www.google.com/gmail/about/static-2.0/images/logo-gmail.png',
+    available: true 
+  },
+  { 
+    id: 'outlook' as Provider, 
+    name: 'Outlook', 
+    icon: null, // Will use Lucide icon
+    iconColor: 'text-blue-600',
+    available: true 
+  },
+  { 
+    id: 'icloud' as Provider, 
+    name: 'iCloud Mail', 
+    icon: null,
+    iconColor: 'text-gray-600',
+    available: false,
+    comingSoon: true
+  },
+  { 
+    id: 'yahoo' as Provider, 
+    name: 'Yahoo Mail', 
+    icon: null,
+    iconColor: 'text-purple-600',
+    available: false,
+    comingSoon: true
+  },
+];
 
 const importModes = [
   { 
@@ -191,36 +223,33 @@ export function EmailConnectionStep({
           </div>
 
           {/* Provider Selection */}
-          <div className="grid grid-cols-2 gap-4">
-            <Button
-              variant="outline"
-              size="lg"
-              className="h-auto py-6 flex-col gap-2"
-              disabled={isConnecting}
-              onClick={() => handleConnect('gmail')}
-            >
-              {isConnecting && selectedProvider === 'gmail' ? (
-                <Loader2 className="h-8 w-8 animate-spin" />
-              ) : (
-                <img src="https://www.google.com/gmail/about/static-2.0/images/logo-gmail.png" alt="Gmail" className="h-8 w-8" />
-              )}
-              <span className="font-medium">Gmail</span>
-            </Button>
-
-            <Button
-              variant="outline"
-              size="lg"
-              className="h-auto py-6 flex-col gap-2"
-              disabled={isConnecting}
-              onClick={() => handleConnect('outlook')}
-            >
-              {isConnecting && selectedProvider === 'outlook' ? (
-                <Loader2 className="h-8 w-8 animate-spin" />
-              ) : (
-                <Mail className="h-8 w-8 text-blue-600" />
-              )}
-              <span className="font-medium">Outlook</span>
-            </Button>
+          <div className="grid grid-cols-2 gap-3">
+            {emailProviders.map((provider) => (
+              <Button
+                key={provider.id}
+                variant="outline"
+                size="lg"
+                className={`h-auto py-5 flex-col gap-2 relative ${
+                  provider.comingSoon ? 'opacity-60 cursor-not-allowed' : ''
+                }`}
+                disabled={isConnecting || provider.comingSoon}
+                onClick={() => provider.available && handleConnect(provider.id)}
+              >
+                {provider.comingSoon && (
+                  <span className="absolute top-2 right-2 text-[10px] font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                    Soon
+                  </span>
+                )}
+                {isConnecting && selectedProvider === provider.id ? (
+                  <Loader2 className="h-7 w-7 animate-spin" />
+                ) : provider.icon ? (
+                  <img src={provider.icon} alt={provider.name} className="h-7 w-7" />
+                ) : (
+                  <Mail className={`h-7 w-7 ${provider.iconColor || 'text-muted-foreground'}`} />
+                )}
+                <span className="font-medium text-sm">{provider.name}</span>
+              </Button>
+            ))}
           </div>
 
           {checkingConnection && (
