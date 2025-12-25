@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Mail, RefreshCw, Trash2, Clock, CheckCircle, Plus, X, Loader2, Rocket, Pencil, Eye, Pause, ChevronDown } from 'lucide-react';
+import { Mail, RefreshCw, Trash2, Clock, CheckCircle, Plus, X, Loader2, Rocket, Pencil, Eye, Pause, ChevronDown, Zap, AlertTriangle } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import {
   AlertDialog,
@@ -42,6 +42,8 @@ interface EmailConfig {
   workspace_id: string;
   aliases?: string[];
   automation_level?: string;
+  subscription_id?: string;
+  subscription_expires_at?: string;
 }
 
 interface EmailAccountCardProps {
@@ -103,9 +105,15 @@ export const EmailAccountCard = ({ config, onDisconnect, onUpdate }: EmailAccoun
   const [newAlias, setNewAlias] = useState('');
   const [addingAlias, setAddingAlias] = useState(false);
   const [updatingAutomation, setUpdatingAutomation] = useState(false);
+  const [refreshingWebhook, setRefreshingWebhook] = useState(false);
 
   const aliases = config.aliases || [];
   const currentLevel = AUTOMATION_LEVELS.find(l => l.value === (config.automation_level || 'draft_only')) || AUTOMATION_LEVELS[1];
+  
+  // Check if subscription is active
+  const isSubscriptionActive = config.subscription_expires_at 
+    ? new Date(config.subscription_expires_at) > new Date()
+    : false;
 
   const handleSync = async () => {
     setSyncing(true);
@@ -134,6 +142,32 @@ export const EmailAccountCard = ({ config, onDisconnect, onUpdate }: EmailAccoun
       });
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const handleRefreshWebhook = async () => {
+    setRefreshingWebhook(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('refresh-aurinko-subscriptions', {
+        body: { configId: config.id },
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Webhook refreshed',
+        description: 'Real-time email sync is now active',
+      });
+      onUpdate();
+    } catch (error: any) {
+      console.error('Error refreshing webhook:', error);
+      toast({
+        title: 'Failed to refresh webhook',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setRefreshingWebhook(false);
     }
   };
 
@@ -255,6 +289,17 @@ export const EmailAccountCard = ({ config, onDisconnect, onUpdate }: EmailAccoun
                   <CheckCircle className="h-3 w-3 mr-1" />
                   Connected
                 </Badge>
+                {isSubscriptionActive ? (
+                  <Badge variant="outline" className="text-xs text-emerald-600 bg-emerald-500/10">
+                    <Zap className="h-3 w-3 mr-1" />
+                    Real-time
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="text-xs text-amber-600 bg-amber-500/10">
+                    <AlertTriangle className="h-3 w-3 mr-1" />
+                    Manual sync only
+                  </Badge>
+                )}
               </div>
               <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
                 <span className="flex items-center gap-1">
@@ -266,11 +311,28 @@ export const EmailAccountCard = ({ config, onDisconnect, onUpdate }: EmailAccoun
                     Last synced {formatDistanceToNow(new Date(config.last_sync_at), { addSuffix: true })}
                   </span>
                 )}
+                {config.subscription_expires_at && isSubscriptionActive && (
+                  <span className="text-emerald-600">
+                    Webhook expires {formatDistanceToNow(new Date(config.subscription_expires_at), { addSuffix: true })}
+                  </span>
+                )}
               </div>
             </div>
           </div>
           
           <div className="flex items-center gap-2">
+            {!isSubscriptionActive && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRefreshWebhook}
+                disabled={refreshingWebhook}
+                className="text-amber-600 hover:text-amber-700"
+              >
+                <Zap className={`h-4 w-4 mr-1 ${refreshingWebhook ? 'animate-pulse' : ''}`} />
+                {refreshingWebhook ? 'Activating...' : 'Enable Real-time'}
+              </Button>
+            )}
             <Button
               variant="outline"
               size="sm"

@@ -671,6 +671,8 @@ export type Database = {
           import_mode: string | null
           last_sync_at: string | null
           provider: string
+          subscription_expires_at: string | null
+          subscription_id: string | null
           updated_at: string | null
           workspace_id: string
         }
@@ -688,6 +690,8 @@ export type Database = {
           import_mode?: string | null
           last_sync_at?: string | null
           provider: string
+          subscription_expires_at?: string | null
+          subscription_id?: string | null
           updated_at?: string | null
           workspace_id: string
         }
@@ -705,6 +709,8 @@ export type Database = {
           import_mode?: string | null
           last_sync_at?: string | null
           provider?: string
+          subscription_expires_at?: string | null
+          subscription_id?: string | null
           updated_at?: string | null
           workspace_id?: string
         }

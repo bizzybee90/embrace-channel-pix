@@ -113,3 +113,6 @@ verify_jwt = false
 
 [functions.withdraw-consent]
 verify_jwt = false
+
+[functions.refresh-aurinko-subscriptions]
+verify_jwt = false
