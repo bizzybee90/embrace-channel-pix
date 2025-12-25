@@ -12,6 +12,9 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChannelIcon } from '@/components/shared/ChannelIcon';
 import { CategoryLabel } from '@/components/shared/CategoryLabel';
 import { TriageCorrectionFlow } from './TriageCorrectionFlow';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { MobileHeader } from '@/components/sidebar/MobileHeader';
+import { MobileSidebarSheet } from '@/components/sidebar/MobileSidebarSheet';
 
 interface JaceStyleInboxProps {
   onSelect: (conversation: Conversation) => void;
@@ -33,7 +36,9 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [correctionOpen, setCorrectionOpen] = useState(false);
   const [selectedForCorrection, setSelectedForCorrection] = useState<Conversation | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
   const PAGE_SIZE = 50;
 
   // Debounce search to avoid spamming requests while typing
@@ -243,6 +248,53 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
     const messageCount = conv.message_count || 0;
     const isUrgent = conv.decision_bucket === 'act_now';
 
+    // Mobile: Two-line layout
+    if (isMobile) {
+      return (
+        <div
+          onClick={() => onSelect(conversation)}
+          className={cn(
+            "px-3 py-3 cursor-pointer border-b border-border/30 transition-all",
+            "border-l-4 hover:bg-muted/50",
+            stateConfig.border,
+            stateConfig.rowClass
+          )}
+        >
+          {/* Top row: Sender + Time */}
+          <div className="flex items-center justify-between gap-2 mb-1">
+            <div className="flex items-center gap-1.5 min-w-0 flex-1">
+              <ChannelIcon channel={conv.channel} className="h-3 w-3 flex-shrink-0 opacity-60" />
+              <span className={cn(
+                "text-sm text-foreground truncate",
+                isUrgent ? "font-semibold" : "font-medium"
+              )}>
+                {customerName}
+              </span>
+              {messageCount > 1 && (
+                <span className="text-[10px] font-medium text-muted-foreground bg-muted rounded-full h-4 min-w-4 px-1 flex items-center justify-center flex-shrink-0">
+                  {messageCount}
+                </span>
+              )}
+            </div>
+            <span className="text-xs text-muted-foreground whitespace-nowrap flex-shrink-0">
+              {formatTime(conv.updated_at || conv.created_at)}
+            </span>
+          </div>
+          
+          {/* Bottom row: Subject + Badge */}
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm text-muted-foreground truncate flex-1 min-w-0">
+              {conv.title || 'No subject'}
+            </p>
+            <div className="flex-shrink-0">
+              {stateConfig.badge}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Desktop: Single-line layout
     return (
       <div
         onClick={() => onSelect(conversation)}
@@ -345,6 +397,13 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
 
   return (
     <div className="flex flex-col h-full bg-background">
+      {/* Mobile Header */}
+      {isMobile && (
+        <>
+          <MobileHeader onMenuClick={() => setSidebarOpen(true)} />
+          <MobileSidebarSheet open={sidebarOpen} onOpenChange={setSidebarOpen} />
+        </>
+      )}
       {/* Header with title and metrics */}
       <div className="px-6 py-4 bg-gradient-to-r from-primary/5 to-transparent border-b border-border/50">
         <div className="flex items-center justify-between">
