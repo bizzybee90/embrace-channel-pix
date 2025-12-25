@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Button } from '@/components/ui/button';
 import { DataExportPanel } from '@/components/settings/DataExportPanel';
 import { DataDeletionPanel } from '@/components/settings/DataDeletionPanel';
 import { AuditLogPanel } from '@/components/settings/AuditLogPanel';
@@ -30,7 +31,7 @@ import { BackButton } from '@/components/shared/BackButton';
 import { SettingsSection } from '@/components/settings/SettingsSection';
 import { MobilePageLayout } from '@/components/layout/MobilePageLayout';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { Bot, Plug, Shield, Layout, Code, ChevronRight } from 'lucide-react';
+import { Bot, Plug, Shield, Layout, Code, ChevronRight, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface SettingsCategory {
@@ -118,6 +119,25 @@ export default function Settings() {
           </SettingsSection>
           <SettingsSection title="GDPR Settings" description="DPA and privacy configuration">
             <WorkspaceGDPRSettingsPanel />
+          </SettingsSection>
+          <SettingsSection title="Self-Service GDPR Portal" description="Customer-facing data rights portal">
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Allow your customers to request data exports or deletion directly through a self-service portal.
+                Share this link with customers who want to exercise their GDPR rights.
+              </p>
+              <div className="flex items-center gap-3">
+                <code className="flex-1 px-3 py-2 bg-muted rounded-md text-sm font-mono truncate">
+                  {window.location.origin}/gdpr-portal
+                </code>
+                <Button variant="outline" size="sm" asChild>
+                  <Link to="/gdpr-portal" target="_blank">
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    Open Portal
+                  </Link>
+                </Button>
+              </div>
+            </div>
           </SettingsSection>
           <SettingsSection title="Data Export" description="Export customer data">
             <DataExportPanel />
