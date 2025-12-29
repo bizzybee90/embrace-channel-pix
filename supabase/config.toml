@@ -116,3 +116,6 @@ verify_jwt = false
 
 [functions.refresh-aurinko-subscriptions]
 verify_jwt = false
+
+[functions.mark-email-read]
+verify_jwt = false

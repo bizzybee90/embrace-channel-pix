@@ -165,6 +165,11 @@ export function DraftMessages({ onNavigate, maxItems = 5 }: DraftMessagesProps) 
           })
           .eq('id', id);
 
+        // Mark the email as read in Gmail/Outlook
+        supabase.functions.invoke('mark-email-read', {
+          body: { conversationId: id, markAsRead: true }
+        }).catch(err => console.error('Failed to mark email as read:', err));
+
         successCount++;
       } catch (error) {
         console.error('Error sending draft:', id, error);

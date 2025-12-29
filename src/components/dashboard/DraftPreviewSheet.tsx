@@ -145,6 +145,11 @@ export function DraftPreviewSheet({
         })
         .eq('id', conversation.id);
 
+      // Mark the email as read in Gmail/Outlook
+      supabase.functions.invoke('mark-email-read', {
+        body: { conversationId: conversation.id, markAsRead: true }
+      }).catch(err => console.error('Failed to mark email as read:', err));
+
       toast({
         title: 'Message sent',
         description: 'Your response has been sent successfully',
