@@ -90,6 +90,13 @@ export const QuickActions = ({ conversation, onUpdate, onBack }: QuickActionsPro
       return;
     }
 
+    // Mark the email as read in Gmail/Outlook
+    if (conversation.channel === 'email') {
+      supabase.functions.invoke('mark-email-read', {
+        body: { conversationId: conversation.id, markAsRead: true }
+      }).catch(err => console.error('Failed to mark email as read:', err));
+    }
+
     console.log('Conversation resolved successfully');
     
     toast({

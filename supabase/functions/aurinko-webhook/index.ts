@@ -66,6 +66,7 @@ serve(async (req) => {
         .filter((p: any) => p.changeType === 'created' || p.changeType === 'updated')
         .map((p: any) => ({
           type: p.changeType === 'created' ? 'message.created' : 'message.updated',
+          changeType: p.changeType,
           resource: p.resource || p,
         }));
       console.log('Parsed payloads array format, notifications:', notifications.length);
@@ -103,7 +104,11 @@ serve(async (req) => {
     // Process each notification
     for (const notif of notifications) {
       if (notif.type === 'message.created' && notif.resource) {
+        // New email arrived - process it
         await processNewEmail(supabase, emailConfig, notif.resource);
+      } else if (notif.type === 'message.updated' && notif.resource) {
+        // Email was updated (e.g., marked as read/unread externally)
+        await processEmailUpdate(supabase, emailConfig, notif.resource);
       }
     }
 
@@ -323,12 +328,100 @@ async function processEmailFromData(supabase: any, emailConfig: any, message: an
 
   console.log('Message added to conversation:', conversationId);
 
-  // Mark email as read in Aurinko/Gmail
-  await markEmailAsRead(emailConfig, aurinkoMessageId);
+  // NOTE: We no longer mark email as read on arrival
+  // Emails will be marked as read when the conversation is resolved in BizzyBee
+  // This allows bi-directional sync with Gmail/Outlook
 
   // Trigger triage and AI agent for processing
   if (body.length > 0) {
     await triggerAIAnalysis(supabase, conversationId, body, senderName, senderEmail, customer, subject, recipientEmail);
+  }
+}
+
+// Process email update notifications (e.g., when email is marked as read/unread externally)
+async function processEmailUpdate(supabase: any, emailConfig: any, emailData: any) {
+  const messageId = emailData.id || emailData.messageId;
+  console.log('Processing email update notification, messageId:', messageId);
+
+  // Fetch the email details to check read status
+  const messageUrl = `https://api.aurinko.io/v1/email/messages/${messageId}`;
+  const messageResponse = await fetch(messageUrl, {
+    headers: {
+      'Authorization': `Bearer ${emailConfig.access_token}`,
+    },
+  });
+
+  if (!messageResponse.ok) {
+    console.error('Failed to fetch message for update check:', messageResponse.status);
+    return;
+  }
+
+  const message = await messageResponse.json();
+  const isUnread = message.unread;
+  const threadId = message.threadId || messageId;
+  
+  console.log('Email update - unread status:', isUnread, 'threadId:', threadId);
+
+  // Find the conversation by external_conversation_id (thread ID)
+  const { data: conversation, error: convError } = await supabase
+    .from('conversations')
+    .select('id, status, metadata')
+    .eq('workspace_id', emailConfig.workspace_id)
+    .eq('external_conversation_id', `aurinko_${threadId}`)
+    .single();
+
+  if (convError || !conversation) {
+    // Try finding by aurinko_message_id in metadata
+    const { data: convByMsgId } = await supabase
+      .from('conversations')
+      .select('id, status, metadata')
+      .eq('workspace_id', emailConfig.workspace_id)
+      .filter('metadata->>aurinko_message_id', 'eq', messageId)
+      .single();
+    
+    if (!convByMsgId) {
+      console.log('No conversation found for this email update');
+      return;
+    }
+    
+    await handleReadStatusChange(supabase, convByMsgId, isUnread);
+    return;
+  }
+
+  await handleReadStatusChange(supabase, conversation, isUnread);
+}
+
+async function handleReadStatusChange(supabase: any, conversation: any, isUnread: boolean) {
+  const currentStatus = conversation.status;
+  
+  if (!isUnread && currentStatus !== 'resolved') {
+    // Email was marked as READ externally -> auto-resolve the conversation
+    console.log('Email marked as read externally, auto-resolving conversation:', conversation.id);
+    
+    await supabase
+      .from('conversations')
+      .update({
+        status: 'resolved',
+        resolved_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', conversation.id);
+    
+    console.log('Conversation auto-resolved due to external read');
+  } else if (isUnread && currentStatus === 'resolved') {
+    // Email was marked as UNREAD externally -> reopen the conversation
+    console.log('Email marked as unread externally, reopening conversation:', conversation.id);
+    
+    await supabase
+      .from('conversations')
+      .update({
+        status: 'open',
+        resolved_at: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', conversation.id);
+    
+    console.log('Conversation reopened due to external unread');
   }
 }
 
