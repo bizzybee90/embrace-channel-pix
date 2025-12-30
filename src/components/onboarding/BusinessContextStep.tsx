@@ -3,10 +3,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
-import { ChevronLeft, ChevronRight, Loader2, Check, ChevronsUpDown } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -49,7 +48,6 @@ const BUSINESS_TYPES = [
   { value: 'other', label: 'Other' },
 ];
 
-// UK locations for service area
 const UK_LOCATIONS = [
   'Aberdeen', 'Aberystwyth', 'Aylesbury', 'Bangor', 'Barnsley', 'Basildon', 'Basingstoke', 
   'Bath', 'Bedford', 'Belfast', 'Birkenhead', 'Birmingham', 'Blackburn', 'Blackpool', 
@@ -73,27 +71,54 @@ const UK_LOCATIONS = [
 
 export function BusinessContextStep({ workspaceId, value, onChange, onNext, onBack }: BusinessContextStepProps) {
   const [isSaving, setIsSaving] = useState(false);
-  const [businessTypeOpen, setBusinessTypeOpen] = useState(false);
   const [businessTypeSearch, setBusinessTypeSearch] = useState('');
-  const [serviceAreaOpen, setServiceAreaOpen] = useState(false);
   const [serviceAreaSearch, setServiceAreaSearch] = useState('');
+  const [businessTypeFocused, setBusinessTypeFocused] = useState(false);
+  const [serviceAreaFocused, setServiceAreaFocused] = useState(false);
+
+  // Parse service areas from comma-separated string
+  const selectedAreas = useMemo(() => {
+    if (!value.serviceArea) return [];
+    return value.serviceArea.split(',').map(s => s.trim()).filter(Boolean);
+  }, [value.serviceArea]);
 
   // Filter business types based on search
   const filteredBusinessTypes = useMemo(() => {
-    if (!businessTypeSearch) return BUSINESS_TYPES;
+    if (!businessTypeSearch) return [];
     const search = businessTypeSearch.toLowerCase();
     return BUSINESS_TYPES.filter(type => 
       type.label.toLowerCase().includes(search) || 
       type.value.toLowerCase().includes(search)
-    );
+    ).slice(0, 8);
   }, [businessTypeSearch]);
 
   // Filter locations based on search
   const filteredLocations = useMemo(() => {
-    if (!serviceAreaSearch) return UK_LOCATIONS.slice(0, 20); // Show first 20 by default
+    if (!serviceAreaSearch) return [];
     const search = serviceAreaSearch.toLowerCase();
-    return UK_LOCATIONS.filter(loc => loc.toLowerCase().includes(search));
-  }, [serviceAreaSearch]);
+    return UK_LOCATIONS
+      .filter(loc => loc.toLowerCase().includes(search) && !selectedAreas.includes(loc))
+      .slice(0, 8);
+  }, [serviceAreaSearch, selectedAreas]);
+
+  const selectedBusinessType = BUSINESS_TYPES.find(t => t.value === value.businessType);
+
+  const handleSelectBusinessType = (type: { value: string; label: string }) => {
+    onChange({ ...value, businessType: type.value });
+    setBusinessTypeSearch('');
+    setBusinessTypeFocused(false);
+  };
+
+  const handleSelectLocation = (location: string) => {
+    const newAreas = [...selectedAreas, location];
+    onChange({ ...value, serviceArea: newAreas.join(', ') });
+    setServiceAreaSearch('');
+  };
+
+  const handleRemoveLocation = (location: string) => {
+    const newAreas = selectedAreas.filter(a => a !== location);
+    onChange({ ...value, serviceArea: newAreas.join(', ') });
+  };
 
   const handleSave = async () => {
     if (!value.companyName || !value.businessType) {
@@ -103,14 +128,12 @@ export function BusinessContextStep({ workspaceId, value, onChange, onNext, onBa
 
     setIsSaving(true);
     try {
-      // Check if business_context exists
       const { data: existing } = await supabase
         .from('business_context')
         .select('id')
         .eq('workspace_id', workspaceId)
         .maybeSingle();
 
-      // Save to proper columns instead of custom_flags
       const contextData = {
         workspace_id: workspaceId,
         company_name: value.companyName,
@@ -131,13 +154,11 @@ export function BusinessContextStep({ workspaceId, value, onChange, onNext, onBa
         await supabase.from('business_context').insert(contextData);
       }
 
-      // Update workspace name
       await supabase
         .from('workspaces')
         .update({ name: value.companyName })
         .eq('id', workspaceId);
 
-      // If receiving invoices, create sender rules for common invoice senders
       if (value.receivesInvoices) {
         const invoiceSenders = ['xero.com', 'quickbooks.com', 'sage.com', 'freshbooks.com', 'stripe.com', 'paypal.com'];
         for (const domain of invoiceSenders) {
@@ -160,7 +181,6 @@ export function BusinessContextStep({ workspaceId, value, onChange, onNext, onBa
         }
       }
 
-      // If hiring, create rules for job portals
       if (value.isHiring) {
         const jobPortals = ['indeed.com', 'linkedin.com', 'reed.co.uk', 'totaljobs.com', 'cv-library.co.uk', 'glassdoor.com'];
         for (const domain of jobPortals) {
@@ -192,8 +212,6 @@ export function BusinessContextStep({ workspaceId, value, onChange, onNext, onBa
     }
   };
 
-  const selectedBusinessType = BUSINESS_TYPES.find(t => t.value === value.businessType);
-
   return (
     <div className="space-y-6">
       <div className="text-center space-y-2">
@@ -218,68 +236,40 @@ export function BusinessContextStep({ workspaceId, value, onChange, onNext, onBa
 
         <div className="space-y-2">
           <Label>What type of business is this? *</Label>
-          <Popover open={businessTypeOpen} onOpenChange={setBusinessTypeOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                role="combobox"
-                aria-expanded={businessTypeOpen}
-                className="w-full justify-between font-normal"
-              >
-                {selectedBusinessType?.label || "Search or select business type..."}
-                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-full p-0" align="start">
-              <Command>
-                <CommandInput 
-                  placeholder="Type to search..." 
-                  value={businessTypeSearch}
-                  onValueChange={setBusinessTypeSearch}
-                />
-                <CommandList>
-                  <CommandEmpty>
-                    {businessTypeSearch ? (
-                      <CommandItem
-                        onSelect={() => {
-                          const customValue = businessTypeSearch.toLowerCase().replace(/[^a-z0-9]+/g, '_');
-                          onChange({ ...value, businessType: customValue });
-                          setBusinessTypeOpen(false);
-                          setBusinessTypeSearch('');
-                        }}
-                      >
-                        <Check className="mr-2 h-4 w-4 opacity-0" />
-                        Use "{businessTypeSearch}"
-                      </CommandItem>
-                    ) : (
-                      "No business type found."
+          <div className="relative">
+            <Input
+              placeholder="Start typing to search..."
+              value={businessTypeSearch || selectedBusinessType?.label || ''}
+              onChange={(e) => {
+                setBusinessTypeSearch(e.target.value);
+                if (value.businessType && e.target.value !== selectedBusinessType?.label) {
+                  onChange({ ...value, businessType: '' });
+                }
+              }}
+              onFocus={() => setBusinessTypeFocused(true)}
+              onBlur={() => setTimeout(() => setBusinessTypeFocused(false), 150)}
+            />
+            {businessTypeFocused && filteredBusinessTypes.length > 0 && (
+              <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg max-h-60 overflow-auto">
+                {filteredBusinessTypes.map((type) => (
+                  <button
+                    key={type.value}
+                    type="button"
+                    className={cn(
+                      "w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground",
+                      value.businessType === type.value && "bg-accent"
                     )}
-                  </CommandEmpty>
-                  <CommandGroup>
-                    {filteredBusinessTypes.map((type) => (
-                      <CommandItem
-                        key={type.value}
-                        value={type.label}
-                        onSelect={() => {
-                          onChange({ ...value, businessType: type.value });
-                          setBusinessTypeOpen(false);
-                          setBusinessTypeSearch('');
-                        }}
-                      >
-                        <Check
-                          className={cn(
-                            "mr-2 h-4 w-4",
-                            value.businessType === type.value ? "opacity-100" : "opacity-0"
-                          )}
-                        />
-                        {type.label}
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      handleSelectBusinessType(type);
+                    }}
+                  >
+                    {type.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <p className="text-xs text-muted-foreground">
             Helps load industry-specific knowledge
           </p>
@@ -298,68 +288,49 @@ export function BusinessContextStep({ workspaceId, value, onChange, onNext, onBa
         </div>
 
         <div className="space-y-2">
-          <Label>Service area (optional)</Label>
-          <Popover open={serviceAreaOpen} onOpenChange={setServiceAreaOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                role="combobox"
-                aria-expanded={serviceAreaOpen}
-                className="w-full justify-between font-normal"
-              >
-                {value.serviceArea || "Search for your area..."}
-                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-full p-0" align="start">
-              <Command>
-                <CommandInput 
-                  placeholder="Type to search locations..." 
-                  value={serviceAreaSearch}
-                  onValueChange={setServiceAreaSearch}
-                />
-                <CommandList>
-                  <CommandEmpty>
-                    {serviceAreaSearch ? (
-                      <CommandItem
-                        onSelect={() => {
-                          onChange({ ...value, serviceArea: serviceAreaSearch });
-                          setServiceAreaOpen(false);
-                          setServiceAreaSearch('');
-                        }}
-                      >
-                        <Check className="mr-2 h-4 w-4 opacity-0" />
-                        Use "{serviceAreaSearch}"
-                      </CommandItem>
-                    ) : (
-                      "Start typing to search..."
-                    )}
-                  </CommandEmpty>
-                  <CommandGroup>
-                    {filteredLocations.map((location) => (
-                      <CommandItem
-                        key={location}
-                        value={location}
-                        onSelect={() => {
-                          onChange({ ...value, serviceArea: location });
-                          setServiceAreaOpen(false);
-                          setServiceAreaSearch('');
-                        }}
-                      >
-                        <Check
-                          className={cn(
-                            "mr-2 h-4 w-4",
-                            value.serviceArea === location ? "opacity-100" : "opacity-0"
-                          )}
-                        />
-                        {location}
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
+          <Label>Service areas (optional)</Label>
+          {selectedAreas.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {selectedAreas.map((area) => (
+                <Badge key={area} variant="secondary" className="gap-1 pr-1">
+                  {area}
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveLocation(area)}
+                    className="ml-1 hover:bg-muted rounded-full p-0.5"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              ))}
+            </div>
+          )}
+          <div className="relative">
+            <Input
+              placeholder="Start typing to add areas..."
+              value={serviceAreaSearch}
+              onChange={(e) => setServiceAreaSearch(e.target.value)}
+              onFocus={() => setServiceAreaFocused(true)}
+              onBlur={() => setTimeout(() => setServiceAreaFocused(false), 150)}
+            />
+            {serviceAreaFocused && filteredLocations.length > 0 && (
+              <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg max-h-60 overflow-auto">
+                {filteredLocations.map((location) => (
+                  <button
+                    key={location}
+                    type="button"
+                    className="w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      handleSelectLocation(location);
+                    }}
+                  >
+                    {location}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <p className="text-xs text-muted-foreground">
             Helps answer location-based questions
           </p>
