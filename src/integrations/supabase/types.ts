@@ -896,6 +896,7 @@ export type Database = {
       faq_database: {
         Row: {
           answer: string
+          archived: boolean | null
           category: string
           created_at: string | null
           embedding: string | null
@@ -916,6 +917,7 @@ export type Database = {
         }
         Insert: {
           answer: string
+          archived?: boolean | null
           category: string
           created_at?: string | null
           embedding?: string | null
@@ -936,6 +938,7 @@ export type Database = {
         }
         Update: {
           answer?: string
+          archived?: boolean | null
           category?: string
           created_at?: string | null
           embedding?: string | null

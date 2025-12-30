@@ -23,7 +23,13 @@ serve(async (req) => {
 
     const { workspaceId, websiteUrl, businessName, businessType } = await req.json();
 
-    console.log(`Scraping website for workspace ${workspaceId}: ${websiteUrl}`);
+    console.log('=== SCRAPE CUSTOMER WEBSITE STARTED ===');
+    console.log(`Workspace: ${workspaceId}`);
+    console.log(`Website URL: ${websiteUrl}`);
+    console.log(`Business: ${businessName} (${businessType})`);
+    console.log(`Firecrawl key present: ${!!FIRECRAWL_API_KEY}`);
+    console.log(`Anthropic key present: ${!!ANTHROPIC_API_KEY}`);
+    console.log(`OpenAI key present: ${!!OPENAI_API_KEY}`);
 
     if (!websiteUrl) {
       return new Response(JSON.stringify({ 

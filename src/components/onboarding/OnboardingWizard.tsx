@@ -253,16 +253,28 @@ export function OnboardingWizard({ workspaceId, onComplete }: OnboardingWizardPr
                   <BookOpen className="h-4 w-4" />
                   <span>
                     {knowledgeResults.websiteFaqs > 0 
-                      ? `${knowledgeResults.websiteFaqs} FAQs from your website, ${knowledgeResults.industryFaqs} industry FAQs`
+                      ? `${knowledgeResults.websiteFaqs} FAQs extracted from your website`
                       : `${knowledgeResults.industryFaqs} industry FAQs loaded`
                     }
                   </span>
                 </div>
               )}
 
-              <Button onClick={onComplete} size="lg" className="px-8">
-                Start Using BizzyBee
-              </Button>
+              <div className="flex flex-col gap-3">
+                <Button onClick={onComplete} size="lg" className="px-8">
+                  Start Using BizzyBee
+                </Button>
+                {totalFaqs > 0 && (
+                  <Button 
+                    variant="outline" 
+                    onClick={() => window.location.href = '/settings?tab=knowledge'}
+                    className="gap-2"
+                  >
+                    <BookOpen className="h-4 w-4" />
+                    View Knowledge Base
+                  </Button>
+                )}
+              </div>
             </div>
           )}
         </CardContent>
