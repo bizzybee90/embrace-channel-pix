@@ -16,6 +16,8 @@ interface BusinessContextStepProps {
     isHiring: boolean;
     receivesInvoices: boolean;
     emailDomain: string;
+    websiteUrl: string;
+    serviceArea: string;
   };
   onChange: (value: any) => void;
   onNext: () => void;
@@ -23,23 +25,37 @@ interface BusinessContextStepProps {
 }
 
 const BUSINESS_TYPES = [
-  'Window Cleaning',
-  'Carpet Cleaning',
-  'Pressure Washing',
-  'General Cleaning',
-  'Property Maintenance',
-  'Plumbing',
-  'Electrical',
-  'Landscaping',
-  'Other Trade',
-  'Professional Services',
-  'Other',
+  { value: 'window_cleaning', label: 'Window Cleaning' },
+  { value: 'carpet_cleaning', label: 'Carpet Cleaning' },
+  { value: 'pressure_washing', label: 'Pressure Washing' },
+  { value: 'general_cleaning', label: 'General Cleaning' },
+  { value: 'dog_groomer', label: 'Dog Groomer' },
+  { value: 'pet_services', label: 'Pet Services' },
+  { value: 'plumber', label: 'Plumber' },
+  { value: 'electrician', label: 'Electrician' },
+  { value: 'locksmith', label: 'Locksmith' },
+  { value: 'roofer', label: 'Roofer' },
+  { value: 'painter_decorator', label: 'Painter & Decorator' },
+  { value: 'landscaping', label: 'Landscaping' },
+  { value: 'gardener', label: 'Gardener' },
+  { value: 'mobile_mechanic', label: 'Mobile Mechanic' },
+  { value: 'pest_control', label: 'Pest Control' },
+  { value: 'removals', label: 'Removals' },
+  { value: 'handyman', label: 'Handyman' },
+  { value: 'property_maintenance', label: 'Property Maintenance' },
+  { value: 'professional_services', label: 'Professional Services' },
+  { value: 'other', label: 'Other' },
 ];
 
 export function BusinessContextStep({ workspaceId, value, onChange, onNext, onBack }: BusinessContextStepProps) {
   const [isSaving, setIsSaving] = useState(false);
 
   const handleSave = async () => {
+    if (!value.companyName || !value.businessType) {
+      toast.error('Please enter your company name and select a business type');
+      return;
+    }
+
     setIsSaving(true);
     try {
       // Check if business_context exists
@@ -49,15 +65,15 @@ export function BusinessContextStep({ workspaceId, value, onChange, onNext, onBa
         .eq('workspace_id', workspaceId)
         .maybeSingle();
 
+      // Save to proper columns instead of custom_flags
       const contextData = {
         workspace_id: workspaceId,
+        company_name: value.companyName,
+        business_type: value.businessType,
+        email_domain: value.emailDomain || null,
+        website_url: value.websiteUrl || null,
+        service_area: value.serviceArea || null,
         is_hiring: value.isHiring,
-        custom_flags: {
-          company_name: value.companyName,
-          business_type: value.businessType,
-          receives_invoices: value.receivesInvoices,
-          email_domain: value.emailDomain,
-        },
         updated_at: new Date().toISOString(),
       };
 
@@ -70,9 +86,15 @@ export function BusinessContextStep({ workspaceId, value, onChange, onNext, onBa
         await supabase.from('business_context').insert(contextData);
       }
 
+      // Update workspace name
+      await supabase
+        .from('workspaces')
+        .update({ name: value.companyName })
+        .eq('id', workspaceId);
+
       // If receiving invoices, create sender rules for common invoice senders
       if (value.receivesInvoices) {
-        const invoiceSenders = ['xero.com', 'quickbooks.com', 'sage.com', 'freshbooks.com'];
+        const invoiceSenders = ['xero.com', 'quickbooks.com', 'sage.com', 'freshbooks.com', 'stripe.com', 'paypal.com'];
         for (const domain of invoiceSenders) {
           const { data: existingRule } = await supabase
             .from('sender_rules')
@@ -95,7 +117,7 @@ export function BusinessContextStep({ workspaceId, value, onChange, onNext, onBa
 
       // If hiring, create rules for job portals
       if (value.isHiring) {
-        const jobPortals = ['indeed.com', 'linkedin.com', 'reed.co.uk', 'totaljobs.com', 'cv-library.co.uk'];
+        const jobPortals = ['indeed.com', 'linkedin.com', 'reed.co.uk', 'totaljobs.com', 'cv-library.co.uk', 'glassdoor.com'];
         for (const domain of jobPortals) {
           const { data: existingRule } = await supabase
             .from('sender_rules')
@@ -125,49 +147,77 @@ export function BusinessContextStep({ workspaceId, value, onChange, onNext, onBa
     }
   };
 
+  const selectedBusinessType = BUSINESS_TYPES.find(t => t.value === value.businessType);
+
   return (
     <div className="space-y-6">
       <div className="text-center space-y-2">
         <h2 className="text-xl font-semibold">Tell us about your business</h2>
         <p className="text-sm text-muted-foreground">
-          This helps BizzyBee understand what's normal for your inbox
+          This helps BizzyBee understand your business and answer customer questions
         </p>
       </div>
 
       <div className="space-y-4">
         <div className="space-y-2">
-          <Label>Your company name</Label>
+          <Label>Your company name *</Label>
           <Input
-            placeholder="e.g., MAC Cleaning"
+            placeholder="e.g., Sarah's Dog Grooming"
             value={value.companyName}
             onChange={(e) => onChange({ ...value, companyName: e.target.value })}
           />
           <p className="text-xs text-muted-foreground">
-            Helps BizzyBee identify invoices TO your company vs misdirected ones
+            Used to identify your business in emails
           </p>
         </div>
 
         <div className="space-y-2">
-          <Label>What type of business is this?</Label>
+          <Label>What type of business is this? *</Label>
           <Select
             value={value.businessType}
             onValueChange={(v) => onChange({ ...value, businessType: v })}
           >
             <SelectTrigger>
-              <SelectValue placeholder="Select business type" />
+              <SelectValue placeholder="Select business type">
+                {selectedBusinessType?.label}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               {BUSINESS_TYPES.map((type) => (
-                <SelectItem key={type} value={type}>{type}</SelectItem>
+                <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
               ))}
             </SelectContent>
           </Select>
+          <p className="text-xs text-muted-foreground">
+            Helps load industry-specific knowledge
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <Label>Your website URL (optional)</Label>
+          <Input
+            placeholder="e.g., https://sarahsdoggrooming.co.uk"
+            value={value.websiteUrl || ''}
+            onChange={(e) => onChange({ ...value, websiteUrl: e.target.value })}
+          />
+          <p className="text-xs text-muted-foreground">
+            We'll extract your prices, services, and policies automatically
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <Label>Service area (optional)</Label>
+          <Input
+            placeholder="e.g., Leeds, Wakefield, Bradford"
+            value={value.serviceArea || ''}
+            onChange={(e) => onChange({ ...value, serviceArea: e.target.value })}
+          />
         </div>
 
         <div className="space-y-2">
           <Label>Your business email domain</Label>
           <Input
-            placeholder="e.g., maccleaning.uk"
+            placeholder="e.g., sarahsdoggrooming.co.uk"
             value={value.emailDomain}
             onChange={(e) => onChange({ ...value, emailDomain: e.target.value })}
           />
@@ -180,7 +230,7 @@ export function BusinessContextStep({ workspaceId, value, onChange, onNext, onBa
           <div className="space-y-0.5">
             <Label>Are you currently hiring?</Label>
             <p className="text-xs text-muted-foreground">
-              We'll auto-file job notifications
+              We'll auto-file job applications
             </p>
           </div>
           <Switch
@@ -193,7 +243,7 @@ export function BusinessContextStep({ workspaceId, value, onChange, onNext, onBa
           <div className="space-y-0.5">
             <Label>Do you receive invoices from suppliers?</Label>
             <p className="text-xs text-muted-foreground">
-              Normal business invoices, not misdirected ones
+              We'll recognize accounting software emails
             </p>
           </div>
           <Switch
@@ -208,7 +258,11 @@ export function BusinessContextStep({ workspaceId, value, onChange, onNext, onBa
           <ChevronLeft className="h-4 w-4 mr-2" />
           Back
         </Button>
-        <Button onClick={handleSave} className="flex-1" disabled={isSaving}>
+        <Button 
+          onClick={handleSave} 
+          className="flex-1" 
+          disabled={isSaving || !value.companyName || !value.businessType}
+        >
           {isSaving ? (
             <Loader2 className="h-4 w-4 animate-spin mr-2" />
           ) : (

@@ -119,3 +119,9 @@ verify_jwt = false
 
 [functions.mark-email-read]
 verify_jwt = false
+
+[functions.copy-industry-faqs]
+verify_jwt = false
+
+[functions.scrape-customer-website]
+verify_jwt = false

@@ -61,8 +61,15 @@ export type Database = {
           custom_flags: Json | null
           email_domain: string | null
           id: string
+          industry_faqs_copied: number | null
           is_hiring: boolean | null
+          knowledge_base_completed_at: string | null
+          knowledge_base_started_at: string | null
+          knowledge_base_status: string | null
+          service_area: string | null
           updated_at: string | null
+          website_faqs_generated: number | null
+          website_url: string | null
           workspace_id: string | null
         }
         Insert: {
@@ -76,8 +83,15 @@ export type Database = {
           custom_flags?: Json | null
           email_domain?: string | null
           id?: string
+          industry_faqs_copied?: number | null
           is_hiring?: boolean | null
+          knowledge_base_completed_at?: string | null
+          knowledge_base_started_at?: string | null
+          knowledge_base_status?: string | null
+          service_area?: string | null
           updated_at?: string | null
+          website_faqs_generated?: number | null
+          website_url?: string | null
           workspace_id?: string | null
         }
         Update: {
@@ -91,8 +105,15 @@ export type Database = {
           custom_flags?: Json | null
           email_domain?: string | null
           id?: string
+          industry_faqs_copied?: number | null
           is_hiring?: boolean | null
+          knowledge_base_completed_at?: string | null
+          knowledge_base_started_at?: string | null
+          knowledge_base_status?: string | null
+          service_area?: string | null
           updated_at?: string | null
+          website_faqs_generated?: number | null
+          website_url?: string | null
           workspace_id?: string | null
         }
         Relationships: [
@@ -880,14 +901,16 @@ export type Database = {
           embedding: string | null
           enabled: boolean | null
           external_id: number | null
+          generation_source: string | null
           id: string
           is_active: boolean | null
           is_industry_standard: boolean | null
-          is_mac_specific: boolean | null
+          is_own_content: boolean | null
           keywords: string[] | null
           priority: number | null
           question: string
           source_company: string | null
+          source_url: string | null
           updated_at: string | null
           workspace_id: string | null
         }
@@ -898,14 +921,16 @@ export type Database = {
           embedding?: string | null
           enabled?: boolean | null
           external_id?: number | null
+          generation_source?: string | null
           id?: string
           is_active?: boolean | null
           is_industry_standard?: boolean | null
-          is_mac_specific?: boolean | null
+          is_own_content?: boolean | null
           keywords?: string[] | null
           priority?: number | null
           question: string
           source_company?: string | null
+          source_url?: string | null
           updated_at?: string | null
           workspace_id?: string | null
         }
@@ -916,14 +941,16 @@ export type Database = {
           embedding?: string | null
           enabled?: boolean | null
           external_id?: number | null
+          generation_source?: string | null
           id?: string
           is_active?: boolean | null
           is_industry_standard?: boolean | null
-          is_mac_specific?: boolean | null
+          is_own_content?: boolean | null
           keywords?: string[] | null
           priority?: number | null
           question?: string
           source_company?: string | null
+          source_url?: string | null
           updated_at?: string | null
           workspace_id?: string | null
         }
@@ -1001,6 +1028,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      industry_faq_templates: {
+        Row: {
+          answer: string
+          category: string | null
+          created_at: string | null
+          embedding: string | null
+          id: string
+          industry_type: string
+          is_active: boolean | null
+          metadata: Json | null
+          question: string
+          tags: string[] | null
+          updated_at: string | null
+        }
+        Insert: {
+          answer: string
+          category?: string | null
+          created_at?: string | null
+          embedding?: string | null
+          id?: string
+          industry_type: string
+          is_active?: boolean | null
+          metadata?: Json | null
+          question: string
+          tags?: string[] | null
+          updated_at?: string | null
+        }
+        Update: {
+          answer?: string
+          category?: string | null
+          created_at?: string | null
+          embedding?: string | null
+          id?: string
+          industry_type?: string
+          is_active?: boolean | null
+          metadata?: Json | null
+          question?: string
+          tags?: string[] | null
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       message_responses: {
         Row: {
@@ -2136,6 +2205,23 @@ export type Database = {
           mode: string
           similarity: number
           text: string
+        }[]
+      }
+      match_faqs_with_priority: {
+        Args: {
+          match_count?: number
+          match_threshold?: number
+          p_workspace_id: string
+          query_embedding: string
+        }
+        Returns: {
+          answer: string
+          category: string
+          id: string
+          is_own_content: boolean
+          priority: number
+          question: string
+          similarity: number
         }[]
       }
       user_has_workspace_access: {
