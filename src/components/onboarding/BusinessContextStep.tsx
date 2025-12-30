@@ -49,10 +49,34 @@ const BUSINESS_TYPES = [
   { value: 'other', label: 'Other' },
 ];
 
+// UK locations for service area
+const UK_LOCATIONS = [
+  'Aberdeen', 'Aberystwyth', 'Aylesbury', 'Bangor', 'Barnsley', 'Basildon', 'Basingstoke', 
+  'Bath', 'Bedford', 'Belfast', 'Birkenhead', 'Birmingham', 'Blackburn', 'Blackpool', 
+  'Bolton', 'Bournemouth', 'Bradford', 'Brighton', 'Bristol', 'Burnley', 'Burton upon Trent',
+  'Bury', 'Cambridge', 'Canterbury', 'Cardiff', 'Carlisle', 'Chelmsford', 'Cheltenham', 
+  'Chester', 'Chesterfield', 'Chichester', 'Colchester', 'Coventry', 'Crawley', 'Crewe',
+  'Darlington', 'Derby', 'Doncaster', 'Dorchester', 'Dudley', 'Dundee', 'Durham', 
+  'Eastbourne', 'Edinburgh', 'Exeter', 'Gateshead', 'Glasgow', 'Gloucester', 'Grimsby',
+  'Guildford', 'Halifax', 'Harrogate', 'Hartlepool', 'Hastings', 'Hereford', 'Huddersfield',
+  'Hull', 'Inverness', 'Ipswich', 'Kettering', 'Kingston upon Hull', 'Lancaster', 'Leeds',
+  'Leicester', 'Lichfield', 'Lincoln', 'Liverpool', 'London', 'Luton', 'Maidstone',
+  'Manchester', 'Mansfield', 'Middlesbrough', 'Milton Keynes', 'Newcastle upon Tyne',
+  'Newport', 'Northampton', 'Norwich', 'Nottingham', 'Oldham', 'Oxford', 'Peterborough',
+  'Plymouth', 'Poole', 'Portsmouth', 'Preston', 'Reading', 'Redditch', 'Rochdale',
+  'Rotherham', 'Salford', 'Salisbury', 'Scarborough', 'Sheffield', 'Shrewsbury', 'Slough',
+  'Solihull', 'Southampton', 'Southend-on-Sea', 'Southport', 'St Albans', 'Stafford',
+  'Stevenage', 'Stockport', 'Stoke-on-Trent', 'Sunderland', 'Sutton Coldfield', 'Swansea',
+  'Swindon', 'Telford', 'Torquay', 'Wakefield', 'Walsall', 'Warrington', 'Watford',
+  'Wigan', 'Winchester', 'Woking', 'Wolverhampton', 'Worcester', 'Worthing', 'Wrexham', 'York'
+];
+
 export function BusinessContextStep({ workspaceId, value, onChange, onNext, onBack }: BusinessContextStepProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [businessTypeOpen, setBusinessTypeOpen] = useState(false);
   const [businessTypeSearch, setBusinessTypeSearch] = useState('');
+  const [serviceAreaOpen, setServiceAreaOpen] = useState(false);
+  const [serviceAreaSearch, setServiceAreaSearch] = useState('');
 
   // Filter business types based on search
   const filteredBusinessTypes = useMemo(() => {
@@ -63,6 +87,13 @@ export function BusinessContextStep({ workspaceId, value, onChange, onNext, onBa
       type.value.toLowerCase().includes(search)
     );
   }, [businessTypeSearch]);
+
+  // Filter locations based on search
+  const filteredLocations = useMemo(() => {
+    if (!serviceAreaSearch) return UK_LOCATIONS.slice(0, 20); // Show first 20 by default
+    const search = serviceAreaSearch.toLowerCase();
+    return UK_LOCATIONS.filter(loc => loc.toLowerCase().includes(search));
+  }, [serviceAreaSearch]);
 
   const handleSave = async () => {
     if (!value.companyName || !value.businessType) {
@@ -268,11 +299,70 @@ export function BusinessContextStep({ workspaceId, value, onChange, onNext, onBa
 
         <div className="space-y-2">
           <Label>Service area (optional)</Label>
-          <Input
-            placeholder="e.g., Leeds, Wakefield, Bradford"
-            value={value.serviceArea || ''}
-            onChange={(e) => onChange({ ...value, serviceArea: e.target.value })}
-          />
+          <Popover open={serviceAreaOpen} onOpenChange={setServiceAreaOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                role="combobox"
+                aria-expanded={serviceAreaOpen}
+                className="w-full justify-between font-normal"
+              >
+                {value.serviceArea || "Search for your area..."}
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-full p-0" align="start">
+              <Command>
+                <CommandInput 
+                  placeholder="Type to search locations..." 
+                  value={serviceAreaSearch}
+                  onValueChange={setServiceAreaSearch}
+                />
+                <CommandList>
+                  <CommandEmpty>
+                    {serviceAreaSearch ? (
+                      <CommandItem
+                        onSelect={() => {
+                          onChange({ ...value, serviceArea: serviceAreaSearch });
+                          setServiceAreaOpen(false);
+                          setServiceAreaSearch('');
+                        }}
+                      >
+                        <Check className="mr-2 h-4 w-4 opacity-0" />
+                        Use "{serviceAreaSearch}"
+                      </CommandItem>
+                    ) : (
+                      "Start typing to search..."
+                    )}
+                  </CommandEmpty>
+                  <CommandGroup>
+                    {filteredLocations.map((location) => (
+                      <CommandItem
+                        key={location}
+                        value={location}
+                        onSelect={() => {
+                          onChange({ ...value, serviceArea: location });
+                          setServiceAreaOpen(false);
+                          setServiceAreaSearch('');
+                        }}
+                      >
+                        <Check
+                          className={cn(
+                            "mr-2 h-4 w-4",
+                            value.serviceArea === location ? "opacity-100" : "opacity-0"
+                          )}
+                        />
+                        {location}
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+          <p className="text-xs text-muted-foreground">
+            Helps answer location-based questions
+          </p>
         </div>
 
         <div className="space-y-2">
