@@ -1,12 +1,14 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { supabase } from '@/integrations/supabase/client';
-import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2, Check, ChevronsUpDown } from 'lucide-react';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 interface BusinessContextStepProps {
   workspaceId: string;
@@ -49,6 +51,18 @@ const BUSINESS_TYPES = [
 
 export function BusinessContextStep({ workspaceId, value, onChange, onNext, onBack }: BusinessContextStepProps) {
   const [isSaving, setIsSaving] = useState(false);
+  const [businessTypeOpen, setBusinessTypeOpen] = useState(false);
+  const [businessTypeSearch, setBusinessTypeSearch] = useState('');
+
+  // Filter business types based on search
+  const filteredBusinessTypes = useMemo(() => {
+    if (!businessTypeSearch) return BUSINESS_TYPES;
+    const search = businessTypeSearch.toLowerCase();
+    return BUSINESS_TYPES.filter(type => 
+      type.label.toLowerCase().includes(search) || 
+      type.value.toLowerCase().includes(search)
+    );
+  }, [businessTypeSearch]);
 
   const handleSave = async () => {
     if (!value.companyName || !value.businessType) {
@@ -173,21 +187,68 @@ export function BusinessContextStep({ workspaceId, value, onChange, onNext, onBa
 
         <div className="space-y-2">
           <Label>What type of business is this? *</Label>
-          <Select
-            value={value.businessType}
-            onValueChange={(v) => onChange({ ...value, businessType: v })}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select business type">
-                {selectedBusinessType?.label}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {BUSINESS_TYPES.map((type) => (
-                <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Popover open={businessTypeOpen} onOpenChange={setBusinessTypeOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                role="combobox"
+                aria-expanded={businessTypeOpen}
+                className="w-full justify-between font-normal"
+              >
+                {selectedBusinessType?.label || "Search or select business type..."}
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-full p-0" align="start">
+              <Command>
+                <CommandInput 
+                  placeholder="Type to search..." 
+                  value={businessTypeSearch}
+                  onValueChange={setBusinessTypeSearch}
+                />
+                <CommandList>
+                  <CommandEmpty>
+                    {businessTypeSearch ? (
+                      <CommandItem
+                        onSelect={() => {
+                          const customValue = businessTypeSearch.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+                          onChange({ ...value, businessType: customValue });
+                          setBusinessTypeOpen(false);
+                          setBusinessTypeSearch('');
+                        }}
+                      >
+                        <Check className="mr-2 h-4 w-4 opacity-0" />
+                        Use "{businessTypeSearch}"
+                      </CommandItem>
+                    ) : (
+                      "No business type found."
+                    )}
+                  </CommandEmpty>
+                  <CommandGroup>
+                    {filteredBusinessTypes.map((type) => (
+                      <CommandItem
+                        key={type.value}
+                        value={type.label}
+                        onSelect={() => {
+                          onChange({ ...value, businessType: type.value });
+                          setBusinessTypeOpen(false);
+                          setBusinessTypeSearch('');
+                        }}
+                      >
+                        <Check
+                          className={cn(
+                            "mr-2 h-4 w-4",
+                            value.businessType === type.value ? "opacity-100" : "opacity-0"
+                          )}
+                        />
+                        {type.label}
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
           <p className="text-xs text-muted-foreground">
             Helps load industry-specific knowledge
           </p>
