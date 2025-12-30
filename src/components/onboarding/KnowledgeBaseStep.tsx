@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { ChevronLeft, ChevronRight, Loader2, CheckCircle2, BookOpen, Globe, AlertCircle, Database } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2, CheckCircle2, Globe, AlertCircle } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 
 interface KnowledgeBaseStepProps {
@@ -15,12 +15,12 @@ interface KnowledgeBaseStepProps {
   onBack: () => void;
 }
 
-type Status = 'idle' | 'copying' | 'scraping' | 'complete' | 'error';
+type Status = 'idle' | 'scraping' | 'complete' | 'error';
 
 export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, onBack }: KnowledgeBaseStepProps) {
   const [status, setStatus] = useState<Status>('idle');
-  const [industryFaqsCopied, setIndustryFaqsCopied] = useState(0);
   const [websiteFaqsGenerated, setWebsiteFaqsGenerated] = useState(0);
+  const [pagesScraped, setPagesScraped] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
 
@@ -29,55 +29,48 @@ export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, on
   }, []);
 
   const startKnowledgeBaseGeneration = async () => {
-    setStatus('copying');
-    setProgress(10);
+    // If no website URL, skip straight to complete
+    if (!businessContext.websiteUrl) {
+      console.log('No website URL provided, skipping scraping');
+      setStatus('complete');
+      setProgress(100);
+      return;
+    }
+
+    setStatus('scraping');
+    setProgress(20);
 
     try {
-      // Map business type to industry type slug
-      const industryType = businessContext.businessType
-        .toLowerCase()
-        .replace(/\s+/g, '_')
-        .replace(/[^a-z0-9_]/g, '');
+      console.log('Scraping website:', businessContext.websiteUrl);
+      
+      // Simulate progress while scraping
+      const progressInterval = setInterval(() => {
+        setProgress(prev => Math.min(prev + 5, 90));
+      }, 3000);
 
-      // Step 1: Copy industry FAQs
-      console.log('Copying industry FAQs for:', industryType);
-      const copyResult = await supabase.functions.invoke('copy-industry-faqs', {
+      const scrapeResult = await supabase.functions.invoke('scrape-customer-website', {
         body: { 
           workspaceId, 
-          industryType 
+          websiteUrl: businessContext.websiteUrl,
+          businessName: businessContext.companyName,
+          businessType: businessContext.businessType
         }
       });
 
-      if (copyResult.error) {
-        console.error('Error copying industry FAQs:', copyResult.error);
+      clearInterval(progressInterval);
+
+      if (scrapeResult.error) {
+        console.error('Error scraping website:', scrapeResult.error);
+        throw new Error(scrapeResult.error.message || 'Failed to scrape website');
       }
+
+      const websiteGenerated = scrapeResult.data?.faqsGenerated || 0;
+      const pages = scrapeResult.data?.pagesScraped || 0;
       
-      const industryCopied = copyResult.data?.faqsCopied || 0;
-      setIndustryFaqsCopied(industryCopied);
-      setProgress(40);
-
-      // Step 2: Scrape website (if URL provided)
-      if (businessContext.websiteUrl) {
-        setStatus('scraping');
-        console.log('Scraping website:', businessContext.websiteUrl);
-        
-        const scrapeResult = await supabase.functions.invoke('scrape-customer-website', {
-          body: { 
-            workspaceId, 
-            websiteUrl: businessContext.websiteUrl,
-            businessName: businessContext.companyName,
-            businessType: businessContext.businessType
-          }
-        });
-
-        if (scrapeResult.error) {
-          console.error('Error scraping website:', scrapeResult.error);
-        }
-
-        const websiteGenerated = scrapeResult.data?.faqsGenerated || 0;
-        setWebsiteFaqsGenerated(websiteGenerated);
-      }
-
+      console.log(`Scraping complete: ${pages} pages, ${websiteGenerated} FAQs`);
+      
+      setWebsiteFaqsGenerated(websiteGenerated);
+      setPagesScraped(pages);
       setProgress(100);
       setStatus('complete');
 
@@ -90,16 +83,23 @@ export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, on
 
   const handleRetry = () => {
     setError(null);
-    setIndustryFaqsCopied(0);
     setWebsiteFaqsGenerated(0);
+    setPagesScraped(0);
     setProgress(0);
     startKnowledgeBaseGeneration();
   };
 
   const handleContinue = () => {
     onComplete({
-      industryFaqs: industryFaqsCopied,
+      industryFaqs: 0, // No industry templates for now
       websiteFaqs: websiteFaqsGenerated
+    });
+  };
+
+  const handleSkip = () => {
+    onComplete({
+      industryFaqs: 0,
+      websiteFaqs: 0
     });
   };
 
@@ -113,7 +113,7 @@ export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, on
           <div className="space-y-2">
             <h2 className="text-xl font-semibold">Something went wrong</h2>
             <p className="text-sm text-muted-foreground">
-              {error || 'We couldn\'t build your knowledge base. Please try again.'}
+              {error || 'We couldn\'t scrape your website. You can add FAQs manually later.'}
             </p>
           </div>
         </div>
@@ -122,6 +122,9 @@ export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, on
           <Button variant="outline" onClick={onBack} className="flex-1">
             <ChevronLeft className="h-4 w-4 mr-2" />
             Back
+          </Button>
+          <Button variant="outline" onClick={handleSkip} className="flex-1">
+            Skip for now
           </Button>
           <Button onClick={handleRetry} className="flex-1">
             Try Again
@@ -132,8 +135,6 @@ export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, on
   }
 
   if (status === 'complete') {
-    const totalFaqs = industryFaqsCopied + websiteFaqsGenerated;
-    
     return (
       <div className="space-y-6">
         <div className="text-center space-y-4">
@@ -141,37 +142,36 @@ export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, on
             <CheckCircle2 className="h-8 w-8 text-green-600" />
           </div>
           <div className="space-y-2">
-            <h2 className="text-xl font-semibold">Knowledge base ready!</h2>
+            <h2 className="text-xl font-semibold">
+              {websiteFaqsGenerated > 0 ? 'Knowledge base ready!' : 'Ready to continue'}
+            </h2>
             <p className="text-sm text-muted-foreground">
-              BizzyBee can now answer questions about your business
+              {websiteFaqsGenerated > 0 
+                ? 'BizzyBee can now answer questions about your business'
+                : 'You can add FAQs manually in Settings → Knowledge Base later'
+              }
             </p>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div className="bg-muted/30 rounded-lg p-4 text-center">
-            <Database className="h-5 w-5 mx-auto mb-2 text-primary" />
-            <div className="text-2xl font-bold text-primary">{industryFaqsCopied}</div>
-            <div className="text-xs text-muted-foreground">Industry knowledge</div>
-          </div>
-          <div className="bg-muted/30 rounded-lg p-4 text-center">
-            <Globe className="h-5 w-5 mx-auto mb-2 text-green-600" />
-            <div className="text-2xl font-bold text-green-600">{websiteFaqsGenerated}</div>
-            <div className="text-xs text-muted-foreground">From your website</div>
-          </div>
-        </div>
-
         {websiteFaqsGenerated > 0 && (
-          <p className="text-xs text-center text-muted-foreground">
-            Your specific prices and services always take priority
-          </p>
+          <div className="bg-muted/30 rounded-lg p-6 text-center">
+            <Globe className="h-8 w-8 mx-auto mb-3 text-green-600" />
+            <div className="text-3xl font-bold text-green-600">{websiteFaqsGenerated}</div>
+            <div className="text-sm text-muted-foreground mt-1">FAQs extracted from your website</div>
+            {pagesScraped > 0 && (
+              <div className="text-xs text-muted-foreground mt-2">
+                Analyzed {pagesScraped} pages
+              </div>
+            )}
+          </div>
         )}
 
-        {totalFaqs === 0 && (
+        {websiteFaqsGenerated === 0 && businessContext.websiteUrl && (
           <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
             <p className="text-sm text-amber-800 dark:text-amber-200">
-              No FAQs were generated yet. You can add them manually in Settings → Knowledge Base, 
-              or industry templates will be added soon.
+              We couldn't extract FAQs from your website, but that's okay! 
+              You can add them manually in Settings → Knowledge Base.
             </p>
           </div>
         )}
@@ -184,73 +184,37 @@ export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, on
     );
   }
 
-  // Loading state
+  // Loading state - website scraping
   return (
     <div className="space-y-6">
       <div className="text-center space-y-2">
-        <h2 className="text-xl font-semibold">Building your knowledge base</h2>
+        <h2 className="text-xl font-semibold">Learning from your website</h2>
         <p className="text-sm text-muted-foreground">
-          This takes about 1-2 minutes
+          This takes 1-2 minutes
         </p>
       </div>
 
       <Progress value={progress} className="h-2" />
 
       <div className="space-y-4">
-        {/* Industry FAQs step */}
         <div className="flex items-start gap-4 p-4 bg-muted/30 rounded-lg">
           <div className="mt-0.5">
-            {status === 'copying' ? (
-              <Loader2 className="h-5 w-5 animate-spin text-primary" />
-            ) : industryFaqsCopied > 0 ? (
-              <CheckCircle2 className="h-5 w-5 text-green-600" />
-            ) : (
-              <BookOpen className="h-5 w-5 text-muted-foreground" />
-            )}
+            <Loader2 className="h-5 w-5 animate-spin text-primary" />
           </div>
           <div className="flex-1">
-            <p className="font-medium">
-              {status === 'copying' ? 'Loading industry knowledge...' : 
-               industryFaqsCopied > 0 ? `${industryFaqsCopied} industry FAQs loaded` :
-               'Load industry knowledge'}
+            <p className="font-medium">Scraping your website...</p>
+            <p className="text-xs text-muted-foreground truncate">
+              {businessContext.websiteUrl}
             </p>
-            <p className="text-xs text-muted-foreground">
-              Common questions for {businessContext.businessType.toLowerCase()} businesses
+            <p className="text-xs text-muted-foreground mt-2">
+              Extracting prices, services, policies, and FAQs
             </p>
           </div>
         </div>
-
-        {/* Website scraping step */}
-        {businessContext.websiteUrl && (
-          <div className="flex items-start gap-4 p-4 bg-muted/30 rounded-lg">
-            <div className="mt-0.5">
-              {status === 'scraping' ? (
-                <Loader2 className="h-5 w-5 animate-spin text-primary" />
-              ) : websiteFaqsGenerated > 0 ? (
-                <CheckCircle2 className="h-5 w-5 text-green-600" />
-              ) : status === 'copying' ? (
-                <Globe className="h-5 w-5 text-muted-foreground" />
-              ) : (
-                <Globe className="h-5 w-5 text-muted-foreground" />
-              )}
-            </div>
-            <div className="flex-1">
-              <p className="font-medium">
-                {status === 'scraping' ? 'Learning from your website...' : 
-                 websiteFaqsGenerated > 0 ? `${websiteFaqsGenerated} FAQs from your website` :
-                 'Extract your prices & services'}
-              </p>
-              <p className="text-xs text-muted-foreground truncate">
-                {businessContext.websiteUrl}
-              </p>
-            </div>
-          </div>
-        )}
       </div>
 
-      <Button variant="ghost" onClick={onBack} className="w-full text-muted-foreground">
-        <ChevronLeft className="h-4 w-4 mr-2" />
-        Go back
+      <Button variant="ghost" onClick={handleSkip} className="w-full text-muted-foreground">
+        Skip this step
       </Button>
     </div>
   );
