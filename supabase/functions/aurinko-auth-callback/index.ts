@@ -56,7 +56,7 @@ const getStyledHTML = (type: 'cancelled' | 'error' | 'success', message?: string
     ${type === 'success' ? `
       <div class="icon success-icon">✓</div>
       <h2>Email Connected!</h2>
-      <p>Your email account has been connected successfully. This window will close automatically.</p>
+      <p>Your email account has been connected successfully. Syncing will begin shortly. This window will close automatically.</p>
     ` : type === 'cancelled' ? `
       <div class="icon">✖️</div>
       <h2>Connection Cancelled</h2>
@@ -194,6 +194,7 @@ serve(async (req) => {
     const webhookUrl = `${SUPABASE_URL}/functions/v1/aurinko-webhook`;
     console.log('Creating email subscription with webhook URL:', webhookUrl);
     
+    let subscriptionId: string | null = null;
     try {
       const subscriptionResponse = await fetch('https://api.aurinko.io/v1/subscriptions', {
         method: 'POST',
@@ -209,6 +210,7 @@ serve(async (req) => {
 
       if (subscriptionResponse.ok) {
         const subscriptionData = await subscriptionResponse.json();
+        subscriptionId = subscriptionData.id?.toString() || null;
         console.log('Email subscription created successfully:', JSON.stringify(subscriptionData));
       } else {
         const subscriptionError = await subscriptionResponse.text();
@@ -223,7 +225,7 @@ serve(async (req) => {
     // Store in database
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
-    const { error: dbError } = await supabase
+    const { data: configData, error: dbError } = await supabase
       .from('email_provider_configs')
       .upsert({
         workspace_id: workspaceId,
@@ -234,16 +236,63 @@ serve(async (req) => {
         import_mode: importMode,
         connected_at: new Date().toISOString(),
         aliases: aliases,
+        subscription_id: subscriptionId,
+        sync_status: 'pending',
+        sync_stage: 'queued',
       }, {
         onConflict: 'workspace_id,email_address'
-      });
+      })
+      .select()
+      .single();
 
     if (dbError) {
       console.error('Database error:', dbError);
       return new Response(getStyledHTML('error', 'Failed to save email configuration'), { status: 200, headers: htmlHeaders });
     }
 
-    console.log('Email provider config saved successfully with', aliases.length, 'aliases');
+    console.log('Email provider config saved successfully with', aliases.length, 'aliases, configId:', configData?.id);
+
+    // =============================================
+    // TRIGGER EMAIL SYNC IMMEDIATELY
+    // This is the key fix - start syncing right after OAuth
+    // =============================================
+    if (configData?.id) {
+      console.log('Triggering email-sync for configId:', configData.id, 'mode:', importMode);
+      
+      try {
+        // Call email-sync function asynchronously (don't wait for it to complete)
+        const syncPromise = supabase.functions.invoke('email-sync', {
+          body: {
+            configId: configData.id,
+            mode: importMode,
+            // For all_history and last_1000, we'll let the function handle pagination
+            maxMessages: importMode === 'all_history' ? 10000 : 
+                        importMode === 'last_1000' ? 1000 : 100,
+          }
+        });
+
+        // Don't await - let it run in background
+        syncPromise.then(result => {
+          console.log('Email sync started in background:', result.data || result.error);
+        }).catch(err => {
+          console.error('Background sync failed to start:', err);
+        });
+
+        // Update sync status to indicate sync is starting
+        await supabase
+          .from('email_provider_configs')
+          .update({ 
+            sync_status: 'syncing',
+            sync_stage: 'fetching_inbox',
+            sync_started_at: new Date().toISOString()
+          })
+          .eq('id', configData.id);
+
+      } catch (syncError) {
+        console.error('Error triggering email sync:', syncError);
+        // Don't fail the OAuth flow, just log the error
+      }
+    }
 
     // Return success HTML that posts message to opener window
     // This allows the onboarding flow to continue seamlessly
