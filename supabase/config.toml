@@ -143,3 +143,6 @@ verify_jwt = false
 
 [functions.competitor-faq-generate]
 verify_jwt = false
+
+[functions.competitor-faq-per-site]
+verify_jwt = false

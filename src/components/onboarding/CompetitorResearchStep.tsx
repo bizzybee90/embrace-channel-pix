@@ -267,6 +267,7 @@ export function CompetitorResearchStep({
             {status === 'scraping' && (
               <span className="text-xs text-muted-foreground ml-8">
                 {progress.sitesScraped} of {progress.sitesApproved} sites completed
+                {progress.faqsGenerated > 0 && ` • ${progress.faqsGenerated} FAQs generated`}
               </span>
             )}
           </div>
@@ -282,12 +283,14 @@ export function CompetitorResearchStep({
               <span>Sites scraped:</span>
               <span className="font-medium text-foreground">{progress.sitesScraped}</span>
             </div>
-            {progress.faqsGenerated > 0 && (
-              <div className="flex justify-between col-span-2">
-                <span>FAQs generated:</span>
-                <span className="font-medium text-foreground">{progress.faqsGenerated}</span>
-              </div>
-            )}
+            <div className="flex justify-between">
+              <span>FAQs generated:</span>
+              <span className="font-medium text-green-600">{progress.faqsGenerated}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>FAQs added:</span>
+              <span className="font-medium text-green-600">{progress.faqsAdded}</span>
+            </div>
           </div>
         </div>
 

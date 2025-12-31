@@ -245,7 +245,7 @@ Respond with ONLY a JSON array like: [{"domain": "example.com", "type": "COMPANY
     // If we have sites, trigger the scraping worker
     if (finalSites.length > 0) {
       supabase.functions.invoke('competitor-scrape-worker', {
-        body: { jobId, workspaceId }
+        body: { jobId, workspaceId, nicheQuery, serviceArea }
       }).catch(err => console.error('Failed to start scraper:', err));
     }
 
