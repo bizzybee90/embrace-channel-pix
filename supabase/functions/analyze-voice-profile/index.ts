@@ -33,7 +33,7 @@ serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
-    // Fetch outbound messages from this workspace
+    // Fetch ALL outbound messages from this workspace (increased limit for better learning)
     const { data: outboundMessages, error: msgError } = await supabase
       .from('messages')
       .select(`
@@ -52,7 +52,7 @@ serve(async (req) => {
       .eq('actor_type', 'human_agent')
       .eq('conversations.workspace_id', workspace_id)
       .order('created_at', { ascending: false })
-      .limit(200);
+      .limit(1000); // Increased from 200 to analyze more messages
 
     if (msgError) {
       console.error('[VoiceProfile] Error fetching messages:', msgError);

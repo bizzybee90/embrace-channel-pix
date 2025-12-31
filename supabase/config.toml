@@ -146,3 +146,6 @@ verify_jwt = false
 
 [functions.competitor-faq-per-site]
 verify_jwt = false
+
+[functions.learn-from-inbox]
+verify_jwt = false
