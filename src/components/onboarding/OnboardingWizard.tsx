@@ -8,6 +8,7 @@ import { SenderRecognitionStep } from './SenderRecognitionStep';
 import { InitialTriageStep } from './InitialTriageStep';
 import { AutomationLevelStep } from './AutomationLevelStep';
 import { EmailConnectionStep } from './EmailConnectionStep';
+import { CompetitorResearchStep } from './CompetitorResearchStep';
 import bizzybeelogo from '@/assets/bizzybee-logo.png';
 import { CheckCircle2, Mail, BookOpen } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -17,9 +18,9 @@ interface OnboardingWizardProps {
   onComplete: () => void;
 }
 
-type Step = 'welcome' | 'email' | 'business' | 'knowledge' | 'senders' | 'triage' | 'automation' | 'complete';
+type Step = 'welcome' | 'email' | 'business' | 'knowledge' | 'competitors' | 'senders' | 'triage' | 'automation' | 'complete';
 
-const STEPS: Step[] = ['welcome', 'email', 'business', 'knowledge', 'senders', 'triage', 'automation', 'complete'];
+const STEPS: Step[] = ['welcome', 'email', 'business', 'knowledge', 'competitors', 'senders', 'triage', 'automation', 'complete'];
 
 export function OnboardingWizard({ workspaceId, onComplete }: OnboardingWizardProps) {
   const [currentStep, setCurrentStep] = useState<Step>('welcome');
@@ -35,6 +36,7 @@ export function OnboardingWizard({ workspaceId, onComplete }: OnboardingWizardPr
   const [senderRulesCreated, setSenderRulesCreated] = useState(0);
   const [triageResults, setTriageResults] = useState({ processed: 0, changed: 0 });
   const [knowledgeResults, setKnowledgeResults] = useState({ industryFaqs: 0, websiteFaqs: 0 });
+  const [competitorResults, setCompetitorResults] = useState({ sitesScraped: 0, faqsGenerated: 0 });
   const [connectedEmail, setConnectedEmail] = useState<string | null>(null);
 
   // Save progress to database
@@ -180,6 +182,22 @@ export function OnboardingWizard({ workspaceId, onComplete }: OnboardingWizardPr
               }}
               onComplete={(results) => {
                 setKnowledgeResults(results);
+                handleNext();
+              }}
+              onBack={handleBack}
+            />
+          )}
+
+          {currentStep === 'competitors' && (
+            <CompetitorResearchStep
+              workspaceId={workspaceId}
+              businessContext={{
+                companyName: businessContext.companyName,
+                businessType: businessContext.businessType,
+                serviceArea: businessContext.serviceArea,
+              }}
+              onComplete={(results) => {
+                setCompetitorResults(results);
                 handleNext();
               }}
               onBack={handleBack}
