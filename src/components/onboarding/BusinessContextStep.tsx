@@ -232,16 +232,50 @@ export function BusinessContextStep({ workspaceId, value, onChange, onNext, onBa
     return value.businessType.split(',').map(s => s.trim()).filter(Boolean);
   }, [value.businessType]);
 
-  // Filter business types based on search (exclude already selected)
+  // Filter business types based on search with fuzzy matching - only show when typing
   const filteredBusinessTypes = useMemo(() => {
-    if (!businessTypeSearch) return BUSINESS_TYPES.filter(type => !selectedBusinessTypes.includes(type.value) && !selectedBusinessTypes.includes(type.label)).slice(0, 8);
-    const search = businessTypeSearch.toLowerCase();
-    return BUSINESS_TYPES.filter(type => 
-      (type.label.toLowerCase().includes(search) || 
-      type.value.toLowerCase().includes(search)) &&
-      !selectedBusinessTypes.includes(type.value) &&
-      !selectedBusinessTypes.includes(type.label)
-    ).slice(0, 8);
+    // Don't show anything if no search input
+    if (!businessTypeSearch || businessTypeSearch.trim().length < 1) return [];
+    
+    const search = businessTypeSearch.toLowerCase().trim();
+    
+    // Score and filter matches
+    const scored = BUSINESS_TYPES
+      .filter(type => 
+        !selectedBusinessTypes.includes(type.value) && 
+        !selectedBusinessTypes.includes(type.label)
+      )
+      .map(type => {
+        const label = type.label.toLowerCase();
+        const value = type.value.toLowerCase();
+        let score = 0;
+        
+        // Exact match gets highest score
+        if (label === search || value === search) {
+          score = 100;
+        }
+        // Starts with search term
+        else if (label.startsWith(search) || value.startsWith(search)) {
+          score = 80;
+        }
+        // Word starts with search term (e.g., "plumb" matches "Plumber")
+        else if (label.split(/[\s&]+/).some(word => word.startsWith(search)) || 
+                 value.split('_').some(word => word.startsWith(search))) {
+          score = 60;
+        }
+        // Contains search term
+        else if (label.includes(search) || value.includes(search)) {
+          score = 40;
+        }
+        
+        return { type, score };
+      })
+      .filter(item => item.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 12)
+      .map(item => item.type);
+    
+    return scored;
   }, [businessTypeSearch, selectedBusinessTypes]);
 
   // Debounced Google Places search
@@ -488,7 +522,7 @@ export function BusinessContextStep({ workspaceId, value, onChange, onNext, onBa
           )}
           <div className="relative">
             <Input
-              placeholder="Type your business type and press Enter..."
+              placeholder="Start typing your trade or business..."
               value={businessTypeSearch}
               onChange={(e) => setBusinessTypeSearch(e.target.value)}
               onKeyDown={handleBusinessTypeKeyDown}
