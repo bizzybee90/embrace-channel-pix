@@ -62,9 +62,14 @@ export function BusinessContextStep({ workspaceId, value, onChange, onNext, onBa
   const [placePredictions, setPlacePredictions] = useState<PlacePrediction[]>([]);
   const [isLoadingPlaces, setIsLoadingPlaces] = useState(false);
 
-  // Parse service areas from comma-separated string
+  // Parse service areas from pipe-separated string (to handle commas in place names)
   const selectedAreas = useMemo(() => {
     if (!value.serviceArea) return [];
+    // Support both old comma format and new pipe format
+    if (value.serviceArea.includes(' | ')) {
+      return value.serviceArea.split(' | ').map(s => s.trim()).filter(Boolean);
+    }
+    // Legacy: if no pipes, assume it's a simple list without commas in names
     return value.serviceArea.split(',').map(s => s.trim()).filter(Boolean);
   }, [value.serviceArea]);
 
@@ -160,7 +165,8 @@ export function BusinessContextStep({ workspaceId, value, onChange, onNext, onBa
     const trimmed = location.trim();
     if (trimmed && !selectedAreas.includes(trimmed)) {
       const newAreas = [...selectedAreas, trimmed];
-      onChange({ ...value, serviceArea: newAreas.join(', ') });
+      // Use pipe separator to preserve commas in place names like "Luton, UK"
+      onChange({ ...value, serviceArea: newAreas.join(' | ') });
     }
     setServiceAreaSearch('');
     setPlacePredictions([]);
@@ -175,7 +181,7 @@ export function BusinessContextStep({ workspaceId, value, onChange, onNext, onBa
 
   const handleRemoveLocation = (location: string) => {
     const newAreas = selectedAreas.filter(a => a !== location);
-    onChange({ ...value, serviceArea: newAreas.join(', ') });
+    onChange({ ...value, serviceArea: newAreas.join(' | ') });
   };
 
   const handleSave = async () => {

@@ -33,7 +33,8 @@ serve(async (req) => {
     // Call Google Places Autocomplete API
     const url = new URL('https://maps.googleapis.com/maps/api/place/autocomplete/json');
     url.searchParams.set('input', input);
-    url.searchParams.set('types', '(regions)'); // Focus on cities, regions, countries
+    // Use geocode type to include cities, counties, regions, countries
+    url.searchParams.set('types', 'geocode');
     url.searchParams.set('key', apiKey);
 
     console.log(`Fetching places for input: "${input}"`);
