@@ -5,7 +5,7 @@ import { Progress } from '@/components/ui/progress';
 import { BusinessContextStep } from './BusinessContextStep';
 import { KnowledgeBaseStep } from './KnowledgeBaseStep';
 import { SenderRecognitionStep } from './SenderRecognitionStep';
-import { InitialTriageStep } from './InitialTriageStep';
+import { InboxLearningStep } from './InboxLearningStep';
 import { AutomationLevelStep } from './AutomationLevelStep';
 import { EmailConnectionStep } from './EmailConnectionStep';
 import { CompetitorResearchStep } from './CompetitorResearchStep';
@@ -214,10 +214,10 @@ export function OnboardingWizard({ workspaceId, onComplete }: OnboardingWizardPr
           )}
 
           {currentStep === 'triage' && (
-            <InitialTriageStep
+            <InboxLearningStep
               workspaceId={workspaceId}
               onComplete={(results) => {
-                setTriageResults(results);
+                setTriageResults({ processed: results.emailsAnalyzed, changed: results.patternsLearned });
                 handleNext();
               }}
               onBack={handleBack}

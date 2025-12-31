@@ -1378,6 +1378,68 @@ export type Database = {
           },
         ]
       }
+      inbox_insights: {
+        Row: {
+          analyzed_at: string | null
+          avg_response_time_hours: number | null
+          common_inquiry_types: Json | null
+          created_at: string | null
+          emails_by_category: Json | null
+          emails_by_sender_domain: Json | null
+          id: string
+          learning_phases_completed: Json | null
+          patterns_learned: number | null
+          peak_email_hours: Json | null
+          response_rate_percent: number | null
+          total_emails_analyzed: number | null
+          total_outbound_analyzed: number | null
+          updated_at: string | null
+          workspace_id: string
+        }
+        Insert: {
+          analyzed_at?: string | null
+          avg_response_time_hours?: number | null
+          common_inquiry_types?: Json | null
+          created_at?: string | null
+          emails_by_category?: Json | null
+          emails_by_sender_domain?: Json | null
+          id?: string
+          learning_phases_completed?: Json | null
+          patterns_learned?: number | null
+          peak_email_hours?: Json | null
+          response_rate_percent?: number | null
+          total_emails_analyzed?: number | null
+          total_outbound_analyzed?: number | null
+          updated_at?: string | null
+          workspace_id: string
+        }
+        Update: {
+          analyzed_at?: string | null
+          avg_response_time_hours?: number | null
+          common_inquiry_types?: Json | null
+          created_at?: string | null
+          emails_by_category?: Json | null
+          emails_by_sender_domain?: Json | null
+          id?: string
+          learning_phases_completed?: Json | null
+          patterns_learned?: number | null
+          peak_email_hours?: Json | null
+          response_rate_percent?: number | null
+          total_emails_analyzed?: number | null
+          total_outbound_analyzed?: number | null
+          updated_at?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inbox_insights_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       industry_faq_templates: {
         Row: {
           answer: string
@@ -1419,6 +1481,53 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      learned_responses: {
+        Row: {
+          created_at: string | null
+          email_category: string | null
+          example_response: string | null
+          id: string
+          response_pattern: string | null
+          success_indicators: Json | null
+          times_used: number | null
+          trigger_phrases: string[] | null
+          updated_at: string | null
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          email_category?: string | null
+          example_response?: string | null
+          id?: string
+          response_pattern?: string | null
+          success_indicators?: Json | null
+          times_used?: number | null
+          trigger_phrases?: string[] | null
+          updated_at?: string | null
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string | null
+          email_category?: string | null
+          example_response?: string | null
+          id?: string
+          response_pattern?: string | null
+          success_indicators?: Json | null
+          times_used?: number | null
+          trigger_phrases?: string[] | null
+          updated_at?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "learned_responses_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       message_responses: {
         Row: {
