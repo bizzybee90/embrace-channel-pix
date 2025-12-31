@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,7 +13,7 @@ interface BusinessContextStepProps {
   workspaceId: string;
   value: {
     companyName: string;
-    businessType: string; // Now comma-separated for multiple types
+    businessType: string;
     isHiring: boolean;
     receivesInvoices: boolean;
     emailDomain: string;
@@ -23,6 +23,11 @@ interface BusinessContextStepProps {
   onChange: (value: any) => void;
   onNext: () => void;
   onBack: () => void;
+}
+
+interface PlacePrediction {
+  description: string;
+  place_id: string;
 }
 
 const BUSINESS_TYPES = [
@@ -48,33 +53,14 @@ const BUSINESS_TYPES = [
   { value: 'other', label: 'Other' },
 ];
 
-const UK_LOCATIONS = [
-  'Aberdeen', 'Aberystwyth', 'Aylesbury', 'Bangor', 'Barnsley', 'Basildon', 'Basingstoke', 
-  'Bath', 'Bedford', 'Belfast', 'Birkenhead', 'Birmingham', 'Blackburn', 'Blackpool', 
-  'Bolton', 'Bournemouth', 'Bradford', 'Brighton', 'Bristol', 'Burnley', 'Burton upon Trent',
-  'Bury', 'Cambridge', 'Canterbury', 'Cardiff', 'Carlisle', 'Chelmsford', 'Cheltenham', 
-  'Chester', 'Chesterfield', 'Chichester', 'Colchester', 'Coventry', 'Crawley', 'Crewe',
-  'Darlington', 'Derby', 'Doncaster', 'Dorchester', 'Dudley', 'Dundee', 'Durham', 
-  'Eastbourne', 'Edinburgh', 'Exeter', 'Gateshead', 'Glasgow', 'Gloucester', 'Grimsby',
-  'Guildford', 'Halifax', 'Harrogate', 'Hartlepool', 'Hastings', 'Hereford', 'Huddersfield',
-  'Hull', 'Inverness', 'Ipswich', 'Kettering', 'Kingston upon Hull', 'Lancaster', 'Leeds',
-  'Leicester', 'Lichfield', 'Lincoln', 'Liverpool', 'London', 'Luton', 'Maidstone',
-  'Manchester', 'Mansfield', 'Middlesbrough', 'Milton Keynes', 'Newcastle upon Tyne',
-  'Newport', 'Northampton', 'Norwich', 'Nottingham', 'Oldham', 'Oxford', 'Peterborough',
-  'Plymouth', 'Poole', 'Portsmouth', 'Preston', 'Reading', 'Redditch', 'Rochdale',
-  'Rotherham', 'Salford', 'Salisbury', 'Scarborough', 'Sheffield', 'Shrewsbury', 'Slough',
-  'Solihull', 'Southampton', 'Southend-on-Sea', 'Southport', 'St Albans', 'Stafford',
-  'Stevenage', 'Stockport', 'Stoke-on-Trent', 'Sunderland', 'Sutton Coldfield', 'Swansea',
-  'Swindon', 'Telford', 'Torquay', 'Wakefield', 'Walsall', 'Warrington', 'Watford',
-  'Wigan', 'Winchester', 'Woking', 'Wolverhampton', 'Worcester', 'Worthing', 'Wrexham', 'York'
-];
-
 export function BusinessContextStep({ workspaceId, value, onChange, onNext, onBack }: BusinessContextStepProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [businessTypeSearch, setBusinessTypeSearch] = useState('');
   const [serviceAreaSearch, setServiceAreaSearch] = useState('');
   const [businessTypeFocused, setBusinessTypeFocused] = useState(false);
   const [serviceAreaFocused, setServiceAreaFocused] = useState(false);
+  const [placePredictions, setPlacePredictions] = useState<PlacePrediction[]>([]);
+  const [isLoadingPlaces, setIsLoadingPlaces] = useState(false);
 
   // Parse service areas from comma-separated string
   const selectedAreas = useMemo(() => {
@@ -88,7 +74,7 @@ export function BusinessContextStep({ workspaceId, value, onChange, onNext, onBa
     return value.businessType.split(',').map(s => s.trim()).filter(Boolean);
   }, [value.businessType]);
 
-  // Filter business types based on search (exclude already selected) - also check labels
+  // Filter business types based on search (exclude already selected)
   const filteredBusinessTypes = useMemo(() => {
     if (!businessTypeSearch) return BUSINESS_TYPES.filter(type => !selectedBusinessTypes.includes(type.value) && !selectedBusinessTypes.includes(type.label)).slice(0, 8);
     const search = businessTypeSearch.toLowerCase();
@@ -100,14 +86,50 @@ export function BusinessContextStep({ workspaceId, value, onChange, onNext, onBa
     ).slice(0, 8);
   }, [businessTypeSearch, selectedBusinessTypes]);
 
-  // Filter locations based on search - show suggestions but allow any input
-  const filteredLocations = useMemo(() => {
-    if (!serviceAreaSearch) return [];
-    const search = serviceAreaSearch.toLowerCase();
-    return UK_LOCATIONS
-      .filter(loc => loc.toLowerCase().includes(search) && !selectedAreas.includes(loc))
-      .slice(0, 6);
-  }, [serviceAreaSearch, selectedAreas]);
+  // Debounced Google Places search
+  const searchPlaces = useCallback(async (input: string) => {
+    if (!input || input.trim().length < 2) {
+      setPlacePredictions([]);
+      return;
+    }
+
+    setIsLoadingPlaces(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('google-places-autocomplete', {
+        body: { input: input.trim() }
+      });
+
+      if (error) {
+        console.error('Places API error:', error);
+        setPlacePredictions([]);
+        return;
+      }
+
+      // Filter out already selected areas
+      const filtered = (data.predictions || []).filter(
+        (p: PlacePrediction) => !selectedAreas.includes(p.description)
+      );
+      setPlacePredictions(filtered);
+    } catch (err) {
+      console.error('Error fetching places:', err);
+      setPlacePredictions([]);
+    } finally {
+      setIsLoadingPlaces(false);
+    }
+  }, [selectedAreas]);
+
+  // Debounce the search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (serviceAreaSearch) {
+        searchPlaces(serviceAreaSearch);
+      } else {
+        setPlacePredictions([]);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [serviceAreaSearch, searchPlaces]);
 
   const handleAddBusinessType = (typeLabel: string) => {
     const trimmed = typeLabel.trim();
@@ -141,6 +163,7 @@ export function BusinessContextStep({ workspaceId, value, onChange, onNext, onBa
       onChange({ ...value, serviceArea: newAreas.join(', ') });
     }
     setServiceAreaSearch('');
+    setPlacePredictions([]);
   };
 
   const handleLocationKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -298,7 +321,6 @@ export function BusinessContextStep({ workspaceId, value, onChange, onNext, onBa
             />
             {businessTypeFocused && (filteredBusinessTypes.length > 0 || (businessTypeSearch.trim() && !filteredBusinessTypes.some(t => t.label.toLowerCase() === businessTypeSearch.toLowerCase()))) && (
               <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg max-h-60 overflow-auto">
-                {/* Show custom entry option if not matching a suggestion */}
                 {businessTypeSearch.trim() && !filteredBusinessTypes.some(t => t.label.toLowerCase() === businessTypeSearch.toLowerCase()) && (
                   <button
                     type="button"
@@ -364,46 +386,54 @@ export function BusinessContextStep({ workspaceId, value, onChange, onNext, onBa
           )}
           <div className="relative">
             <Input
-              placeholder="Type a location and press Enter..."
+              placeholder="Search for a location..."
               value={serviceAreaSearch}
               onChange={(e) => setServiceAreaSearch(e.target.value)}
               onKeyDown={handleLocationKeyDown}
               onFocus={() => setServiceAreaFocused(true)}
-              onBlur={() => setTimeout(() => setServiceAreaFocused(false), 150)}
+              onBlur={() => setTimeout(() => setServiceAreaFocused(false), 200)}
             />
-            {serviceAreaFocused && (filteredLocations.length > 0 || (serviceAreaSearch.trim() && !filteredLocations.some(l => l.toLowerCase() === serviceAreaSearch.toLowerCase()))) && (
+            {serviceAreaFocused && (isLoadingPlaces || placePredictions.length > 0 || (serviceAreaSearch.trim().length >= 2 && !placePredictions.some(p => p.description.toLowerCase() === serviceAreaSearch.toLowerCase()))) && (
               <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg max-h-60 overflow-auto">
-                {/* Show custom entry option if not in suggestions */}
-                {serviceAreaSearch.trim() && !filteredLocations.some(l => l.toLowerCase() === serviceAreaSearch.toLowerCase()) && (
-                  <button
-                    type="button"
-                    className="w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground border-b"
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      handleSelectLocation(serviceAreaSearch);
-                    }}
-                  >
-                    Add "{serviceAreaSearch.trim()}"
-                  </button>
+                {isLoadingPlaces ? (
+                  <div className="flex items-center justify-center py-3 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Searching...
+                  </div>
+                ) : (
+                  <>
+                    {serviceAreaSearch.trim().length >= 2 && !placePredictions.some(p => p.description.toLowerCase() === serviceAreaSearch.toLowerCase()) && (
+                      <button
+                        type="button"
+                        className="w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground border-b"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          handleSelectLocation(serviceAreaSearch);
+                        }}
+                      >
+                        Add "{serviceAreaSearch.trim()}"
+                      </button>
+                    )}
+                    {placePredictions.map((prediction) => (
+                      <button
+                        key={prediction.place_id}
+                        type="button"
+                        className="w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          handleSelectLocation(prediction.description);
+                        }}
+                      >
+                        {prediction.description}
+                      </button>
+                    ))}
+                  </>
                 )}
-                {filteredLocations.map((location) => (
-                  <button
-                    key={location}
-                    type="button"
-                    className="w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground"
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      handleSelectLocation(location);
-                    }}
-                  >
-                    {location}
-                  </button>
-                ))}
               </div>
             )}
           </div>
           <p className="text-xs text-muted-foreground">
-            Type any location and press Enter, or select from suggestions
+            Search for cities, regions, or countries you serve
           </p>
         </div>
 
@@ -423,45 +453,54 @@ export function BusinessContextStep({ workspaceId, value, onChange, onNext, onBa
           <div className="space-y-0.5">
             <Label>Are you currently hiring?</Label>
             <p className="text-xs text-muted-foreground">
-              We'll auto-file job applications
+              Helps us flag job applications separately
             </p>
           </div>
           <Switch
             checked={value.isHiring}
-            onCheckedChange={(v) => onChange({ ...value, isHiring: v })}
+            onCheckedChange={(checked) => onChange({ ...value, isHiring: checked })}
           />
         </div>
 
         <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
           <div className="space-y-0.5">
-            <Label>Do you receive invoices from suppliers?</Label>
+            <Label>Do you receive invoices by email?</Label>
             <p className="text-xs text-muted-foreground">
-              We'll recognize accounting software emails
+              Auto-sorts invoices from Xero, QuickBooks, etc.
             </p>
           </div>
           <Switch
             checked={value.receivesInvoices}
-            onCheckedChange={(v) => onChange({ ...value, receivesInvoices: v })}
+            onCheckedChange={(checked) => onChange({ ...value, receivesInvoices: checked })}
           />
         </div>
       </div>
 
-      <div className="flex gap-3">
-        <Button variant="outline" onClick={onBack} className="flex-1">
-          <ChevronLeft className="h-4 w-4 mr-2" />
+      <div className="flex gap-3 pt-4">
+        <Button
+          variant="outline"
+          className="flex-1"
+          onClick={onBack}
+        >
+          <ChevronLeft className="mr-2 h-4 w-4" />
           Back
         </Button>
-        <Button 
-          onClick={handleSave} 
-          className="flex-1" 
+        <Button
+          className="flex-1"
+          onClick={handleSave}
           disabled={isSaving || !value.companyName || selectedBusinessTypes.length === 0}
         >
           {isSaving ? (
-            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Saving...
+            </>
           ) : (
-            <ChevronRight className="h-4 w-4 mr-2" />
+            <>
+              Continue
+              <ChevronRight className="ml-2 h-4 w-4" />
+            </>
           )}
-          Continue
         </Button>
       </div>
     </div>
