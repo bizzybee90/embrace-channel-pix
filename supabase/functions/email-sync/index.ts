@@ -459,8 +459,10 @@ serve(async (req) => {
           console.log('Skipping AI agent - no body content');
         }
 
-        // Mark email as read in Aurinko/Gmail
-        await markEmailAsRead(config.access_token, message.id);
+        // NOTE: We no longer mark email as read on sync
+        // Emails will be marked as read when the conversation is resolved in BizzyBee
+        // This allows bi-directional sync with Gmail/Outlook
+        // await markEmailAsRead(config.access_token, message.id);
 
       } catch (msgError) {
         console.error('Error processing message:', msgError);
