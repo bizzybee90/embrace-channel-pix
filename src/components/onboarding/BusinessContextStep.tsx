@@ -5,9 +5,16 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
-import { ChevronLeft, ChevronRight, Loader2, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2, X, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface BusinessContextStepProps {
   workspaceId: string;
@@ -28,6 +35,12 @@ interface BusinessContextStepProps {
 interface PlacePrediction {
   description: string;
   place_id: string;
+  original?: string;
+}
+
+interface ServiceArea {
+  name: string;
+  radius?: number; // in miles
 }
 
 const BUSINESS_TYPES = [
@@ -62,15 +75,22 @@ export function BusinessContextStep({ workspaceId, value, onChange, onNext, onBa
   const [placePredictions, setPlacePredictions] = useState<PlacePrediction[]>([]);
   const [isLoadingPlaces, setIsLoadingPlaces] = useState(false);
 
-  // Parse service areas from pipe-separated string (to handle commas in place names)
-  const selectedAreas = useMemo(() => {
+  // Parse service areas from pipe-separated string (supports radius like "Luton (20 miles)")
+  const selectedAreas = useMemo((): ServiceArea[] => {
     if (!value.serviceArea) return [];
     // Support both old comma format and new pipe format
-    if (value.serviceArea.includes(' | ')) {
-      return value.serviceArea.split(' | ').map(s => s.trim()).filter(Boolean);
-    }
-    // Legacy: if no pipes, assume it's a simple list without commas in names
-    return value.serviceArea.split(',').map(s => s.trim()).filter(Boolean);
+    const raw = value.serviceArea.includes(' | ') 
+      ? value.serviceArea.split(' | ').map(s => s.trim()).filter(Boolean)
+      : value.serviceArea.split(',').map(s => s.trim()).filter(Boolean);
+    
+    return raw.map(area => {
+      // Parse radius if present: "Luton (20 miles)"
+      const radiusMatch = area.match(/^(.+?)\s*\((\d+)\s*miles?\)$/i);
+      if (radiusMatch) {
+        return { name: radiusMatch[1].trim(), radius: parseInt(radiusMatch[2], 10) };
+      }
+      return { name: area, radius: undefined };
+    });
   }, [value.serviceArea]);
 
   // Parse business types from comma-separated string
@@ -111,8 +131,9 @@ export function BusinessContextStep({ workspaceId, value, onChange, onNext, onBa
       }
 
       // Filter out already selected areas
+      const areaNames = selectedAreas.map(a => a.name);
       const filtered = (data.predictions || []).filter(
-        (p: PlacePrediction) => !selectedAreas.includes(p.description)
+        (p: PlacePrediction) => !areaNames.includes(p.description)
       );
       setPlacePredictions(filtered);
     } catch (err) {
@@ -161,19 +182,30 @@ export function BusinessContextStep({ workspaceId, value, onChange, onNext, onBa
     }
   };
 
-  const handleSelectLocation = (location: string) => {
-    // Strip country suffix (e.g., ", UK", ", USA", ", Australia") for cleaner display
+  const handleSelectLocation = (location: string, radius?: number) => {
+    // The edge function already strips country suffix, but clean up just in case
     let cleanLocation = location.trim();
-    const countryPattern = /, (UK|USA|Australia|Canada|Ireland|Germany|France|Italy|Spain|Netherlands|New Zealand|India|Poland|Czechia|South Korea|Malaysia|Belarus)$/i;
+    const countryPattern = /, (UK|United Kingdom|USA|United States|Australia|Canada|Ireland|Germany|France|Italy|Spain|Netherlands|New Zealand|India|Poland|Czechia|South Korea|Malaysia|Belarus|England|Scotland|Wales|Northern Ireland)$/i;
     cleanLocation = cleanLocation.replace(countryPattern, '');
     
-    if (cleanLocation && !selectedAreas.includes(cleanLocation)) {
-      const newAreas = [...selectedAreas, cleanLocation];
-      // Use pipe separator to preserve commas in place names
-      onChange({ ...value, serviceArea: newAreas.join(' | ') });
+    const areaNames = selectedAreas.map(a => a.name);
+    if (cleanLocation && !areaNames.includes(cleanLocation)) {
+      const newArea: ServiceArea = { name: cleanLocation, radius };
+      const newAreas = [...selectedAreas, newArea];
+      // Serialize with radius: "Luton (20 miles)" or just "Luton"
+      const serialized = newAreas.map(a => a.radius ? `${a.name} (${a.radius} miles)` : a.name).join(' | ');
+      onChange({ ...value, serviceArea: serialized });
     }
     setServiceAreaSearch('');
     setPlacePredictions([]);
+  };
+
+  const handleUpdateRadius = (areaName: string, radius: number | undefined) => {
+    const newAreas = selectedAreas.map(a => 
+      a.name === areaName ? { ...a, radius } : a
+    );
+    const serialized = newAreas.map(a => a.radius ? `${a.name} (${a.radius} miles)` : a.name).join(' | ');
+    onChange({ ...value, serviceArea: serialized });
   };
 
   const handleLocationKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -183,9 +215,10 @@ export function BusinessContextStep({ workspaceId, value, onChange, onNext, onBa
     }
   };
 
-  const handleRemoveLocation = (location: string) => {
-    const newAreas = selectedAreas.filter(a => a !== location);
-    onChange({ ...value, serviceArea: newAreas.join(' | ') });
+  const handleRemoveLocation = (areaName: string) => {
+    const newAreas = selectedAreas.filter(a => a.name !== areaName);
+    const serialized = newAreas.map(a => a.radius ? `${a.name} (${a.radius} miles)` : a.name).join(' | ');
+    onChange({ ...value, serviceArea: serialized });
   };
 
   const handleSave = async () => {
@@ -379,18 +412,36 @@ export function BusinessContextStep({ workspaceId, value, onChange, onNext, onBa
         <div className="space-y-2">
           <Label>Service areas (optional)</Label>
           {selectedAreas.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mb-2">
+            <div className="flex flex-wrap gap-2 mb-2">
               {selectedAreas.map((area) => (
-                <Badge key={area} variant="secondary" className="gap-1 pr-1">
-                  {area}
+                <div key={area.name} className="flex items-center gap-1 bg-secondary rounded-md pl-2 pr-1 py-1">
+                  <MapPin className="h-3 w-3 text-muted-foreground" />
+                  <span className="text-sm">{area.name}</span>
+                  <Select
+                    value={area.radius?.toString() || 'exact'}
+                    onValueChange={(val) => handleUpdateRadius(area.name, val === 'exact' ? undefined : parseInt(val, 10))}
+                  >
+                    <SelectTrigger className="h-6 w-auto min-w-[70px] text-xs border-0 bg-transparent px-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="exact">exact</SelectItem>
+                      <SelectItem value="5">+5 mi</SelectItem>
+                      <SelectItem value="10">+10 mi</SelectItem>
+                      <SelectItem value="15">+15 mi</SelectItem>
+                      <SelectItem value="20">+20 mi</SelectItem>
+                      <SelectItem value="30">+30 mi</SelectItem>
+                      <SelectItem value="50">+50 mi</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <button
                     type="button"
-                    onClick={() => handleRemoveLocation(area)}
-                    className="ml-1 hover:bg-muted rounded-full p-0.5"
+                    onClick={() => handleRemoveLocation(area.name)}
+                    className="hover:bg-muted rounded-full p-0.5"
                   >
                     <X className="h-3 w-3" />
                   </button>
-                </Badge>
+                </div>
               ))}
             </div>
           )}

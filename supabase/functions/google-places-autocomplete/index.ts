@@ -53,11 +53,18 @@ serve(async (req) => {
       );
     }
 
-    // Format the predictions
-    const predictions = (data.predictions || []).map((p: any) => ({
-      description: p.description,
-      place_id: p.place_id,
-    }));
+    // Format the predictions - strip country suffix but keep parent region for disambiguation
+    const countryPattern = /, (UK|United Kingdom|USA|United States|Australia|Canada|Ireland|Germany|France|Italy|Spain|Netherlands|New Zealand|India|Poland|Czechia|South Korea|Malaysia|Belarus|England|Scotland|Wales|Northern Ireland)$/i;
+    
+    const predictions = (data.predictions || []).map((p: any) => {
+      // Remove country from the end but keep everything else (like county/region)
+      const cleanDescription = p.description.replace(countryPattern, '');
+      return {
+        description: cleanDescription,
+        place_id: p.place_id,
+        original: p.description, // Keep original for reference
+      };
+    });
 
     console.log(`Returning ${predictions.length} predictions`);
 
