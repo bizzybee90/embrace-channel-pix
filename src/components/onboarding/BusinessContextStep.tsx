@@ -99,13 +99,13 @@ export function BusinessContextStep({ workspaceId, value, onChange, onNext, onBa
     ).slice(0, 8);
   }, [businessTypeSearch, selectedBusinessTypes]);
 
-  // Filter locations based on search
+  // Filter locations based on search - show suggestions but allow any input
   const filteredLocations = useMemo(() => {
     if (!serviceAreaSearch) return [];
     const search = serviceAreaSearch.toLowerCase();
     return UK_LOCATIONS
       .filter(loc => loc.toLowerCase().includes(search) && !selectedAreas.includes(loc))
-      .slice(0, 8);
+      .slice(0, 6);
   }, [serviceAreaSearch, selectedAreas]);
 
   const handleSelectBusinessType = (type: { value: string; label: string }) => {
@@ -120,9 +120,19 @@ export function BusinessContextStep({ workspaceId, value, onChange, onNext, onBa
   };
 
   const handleSelectLocation = (location: string) => {
-    const newAreas = [...selectedAreas, location];
-    onChange({ ...value, serviceArea: newAreas.join(', ') });
+    const trimmed = location.trim();
+    if (trimmed && !selectedAreas.includes(trimmed)) {
+      const newAreas = [...selectedAreas, trimmed];
+      onChange({ ...value, serviceArea: newAreas.join(', ') });
+    }
     setServiceAreaSearch('');
+  };
+
+  const handleLocationKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && serviceAreaSearch.trim()) {
+      e.preventDefault();
+      handleSelectLocation(serviceAreaSearch);
+    }
   };
 
   const handleRemoveLocation = (location: string) => {
@@ -328,14 +338,28 @@ export function BusinessContextStep({ workspaceId, value, onChange, onNext, onBa
           )}
           <div className="relative">
             <Input
-              placeholder="Start typing to add areas..."
+              placeholder="Type a location and press Enter..."
               value={serviceAreaSearch}
               onChange={(e) => setServiceAreaSearch(e.target.value)}
+              onKeyDown={handleLocationKeyDown}
               onFocus={() => setServiceAreaFocused(true)}
               onBlur={() => setTimeout(() => setServiceAreaFocused(false), 150)}
             />
-            {serviceAreaFocused && filteredLocations.length > 0 && (
+            {serviceAreaFocused && (filteredLocations.length > 0 || (serviceAreaSearch.trim() && !filteredLocations.some(l => l.toLowerCase() === serviceAreaSearch.toLowerCase()))) && (
               <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg max-h-60 overflow-auto">
+                {/* Show custom entry option if not in suggestions */}
+                {serviceAreaSearch.trim() && !filteredLocations.some(l => l.toLowerCase() === serviceAreaSearch.toLowerCase()) && (
+                  <button
+                    type="button"
+                    className="w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground border-b"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      handleSelectLocation(serviceAreaSearch);
+                    }}
+                  >
+                    Add "{serviceAreaSearch.trim()}"
+                  </button>
+                )}
                 {filteredLocations.map((location) => (
                   <button
                     key={location}
@@ -353,7 +377,7 @@ export function BusinessContextStep({ workspaceId, value, onChange, onNext, onBa
             )}
           </div>
           <p className="text-xs text-muted-foreground">
-            Helps answer location-based questions
+            Type any location and press Enter, or select from suggestions
           </p>
         </div>
 
