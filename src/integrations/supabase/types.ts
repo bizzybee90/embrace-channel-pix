@@ -170,6 +170,211 @@ export type Database = {
           },
         ]
       }
+      competitor_faq_candidates: {
+        Row: {
+          answer: string
+          category: string | null
+          created_at: string | null
+          id: string
+          job_id: string
+          merged_into_faq_id: string | null
+          question: string
+          site_id: string | null
+          source_domain: string | null
+          status: string
+          workspace_id: string
+        }
+        Insert: {
+          answer: string
+          category?: string | null
+          created_at?: string | null
+          id?: string
+          job_id: string
+          merged_into_faq_id?: string | null
+          question: string
+          site_id?: string | null
+          source_domain?: string | null
+          status?: string
+          workspace_id: string
+        }
+        Update: {
+          answer?: string
+          category?: string | null
+          created_at?: string | null
+          id?: string
+          job_id?: string
+          merged_into_faq_id?: string | null
+          question?: string
+          site_id?: string | null
+          source_domain?: string | null
+          status?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "competitor_faq_candidates_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "competitor_research_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "competitor_faq_candidates_merged_into_faq_id_fkey"
+            columns: ["merged_into_faq_id"]
+            isOneToOne: false
+            referencedRelation: "faq_database"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "competitor_faq_candidates_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "competitor_sites"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "competitor_faq_candidates_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      competitor_research_jobs: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          error_message: string | null
+          exclude_domains: string[] | null
+          faqs_added: number | null
+          faqs_generated: number | null
+          id: string
+          niche_query: string
+          service_area: string | null
+          sites_approved: number | null
+          sites_discovered: number | null
+          sites_scraped: number | null
+          started_at: string | null
+          status: string
+          target_count: number | null
+          updated_at: string | null
+          workspace_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          exclude_domains?: string[] | null
+          faqs_added?: number | null
+          faqs_generated?: number | null
+          id?: string
+          niche_query: string
+          service_area?: string | null
+          sites_approved?: number | null
+          sites_discovered?: number | null
+          sites_scraped?: number | null
+          started_at?: string | null
+          status?: string
+          target_count?: number | null
+          updated_at?: string | null
+          workspace_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          exclude_domains?: string[] | null
+          faqs_added?: number | null
+          faqs_generated?: number | null
+          id?: string
+          niche_query?: string
+          service_area?: string | null
+          sites_approved?: number | null
+          sites_discovered?: number | null
+          sites_scraped?: number | null
+          started_at?: string | null
+          status?: string
+          target_count?: number | null
+          updated_at?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "competitor_research_jobs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      competitor_sites: {
+        Row: {
+          content_extracted: string | null
+          created_at: string | null
+          description: string | null
+          domain: string
+          id: string
+          is_directory: boolean | null
+          job_id: string
+          pages_scraped: number | null
+          rejection_reason: string | null
+          scraped_at: string | null
+          status: string
+          title: string | null
+          url: string
+          workspace_id: string
+        }
+        Insert: {
+          content_extracted?: string | null
+          created_at?: string | null
+          description?: string | null
+          domain: string
+          id?: string
+          is_directory?: boolean | null
+          job_id: string
+          pages_scraped?: number | null
+          rejection_reason?: string | null
+          scraped_at?: string | null
+          status?: string
+          title?: string | null
+          url: string
+          workspace_id: string
+        }
+        Update: {
+          content_extracted?: string | null
+          created_at?: string | null
+          description?: string | null
+          domain?: string
+          id?: string
+          is_directory?: boolean | null
+          job_id?: string
+          pages_scraped?: number | null
+          rejection_reason?: string | null
+          scraped_at?: string | null
+          status?: string
+          title?: string | null
+          url?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "competitor_sites_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "competitor_research_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "competitor_sites_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversations: {
         Row: {
           ai_confidence: number | null
@@ -889,6 +1094,78 @@ export type Database = {
             foreignKeyName: "email_settings_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_sync_jobs: {
+        Row: {
+          completed_at: string | null
+          config_id: string
+          created_at: string | null
+          error_message: string | null
+          id: string
+          import_mode: string
+          inbound_cursor: string | null
+          inbound_processed: number | null
+          last_batch_at: string | null
+          sent_cursor: string | null
+          sent_processed: number | null
+          started_at: string | null
+          status: string
+          threads_linked: number | null
+          updated_at: string | null
+          workspace_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          config_id: string
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          import_mode: string
+          inbound_cursor?: string | null
+          inbound_processed?: number | null
+          last_batch_at?: string | null
+          sent_cursor?: string | null
+          sent_processed?: number | null
+          started_at?: string | null
+          status?: string
+          threads_linked?: number | null
+          updated_at?: string | null
+          workspace_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          config_id?: string
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          import_mode?: string
+          inbound_cursor?: string | null
+          inbound_processed?: number | null
+          last_batch_at?: string | null
+          sent_cursor?: string | null
+          sent_processed?: number | null
+          started_at?: string | null
+          status?: string
+          threads_linked?: number | null
+          updated_at?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_sync_jobs_config_id_fkey"
+            columns: ["config_id"]
+            isOneToOne: false
+            referencedRelation: "email_provider_configs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_sync_jobs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
             referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },

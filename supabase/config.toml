@@ -131,3 +131,15 @@ verify_jwt = false
 
 [functions.analyze-voice-profile]
 verify_jwt = false
+
+[functions.email-sync-worker]
+verify_jwt = false
+
+[functions.competitor-discover]
+verify_jwt = false
+
+[functions.competitor-scrape-worker]
+verify_jwt = false
+
+[functions.competitor-faq-generate]
+verify_jwt = false

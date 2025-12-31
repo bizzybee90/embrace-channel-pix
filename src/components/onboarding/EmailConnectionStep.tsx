@@ -136,9 +136,10 @@ export function EmailConnectionStep({
         
         // Check if popup was blocked
         if (!popup || popup.closed || typeof popup.closed === 'undefined') {
-          toast.error('Popup blocked! Please allow popups for this site, or click the link to open in a new tab.');
-          // Fallback: redirect in same window
-          window.location.href = data.authUrl;
+          toast.info('Opening in new tab instead...');
+          // Fallback: open in new tab (will redirect back to onboarding on success)
+          window.open(data.authUrl, '_blank');
+          setIsConnecting(false);
           return;
         }
         
@@ -274,6 +275,20 @@ export function EmailConnectionStep({
           BizzyBee will learn from your inbox to handle emails just like you would.
         </CardDescription>
       </div>
+
+      {/* Popup guidance - shown when not connected */}
+      {!connectedEmail && !isConnecting && (
+        <div className="flex items-start gap-3 p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800 text-sm">
+          <div className="shrink-0 mt-0.5">
+            <svg className="h-4 w-4 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <div className="text-blue-800 dark:text-blue-200">
+            <span className="font-medium">Heads up:</span> A secure login window will open in a popup or new tab. If you don't see it, check if your browser blocked the popup.
+          </div>
+        </div>
+      )}
 
       {connectedEmail ? (
         <div className="space-y-6">
