@@ -318,6 +318,7 @@ export type Database = {
           created_at: string | null
           description: string | null
           domain: string
+          faqs_generated: number | null
           id: string
           is_directory: boolean | null
           job_id: string
@@ -334,6 +335,7 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           domain: string
+          faqs_generated?: number | null
           id?: string
           is_directory?: boolean | null
           job_id: string
@@ -350,6 +352,7 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           domain?: string
+          faqs_generated?: number | null
           id?: string
           is_directory?: boolean | null
           job_id?: string

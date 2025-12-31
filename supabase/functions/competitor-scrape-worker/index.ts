@@ -16,7 +16,7 @@ serve(async (req) => {
   }
 
   try {
-    const { jobId, workspaceId } = await req.json();
+    const { jobId, workspaceId, nicheQuery, serviceArea } = await req.json();
     console.log('Competitor scrape worker started:', { jobId });
 
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
@@ -161,6 +161,18 @@ serve(async (req) => {
         if (siteContent.length > 100) {
           scrapedCount++;
           totalContent += `\n\n=== COMPETITOR: ${site.domain} ===\n${siteContent}`;
+
+          // Generate FAQs immediately for this site (don't await - fire and forget)
+          console.log(`Triggering FAQ generation for ${site.domain}`);
+          supabase.functions.invoke('competitor-faq-per-site', {
+            body: { 
+              siteId: site.id, 
+              jobId, 
+              workspaceId,
+              nicheQuery: nicheQuery || '',
+              serviceArea: serviceArea || '',
+            }
+          }).catch(err => console.error('Per-site FAQ error:', site.domain, err));
         }
 
         // Delay between sites
@@ -199,18 +211,20 @@ serve(async (req) => {
       // Schedule next batch
       console.log(`${remainingCount} sites remaining, scheduling next batch`);
       supabase.functions.invoke('competitor-scrape-worker', {
-        body: { jobId, workspaceId }
+        body: { jobId, workspaceId, nicheQuery, serviceArea }
       }).catch(err => console.error('Failed to schedule next batch:', err));
     } else {
-      // All done, trigger FAQ generation
-      console.log('All sites scraped, starting FAQ generation');
+      // All done - FAQs were generated per-site, now do final summary
+      console.log('All sites scraped, completing job');
+      
+      // Wait a bit for per-site FAQ generation to complete
+      await new Promise(r => setTimeout(r, 3000));
+      
       await supabase.from('competitor_research_jobs').update({
-        status: 'generating',
+        status: 'completed',
+        completed_at: new Date().toISOString(),
+        current_scraping_domain: null,
       }).eq('id', jobId);
-
-      supabase.functions.invoke('competitor-faq-generate', {
-        body: { jobId, workspaceId }
-      }).catch(err => console.error('Failed to start FAQ generation:', err));
     }
 
     return new Response(JSON.stringify({
