@@ -14,12 +14,16 @@ const redirectTo = (baseUrl: string, path: string, params?: Record<string, strin
   });
 };
 
-const getStyledHTML = (type: 'cancelled' | 'error' | 'success', message?: string) => `<!DOCTYPE html>
+const getStyledHTML = (type: 'cancelled' | 'error' | 'success', message?: string, origin?: string) => {
+  const errorDetail = message ? `<div class="error-detail">${message}</div>` : '';
+  const errorPostMessage = type === 'error' && message ? `, error: '${message.replace(/'/g, "\\'")}'` : '';
+  
+  return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${type === 'success' ? 'Connected!' : type === 'cancelled' ? 'Connection Cancelled' : 'Connection Error'}</title>
+  <title>${type === 'success' ? 'Connected!' : type === 'cancelled' ? 'Cancelled' : 'Error'}</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { 
@@ -35,12 +39,13 @@ const getStyledHTML = (type: 'cancelled' | 'error' | 'success', message?: string
     }
     .icon { font-size: 48px; margin-bottom: 16px; }
     h2 { color: #1a1a1a; margin-bottom: 12px; font-size: 24px; font-weight: 600; }
-    p { color: #666; margin-bottom: 24px; line-height: 1.5; }
+    p { color: #666; margin-bottom: 24px; line-height: 1.5; font-size: 14px; }
     .error-detail { 
       background: #fef2f2; color: #991b1b; padding: 12px 16px; 
       border-radius: 8px; margin-bottom: 24px; font-size: 13px;
       word-break: break-word;
     }
+    .closing { color: #3b82f6; font-weight: 500; }
     button {
       background: hsl(217, 91%, 60%); color: white; border: none;
       padding: 12px 32px; border-radius: 8px; cursor: pointer;
@@ -56,26 +61,41 @@ const getStyledHTML = (type: 'cancelled' | 'error' | 'success', message?: string
     ${type === 'success' ? `
       <div class="icon success-icon">✓</div>
       <h2>Email Connected!</h2>
-      <p>Your email account has been connected successfully. Syncing will begin shortly. This window will close automatically.</p>
+      <p class="closing">Closing automatically...</p>
     ` : type === 'cancelled' ? `
       <div class="icon">✖️</div>
       <h2>Connection Cancelled</h2>
-      <p>No worries! You can connect your email account anytime from Settings.</p>
+      <p>No worries! You can connect your email anytime.</p>
     ` : `
       <div class="icon error-icon">⚠️</div>
       <h2>Connection Failed</h2>
-      <p>Something went wrong while connecting your email account.</p>
-      ${message ? `<div class="error-detail">${message}</div>` : ''}
-      <p>Please try again or contact support if the issue persists.</p>
+      ${errorDetail}
     `}
-    <button onclick="window.close()">Close Window</button>
+    <button onclick="goBack()">Return to App</button>
   </div>
   <script>
-    window.opener?.postMessage({ type: 'aurinko-auth-${type}'${type === 'error' && message ? `, error: '${message.replace(/'/g, "\\'")}'` : ''} }, '*');
-    ${type === 'success' ? "setTimeout(() => window.close(), 2000);" : ""}
+    function goBack() {
+      var appUrl = '${origin || ''}' + '/onboarding?step=email';
+      if (window.opener) {
+        window.opener.postMessage({ type: 'aurinko-auth-${type}'${errorPostMessage} }, '*');
+        window.close();
+      } else {
+        window.location.href = appUrl;
+      }
+    }
+    ${type === 'success' ? `
+    window.opener && window.opener.postMessage({ type: 'aurinko-auth-success' }, '*');
+    setTimeout(function() { try { window.close(); } catch(e) {} }, 500);
+    setTimeout(function() { try { window.close(); } catch(e) {} }, 1500);
+    setTimeout(function() {
+      var el = document.querySelector('.closing');
+      if (el) el.textContent = 'Click below to return:';
+    }, 3000);
+    ` : ''}
   </script>
 </body>
 </html>`;
+};
 
 const htmlHeaders = new Headers({
   'Content-Type': 'text/html; charset=utf-8',
@@ -95,7 +115,15 @@ serve(async (req) => {
     // Handle cancellation scenarios
     if (error === 'access_denied' || error === 'user_cancelled' || error === 'consent_required') {
       console.log('User cancelled OAuth flow:', error);
-      return new Response(getStyledHTML('cancelled'), { status: 200, headers: htmlHeaders });
+      // Try to get origin from state if available
+      let cancelOrigin = '';
+      try {
+        if (state) {
+          const stateData = JSON.parse(atob(state));
+          cancelOrigin = stateData.origin || '';
+        }
+      } catch(e) {}
+      return new Response(getStyledHTML('cancelled', undefined, cancelOrigin), { status: 200, headers: htmlHeaders });
     }
 
     // If no code and no explicit error, treat as cancellation
@@ -296,7 +324,7 @@ serve(async (req) => {
 
     // Return success HTML that posts message to opener window
     // This allows the onboarding flow to continue seamlessly
-    return new Response(getStyledHTML('success'), { status: 200, headers: htmlHeaders });
+    return new Response(getStyledHTML('success', undefined, appOrigin), { status: 200, headers: htmlHeaders });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('Error in aurinko-auth-callback:', error);
