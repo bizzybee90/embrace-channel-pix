@@ -71,26 +71,27 @@ const getStyledHTML = (type: 'cancelled' | 'error' | 'success', message?: string
       <h2>Connection Failed</h2>
       ${errorDetail}
     `}
-    <button onclick="goBack()">Return to App</button>
+    ${type !== 'success' ? `<button onclick="goBack()">Return to App</button>` : ''}
   </div>
   <script>
+    var appUrl = '${origin || ''}' + '/onboarding?step=email';
     function goBack() {
-      var appUrl = '${origin || ''}' + '/onboarding?step=email';
       if (window.opener) {
         window.opener.postMessage({ type: 'aurinko-auth-${type}'${errorPostMessage} }, '*');
-        window.close();
-      } else {
-        window.location.href = appUrl;
+        try { window.close(); } catch(e) {}
       }
+      window.location.href = appUrl;
     }
     ${type === 'success' ? `
-    window.opener && window.opener.postMessage({ type: 'aurinko-auth-success' }, '*');
-    setTimeout(function() { try { window.close(); } catch(e) {} }, 500);
-    setTimeout(function() { try { window.close(); } catch(e) {} }, 1500);
-    setTimeout(function() {
-      var el = document.querySelector('.closing');
-      if (el) el.textContent = 'Click below to return:';
-    }, 3000);
+    // Immediately notify parent and close
+    (function() {
+      if (window.opener) {
+        window.opener.postMessage({ type: 'aurinko-auth-success' }, '*');
+        try { window.close(); } catch(e) {}
+      }
+      // Fallback redirect if window didn't close
+      setTimeout(function() { window.location.href = appUrl; }, 1000);
+    })();
     ` : ''}
   </script>
 </body>

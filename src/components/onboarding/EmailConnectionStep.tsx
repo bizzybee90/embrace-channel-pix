@@ -329,28 +329,18 @@ export function EmailConnectionStep({
                     {!['fetching_inbox', 'fetching_sent', 'analyzing_voice', 'complete', 'pending', 'queued'].includes(syncStatus.stage) && 'Processing...'}
                   </span>
                 </div>
-                <span className="text-muted-foreground">
-                  {syncStatus.total > 0 
-                    ? `${Math.min(Math.round((syncStatus.inboundFound / syncStatus.total) * 100), 100)}%`
-                    : syncStatus.inboundFound > 0 
-                      ? `${syncStatus.inboundFound} emails`
-                      : ''}
+              <span className="text-muted-foreground">
+                  {syncStatus.inboundFound > 0 
+                    ? `${syncStatus.inboundFound.toLocaleString()} emails`
+                    : ''}
                 </span>
               </div>
               
-              {/* Progress bar when we have total */}
-              {syncStatus.total > 0 && (
-                <Progress 
-                  value={Math.min((syncStatus.inboundFound / syncStatus.total) * 100, 100)} 
-                  className="h-2"
-                />
-              )}
-
               {syncStatus.inboundFound > 0 && (
                 <div className="text-xs text-muted-foreground space-y-1">
                   <div className="flex justify-between">
-                    <span>Inbox emails:</span>
-                    <span>{syncStatus.inboundFound}{syncStatus.total > 0 ? ` / ${syncStatus.total}` : ''}</span>
+                    <span>Inbox emails imported:</span>
+                    <span>{syncStatus.inboundFound.toLocaleString()}</span>
                   </div>
                   {syncStatus.outboundFound > 0 && (
                     <div className="flex justify-between">
@@ -372,34 +362,6 @@ export function EmailConnectionStep({
                   : 'You can continue while we import your emails in the background.'}
               </p>
 
-              {/* Stuck/resume action */}
-              {connectedConfigId && syncStatus.status === 'syncing' && syncStatus.stage === 'fetching_inbox' && (
-                <div className="pt-1">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={async () => {
-                      try {
-                        toast.info('Resuming email import...');
-                        await supabase.functions.invoke('email-sync', {
-                          body: {
-                            configId: connectedConfigId,
-                            mode: connectedImportMode || 'last_1000',
-                          },
-                        });
-                        await checkEmailConnection();
-                        toast.success('Import resumed.');
-                      } catch (e) {
-                        console.error(e);
-                        toast.error('Could not resume import.');
-                      }
-                    }}
-                  >
-                    Resume import
-                  </Button>
-                </div>
-              )}
             </div>
           )}
 
