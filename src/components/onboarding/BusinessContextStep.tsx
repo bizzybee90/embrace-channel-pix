@@ -88,14 +88,15 @@ export function BusinessContextStep({ workspaceId, value, onChange, onNext, onBa
     return value.businessType.split(',').map(s => s.trim()).filter(Boolean);
   }, [value.businessType]);
 
-  // Filter business types based on search (exclude already selected)
+  // Filter business types based on search (exclude already selected) - also check labels
   const filteredBusinessTypes = useMemo(() => {
-    if (!businessTypeSearch) return [];
+    if (!businessTypeSearch) return BUSINESS_TYPES.filter(type => !selectedBusinessTypes.includes(type.value) && !selectedBusinessTypes.includes(type.label)).slice(0, 8);
     const search = businessTypeSearch.toLowerCase();
     return BUSINESS_TYPES.filter(type => 
       (type.label.toLowerCase().includes(search) || 
       type.value.toLowerCase().includes(search)) &&
-      !selectedBusinessTypes.includes(type.value)
+      !selectedBusinessTypes.includes(type.value) &&
+      !selectedBusinessTypes.includes(type.label)
     ).slice(0, 8);
   }, [businessTypeSearch, selectedBusinessTypes]);
 
@@ -108,15 +109,29 @@ export function BusinessContextStep({ workspaceId, value, onChange, onNext, onBa
       .slice(0, 6);
   }, [serviceAreaSearch, selectedAreas]);
 
-  const handleSelectBusinessType = (type: { value: string; label: string }) => {
-    const newTypes = [...selectedBusinessTypes, type.value];
-    onChange({ ...value, businessType: newTypes.join(', ') });
+  const handleAddBusinessType = (typeLabel: string) => {
+    const trimmed = typeLabel.trim();
+    if (trimmed && !selectedBusinessTypes.includes(trimmed)) {
+      const newTypes = [...selectedBusinessTypes, trimmed];
+      onChange({ ...value, businessType: newTypes.join(', ') });
+    }
     setBusinessTypeSearch('');
   };
 
-  const handleRemoveBusinessType = (typeValue: string) => {
-    const newTypes = selectedBusinessTypes.filter(t => t !== typeValue);
+  const handleSelectBusinessType = (type: { value: string; label: string }) => {
+    handleAddBusinessType(type.label);
+  };
+
+  const handleRemoveBusinessType = (typeLabel: string) => {
+    const newTypes = selectedBusinessTypes.filter(t => t !== typeLabel);
     onChange({ ...value, businessType: newTypes.join(', ') });
+  };
+
+  const handleBusinessTypeKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && businessTypeSearch.trim()) {
+      e.preventDefault();
+      handleAddBusinessType(businessTypeSearch);
+    }
   };
 
   const handleSelectLocation = (location: string) => {
@@ -258,33 +273,44 @@ export function BusinessContextStep({ workspaceId, value, onChange, onNext, onBa
           <Label>What type of business is this? *</Label>
           {selectedBusinessTypes.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mb-2">
-              {selectedBusinessTypes.map((typeValue) => {
-                const type = BUSINESS_TYPES.find(t => t.value === typeValue);
-                return (
-                  <Badge key={typeValue} variant="secondary" className="gap-1 pr-1">
-                    {type?.label || typeValue}
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveBusinessType(typeValue)}
-                      className="ml-1 hover:bg-muted rounded-full p-0.5"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </Badge>
-                );
-              })}
+              {selectedBusinessTypes.map((typeLabel) => (
+                <Badge key={typeLabel} variant="secondary" className="gap-1 pr-1">
+                  {typeLabel}
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveBusinessType(typeLabel)}
+                    className="ml-1 hover:bg-muted rounded-full p-0.5"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              ))}
             </div>
           )}
           <div className="relative">
             <Input
-              placeholder="Start typing to add business types..."
+              placeholder="Type your business type and press Enter..."
               value={businessTypeSearch}
               onChange={(e) => setBusinessTypeSearch(e.target.value)}
+              onKeyDown={handleBusinessTypeKeyDown}
               onFocus={() => setBusinessTypeFocused(true)}
               onBlur={() => setTimeout(() => setBusinessTypeFocused(false), 150)}
             />
-            {businessTypeFocused && filteredBusinessTypes.length > 0 && (
+            {businessTypeFocused && (filteredBusinessTypes.length > 0 || (businessTypeSearch.trim() && !filteredBusinessTypes.some(t => t.label.toLowerCase() === businessTypeSearch.toLowerCase()))) && (
               <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg max-h-60 overflow-auto">
+                {/* Show custom entry option if not matching a suggestion */}
+                {businessTypeSearch.trim() && !filteredBusinessTypes.some(t => t.label.toLowerCase() === businessTypeSearch.toLowerCase()) && (
+                  <button
+                    type="button"
+                    className="w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground border-b"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      handleAddBusinessType(businessTypeSearch);
+                    }}
+                  >
+                    Add "{businessTypeSearch.trim()}"
+                  </button>
+                )}
                 {filteredBusinessTypes.map((type) => (
                   <button
                     key={type.value}
@@ -302,7 +328,7 @@ export function BusinessContextStep({ workspaceId, value, onChange, onNext, onBa
             )}
           </div>
           <p className="text-xs text-muted-foreground">
-            Add all that apply - helps load industry-specific knowledge
+            Type any business type and press Enter, or select from suggestions
           </p>
         </div>
 
