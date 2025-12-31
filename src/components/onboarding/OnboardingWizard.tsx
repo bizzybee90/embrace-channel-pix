@@ -267,7 +267,20 @@ export function OnboardingWizard({ workspaceId, onComplete }: OnboardingWizardPr
                 {totalFaqs > 0 && (
                   <Button 
                     variant="outline" 
-                    onClick={() => window.location.href = '/settings?tab=knowledge'}
+                    onClick={async () => {
+                      // Mark onboarding complete before navigating
+                      const { data: { user } } = await supabase.auth.getUser();
+                      if (user) {
+                        await supabase
+                          .from('users')
+                          .update({ 
+                            onboarding_completed: true,
+                            onboarding_step: 'complete'
+                          })
+                          .eq('id', user.id);
+                      }
+                      window.location.href = '/settings?tab=knowledge';
+                    }}
                     className="gap-2"
                   >
                     <BookOpen className="h-4 w-4" />
