@@ -16,7 +16,7 @@ interface EmailConnectionStepProps {
 }
 
 type Provider = 'gmail' | 'outlook' | 'icloud' | 'yahoo';
-type ImportMode = 'new_only' | 'unread_only' | 'all_historical_30_days' | 'all_historical_90_days' | 'last_1000';
+type ImportMode = 'new_only' | 'unread_only' | 'all_historical_30_days' | 'all_historical_90_days' | 'last_1000' | 'all_history';
 
 const emailProviders = [
   { 
@@ -37,7 +37,7 @@ const emailProviders = [
     name: 'iCloud Mail', 
     icon: null,
     iconColor: 'text-sky-500',
-    available: true  // Aurinko supports iCloud!
+    available: true
   },
   { 
     id: 'yahoo' as Provider, 
@@ -51,9 +51,15 @@ const emailProviders = [
 
 const importModes = [
   { 
+    value: 'all_history' as ImportMode, 
+    label: 'Entire email history', 
+    description: 'Import everything — best for maximum AI accuracy (may take longer for large inboxes)',
+    recommended: false
+  },
+  { 
     value: 'last_1000' as ImportMode, 
     label: 'Last 1,000 emails', 
-    description: 'Best for AI learning — gives BizzyBee enough context to understand your patterns',
+    description: 'Great balance of learning data and speed',
     recommended: true
   },
   { 
@@ -91,8 +97,13 @@ export function EmailConnectionStep({
   const [checkingConnection, setCheckingConnection] = useState(false);
   const [syncStatus, setSyncStatus] = useState<{
     status: string;
+    stage: string;
     progress: number;
     total: number;
+    inboundFound: number;
+    outboundFound: number;
+    threadsLinked: number;
+    voiceProfileStatus: string;
   } | null>(null);
 
   const handleConnect = async (provider: Provider) => {
@@ -155,7 +166,7 @@ export function EmailConnectionStep({
     try {
       const { data, error } = await supabase
         .from('email_provider_configs')
-        .select('email_address, sync_status, sync_progress, sync_total')
+        .select('email_address, sync_status, sync_stage, sync_progress, sync_total, inbound_emails_found, outbound_emails_found, threads_linked, voice_profile_status')
         .eq('workspace_id', workspaceId)
         .order('created_at', { ascending: false })
         .limit(1)
@@ -165,12 +176,17 @@ export function EmailConnectionStep({
         setConnectedEmail(data.email_address);
         onEmailConnected(data.email_address);
         
-        // Update sync status
+        // Update sync status with detailed info
         if (data.sync_status) {
           setSyncStatus({
             status: data.sync_status,
+            stage: data.sync_stage || 'pending',
             progress: data.sync_progress || 0,
             total: data.sync_total || 0,
+            inboundFound: data.inbound_emails_found || 0,
+            outboundFound: data.outbound_emails_found || 0,
+            threadsLinked: data.threads_linked || 0,
+            voiceProfileStatus: data.voice_profile_status || 'pending',
           });
         }
         
@@ -198,7 +214,7 @@ export function EmailConnectionStep({
       const interval = setInterval(async () => {
         const { data } = await supabase
           .from('email_provider_configs')
-          .select('sync_status, sync_progress, sync_total')
+          .select('sync_status, sync_stage, sync_progress, sync_total, inbound_emails_found, outbound_emails_found, threads_linked, voice_profile_status')
           .eq('workspace_id', workspaceId)
           .order('created_at', { ascending: false })
           .limit(1)
@@ -207,16 +223,24 @@ export function EmailConnectionStep({
         if (data) {
           setSyncStatus({
             status: data.sync_status || 'pending',
+            stage: data.sync_stage || 'pending',
             progress: data.sync_progress || 0,
             total: data.sync_total || 0,
+            inboundFound: data.inbound_emails_found || 0,
+            outboundFound: data.outbound_emails_found || 0,
+            threadsLinked: data.threads_linked || 0,
+            voiceProfileStatus: data.voice_profile_status || 'pending',
           });
           
-          // Stop polling when complete
-          if (data.sync_status === 'completed' || data.sync_status === 'error') {
+          // Stop polling when complete (including voice profile)
+          if (data.sync_status === 'completed' && data.voice_profile_status === 'complete') {
+            clearInterval(interval);
+          }
+          if (data.sync_status === 'error') {
             clearInterval(interval);
           }
         }
-      }, 3000);
+      }, 2000);
       
       return () => clearInterval(interval);
     }
@@ -254,35 +278,86 @@ export function EmailConnectionStep({
           </div>
 
           {/* Sync Progress Indicator */}
-          {syncStatus && syncStatus.status !== 'completed' && (
+          {syncStatus && (syncStatus.status !== 'completed' || syncStatus.voiceProfileStatus !== 'complete') && syncStatus.status !== 'error' && (
             <div className="space-y-3 p-4 bg-muted/50 rounded-lg border">
               <div className="flex items-center justify-between text-sm">
                 <div className="flex items-center gap-2">
                   <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                  <span className="font-medium">Importing emails...</span>
+                  <span className="font-medium">
+                    {syncStatus.stage === 'fetching_inbox' && 'Importing inbox...'}
+                    {syncStatus.stage === 'fetching_sent' && 'Importing sent emails...'}
+                    {syncStatus.stage === 'analyzing_voice' && 'Learning your writing style...'}
+                    {syncStatus.stage === 'complete' && syncStatus.voiceProfileStatus === 'analyzing' && 'Analyzing your writing style...'}
+                    {syncStatus.stage === 'pending' && 'Starting import...'}
+                    {!['fetching_inbox', 'fetching_sent', 'analyzing_voice', 'complete', 'pending'].includes(syncStatus.stage) && 'Processing...'}
+                  </span>
                 </div>
                 <span className="text-muted-foreground">
-                  {syncStatus.total > 0 
-                    ? `${syncStatus.progress} / ${syncStatus.total}`
-                    : 'Starting...'}
+                  {syncStatus.stage === 'fetching_inbox' && syncStatus.inboundFound > 0 && `${syncStatus.inboundFound} emails`}
+                  {syncStatus.stage === 'fetching_sent' && syncStatus.outboundFound > 0 && `${syncStatus.outboundFound} sent`}
+                  {syncStatus.stage === 'analyzing_voice' && syncStatus.outboundFound > 0 && `Analyzing ${syncStatus.outboundFound} emails`}
                 </span>
               </div>
-              {syncStatus.total > 0 && (
-                <Progress 
-                  value={(syncStatus.progress / syncStatus.total) * 100} 
-                  className="h-2"
-                />
+              {syncStatus.inboundFound > 0 && (
+                <div className="text-xs text-muted-foreground space-y-1">
+                  <div className="flex justify-between">
+                    <span>Inbox emails:</span>
+                    <span>{syncStatus.inboundFound}</span>
+                  </div>
+                  {syncStatus.outboundFound > 0 && (
+                    <div className="flex justify-between">
+                      <span>Your replies found:</span>
+                      <span>{syncStatus.outboundFound}</span>
+                    </div>
+                  )}
+                  {syncStatus.threadsLinked > 0 && (
+                    <div className="flex justify-between">
+                      <span>Conversations linked:</span>
+                      <span>{syncStatus.threadsLinked}</span>
+                    </div>
+                  )}
+                </div>
               )}
               <p className="text-xs text-muted-foreground">
-                You can continue while we import your emails in the background.
+                {syncStatus.voiceProfileStatus === 'analyzing' 
+                  ? 'BizzyBee is learning how you write so it can match your style.'
+                  : 'You can continue while we import your emails in the background.'}
               </p>
             </div>
           )}
 
-          {syncStatus?.status === 'completed' && (
-            <div className="flex items-center justify-center gap-2 p-3 bg-success/5 rounded-lg border border-success/20 text-success text-sm">
-              <CheckCircle2 className="h-4 w-4" />
-              <span>Import complete! {syncStatus.progress} emails imported.</span>
+          {syncStatus?.status === 'completed' && syncStatus.voiceProfileStatus === 'complete' && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-center gap-2 p-3 bg-success/5 rounded-lg border border-success/20 text-success text-sm">
+                <CheckCircle2 className="h-4 w-4" />
+                <span>Import complete!</span>
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                <div className="bg-muted/30 rounded p-2">
+                  <div className="font-semibold text-foreground">{syncStatus.inboundFound}</div>
+                  <div className="text-muted-foreground">Inbox emails</div>
+                </div>
+                <div className="bg-muted/30 rounded p-2">
+                  <div className="font-semibold text-foreground">{syncStatus.outboundFound}</div>
+                  <div className="text-muted-foreground">Your replies</div>
+                </div>
+                <div className="bg-muted/30 rounded p-2">
+                  <div className="font-semibold text-foreground">✓</div>
+                  <div className="text-muted-foreground">Style learned</div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {syncStatus?.voiceProfileStatus === 'insufficient_data' && syncStatus.status === 'completed' && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-center gap-2 p-3 bg-success/5 rounded-lg border border-success/20 text-success text-sm">
+                <CheckCircle2 className="h-4 w-4" />
+                <span>Import complete! {syncStatus.inboundFound} emails imported.</span>
+              </div>
+              <p className="text-xs text-center text-muted-foreground">
+                Not enough sent emails to learn your style yet. BizzyBee will learn as you use it!
+              </p>
             </div>
           )}
 
