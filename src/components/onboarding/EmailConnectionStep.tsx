@@ -92,6 +92,8 @@ export function EmailConnectionStep({
 }: EmailConnectionStepProps) {
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectedEmail, setConnectedEmail] = useState<string | null>(null);
+  const [connectedConfigId, setConnectedConfigId] = useState<string | null>(null);
+  const [connectedImportMode, setConnectedImportMode] = useState<ImportMode | null>(null);
   const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null);
   const [importMode, setImportMode] = useState<ImportMode>('last_1000');
   const [checkingConnection, setCheckingConnection] = useState(false);
@@ -104,6 +106,9 @@ export function EmailConnectionStep({
     outboundFound: number;
     threadsLinked: number;
     voiceProfileStatus: string;
+    lastSyncAt?: string | null;
+    syncStartedAt?: string | null;
+    syncError?: string | null;
   } | null>(null);
 
   const handleConnect = async (provider: Provider) => {
@@ -175,7 +180,7 @@ export function EmailConnectionStep({
     try {
       const { data, error } = await supabase
         .from('email_provider_configs')
-        .select('email_address, sync_status, sync_stage, sync_progress, sync_total, inbound_emails_found, outbound_emails_found, threads_linked, voice_profile_status')
+        .select('id, import_mode, email_address, sync_status, sync_stage, sync_progress, sync_total, inbound_emails_found, outbound_emails_found, threads_linked, voice_profile_status, last_sync_at, sync_started_at, sync_error')
         .eq('workspace_id', workspaceId)
         .order('created_at', { ascending: false })
         .limit(1)
@@ -183,6 +188,8 @@ export function EmailConnectionStep({
 
       if (data?.email_address) {
         setConnectedEmail(data.email_address);
+        setConnectedConfigId(data.id);
+        setConnectedImportMode((data.import_mode as ImportMode) || null);
         onEmailConnected(data.email_address);
         
         // Update sync status with detailed info
@@ -196,6 +203,9 @@ export function EmailConnectionStep({
             outboundFound: data.outbound_emails_found || 0,
             threadsLinked: data.threads_linked || 0,
             voiceProfileStatus: data.voice_profile_status || 'pending',
+            lastSyncAt: data.last_sync_at || null,
+            syncStartedAt: data.sync_started_at || null,
+            syncError: data.sync_error || null,
           });
         }
         
@@ -223,7 +233,7 @@ export function EmailConnectionStep({
       const interval = setInterval(async () => {
         const { data } = await supabase
           .from('email_provider_configs')
-          .select('sync_status, sync_stage, sync_progress, sync_total, inbound_emails_found, outbound_emails_found, threads_linked, voice_profile_status')
+          .select('sync_status, sync_stage, sync_progress, sync_total, inbound_emails_found, outbound_emails_found, threads_linked, voice_profile_status, last_sync_at, sync_started_at, sync_error')
           .eq('workspace_id', workspaceId)
           .order('created_at', { ascending: false })
           .limit(1)
@@ -239,6 +249,9 @@ export function EmailConnectionStep({
             outboundFound: data.outbound_emails_found || 0,
             threadsLinked: data.threads_linked || 0,
             voiceProfileStatus: data.voice_profile_status || 'pending',
+            lastSyncAt: data.last_sync_at || null,
+            syncStartedAt: data.sync_started_at || null,
+            syncError: data.sync_error || null,
           });
           
           // Stop polling when complete (including voice profile)
@@ -253,7 +266,7 @@ export function EmailConnectionStep({
       
       return () => clearInterval(interval);
     }
-  }, [connectedEmail, workspaceId]);
+  }, [connectedEmail, workspaceId, connectedConfigId, connectedImportMode]);
 
   // Listen for OAuth completion message from popup
   useEffect(() => {
@@ -342,10 +355,39 @@ export function EmailConnectionStep({
                 </div>
               )}
               <p className="text-xs text-muted-foreground">
-                {syncStatus.voiceProfileStatus === 'analyzing' 
+                {syncStatus.voiceProfileStatus === 'analyzing'
                   ? 'BizzyBee is learning how you write so it can match your style.'
                   : 'You can continue while we import your emails in the background.'}
               </p>
+
+              {/* Stuck/resume action */}
+              {connectedConfigId && syncStatus.status === 'syncing' && syncStatus.stage === 'fetching_inbox' && (
+                <div className="pt-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      try {
+                        toast.info('Resuming email import...');
+                        await supabase.functions.invoke('email-sync', {
+                          body: {
+                            configId: connectedConfigId,
+                            mode: connectedImportMode || 'last_1000',
+                          },
+                        });
+                        await checkEmailConnection();
+                        toast.success('Import resumed.');
+                      } catch (e) {
+                        console.error(e);
+                        toast.error('Could not resume import.');
+                      }
+                    }}
+                  >
+                    Resume import
+                  </Button>
+                </div>
+              )}
             </div>
           )}
 
