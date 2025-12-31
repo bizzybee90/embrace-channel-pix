@@ -162,10 +162,14 @@ export function BusinessContextStep({ workspaceId, value, onChange, onNext, onBa
   };
 
   const handleSelectLocation = (location: string) => {
-    const trimmed = location.trim();
-    if (trimmed && !selectedAreas.includes(trimmed)) {
-      const newAreas = [...selectedAreas, trimmed];
-      // Use pipe separator to preserve commas in place names like "Luton, UK"
+    // Strip country suffix (e.g., ", UK", ", USA", ", Australia") for cleaner display
+    let cleanLocation = location.trim();
+    const countryPattern = /, (UK|USA|Australia|Canada|Ireland|Germany|France|Italy|Spain|Netherlands|New Zealand|India|Poland|Czechia|South Korea|Malaysia|Belarus)$/i;
+    cleanLocation = cleanLocation.replace(countryPattern, '');
+    
+    if (cleanLocation && !selectedAreas.includes(cleanLocation)) {
+      const newAreas = [...selectedAreas, cleanLocation];
+      // Use pipe separator to preserve commas in place names
       onChange({ ...value, serviceArea: newAreas.join(' | ') });
     }
     setServiceAreaSearch('');
