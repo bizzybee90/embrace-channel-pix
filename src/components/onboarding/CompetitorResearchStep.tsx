@@ -45,6 +45,7 @@ export function CompetitorResearchStep({
     sitesScraped: 0,
     faqsGenerated: 0,
     faqsAdded: 0,
+    currentSite: null as string | null,
   });
   const [error, setError] = useState<string | null>(null);
 
@@ -66,6 +67,7 @@ export function CompetitorResearchStep({
           sitesScraped: data.sites_scraped || 0,
           faqsGenerated: data.faqs_generated || 0,
           faqsAdded: data.faqs_added || 0,
+          currentSite: data.current_scraping_domain || null,
         });
 
         if (data.status === 'completed') {
@@ -251,13 +253,22 @@ export function CompetitorResearchStep({
         </div>
 
         <div className="space-y-4 p-4 bg-muted/30 rounded-lg">
-          <div className="flex items-center gap-3">
-            <Loader2 className="h-5 w-5 animate-spin text-primary" />
-            <span className="font-medium">
-              {status === 'discovering' && `Discovering competitors...`}
-              {status === 'scraping' && `Scraping ${progress.sitesScraped}/${progress.sitesApproved} sites...`}
-              {status === 'generating' && 'Generating FAQs...'}
-            </span>
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-3">
+              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+              <span className="font-medium">
+                {status === 'discovering' && `Discovering competitors...`}
+                {status === 'scraping' && progress.currentSite 
+                  ? `Scraping ${progress.currentSite}...`
+                  : `Scraping competitors...`}
+                {status === 'generating' && 'Generating FAQs...'}
+              </span>
+            </div>
+            {status === 'scraping' && (
+              <span className="text-xs text-muted-foreground ml-8">
+                {progress.sitesScraped} of {progress.sitesApproved} sites completed
+              </span>
+            )}
           </div>
 
           <Progress value={getProgressPercent()} className="h-2" />

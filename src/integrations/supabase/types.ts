@@ -245,6 +245,7 @@ export type Database = {
         Row: {
           completed_at: string | null
           created_at: string | null
+          current_scraping_domain: string | null
           error_message: string | null
           exclude_domains: string[] | null
           faqs_added: number | null
@@ -264,6 +265,7 @@ export type Database = {
         Insert: {
           completed_at?: string | null
           created_at?: string | null
+          current_scraping_domain?: string | null
           error_message?: string | null
           exclude_domains?: string[] | null
           faqs_added?: number | null
@@ -283,6 +285,7 @@ export type Database = {
         Update: {
           completed_at?: string | null
           created_at?: string | null
+          current_scraping_domain?: string | null
           error_message?: string | null
           exclude_domains?: string[] | null
           faqs_added?: number | null

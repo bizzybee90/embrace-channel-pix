@@ -75,6 +75,11 @@ serve(async (req) => {
       try {
         console.log('Scraping:', site.domain);
 
+        // Update current scraping domain for UI feedback
+        await supabase.from('competitor_research_jobs').update({
+          current_scraping_domain: site.domain,
+        }).eq('id', jobId);
+
         // First, map the site to get key URLs
         const mapResponse = await fetch('https://api.firecrawl.dev/v1/map', {
           method: 'POST',
@@ -180,6 +185,7 @@ serve(async (req) => {
 
     await supabase.from('competitor_research_jobs').update({
       sites_scraped: newScrapedTotal,
+      current_scraping_domain: null, // Clear current site after batch
     }).eq('id', jobId);
 
     // Check if there are more sites to scrape
