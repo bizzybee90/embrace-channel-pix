@@ -325,20 +325,32 @@ export function EmailConnectionStep({
                     {syncStatus.stage === 'analyzing_voice' && 'Learning your writing style...'}
                     {syncStatus.stage === 'complete' && syncStatus.voiceProfileStatus === 'analyzing' && 'Analyzing your writing style...'}
                     {syncStatus.stage === 'pending' && 'Starting import...'}
-                    {!['fetching_inbox', 'fetching_sent', 'analyzing_voice', 'complete', 'pending'].includes(syncStatus.stage) && 'Processing...'}
+                    {syncStatus.stage === 'queued' && 'Queued...'}
+                    {!['fetching_inbox', 'fetching_sent', 'analyzing_voice', 'complete', 'pending', 'queued'].includes(syncStatus.stage) && 'Processing...'}
                   </span>
                 </div>
                 <span className="text-muted-foreground">
-                  {syncStatus.stage === 'fetching_inbox' && syncStatus.inboundFound > 0 && `${syncStatus.inboundFound} emails`}
-                  {syncStatus.stage === 'fetching_sent' && syncStatus.outboundFound > 0 && `${syncStatus.outboundFound} sent`}
-                  {syncStatus.stage === 'analyzing_voice' && syncStatus.outboundFound > 0 && `Analyzing ${syncStatus.outboundFound} emails`}
+                  {syncStatus.total > 0 
+                    ? `${Math.min(Math.round((syncStatus.inboundFound / syncStatus.total) * 100), 100)}%`
+                    : syncStatus.inboundFound > 0 
+                      ? `${syncStatus.inboundFound} emails`
+                      : ''}
                 </span>
               </div>
+              
+              {/* Progress bar when we have total */}
+              {syncStatus.total > 0 && (
+                <Progress 
+                  value={Math.min((syncStatus.inboundFound / syncStatus.total) * 100, 100)} 
+                  className="h-2"
+                />
+              )}
+
               {syncStatus.inboundFound > 0 && (
                 <div className="text-xs text-muted-foreground space-y-1">
                   <div className="flex justify-between">
                     <span>Inbox emails:</span>
-                    <span>{syncStatus.inboundFound}</span>
+                    <span>{syncStatus.inboundFound}{syncStatus.total > 0 ? ` / ${syncStatus.total}` : ''}</span>
                   </div>
                   {syncStatus.outboundFound > 0 && (
                     <div className="flex justify-between">
