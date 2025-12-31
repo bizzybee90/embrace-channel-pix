@@ -38,16 +38,32 @@ serve(async (req) => {
     console.log('Found config for:', config.email_address, 'mode:', mode || config.import_mode);
 
     const syncMode = mode || config.import_mode || 'new_only';
-    const maxToProcess = typeof maxMessages === 'number' && maxMessages > 0 ? Math.min(maxMessages, 25) : 10;
-    let messagesProcessed = 0;
+    
+    // Determine max messages based on mode
+    let maxToProcess = 25; // Default quick limit
+    if (syncMode === 'all_history') {
+      maxToProcess = Math.min(maxMessages || 10000, 10000); // Full history up to 10k
+    } else if (syncMode === 'last_1000') {
+      maxToProcess = Math.min(maxMessages || 1000, 1000);
+    } else if (typeof maxMessages === 'number' && maxMessages > 0) {
+      maxToProcess = Math.min(maxMessages, 500);
+    }
+    
+    let inboundProcessed = 0;
+    let outboundProcessed = 0;
+    let threadsLinked = 0;
 
     // Update sync status to 'syncing'
     await supabase
       .from('email_provider_configs')
       .update({ 
         sync_status: 'syncing',
+        sync_stage: 'fetching_inbox',
         sync_started_at: new Date().toISOString(),
-        sync_error: null
+        sync_error: null,
+        inbound_emails_found: 0,
+        outbound_emails_found: 0,
+        threads_linked: 0,
       })
       .eq('id', configId);
 
@@ -56,435 +72,457 @@ serve(async (req) => {
     if (syncMode === 'all_historical_90_days') {
       afterDate = new Date();
       afterDate.setDate(afterDate.getDate() - 90);
-    } else if (syncMode === 'unread_only') {
-      // Will use unread filter instead of date
+    } else if (syncMode === 'all_historical_30_days') {
+      afterDate = new Date();
+      afterDate.setDate(afterDate.getDate() - 30);
     }
 
-    // Fetch messages from Aurinko
-    const baseUrl = 'https://api.aurinko.io/v1/email/messages';
-    let queryParams: string[] = [];
-    
-    if (syncMode === 'unread_only') {
-      queryParams.push('unread=true');
-    }
-    if (afterDate) {
-      queryParams.push(`after=${afterDate.toISOString()}`);
-    }
-    queryParams.push(`limit=${Math.max(5, maxToProcess)}`); // Keep runs quick to avoid timeouts
-    
-    const fetchUrl = `${baseUrl}?${queryParams.join('&')}`;
-    console.log('Fetching emails from:', fetchUrl);
+    // Helper function to strip HTML
+    const stripHtml = (html: string): string => {
+      return html
+        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/\s+/g, ' ')
+        .trim();
+    };
 
-    const messagesResponse = await fetch(fetchUrl, {
+    // All connected email addresses (main + aliases)
+    const allConnectedEmails = [
+      config.email_address.toLowerCase(), 
+      ...(config.aliases || []).map((a: string) => a.toLowerCase())
+    ];
+
+    // =============================================
+    // STEP 1: FETCH AND IMPORT INBOUND EMAILS
+    // =============================================
+    console.log('=== STEP 1: Fetching inbound emails ===');
+    
+    let nextPageToken: string | null = null;
+    let totalFetched = 0;
+    
+    do {
+      const baseUrl = 'https://api.aurinko.io/v1/email/messages';
+      let queryParams: string[] = [];
+      
+      if (syncMode === 'unread_only') {
+        queryParams.push('unread=true');
+      }
+      if (afterDate) {
+        queryParams.push(`after=${afterDate.toISOString()}`);
+      }
+      // Fetch in batches of 50 for pagination
+      queryParams.push(`limit=50`);
+      if (nextPageToken) {
+        queryParams.push(`pageToken=${nextPageToken}`);
+      }
+      
+      const fetchUrl = `${baseUrl}?${queryParams.join('&')}`;
+      console.log('Fetching from:', fetchUrl);
+
+      const messagesResponse = await fetch(fetchUrl, {
+        headers: {
+          'Authorization': `Bearer ${config.access_token}`,
+        },
+      });
+
+      if (!messagesResponse.ok) {
+        const errorText = await messagesResponse.text();
+        console.error('Failed to fetch messages:', messagesResponse.status, errorText);
+        break;
+      }
+
+      const messagesData = await messagesResponse.json();
+      const messages = messagesData.records || [];
+      nextPageToken = messagesData.nextPageToken || null;
+      totalFetched += messages.length;
+      
+      console.log(`Fetched batch: ${messages.length} messages, total: ${totalFetched}, hasMore: ${!!nextPageToken}`);
+
+      // Update progress
+      await supabase
+        .from('email_provider_configs')
+        .update({ 
+          sync_total: Math.min(totalFetched + (nextPageToken ? 50 : 0), maxToProcess),
+          sync_progress: inboundProcessed + outboundProcessed
+        })
+        .eq('id', configId);
+
+      // Process each message
+      for (const messageSummary of messages) {
+        if (inboundProcessed >= maxToProcess) {
+          console.log('Reached max inbound limit:', maxToProcess);
+          nextPageToken = null; // Stop pagination
+          break;
+        }
+
+        try {
+          const externalId = messageSummary.id?.toString();
+          
+          // Skip if already processed
+          const { data: existing } = await supabase
+            .from('conversations')
+            .select('id')
+            .eq('external_conversation_id', `aurinko_${externalId}`)
+            .single();
+
+          if (existing) {
+            continue;
+          }
+
+          // Fetch full message details
+          const fullMessageResponse = await fetch(`https://api.aurinko.io/v1/email/messages/${externalId}`, {
+            headers: {
+              'Authorization': `Bearer ${config.access_token}`,
+            },
+          });
+
+          if (!fullMessageResponse.ok) {
+            continue;
+          }
+
+          const message = await fullMessageResponse.json();
+          
+          // Extract email details
+          const fromEmail = (message.from?.address || message.from?.email || message.sender?.address || '').toLowerCase();
+          const fromName = message.from?.name || message.sender?.name || fromEmail.split('@')[0] || 'Unknown';
+          const subject = message.subject || 'No Subject';
+          const threadId = message.threadId || externalId;
+          
+          // Check if this is an outbound email (from us)
+          const isOutbound = allConnectedEmails.includes(fromEmail);
+          
+          if (isOutbound) {
+            // Skip outbound in this pass - we'll handle them separately
+            continue;
+          }
+
+          // Extract body
+          let body = '';
+          if (message.textBody) {
+            body = message.textBody;
+          } else if (message.body && typeof message.body === 'object') {
+            body = message.body.text || message.body.plain || '';
+            if (!body && message.body.html) {
+              body = stripHtml(message.body.html);
+            }
+          } else if (message.htmlBody) {
+            body = stripHtml(message.htmlBody);
+          } else if (message.snippet) {
+            body = message.snippet;
+          } else if (typeof message.body === 'string') {
+            if (message.body.includes('<') && message.body.includes('>')) {
+              body = stripHtml(message.body);
+            } else {
+              body = message.body;
+            }
+          }
+          
+          const receivedAt = message.receivedAt || message.createdAt || message.date;
+
+          // Find or create customer
+          let customer;
+          const { data: existingCustomer } = await supabase
+            .from('customers')
+            .select('*')
+            .eq('email', fromEmail)
+            .eq('workspace_id', config.workspace_id)
+            .single();
+
+          if (existingCustomer) {
+            customer = existingCustomer;
+          } else {
+            const { data: newCustomer, error: customerError } = await supabase
+              .from('customers')
+              .insert({
+                workspace_id: config.workspace_id,
+                email: fromEmail,
+                name: fromName,
+                preferred_channel: 'email',
+              })
+              .select()
+              .single();
+
+            if (customerError) {
+              console.error('Error creating customer:', customerError);
+              continue;
+            }
+            customer = newCustomer;
+          }
+
+          // Get original recipient
+          const toAddresses: string[] = [];
+          if (Array.isArray(message.to)) {
+            for (const t of message.to) {
+              if (typeof t === 'string') {
+                toAddresses.push(t.toLowerCase());
+              } else if (t?.email) {
+                toAddresses.push(t.email.toLowerCase());
+              } else if (t?.address) {
+                toAddresses.push(t.address.toLowerCase());
+              }
+            }
+          }
+          const originalRecipient = toAddresses.find((addr: string) => allConnectedEmails.includes(addr)) || config.email_address;
+
+          // Create conversation
+          const { data: conversation, error: convError } = await supabase
+            .from('conversations')
+            .insert({
+              workspace_id: config.workspace_id,
+              customer_id: customer.id,
+              channel: 'email',
+              title: subject,
+              status: 'new',
+              external_conversation_id: `aurinko_${externalId}`,
+              metadata: {
+                original_recipient_email: originalRecipient,
+                thread_id: threadId,
+                email_provider: config.provider,
+                aurinko_message_id: externalId,
+              },
+              created_at: receivedAt,
+            })
+            .select()
+            .single();
+
+          if (convError) {
+            console.error('Error creating conversation:', convError);
+            continue;
+          }
+
+          // Create message
+          const { error: msgError } = await supabase
+            .from('messages')
+            .insert({
+              conversation_id: conversation.id,
+              body: body.substring(0, 10000),
+              direction: 'inbound',
+              channel: 'email',
+              actor_type: 'customer',
+              actor_name: fromName,
+              created_at: receivedAt,
+              raw_payload: message,
+            });
+
+          if (msgError) {
+            console.error('Error creating message:', msgError);
+            continue;
+          }
+
+          inboundProcessed++;
+
+          // Update progress periodically
+          if (inboundProcessed % 10 === 0) {
+            await supabase
+              .from('email_provider_configs')
+              .update({ 
+                sync_progress: inboundProcessed,
+                inbound_emails_found: inboundProcessed
+              })
+              .eq('id', configId);
+          }
+
+          // Trigger AI triage (non-blocking)
+          if (body.length > 0) {
+            triggerAITriage(supabase, conversation, body, fromEmail, fromName, customer, subject, originalRecipient, config.workspace_id);
+          }
+
+        } catch (msgError) {
+          console.error('Error processing message:', msgError);
+        }
+      }
+
+      // Small delay between pages to avoid rate limits
+      if (nextPageToken && inboundProcessed < maxToProcess) {
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+      
+    } while (nextPageToken && inboundProcessed < maxToProcess);
+
+    console.log(`Inbound import complete: ${inboundProcessed} emails`);
+
+    // =============================================
+    // STEP 2: FETCH AND IMPORT OUTBOUND EMAILS (for voice learning)
+    // =============================================
+    console.log('=== STEP 2: Fetching outbound (sent) emails ===');
+    
+    await supabase
+      .from('email_provider_configs')
+      .update({ sync_stage: 'fetching_sent' })
+      .eq('id', configId);
+
+    // Fetch from sent folder
+    nextPageToken = null;
+    let sentFetched = 0;
+    const maxSentToFetch = Math.min(500, maxToProcess); // Limit sent emails for voice learning
+    
+  do {
+    const sentUrlStr: string = `https://api.aurinko.io/v1/email/messages?folder=SENT&limit=50${nextPageToken ? `&pageToken=${nextPageToken}` : ''}`;
+    console.log('Fetching sent emails from:', sentUrlStr);
+
+    const sentResp: Response = await fetch(sentUrlStr, {
       headers: {
         'Authorization': `Bearer ${config.access_token}`,
       },
     });
 
-    if (!messagesResponse.ok) {
-      const errorText = await messagesResponse.text();
-      console.error('Failed to fetch messages:', messagesResponse.status, errorText);
+    if (!sentResp.ok) {
+      console.log('Sent folder fetch failed (may not be supported):', sentResp.status);
+      break;
+    }
+
+    const sentDataJson: any = await sentResp.json();
+    const sentMessages = sentDataJson.records || [];
+    nextPageToken = sentDataJson.nextPageToken || null;
       
-      return new Response(JSON.stringify({ 
-        error: 'Failed to fetch messages',
-        details: errorText,
-        status: messagesResponse.status 
-      }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      console.log(`Fetched ${sentMessages.length} sent emails`);
+
+      for (const message of sentMessages) {
+        if (outboundProcessed >= maxSentToFetch) {
+          nextPageToken = null;
+          break;
+        }
+
+        try {
+          const externalId = message.id?.toString();
+          const threadId = message.threadId || externalId;
+
+          // Check if we already have this message
+          const { data: existingMsg } = await supabase
+            .from('messages')
+            .select('id')
+            .eq('raw_payload->>id', externalId)
+            .single();
+
+          if (existingMsg) {
+            continue;
+          }
+
+          // Fetch full message for body
+          const fullMsgResponse = await fetch(`https://api.aurinko.io/v1/email/messages/${externalId}`, {
+            headers: {
+              'Authorization': `Bearer ${config.access_token}`,
+            },
+          });
+
+          if (!fullMsgResponse.ok) continue;
+
+          const fullMsg = await fullMsgResponse.json();
+          
+          // Extract body (strip quoted content for voice learning)
+          let body = '';
+          if (fullMsg.textBody) {
+            body = fullMsg.textBody;
+          } else if (fullMsg.body?.text) {
+            body = fullMsg.body.text;
+          } else if (fullMsg.body?.html || fullMsg.htmlBody) {
+            body = stripHtml(fullMsg.body?.html || fullMsg.htmlBody);
+          }
+
+          // Strip quoted content (lines starting with > or On ... wrote:)
+          body = stripQuotedContent(body);
+
+          if (!body || body.length < 20) {
+            continue; // Skip very short replies
+          }
+
+          // Find the conversation this reply belongs to
+          const { data: conversation } = await supabase
+            .from('conversations')
+            .select('id, customer_id')
+            .eq('metadata->>thread_id', threadId)
+            .eq('workspace_id', config.workspace_id)
+            .single();
+
+          if (conversation) {
+            // Link outbound message to existing conversation
+            await supabase
+              .from('messages')
+              .insert({
+                conversation_id: conversation.id,
+                body: body.substring(0, 10000),
+                direction: 'outbound',
+                channel: 'email',
+                actor_type: 'human_agent',
+                actor_name: config.email_address.split('@')[0],
+                created_at: fullMsg.sentAt || fullMsg.createdAt || fullMsg.date,
+                raw_payload: fullMsg,
+              });
+
+            threadsLinked++;
+          }
+
+          outboundProcessed++;
+          sentFetched++;
+
+        } catch (err) {
+          console.error('Error processing sent email:', err);
+        }
+      }
+
+      if (nextPageToken && outboundProcessed < maxSentToFetch) {
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+      
+    } while (nextPageToken && outboundProcessed < maxSentToFetch);
+
+    console.log(`Outbound import complete: ${outboundProcessed} emails, ${threadsLinked} threads linked`);
+
+    // =============================================
+    // STEP 3: TRIGGER VOICE PROFILE ANALYSIS
+    // =============================================
+    if (outboundProcessed >= 10) {
+      console.log('=== STEP 3: Triggering voice profile analysis ===');
+      
+      await supabase
+        .from('email_provider_configs')
+        .update({ 
+          sync_stage: 'analyzing_voice',
+          voice_profile_status: 'analyzing'
+        })
+        .eq('id', configId);
+
+      // Trigger voice analysis asynchronously
+      supabase.functions.invoke('analyze-voice-profile', {
+        body: { workspace_id: config.workspace_id }
+      }).then(result => {
+        console.log('Voice profile analysis triggered:', result.data || result.error);
+      }).catch(err => {
+        console.error('Voice analysis failed:', err);
       });
     }
 
-    const messagesData = await messagesResponse.json();
-    const totalMessages = messagesData.records?.length || 0;
-    console.log('Fetched', totalMessages, 'messages from list API');
-
-    // Update total count for progress tracking
-    await supabase
-      .from('email_provider_configs')
-      .update({ 
-        sync_total: Math.min(totalMessages, maxToProcess),
-        sync_progress: 0
-      })
-      .eq('id', configId);
-
-    // Process each message (hard-capped to keep sync responsive)
-    for (const messageSummary of messagesData.records || []) {
-      if (messagesProcessed >= maxToProcess) {
-        console.log('Reached maxToProcess cap, stopping early:', maxToProcess);
-        break;
-      }
-      try {
-        // Skip if already processed (check by external ID)
-        const externalId = messageSummary.id?.toString();
-        const { data: existing } = await supabase
-          .from('conversations')
-          .select('id')
-          .eq('external_conversation_id', `aurinko_${externalId}`)
-          .single();
-
-        if (existing) {
-          console.log('Message already processed:', externalId);
-          continue;
-        }
-
-        // IMPORTANT: Fetch full message details to get the body content
-        console.log('Fetching full message details for:', externalId);
-        const fullMessageResponse = await fetch(`https://api.aurinko.io/v1/email/messages/${externalId}`, {
-          headers: {
-            'Authorization': `Bearer ${config.access_token}`,
-          },
-        });
-
-        if (!fullMessageResponse.ok) {
-          console.error('Failed to fetch full message:', externalId, fullMessageResponse.status);
-          continue;
-        }
-
-        const message = await fullMessageResponse.json();
-        console.log('Full message fetched:', JSON.stringify({
-          hasTextBody: !!message.textBody,
-          hasHtmlBody: !!message.htmlBody,
-          hasBody: !!message.body,
-          bodyType: typeof message.body,
-          bodyKeys: message.body ? Object.keys(message.body) : [],
-        }));
-
-        // Extract email details - Aurinko uses 'address' not 'email'
-        const fromEmail = (message.from?.address || message.from?.email || message.sender?.address || message.sender?.email || '').toLowerCase();
-        const fromName = message.from?.name || message.sender?.name || fromEmail.split('@')[0] || 'Unknown';
-        const subject = message.subject || 'No Subject';
-        
-        console.log('Extracted sender:', { fromEmail, fromName, rawFrom: message.from });
-        
-        // Helper to strip HTML and clean up text
-        const stripHtml = (html: string): string => {
-          return html
-            .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '') // Remove style blocks
-            .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '') // Remove script blocks
-            .replace(/<[^>]+>/g, ' ') // Remove HTML tags
-            .replace(/&nbsp;/g, ' ')
-            .replace(/&amp;/g, '&')
-            .replace(/&lt;/g, '<')
-            .replace(/&gt;/g, '>')
-            .replace(/&quot;/g, '"')
-            .replace(/&#39;/g, "'")
-            .replace(/\s+/g, ' ')
-            .trim();
-        };
-
-        // Try multiple fields for body content - Aurinko uses nested body object
-        let body = '';
-        if (message.textBody) {
-          body = message.textBody;
-        } else if (message.body && typeof message.body === 'object') {
-          // Aurinko returns body as { text: "...", html: "..." }
-          body = message.body.text || message.body.plain || '';
-          if (!body && message.body.html) {
-            body = stripHtml(message.body.html);
-          }
-        } else if (message.htmlBody) {
-          body = stripHtml(message.htmlBody);
-        } else if (message.snippet) {
-          body = message.snippet;
-        } else if (typeof message.body === 'string') {
-          // Check if it looks like HTML
-          if (message.body.includes('<') && message.body.includes('>')) {
-            body = stripHtml(message.body);
-          } else {
-            body = message.body;
-          }
-        }
-        
-        console.log('Extracted body length:', body.length, 'preview:', body.substring(0, 100));
-        
-        const receivedAt = message.receivedAt || message.createdAt || message.date;
-
-        // Skip outbound emails (from our connected accounts)
-        const allConnectedEmails = [config.email_address.toLowerCase(), ...(config.aliases || []).map((a: string) => a.toLowerCase())];
-        if (allConnectedEmails.includes(fromEmail)) {
-          console.log('Skipping outbound email from:', fromEmail);
-          continue;
-        }
-
-        // Find or create customer
-        let customer;
-        const { data: existingCustomer } = await supabase
-          .from('customers')
-          .select('*')
-          .eq('email', fromEmail)
-          .eq('workspace_id', config.workspace_id)
-          .single();
-
-        if (existingCustomer) {
-          customer = existingCustomer;
-        } else {
-          const { data: newCustomer, error: customerError } = await supabase
-            .from('customers')
-            .insert({
-              workspace_id: config.workspace_id,
-              email: fromEmail,
-              name: fromName,
-              preferred_channel: 'email',
-            })
-            .select()
-            .single();
-
-          if (customerError) {
-            console.error('Error creating customer:', customerError);
-            continue;
-          }
-          customer = newCustomer;
-        }
-
-        // Get original recipient (to address) - safely extract email
-        const toAddresses: string[] = [];
-        if (Array.isArray(message.to)) {
-          for (const t of message.to) {
-            if (typeof t === 'string') {
-              toAddresses.push(t.toLowerCase());
-            } else if (t && typeof t.email === 'string') {
-              toAddresses.push(t.email.toLowerCase());
-            } else if (t && typeof t.address === 'string') {
-              toAddresses.push(t.address.toLowerCase());
-            }
-          }
-        }
-        const originalRecipient = toAddresses.find((addr: string) => allConnectedEmails.includes(addr)) || config.email_address;
-
-        // Create conversation
-        const { data: conversation, error: convError } = await supabase
-          .from('conversations')
-          .insert({
-            workspace_id: config.workspace_id,
-            customer_id: customer.id,
-            channel: 'email',
-            title: subject,
-            status: 'new',
-            external_conversation_id: `aurinko_${externalId}`,
-            metadata: {
-              original_recipient_email: originalRecipient,
-              thread_id: message.threadId,
-              email_provider: config.provider,
-              aurinko_message_id: externalId,
-            },
-            created_at: receivedAt,
-          })
-          .select()
-          .single();
-
-        if (convError) {
-          console.error('Error creating conversation:', convError);
-          continue;
-        }
-
-        // Create message with the full body
-        const { error: msgError } = await supabase
-          .from('messages')
-          .insert({
-            conversation_id: conversation.id,
-            body: body.substring(0, 10000), // Limit body size
-            direction: 'inbound',
-            channel: 'email',
-            actor_type: 'customer',
-            actor_name: fromName,
-            created_at: receivedAt,
-            raw_payload: message, // Store full message for debugging
-          });
-
-        if (msgError) {
-          console.error('Error creating message:', msgError);
-          continue;
-        }
-
-        messagesProcessed++;
-        console.log('Processed message:', subject, 'body length:', body.length);
-
-        // Update progress
-        await supabase
-          .from('email_provider_configs')
-          .update({ sync_progress: messagesProcessed })
-          .eq('id', configId);
-
-        // Trigger AI agent for analysis
-        if (body.length > 0) {
-          try {
-            console.log('Triggering AI agent for conversation:', conversation.id);
-            
-            // Call AI agent with proper structure matching receive-message
-            const aiResponse = await supabase.functions.invoke('claude-ai-agent-tools', {
-              body: {
-                message: {
-                  message_content: body.substring(0, 5000),
-                  channel: 'email',
-                  customer_identifier: fromEmail,
-                  customer_name: fromName,
-                  sender_phone: customer?.phone || null,
-                  sender_email: fromEmail,
-                },
-                conversation_history: [],
-                customer_data: customer,
-              }
-            });
-            
-            console.log('AI agent response:', JSON.stringify(aiResponse.data || aiResponse.error));
-            
-            if (aiResponse.data && !aiResponse.error) {
-              const aiOutput = aiResponse.data;
-              
-              // Determine status based on requires_reply and escalate flags
-              const requiresReply = aiOutput.requires_reply !== false; // Default to true for backwards compatibility
-              let status = 'new';
-              if (!requiresReply) {
-                status = 'resolved'; // Auto-close emails that don't need reply
-              } else if (aiOutput.escalate) {
-                status = 'escalated';
-              }
-              
-              // Update conversation with AI analysis including triage fields
-              const { error: updateError } = await supabase
-                .from('conversations')
-                .update({
-                  ai_confidence: aiOutput.confidence || 0,
-                  triage_confidence: aiOutput.confidence || null, // Also save to triage_confidence for Review queue
-                  ai_sentiment: aiOutput.sentiment || 'neutral',
-                  ai_reason_for_escalation: aiOutput.escalation_reason || null,
-                  ai_draft_response: aiOutput.response || null,
-                  summary_for_human: aiOutput.ai_summary || null,
-                  title: aiOutput.ai_title || subject,
-                  category: aiOutput.ai_category || 'other',
-                  is_escalated: aiOutput.escalate || false,
-                  status: status,
-                  escalated_at: aiOutput.escalate ? new Date().toISOString() : null,
-                  resolved_at: !requiresReply ? new Date().toISOString() : null,
-                  requires_reply: requiresReply,
-                  email_classification: aiOutput.email_classification || null,
-                  // Route low-confidence items to review
-                  needs_review: (aiOutput.confidence || 0) < 0.8,
-                })
-                .eq('id', conversation.id);
-              
-              if (updateError) {
-                console.error('Error updating conversation with AI data:', updateError);
-              } else {
-                console.log('Updated conversation with AI analysis:', {
-                  title: aiOutput.ai_title,
-                  category: aiOutput.ai_category,
-                  sentiment: aiOutput.sentiment,
-                  confidence: aiOutput.confidence,
-                  escalated: aiOutput.escalate,
-                  requires_reply: requiresReply,
-                  email_classification: aiOutput.email_classification,
-                  status: status,
-                });
-              }
-              
-              // Now call email-triage-agent for decision bucket routing
-              try {
-                console.log('Calling email-triage-agent for decision routing...');
-                const triageResponse = await supabase.functions.invoke('email-triage-agent', {
-                  body: {
-                    email: {
-                      from_email: fromEmail,
-                      from_name: fromName,
-                      subject: subject,
-                      body: body.substring(0, 5000),
-                      to_email: originalRecipient,
-                    },
-                    workspace_id: config.workspace_id,
-                  }
-                });
-                
-                if (triageResponse.data && !triageResponse.error) {
-                  const triageOutput = triageResponse.data;
-                  console.log('Triage decision:', {
-                    bucket: triageOutput.decision?.bucket,
-                    confidence: triageOutput.decision?.confidence,
-                    why: triageOutput.decision?.why_this_needs_you,
-                    needs_review: triageOutput.needs_review,
-                  });
-                  
-                  // Update conversation with decision bucket
-                  const { error: bucketError } = await supabase
-                    .from('conversations')
-                    .update({
-                      decision_bucket: triageOutput.decision?.bucket || 'wait',
-                      why_this_needs_you: triageOutput.decision?.why_this_needs_you || null,
-                      triage_confidence: triageOutput.decision?.confidence || null,
-                      triage_reasoning: triageOutput.reasoning || null,
-                      cognitive_load: triageOutput.risk?.cognitive_load || 'low',
-                      risk_level: triageOutput.risk?.level || 'none',
-                      needs_review: triageOutput.needs_review || (triageOutput.decision?.confidence || 0) < 0.85,
-                      urgency: triageOutput.priority?.urgency || 'medium',
-                      urgency_reason: triageOutput.priority?.urgency_reason || null,
-                    })
-                    .eq('id', conversation.id);
-                  
-                  if (bucketError) {
-                    console.error('Error updating conversation with triage data:', bucketError);
-                  } else {
-                    console.log('Updated conversation with decision bucket:', triageOutput.decision?.bucket);
-                  }
-                } else {
-                  console.error('Triage agent error:', triageResponse.error);
-                  // Set a default bucket on error
-                  await supabase
-                    .from('conversations')
-                    .update({
-                      decision_bucket: 'act_now', // Safe default
-                      why_this_needs_you: 'Triage failed - needs review',
-                      needs_review: true,
-                    })
-                    .eq('id', conversation.id);
-                }
-              } catch (triageError) {
-                console.error('Email triage call failed (non-blocking):', triageError);
-                // Set a default bucket on exception
-                await supabase
-                  .from('conversations')
-                  .update({
-                    decision_bucket: 'act_now',
-                    why_this_needs_you: 'Triage error - needs review',
-                    needs_review: true,
-                  })
-                  .eq('id', conversation.id);
-              }
-            } else {
-              console.error('AI agent error:', aiResponse.error);
-            }
-          } catch (aiError) {
-            console.error('AI agent call failed (non-blocking):', aiError);
-          }
-        } else {
-          console.log('Skipping AI agent - no body content');
-        }
-
-        // NOTE: We no longer mark email as read on sync
-        // Emails will be marked as read when the conversation is resolved in BizzyBee
-        // This allows bi-directional sync with Gmail/Outlook
-        // await markEmailAsRead(config.access_token, message.id);
-
-      } catch (msgError) {
-        console.error('Error processing message:', msgError);
-      }
-    }
-
-    // Update last_sync_at and sync status
+    // =============================================
+    // COMPLETE
+    // =============================================
     await supabase
       .from('email_provider_configs')
       .update({ 
         last_sync_at: new Date().toISOString(),
         sync_status: 'completed',
+        sync_stage: 'complete',
         sync_completed_at: new Date().toISOString(),
-        sync_progress: messagesProcessed
+        sync_progress: inboundProcessed + outboundProcessed,
+        inbound_emails_found: inboundProcessed,
+        outbound_emails_found: outboundProcessed,
+        threads_linked: threadsLinked,
       })
       .eq('id', configId);
 
-    console.log('Sync complete. Processed', messagesProcessed, 'messages');
+    console.log('Sync complete:', { inboundProcessed, outboundProcessed, threadsLinked });
 
     return new Response(JSON.stringify({ 
       success: true, 
-      messagesProcessed,
+      inboundProcessed,
+      outboundProcessed,
+      threadsLinked,
       mode: syncMode
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -494,25 +532,6 @@ serve(async (req) => {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('Error in email-sync:', error);
     
-    // Update sync status to error if we have a configId
-    try {
-      const { configId } = await req.json().catch(() => ({}));
-      if (configId) {
-        const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-        const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-        const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-        await supabase
-          .from('email_provider_configs')
-          .update({ 
-            sync_status: 'error',
-            sync_error: errorMessage
-          })
-          .eq('id', configId);
-      }
-    } catch (e) {
-      console.error('Failed to update error status:', e);
-    }
-    
     return new Response(JSON.stringify({ error: errorMessage }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -520,24 +539,96 @@ serve(async (req) => {
   }
 });
 
-async function markEmailAsRead(accessToken: string, messageId: string) {
-  try {
-    console.log('Marking email as read:', messageId);
-    const response = await fetch(`https://api.aurinko.io/v1/email/messages/${messageId}`, {
-      method: 'PATCH',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ unread: false }),
-    });
-    
-    if (response.ok) {
-      console.log('Email marked as read successfully');
-    } else {
-      console.error('Failed to mark email as read:', response.status, await response.text());
+// Helper to strip quoted content from email replies
+function stripQuotedContent(text: string): string {
+  const lines = text.split('\n');
+  const cleanLines: string[] = [];
+  let hitQuoteMarker = false;
+
+  for (const line of lines) {
+    // Stop at common quote markers
+    if (line.match(/^On .+ wrote:$/i) || 
+        line.match(/^-{3,} Original Message -{3,}$/i) ||
+        line.match(/^>{2,}/) ||
+        line.match(/^From: .+@.+$/i)) {
+      hitQuoteMarker = true;
+      break;
     }
-  } catch (error) {
-    console.error('Error marking email as read:', error);
+    
+    // Skip lines that start with >
+    if (line.startsWith('>')) {
+      continue;
+    }
+    
+    cleanLines.push(line);
+  }
+
+  return cleanLines.join('\n').trim();
+}
+
+// Trigger AI triage asynchronously
+async function triggerAITriage(
+  supabase: any,
+  conversation: any,
+  body: string,
+  fromEmail: string,
+  fromName: string,
+  customer: any,
+  subject: string,
+  toEmail: string,
+  workspaceId: string
+) {
+  try {
+    // Call pre-triage-rules first
+    const preTriageResponse = await supabase.functions.invoke('pre-triage-rules', {
+      body: {
+        email: { from_email: fromEmail, from_name: fromName, subject, body: body.substring(0, 5000) },
+        workspace_id: workspaceId,
+      }
+    });
+
+    if (preTriageResponse.data?.matched && preTriageResponse.data?.skip_llm) {
+      const preTriage = preTriageResponse.data;
+      await supabase
+        .from('conversations')
+        .update({
+          email_classification: preTriage.classification,
+          decision_bucket: preTriage.decision_bucket,
+          requires_reply: preTriage.requires_reply,
+          triage_confidence: 1.0,
+          status: !preTriage.requires_reply ? 'resolved' : 'new',
+          resolved_at: !preTriage.requires_reply ? new Date().toISOString() : null,
+        })
+        .eq('id', conversation.id);
+      return;
+    }
+
+    // Call LLM-based triage
+    const triageResponse = await supabase.functions.invoke('email-triage-agent', {
+      body: {
+        email: { from_email: fromEmail, from_name: fromName, subject, body: body.substring(0, 5000), to_email: toEmail },
+        workspace_id: workspaceId,
+      }
+    });
+
+    if (triageResponse.data && !triageResponse.error) {
+      const triage = triageResponse.data;
+      await supabase
+        .from('conversations')
+        .update({
+          email_classification: triage.decision?.classification,
+          decision_bucket: triage.decision?.bucket || 'wait',
+          requires_reply: triage.decision?.requires_reply,
+          why_this_needs_you: triage.decision?.why_this_needs_you,
+          triage_confidence: triage.decision?.confidence,
+          ai_sentiment: triage.sentiment,
+          urgency: triage.priority?.urgency,
+          needs_review: (triage.decision?.confidence || 0) < 0.85,
+        })
+        .eq('id', conversation.id);
+    }
+
+  } catch (err) {
+    console.error('Triage error (non-blocking):', err);
   }
 }

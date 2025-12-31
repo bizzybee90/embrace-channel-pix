@@ -692,6 +692,54 @@ export type Database = {
           },
         ]
       }
+      draft_edits: {
+        Row: {
+          conversation_id: string | null
+          created_at: string | null
+          edit_distance: number | null
+          edit_type: string | null
+          edited_draft: string
+          id: string
+          original_draft: string
+          workspace_id: string | null
+        }
+        Insert: {
+          conversation_id?: string | null
+          created_at?: string | null
+          edit_distance?: number | null
+          edit_type?: string | null
+          edited_draft: string
+          id?: string
+          original_draft: string
+          workspace_id?: string | null
+        }
+        Update: {
+          conversation_id?: string | null
+          created_at?: string | null
+          edit_distance?: number | null
+          edit_type?: string | null
+          edited_draft?: string
+          id?: string
+          original_draft?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "draft_edits_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "draft_edits_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_provider_configs: {
         Row: {
           access_token: string | null
@@ -705,17 +753,22 @@ export type Database = {
           encryption_key_id: string | null
           id: string
           import_mode: string | null
+          inbound_emails_found: number | null
           last_sync_at: string | null
+          outbound_emails_found: number | null
           provider: string
           subscription_expires_at: string | null
           subscription_id: string | null
           sync_completed_at: string | null
           sync_error: string | null
           sync_progress: number | null
+          sync_stage: string | null
           sync_started_at: string | null
           sync_status: string | null
           sync_total: number | null
+          threads_linked: number | null
           updated_at: string | null
+          voice_profile_status: string | null
           workspace_id: string
         }
         Insert: {
@@ -730,17 +783,22 @@ export type Database = {
           encryption_key_id?: string | null
           id?: string
           import_mode?: string | null
+          inbound_emails_found?: number | null
           last_sync_at?: string | null
+          outbound_emails_found?: number | null
           provider: string
           subscription_expires_at?: string | null
           subscription_id?: string | null
           sync_completed_at?: string | null
           sync_error?: string | null
           sync_progress?: number | null
+          sync_stage?: string | null
           sync_started_at?: string | null
           sync_status?: string | null
           sync_total?: number | null
+          threads_linked?: number | null
           updated_at?: string | null
+          voice_profile_status?: string | null
           workspace_id: string
         }
         Update: {
@@ -755,17 +813,22 @@ export type Database = {
           encryption_key_id?: string | null
           id?: string
           import_mode?: string | null
+          inbound_emails_found?: number | null
           last_sync_at?: string | null
+          outbound_emails_found?: number | null
           provider?: string
           subscription_expires_at?: string | null
           subscription_id?: string | null
           sync_completed_at?: string | null
           sync_error?: string | null
           sync_progress?: number | null
+          sync_stage?: string | null
           sync_started_at?: string | null
           sync_status?: string | null
           sync_total?: number | null
+          threads_linked?: number | null
           updated_at?: string | null
+          voice_profile_status?: string | null
           workspace_id?: string
         }
         Relationships: [
@@ -1886,6 +1949,74 @@ export type Database = {
             foreignKeyName: "users_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      voice_profiles: {
+        Row: {
+          analysis_status: string | null
+          avg_response_length: number | null
+          common_phrases: Json | null
+          created_at: string | null
+          emails_analyzed: number | null
+          formality_score: number | null
+          greeting_patterns: Json | null
+          id: string
+          last_analyzed_at: string | null
+          outbound_emails_found: number | null
+          sample_responses: Json | null
+          signoff_patterns: Json | null
+          tone_descriptors: string[] | null
+          updated_at: string | null
+          uses_emojis: boolean | null
+          uses_exclamations: boolean | null
+          workspace_id: string | null
+        }
+        Insert: {
+          analysis_status?: string | null
+          avg_response_length?: number | null
+          common_phrases?: Json | null
+          created_at?: string | null
+          emails_analyzed?: number | null
+          formality_score?: number | null
+          greeting_patterns?: Json | null
+          id?: string
+          last_analyzed_at?: string | null
+          outbound_emails_found?: number | null
+          sample_responses?: Json | null
+          signoff_patterns?: Json | null
+          tone_descriptors?: string[] | null
+          updated_at?: string | null
+          uses_emojis?: boolean | null
+          uses_exclamations?: boolean | null
+          workspace_id?: string | null
+        }
+        Update: {
+          analysis_status?: string | null
+          avg_response_length?: number | null
+          common_phrases?: Json | null
+          created_at?: string | null
+          emails_analyzed?: number | null
+          formality_score?: number | null
+          greeting_patterns?: Json | null
+          id?: string
+          last_analyzed_at?: string | null
+          outbound_emails_found?: number | null
+          sample_responses?: Json | null
+          signoff_patterns?: Json | null
+          tone_descriptors?: string[] | null
+          updated_at?: string | null
+          uses_emojis?: boolean | null
+          uses_exclamations?: boolean | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "voice_profiles_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
             referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
