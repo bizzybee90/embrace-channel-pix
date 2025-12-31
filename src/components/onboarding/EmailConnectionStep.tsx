@@ -134,6 +134,14 @@ export function EmailConnectionStep({
           'width=600,height=700,left=200,top=100'
         );
         
+        // Check if popup was blocked
+        if (!popup || popup.closed || typeof popup.closed === 'undefined') {
+          toast.error('Popup blocked! Please allow popups for this site, or click the link to open in a new tab.');
+          // Fallback: redirect in same window
+          window.location.href = data.authUrl;
+          return;
+        }
+        
         // Poll for completion
         const pollInterval = setInterval(async () => {
           if (popup?.closed) {
