@@ -293,7 +293,6 @@ OUTPUT FORMAT (JSON array only, no other text):
             answer: faq.answer,
             category: faq.category || 'general',
             keywords: faq.tags || [],
-            metadata: { source: 'website_scrape', url: formattedUrl },
             embedding: embData.data[0].embedding,
             workspace_id: workspaceId,
             is_own_content: true,
@@ -303,9 +302,7 @@ OUTPUT FORMAT (JSON array only, no other text):
             generation_source: 'website_scrape',
             priority: 10,
             is_active: true,
-            enabled: true,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
+            enabled: true
           });
         }
       } catch (e) {
