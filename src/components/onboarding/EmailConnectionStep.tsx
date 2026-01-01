@@ -118,10 +118,6 @@ export function EmailConnectionStep({
     syncStartedAt?: string | null;
     syncError?: string | null;
   } | null>(null);
-  
-  // Track processing rate for time estimate
-  const rateHistoryRef = useRef<{ count: number; time: number }[]>([]);
-  const [estimatedMinutesLeft, setEstimatedMinutesLeft] = useState<number | null>(null);
 
   const [onboardingProgress, setOnboardingProgress] = useState<{
     emailImportStatus: string;
@@ -278,33 +274,6 @@ export function EmailConnectionStep({
           if (next.progress !== lastProgressRef.current.progress) {
             lastProgressRef.current = { progress: next.progress, at: Date.now() };
           }
-          
-          // Update rate history for time estimation (only during active sync)
-          if (next.status === 'syncing' && next.inboundFound > 0) {
-            const now = Date.now();
-            rateHistoryRef.current.push({ count: next.inboundFound, time: now });
-            // Keep only last 10 data points for a rolling average
-            if (rateHistoryRef.current.length > 10) {
-              rateHistoryRef.current.shift();
-            }
-            // Calculate rate if we have at least 2 data points
-            if (rateHistoryRef.current.length >= 2) {
-              const oldest = rateHistoryRef.current[0];
-              const newest = rateHistoryRef.current[rateHistoryRef.current.length - 1];
-              const emailsDelta = newest.count - oldest.count;
-              const timeDeltaMs = newest.time - oldest.time;
-              if (timeDeltaMs > 0 && emailsDelta > 0) {
-                const emailsPerMinute = (emailsDelta / timeDeltaMs) * 60000;
-                // Estimate remaining based on typical inbox patterns
-                // If we've processed X emails in Y minutes, estimate we're ~60-80% done
-                // (most inboxes taper off as we go back in time)
-                const estimatedTotal = next.inboundFound * 1.3; // Assume ~30% more to go
-                const remaining = estimatedTotal - next.inboundFound;
-                const minutesLeft = remaining / emailsPerMinute;
-                setEstimatedMinutesLeft(Math.max(1, Math.round(minutesLeft)));
-              }
-            }
-          }
         }
 
         if (!connectedEmail) {
@@ -396,35 +365,6 @@ export function EmailConnectionStep({
 
           if (next.progress !== lastProgressRef.current.progress) {
             lastProgressRef.current = { progress: next.progress, at: Date.now() };
-          }
-          
-          // Update rate history for time estimation (only during active sync)
-          if (next.status === 'syncing' && next.inboundFound > 0) {
-            const now = Date.now();
-            rateHistoryRef.current.push({ count: next.inboundFound, time: now });
-            // Keep only last 10 data points for a rolling average
-            if (rateHistoryRef.current.length > 10) {
-              rateHistoryRef.current.shift();
-            }
-            // Calculate rate if we have at least 2 data points
-            if (rateHistoryRef.current.length >= 2) {
-              const oldest = rateHistoryRef.current[0];
-              const newest = rateHistoryRef.current[rateHistoryRef.current.length - 1];
-              const emailsDelta = newest.count - oldest.count;
-              const timeDeltaMs = newest.time - oldest.time;
-              if (timeDeltaMs > 0 && emailsDelta > 0) {
-                const emailsPerMinute = (emailsDelta / timeDeltaMs) * 60000;
-                // Estimate remaining based on typical inbox patterns
-                // If we've processed X emails in Y minutes, estimate we're ~60-80% done
-                // (most inboxes taper off as we go back in time)
-                const estimatedTotal = next.inboundFound * 1.3; // Assume ~30% more to go
-                const remaining = estimatedTotal - next.inboundFound;
-                const minutesLeft = remaining / emailsPerMinute;
-                setEstimatedMinutesLeft(Math.max(1, Math.round(minutesLeft)));
-              }
-            }
-          } else if (next.status === 'completed') {
-            setEstimatedMinutesLeft(null);
           }
 
           // Stop polling when complete
@@ -593,21 +533,13 @@ export function EmailConnectionStep({
                 </div>
               )}
 
-              {/* Live activity indicator with time estimate */}
+              {/* Live activity indicator */}
               <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
                 <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
                 </span>
-                <span>
-                  Actively syncing
-                  {estimatedMinutesLeft != null && estimatedMinutesLeft > 0 && (
-                    <> · ~{estimatedMinutesLeft < 60 
-                      ? `${estimatedMinutesLeft} min left` 
-                      : `${Math.round(estimatedMinutesLeft / 60)} hour${Math.round(estimatedMinutesLeft / 60) !== 1 ? 's' : ''} left`
-                    }</>
-                  )}
-                </span>
+                <span>Actively syncing</span>
               </div>
 
               <div className="text-center space-y-1">
