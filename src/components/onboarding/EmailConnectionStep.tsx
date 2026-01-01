@@ -104,7 +104,6 @@ export function EmailConnectionStep({
   const [importMode, setImportMode] = useState<ImportMode>('last_1000');
   const [checkingConnection, setCheckingConnection] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
-  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
   const [syncStatus, setSyncStatus] = useState<{
     status: string;
     stage: string;
@@ -270,7 +269,6 @@ export function EmailConnectionStep({
           };
 
           setSyncStatus(next);
-          setLastUpdatedAt(new Date());
 
           // Track last progress movement to detect stalls
           if (next.progress !== lastProgressRef.current.progress) {
@@ -364,7 +362,6 @@ export function EmailConnectionStep({
           };
 
           setSyncStatus(next);
-          setLastUpdatedAt(new Date());
 
           if (next.progress !== lastProgressRef.current.progress) {
             lastProgressRef.current = { progress: next.progress, at: Date.now() };
@@ -542,12 +539,7 @@ export function EmailConnectionStep({
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
                 </span>
-                <span>
-                  Actively syncing
-                  {lastUpdatedAt && (
-                    <> · updated {Math.round((Date.now() - lastUpdatedAt.getTime()) / 1000)}s ago</>
-                  )}
-                </span>
+                <span>Actively syncing</span>
               </div>
 
               <div className="text-center space-y-1">
