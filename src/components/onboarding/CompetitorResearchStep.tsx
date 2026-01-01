@@ -34,10 +34,25 @@ export function CompetitorResearchStep({
   onComplete, 
   onBack 
 }: CompetitorResearchStepProps) {
+  const draftKey = `bizzybee:onboarding:${workspaceId}:competitorDraft`;
+
+  const readDraft = () => {
+    try {
+      const raw = localStorage.getItem(draftKey);
+      return raw
+        ? (JSON.parse(raw) as { nicheQuery?: string; serviceArea?: string; targetCount?: number })
+        : {};
+    } catch {
+      return {};
+    }
+  };
+
+  const draft = readDraft();
+
   const [status, setStatus] = useState<Status>('idle');
-  const [nicheQuery, setNicheQuery] = useState(businessContext.businessType || '');
-  const [serviceArea, setServiceArea] = useState(businessContext.serviceArea || '');
-  const [targetCount, setTargetCount] = useState(100);
+  const [nicheQuery, setNicheQuery] = useState(draft.nicheQuery ?? businessContext.businessType ?? '');
+  const [serviceArea, setServiceArea] = useState(draft.serviceArea ?? businessContext.serviceArea ?? '');
+  const [targetCount, setTargetCount] = useState(draft.targetCount ?? 100);
   const [jobId, setJobId] = useState<string | null>(null);
   const [progress, setProgress] = useState({
     sitesDiscovered: 0,
@@ -48,6 +63,19 @@ export function CompetitorResearchStep({
     currentSite: null as string | null,
   });
   const [error, setError] = useState<string | null>(null);
+
+  // Persist form inputs so Back/refresh doesn't wipe them
+  useEffect(() => {
+    if (status !== 'idle') return;
+    try {
+      localStorage.setItem(
+        draftKey,
+        JSON.stringify({ nicheQuery, serviceArea, targetCount, updatedAt: Date.now() })
+      );
+    } catch {
+      // ignore
+    }
+  }, [draftKey, nicheQuery, serviceArea, targetCount, status]);
 
   // Poll for job progress
   useEffect(() => {
