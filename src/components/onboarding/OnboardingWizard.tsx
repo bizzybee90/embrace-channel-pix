@@ -6,6 +6,7 @@ import { BusinessContextStep } from './BusinessContextStep';
 import { KnowledgeBaseStep } from './KnowledgeBaseStep';
 import { SenderRecognitionStep } from './SenderRecognitionStep';
 import { InboxLearningStep } from './InboxLearningStep';
+import { ReviewLearningStep } from './ReviewLearningStep';
 import { AutomationLevelStep } from './AutomationLevelStep';
 import { EmailConnectionStep } from './EmailConnectionStep';
 import { CompetitorResearchStep } from './CompetitorResearchStep';
@@ -18,9 +19,9 @@ interface OnboardingWizardProps {
   onComplete: () => void;
 }
 
-type Step = 'welcome' | 'email' | 'business' | 'knowledge' | 'competitors' | 'senders' | 'triage' | 'automation' | 'complete';
+type Step = 'welcome' | 'email' | 'business' | 'knowledge' | 'competitors' | 'senders' | 'triage' | 'review' | 'automation' | 'complete';
 
-const STEPS: Step[] = ['welcome', 'email', 'business', 'knowledge', 'competitors', 'senders', 'triage', 'automation', 'complete'];
+const STEPS: Step[] = ['welcome', 'email', 'business', 'knowledge', 'competitors', 'senders', 'triage', 'review', 'automation', 'complete'];
 
 export function OnboardingWizard({ workspaceId, onComplete }: OnboardingWizardProps) {
   const [currentStep, setCurrentStep] = useState<Step>('welcome');
@@ -220,6 +221,14 @@ export function OnboardingWizard({ workspaceId, onComplete }: OnboardingWizardPr
                 setTriageResults({ processed: results.emailsAnalyzed, changed: results.patternsLearned });
                 handleNext();
               }}
+              onBack={handleBack}
+            />
+          )}
+
+          {currentStep === 'review' && (
+            <ReviewLearningStep
+              workspaceId={workspaceId}
+              onComplete={handleNext}
               onBack={handleBack}
             />
           )}
