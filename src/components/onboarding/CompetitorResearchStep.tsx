@@ -113,8 +113,8 @@ export function CompetitorResearchStep({
 
       setJobId(job.id);
 
-      // Start the discovery process
-      const { error: invokeError } = await supabase.functions.invoke('competitor-discover', {
+      // Start the discovery process using smart Gemini-powered discovery
+      const { error: invokeError } = await supabase.functions.invoke('competitor-discover-smart', {
         body: {
           jobId: job.id,
           workspaceId,
