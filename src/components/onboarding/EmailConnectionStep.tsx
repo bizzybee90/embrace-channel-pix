@@ -305,10 +305,10 @@ export function EmailConnectionStep({
 
   // Check on mount and poll for sync progress
   useEffect(() => {
+    // Always check for an existing connection on mount (restores state when navigating back)
+    checkEmailConnection();
+
     const pending = localStorage.getItem('onboarding_email_pending') === 'true';
-    if (pending) {
-      checkEmailConnection();
-    }
 
     // While connecting, keep checking in case the OAuth flow redirected in-tab
     // (popup not closed => previous polling never fires).
