@@ -56,45 +56,51 @@ serve(async (req) => {
       console.log('Could not get email count:', e);
     }
 
-    // Create a new resumable sync job (idempotent: if a running job exists, reuse it)
-    const { data: existingJob } = await supabase
+    // IMPORTANT: Reset counts on the config to prevent accumulation
+    // This ensures each sync starts fresh
+    await supabase
+      .from("email_provider_configs")
+      .update({
+        inbound_emails_found: 0,
+        outbound_emails_found: 0,
+        threads_linked: 0,
+        sync_progress: 0,
+      })
+      .eq("id", configId);
+
+    // Cancel any existing queued/running jobs for this config
+    await supabase
       .from("email_sync_jobs")
-      .select("id, status")
+      .update({ status: "cancelled" })
       .eq("config_id", configId)
-      .in("status", ["queued", "running"])
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .in("status", ["queued", "running"]);
 
-    let jobId = existingJob?.id as string | undefined;
+    // Always create a fresh sync job
+    const { data: newJob, error: jobError } = await supabase
+      .from("email_sync_jobs")
+      .insert({
+        workspace_id: config.workspace_id,
+        config_id: configId,
+        status: "queued",
+        import_mode: importMode,
+        inbound_cursor: "START",
+        sent_cursor: "START",
+        inbound_processed: 0,
+        sent_processed: 0,
+        threads_linked: 0,
+        started_at: new Date().toISOString(),
+      })
+      .select("id")
+      .single();
 
-    if (!jobId) {
-      const { data: newJob, error: jobError } = await supabase
-        .from("email_sync_jobs")
-        .insert({
-          workspace_id: config.workspace_id,
-          config_id: configId,
-          status: "queued",
-          import_mode: importMode,
-          inbound_cursor: "START",
-          sent_cursor: "START",
-          inbound_processed: 0,
-          sent_processed: 0,
-          threads_linked: 0,
-          started_at: new Date().toISOString(),
-        })
-        .select("id")
-        .single();
-
-      if (jobError || !newJob) {
-        return new Response(JSON.stringify({ error: "Failed to create sync job" }), {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      jobId = newJob.id;
+    if (jobError || !newJob) {
+      return new Response(JSON.stringify({ error: "Failed to create sync job" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
+
+    const jobId = newJob.id;
 
     // Update UI-facing status with total count
     await supabase

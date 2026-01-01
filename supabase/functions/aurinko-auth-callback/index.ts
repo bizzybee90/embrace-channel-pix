@@ -15,88 +15,85 @@ const redirectTo = (baseUrl: string, path: string, params?: Record<string, strin
 };
 
 const getStyledHTML = (type: 'cancelled' | 'error' | 'success', message?: string, origin?: string) => {
-  const errorDetail = message ? `<div class="error-detail">${message}</div>` : '';
-  const errorPostMessage = type === 'error' && message ? `, error: '${message.replace(/'/g, "\\'")}'` : '';
+  const errorDetail = message ? `<div class="error-detail">${escapeHtml(message)}</div>` : '';
+  const errorPostMessage = type === 'error' && message ? `, error: '${message.replace(/'/g, "\\'").replace(/\n/g, ' ')}'` : '';
+  const appUrl = origin ? `${origin}/onboarding?step=email` : '/onboarding?step=email';
   
+  const titles: Record<string, string> = {
+    success: 'Connected!',
+    cancelled: 'Cancelled',
+    error: 'Error'
+  };
+  
+  const icons: Record<string, string> = {
+    success: '&#10003;',  // checkmark
+    cancelled: '&#10005;', // X
+    error: '&#9888;'       // warning
+  };
+  
+  const iconClasses: Record<string, string> = {
+    success: 'success-icon',
+    cancelled: '',
+    error: 'error-icon'
+  };
+  
+  const headings: Record<string, string> = {
+    success: 'Email Connected!',
+    cancelled: 'Connection Cancelled',
+    error: 'Connection Failed'
+  };
+  
+  const descriptions: Record<string, string> = {
+    success: 'Closing automatically...',
+    cancelled: 'No worries! You can connect your email anytime.',
+    error: ''
+  };
+
   return `<!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${type === 'success' ? 'Connected!' : type === 'cancelled' ? 'Cancelled' : 'Error'}</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { 
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      display: flex; align-items: center; justify-content: center;
-      min-height: 100vh;
-      background: linear-gradient(135deg, hsl(45, 100%, 52%) 0%, hsl(217, 91%, 60%) 100%);
-    }
-    .card {
-      background: white; padding: 48px; border-radius: 16px;
-      box-shadow: 0 10px 40px rgba(0,0,0,0.15);
-      text-align: center; max-width: 400px; margin: 20px;
-    }
-    .icon { font-size: 48px; margin-bottom: 16px; }
-    h2 { color: #1a1a1a; margin-bottom: 12px; font-size: 24px; font-weight: 600; }
-    p { color: #666; margin-bottom: 24px; line-height: 1.5; font-size: 14px; }
-    .error-detail { 
-      background: #fef2f2; color: #991b1b; padding: 12px 16px; 
-      border-radius: 8px; margin-bottom: 24px; font-size: 13px;
-      word-break: break-word;
-    }
-    .closing { color: #3b82f6; font-weight: 500; }
-    button {
-      background: hsl(217, 91%, 60%); color: white; border: none;
-      padding: 12px 32px; border-radius: 8px; cursor: pointer;
-      font-size: 14px; font-weight: 500; transition: background 0.2s;
-    }
-    button:hover { background: hsl(217, 91%, 50%); }
-    .success-icon { color: #22c55e; }
-    .error-icon { color: #ef4444; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${titles[type]}</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;background:linear-gradient(135deg,#f5a623 0%,#3b82f6 100%)}
+.card{background:#fff;padding:48px;border-radius:16px;box-shadow:0 10px 40px rgba(0,0,0,.15);text-align:center;max-width:400px;margin:20px}
+.icon{font-size:48px;margin-bottom:16px}
+h2{color:#1a1a1a;margin-bottom:12px;font-size:24px;font-weight:600}
+p{color:#666;margin-bottom:24px;line-height:1.5;font-size:14px}
+.error-detail{background:#fef2f2;color:#991b1b;padding:12px 16px;border-radius:8px;margin-bottom:24px;font-size:13px;word-break:break-word}
+.closing{color:#3b82f6;font-weight:500}
+button{background:#3b82f6;color:#fff;border:none;padding:12px 32px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:500;transition:background .2s}
+button:hover{background:#2563eb}
+.success-icon{color:#22c55e}
+.error-icon{color:#ef4444}
+</style>
 </head>
 <body>
-  <div class="card">
-    ${type === 'success' ? `
-      <div class="icon success-icon">✓</div>
-      <h2>Email Connected!</h2>
-      <p class="closing">Closing automatically...</p>
-    ` : type === 'cancelled' ? `
-      <div class="icon">✖️</div>
-      <h2>Connection Cancelled</h2>
-      <p>No worries! You can connect your email anytime.</p>
-    ` : `
-      <div class="icon error-icon">⚠️</div>
-      <h2>Connection Failed</h2>
-      ${errorDetail}
-    `}
-    ${type !== 'success' ? `<button onclick="goBack()">Return to App</button>` : ''}
-  </div>
-  <script>
-    var appUrl = '${origin || ''}' + '/onboarding?step=email';
-    function goBack() {
-      if (window.opener) {
-        window.opener.postMessage({ type: 'aurinko-auth-${type}'${errorPostMessage} }, '*');
-        try { window.close(); } catch(e) {}
-      }
-      window.location.href = appUrl;
-    }
-    ${type === 'success' ? `
-    // Immediately notify parent and close
-    (function() {
-      if (window.opener) {
-        window.opener.postMessage({ type: 'aurinko-auth-success' }, '*');
-        try { window.close(); } catch(e) {}
-      }
-      // Fallback redirect if window didn't close
-      setTimeout(function() { window.location.href = appUrl; }, 1000);
-    })();
-    ` : ''}
-  </script>
+<div class="card">
+<div class="icon ${iconClasses[type]}">${icons[type]}</div>
+<h2>${headings[type]}</h2>
+${type === 'error' ? errorDetail : `<p class="${type === 'success' ? 'closing' : ''}">${descriptions[type]}</p>`}
+${type !== 'success' ? '<button onclick="goBack()">Return to App</button>' : ''}
+</div>
+<script>
+var appUrl='${appUrl}';
+function goBack(){if(window.opener){window.opener.postMessage({type:'aurinko-auth-${type}'${errorPostMessage}},'*');try{window.close()}catch(e){}}window.location.href=appUrl}
+${type === 'success' ? `(function(){if(window.opener){window.opener.postMessage({type:'aurinko-auth-success'},'*');try{window.close()}catch(e){}}setTimeout(function(){window.location.href=appUrl},1500)})();` : ''}
+</script>
 </body>
 </html>`;
 };
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
 
 const htmlHeaders = {
   'Content-Type': 'text/html; charset=utf-8',
