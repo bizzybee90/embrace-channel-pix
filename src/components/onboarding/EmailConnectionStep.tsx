@@ -208,7 +208,7 @@ export function EmailConnectionStep({
         .eq('workspace_id', workspaceId)
         .order('created_at', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
 
