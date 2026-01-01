@@ -56,18 +56,6 @@ serve(async (req) => {
       console.log('Could not get email count:', e);
     }
 
-    // IMPORTANT: Reset counts on the config to prevent accumulation
-    // This ensures each sync starts fresh
-    await supabase
-      .from("email_provider_configs")
-      .update({
-        inbound_emails_found: 0,
-        outbound_emails_found: 0,
-        threads_linked: 0,
-        sync_progress: 0,
-      })
-      .eq("id", configId);
-
     // Cancel any existing queued/running jobs for this config
     await supabase
       .from("email_sync_jobs")
@@ -101,6 +89,34 @@ serve(async (req) => {
     }
 
     const jobId = newJob.id;
+
+    // CRITICAL: Set this job as the ACTIVE job and reset counters
+    // This prevents race conditions with parallel jobs
+    await supabase
+      .from("email_provider_configs")
+      .update({
+        active_job_id: jobId,
+        inbound_emails_found: 0,
+        outbound_emails_found: 0,
+        threads_linked: 0,
+        sync_progress: 0,
+      })
+      .eq("id", configId);
+
+    // Also create/update onboarding progress record
+    await supabase
+      .from("onboarding_progress")
+      .upsert({
+        workspace_id: config.workspace_id,
+        email_import_status: "running",
+        email_import_progress: 0,
+        email_import_count: 0,
+        thread_matching_status: "pending",
+        categorization_status: "pending",
+        style_analysis_status: "pending",
+        few_shot_status: "pending",
+        started_at: new Date().toISOString(),
+      }, { onConflict: "workspace_id" });
 
     // Update UI-facing status with total count
     await supabase

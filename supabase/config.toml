@@ -152,3 +152,12 @@ verify_jwt = false
 
 [functions.competitor-discover-smart]
 verify_jwt = false
+
+[functions.match-email-threads]
+verify_jwt = false
+
+[functions.categorize-email-pairs]
+verify_jwt = false
+
+[functions.build-few-shot-library]
+verify_jwt = false

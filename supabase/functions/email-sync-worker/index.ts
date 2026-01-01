@@ -58,6 +58,23 @@ serve(async (req) => {
       });
     }
 
+    // CRITICAL: Check if this job is still the active job for this config
+    // If not, another sync has been started and this job should exit
+    if (config.active_job_id && config.active_job_id !== jobId) {
+      console.log('[Worker] Job superseded by newer job, exiting', { 
+        thisJob: jobId, 
+        activeJob: config.active_job_id 
+      });
+      await supabase.from('email_sync_jobs').update({ 
+        status: 'cancelled',
+        error_message: 'Superseded by newer sync job'
+      }).eq('id', jobId);
+      return new Response(JSON.stringify({ cancelled: true, reason: 'superseded' }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
     // Mark job as running
     await supabase.from('email_sync_jobs').update({ 
       status: 'running',
@@ -427,16 +444,22 @@ serve(async (req) => {
 
       await supabase.from('email_provider_configs').update({
         sync_status: 'completed',
-        sync_stage: 'complete',
+        sync_stage: 'matching_threads',
         sync_completed_at: new Date().toISOString(),
       }).eq('id', configId);
 
-      // Trigger voice profile analysis if we have enough sent emails
-      if (sentProcessed >= 10) {
-        supabase.functions.invoke('analyze-voice-profile', {
-          body: { workspace_id: config.workspace_id }
-        }).catch(err => console.error('Voice analysis failed:', err));
-      }
+      // Update onboarding progress
+      await supabase.from('onboarding_progress').update({
+        email_import_status: 'completed',
+        email_import_count: inboundProcessed + sentProcessed,
+        thread_matching_status: 'running',
+      }).eq('workspace_id', config.workspace_id);
+
+      // Trigger thread matching (Phase 2 of training)
+      console.log('Starting thread matching phase...');
+      supabase.functions.invoke('match-email-threads', {
+        body: { workspace_id: config.workspace_id }
+      }).catch(err => console.error('Thread matching failed:', err));
 
     } else if (needsContinuation) {
       // Schedule next batch (self-invoke)
