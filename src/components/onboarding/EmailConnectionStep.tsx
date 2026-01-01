@@ -188,9 +188,29 @@ export function EmailConnectionStep({
         localStorage.setItem('onboarding_workspace_id', workspaceId);
         localStorage.setItem('onboarding_import_mode', importMode);
 
-        // Use direct navigation instead of popup for better Safari/COOP compatibility
-        // The callback will redirect back to /onboarding with status params
-        window.location.href = data.authUrl;
+        // In embedded previews (iframe), Google blocks the auth UI and shows a 403.
+        // Open OAuth in a new tab so it runs in a top-level browsing context.
+        const isEmbedded = (() => {
+          try {
+            return window.self !== window.top;
+          } catch {
+            return true;
+          }
+        })();
+
+        if (isEmbedded) {
+          const popup = window.open(data.authUrl, '_blank', 'noopener,noreferrer');
+          if (!popup) {
+            toast.error('Popup blocked — please allow popups and try again.');
+            setIsConnecting(false);
+            return;
+          }
+          toast.message('Complete the email connection in the new tab, then come back here.');
+          // Keep isConnecting=true so we keep polling for the connection.
+        } else {
+          // Direct navigation for normal (non-iframe) environments.
+          window.location.href = data.authUrl;
+        }
       }
     } catch (error) {
       console.error('Error starting OAuth:', error);
