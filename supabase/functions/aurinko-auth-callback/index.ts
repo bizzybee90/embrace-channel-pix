@@ -1,4 +1,3 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // Redirect helper that uses origin from state
@@ -95,13 +94,14 @@ function escapeHtml(text: string): string {
     .replace(/'/g, '&#039;');
 }
 
-const htmlHeaders = {
-  'Content-Type': 'text/html; charset=utf-8',
-  'Cache-Control': 'no-cache, no-store, must-revalidate',
-  'X-Content-Type-Options': 'nosniff',
-};
+const htmlHeaders = new Headers({
+  // NOTE: Some gateways will coerce unknown/unsafe content types.
+  // Using lowercase header name + explicit html helps ensure browsers render this page.
+  'content-type': 'text/html; charset=utf-8',
+  'cache-control': 'no-cache, no-store, must-revalidate',
+});
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   try {
     const url = new URL(req.url);
     const code = url.searchParams.get('code');
