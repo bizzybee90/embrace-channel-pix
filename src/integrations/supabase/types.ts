@@ -1079,9 +1079,12 @@ export type Database = {
           id: string
           import_mode: string | null
           inbound_emails_found: number | null
+          inbound_total: number | null
           last_sync_at: string | null
           outbound_emails_found: number | null
+          outbound_total: number | null
           provider: string
+          refresh_token: string | null
           subscription_expires_at: string | null
           subscription_id: string | null
           sync_completed_at: string | null
@@ -1092,6 +1095,7 @@ export type Database = {
           sync_status: string | null
           sync_total: number | null
           threads_linked: number | null
+          token_expires_at: string | null
           updated_at: string | null
           voice_profile_status: string | null
           workspace_id: string
@@ -1110,9 +1114,12 @@ export type Database = {
           id?: string
           import_mode?: string | null
           inbound_emails_found?: number | null
+          inbound_total?: number | null
           last_sync_at?: string | null
           outbound_emails_found?: number | null
+          outbound_total?: number | null
           provider: string
+          refresh_token?: string | null
           subscription_expires_at?: string | null
           subscription_id?: string | null
           sync_completed_at?: string | null
@@ -1123,6 +1130,7 @@ export type Database = {
           sync_status?: string | null
           sync_total?: number | null
           threads_linked?: number | null
+          token_expires_at?: string | null
           updated_at?: string | null
           voice_profile_status?: string | null
           workspace_id: string
@@ -1141,9 +1149,12 @@ export type Database = {
           id?: string
           import_mode?: string | null
           inbound_emails_found?: number | null
+          inbound_total?: number | null
           last_sync_at?: string | null
           outbound_emails_found?: number | null
+          outbound_total?: number | null
           provider?: string
+          refresh_token?: string | null
           subscription_expires_at?: string | null
           subscription_id?: string | null
           sync_completed_at?: string | null
@@ -1154,6 +1165,7 @@ export type Database = {
           sync_status?: string | null
           sync_total?: number | null
           threads_linked?: number | null
+          token_expires_at?: string | null
           updated_at?: string | null
           voice_profile_status?: string | null
           workspace_id?: string

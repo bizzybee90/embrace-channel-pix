@@ -111,6 +111,8 @@ export function EmailConnectionStep({
     total: number;
     inboundFound: number;
     outboundFound: number;
+    inboundTotal: number;
+    outboundTotal: number;
     threadsLinked: number;
     voiceProfileStatus: string;
     activeJobId?: string | null;
@@ -166,7 +168,10 @@ export function EmailConnectionStep({
     popupRef.current = null;
 
     try {
-      const { data, error } = await supabase.functions.invoke('aurinko-auth-start', {
+      // Use Gmail direct API for Gmail, Aurinko for others
+      const authEndpoint = provider === 'gmail' ? 'gmail-auth-start' : 'aurinko-auth-start';
+      
+      const { data, error } = await supabase.functions.invoke(authEndpoint, {
         body: {
           workspaceId,
           provider,
@@ -230,7 +235,7 @@ export function EmailConnectionStep({
     try {
       const { data, error } = await supabase
         .from('email_provider_configs')
-        .select('id, import_mode, email_address, sync_status, sync_stage, sync_progress, sync_total, inbound_emails_found, outbound_emails_found, threads_linked, voice_profile_status, last_sync_at, sync_started_at, sync_error, active_job_id')
+        .select('id, import_mode, email_address, sync_status, sync_stage, sync_progress, sync_total, inbound_emails_found, outbound_emails_found, inbound_total, outbound_total, threads_linked, voice_profile_status, last_sync_at, sync_started_at, sync_error, active_job_id')
         .eq('workspace_id', workspaceId)
         .order('created_at', { ascending: false })
         .limit(1)
@@ -260,6 +265,8 @@ export function EmailConnectionStep({
             total: data.sync_total || 0,
             inboundFound: data.inbound_emails_found || 0,
             outboundFound: data.outbound_emails_found || 0,
+            inboundTotal: data.inbound_total || 0,
+            outboundTotal: data.outbound_total || 0,
             threadsLinked: data.threads_linked || 0,
             voiceProfileStatus: data.voice_profile_status || 'pending',
             activeJobId: data.active_job_id || null,
@@ -333,7 +340,7 @@ export function EmailConnectionStep({
         const [configResult, progressResult] = await Promise.all([
           supabase
             .from('email_provider_configs')
-            .select('sync_status, sync_stage, sync_progress, sync_total, inbound_emails_found, outbound_emails_found, threads_linked, voice_profile_status, last_sync_at, sync_started_at, sync_error, active_job_id')
+            .select('sync_status, sync_stage, sync_progress, sync_total, inbound_emails_found, outbound_emails_found, inbound_total, outbound_total, threads_linked, voice_profile_status, last_sync_at, sync_started_at, sync_error, active_job_id')
             .eq('workspace_id', workspaceId)
             .order('created_at', { ascending: false })
             .limit(1)
@@ -353,6 +360,8 @@ export function EmailConnectionStep({
             total: configResult.data.sync_total || 0,
             inboundFound: configResult.data.inbound_emails_found || 0,
             outboundFound: configResult.data.outbound_emails_found || 0,
+            inboundTotal: configResult.data.inbound_total || 0,
+            outboundTotal: configResult.data.outbound_total || 0,
             threadsLinked: configResult.data.threads_linked || 0,
             voiceProfileStatus: configResult.data.voice_profile_status || 'pending',
             activeJobId: configResult.data.active_job_id || null,
@@ -503,31 +512,51 @@ export function EmailConnectionStep({
                 </span>
               </div>
 
-              {/* Always show email counts */}
+              {/* Always show email counts with real progress */}
               <div className="grid grid-cols-2 gap-3 text-xs">
                 <div className="bg-background/50 rounded p-2">
                   <div className="font-semibold text-foreground flex items-center gap-1">
                     {syncStatus.inboundFound.toLocaleString()}
+                    {syncStatus.inboundTotal > 0 && (
+                      <span className="text-muted-foreground">/ {syncStatus.inboundTotal.toLocaleString()}</span>
+                    )}
                     {syncStatus.stage === 'fetching_inbox' && (
                       <span className="text-muted-foreground animate-pulse">+</span>
                     )}
                   </div>
                   <div className="text-muted-foreground">
-                    Inbox emails {syncStatus.stage === 'fetching_inbox' ? 'scanned' : ''}
+                    Inbox emails {syncStatus.inboundTotal > 0 && syncStatus.stage === 'fetching_inbox' 
+                      ? `(${Math.round((syncStatus.inboundFound / syncStatus.inboundTotal) * 100)}%)` 
+                      : syncStatus.stage === 'fetching_inbox' ? 'scanned' : ''}
                   </div>
                 </div>
                 <div className="bg-background/50 rounded p-2">
                   <div className="font-semibold text-foreground flex items-center gap-1">
                     {syncStatus.outboundFound.toLocaleString()}
+                    {syncStatus.outboundTotal > 0 && (
+                      <span className="text-muted-foreground">/ {syncStatus.outboundTotal.toLocaleString()}</span>
+                    )}
                     {syncStatus.stage === 'fetching_sent' && (
                       <span className="text-muted-foreground animate-pulse">+</span>
                     )}
                   </div>
                   <div className="text-muted-foreground">
-                    Sent emails {syncStatus.stage === 'fetching_sent' ? 'scanned' : syncStatus.stage === 'fetching_inbox' ? '(next)' : ''}
+                    Sent emails {syncStatus.outboundTotal > 0 && syncStatus.stage === 'fetching_sent'
+                      ? `(${Math.round((syncStatus.outboundFound / syncStatus.outboundTotal) * 100)}%)`
+                      : syncStatus.stage === 'fetching_sent' ? 'scanned' : syncStatus.stage === 'fetching_inbox' ? '(next)' : ''}
                   </div>
                 </div>
               </div>
+
+              {/* Real progress bar when totals are available */}
+              {syncStatus.total > 0 && (syncStatus.stage === 'fetching_inbox' || syncStatus.stage === 'fetching_sent') && (
+                <div className="space-y-1">
+                  <Progress value={syncStatus.progress} className="h-2" />
+                  <p className="text-xs text-center text-muted-foreground">
+                    {syncStatus.progress}% complete
+                  </p>
+                </div>
+              )}
 
               {/* Insights preview when available */}
               {onboardingProgress?.responseRatePercent != null && (

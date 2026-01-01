@@ -161,3 +161,12 @@ verify_jwt = false
 
 [functions.build-few-shot-library]
 verify_jwt = false
+
+[functions.gmail-auth-start]
+verify_jwt = false
+
+[functions.gmail-auth-callback]
+verify_jwt = false
+
+[functions.gmail-sync-worker]
+verify_jwt = false
