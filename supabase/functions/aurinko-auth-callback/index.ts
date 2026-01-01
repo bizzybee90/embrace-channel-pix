@@ -18,14 +18,7 @@ const buildRedirectUrl = (
   type: 'cancelled' | 'error' | 'success',
   message?: string
 ) => {
-  // For success, redirect to a dedicated success page
-  if (type === 'success') {
-    const url = new URL('/email-auth-success', origin);
-    url.searchParams.set('aurinko', 'success');
-    return url.toString();
-  }
-  
-  // For errors/cancelled, redirect back to onboarding
+  // Always return to onboarding so the app can immediately refresh connection state.
   const url = new URL('/onboarding', origin);
   url.searchParams.set('step', 'email');
   url.searchParams.set('aurinko', type);
