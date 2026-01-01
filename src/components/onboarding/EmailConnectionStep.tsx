@@ -329,17 +329,26 @@ export function EmailConnectionStep({
                     {!['fetching_inbox', 'fetching_sent', 'analyzing_voice', 'complete', 'pending', 'queued'].includes(syncStatus.stage) && 'Processing...'}
                   </span>
                 </div>
-              <span className="text-muted-foreground">
-                  {syncStatus.inboundFound > 0 
-                    ? `${syncStatus.inboundFound.toLocaleString()} emails`
-                    : ''}
+                <span className="text-muted-foreground">
+                  {syncStatus.total > 0
+                    ? `${Math.min(syncStatus.progress, syncStatus.total).toLocaleString()} / ${syncStatus.total.toLocaleString()}`
+                    : syncStatus.inboundFound > 0
+                      ? `${syncStatus.inboundFound.toLocaleString()} emails`
+                      : ''}
                 </span>
               </div>
-              
+
+              {syncStatus.total > 0 && (
+                <Progress
+                  value={Math.min(100, Math.round((syncStatus.progress / Math.max(syncStatus.total, 1)) * 100))}
+                  className="h-2"
+                />
+              )}
+
               {syncStatus.inboundFound > 0 && (
                 <div className="text-xs text-muted-foreground space-y-1">
                   <div className="flex justify-between">
-                    <span>Inbox emails imported:</span>
+                    <span>Inbox emails scanned:</span>
                     <span>{syncStatus.inboundFound.toLocaleString()}</span>
                   </div>
                   {syncStatus.outboundFound > 0 && (

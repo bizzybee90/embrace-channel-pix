@@ -140,7 +140,11 @@ serve(async (req) => {
 
         try {
           const externalId = messageSummary.id?.toString();
-          
+
+          // Count "processed" emails as those we have scanned, even if we skip importing
+          // (prevents UI from appearing stuck when most emails were imported previously).
+          inboundProcessed++;
+
           // Skip if exists
           const { data: existing } = await supabase
             .from('conversations')
@@ -231,7 +235,6 @@ serve(async (req) => {
             raw_payload: message,
           });
 
-          inboundProcessed++;
           batchCount++;
 
         } catch (err) {
