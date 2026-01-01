@@ -103,6 +103,8 @@ export function EmailConnectionStep({
   const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null);
   const [importMode, setImportMode] = useState<ImportMode>('last_1000');
   const [checkingConnection, setCheckingConnection] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
   const [syncStatus, setSyncStatus] = useState<{
     status: string;
     stage: string;
@@ -268,6 +270,7 @@ export function EmailConnectionStep({
           };
 
           setSyncStatus(next);
+          setLastUpdatedAt(new Date());
 
           // Track last progress movement to detect stalls
           if (next.progress !== lastProgressRef.current.progress) {
@@ -285,6 +288,7 @@ export function EmailConnectionStep({
       console.error('Error checking connection:', error);
     } finally {
       setCheckingConnection(false);
+      setInitialLoading(false);
     }
   };
 
@@ -360,6 +364,7 @@ export function EmailConnectionStep({
           };
 
           setSyncStatus(next);
+          setLastUpdatedAt(new Date());
 
           if (next.progress !== lastProgressRef.current.progress) {
             lastProgressRef.current = { progress: next.progress, at: Date.now() };
@@ -431,6 +436,24 @@ export function EmailConnectionStep({
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
   }, []);
+
+  // Show loading state while checking for existing connection
+  if (initialLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center">
+          <CardTitle className="text-xl">Connect Your Email</CardTitle>
+          <CardDescription className="mt-2">
+            BizzyBee will learn from your inbox to handle emails just like you would.
+          </CardDescription>
+        </div>
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+          <span className="ml-2 text-muted-foreground">Checking connection...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -512,6 +535,20 @@ export function EmailConnectionStep({
                   )}
                 </div>
               )}
+
+              {/* Live activity indicator */}
+              <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                </span>
+                <span>
+                  Actively syncing
+                  {lastUpdatedAt && (
+                    <> · updated {Math.round((Date.now() - lastUpdatedAt.getTime()) / 1000)}s ago</>
+                  )}
+                </span>
+              </div>
 
               <div className="text-center space-y-1">
                 <p className="text-xs text-muted-foreground">
