@@ -362,8 +362,8 @@ export function EmailConnectionStep({
                 <div className="flex items-center gap-2">
                   <Loader2 className="h-4 w-4 animate-spin text-primary" />
                   <span className="font-medium">
-                    {syncStatus.stage === 'fetching_inbox' && 'Importing inbox...'}
-                    {syncStatus.stage === 'fetching_sent' && 'Importing sent emails...'}
+                    {syncStatus.stage === 'fetching_inbox' && 'Scanning inbox...'}
+                    {syncStatus.stage === 'fetching_sent' && 'Scanning sent emails...'}
                     {syncStatus.stage === 'analyzing_voice' && 'Learning your writing style...'}
                     {syncStatus.stage === 'complete' && syncStatus.voiceProfileStatus === 'analyzing' && 'Analyzing your writing style...'}
                     {syncStatus.stage === 'pending' && 'Starting import...'}
@@ -371,48 +371,35 @@ export function EmailConnectionStep({
                     {!['fetching_inbox', 'fetching_sent', 'analyzing_voice', 'complete', 'pending', 'queued'].includes(syncStatus.stage) && 'Processing...'}
                   </span>
                 </div>
-                <span className="text-muted-foreground">
-                  {syncStatus.total > 0
-                    ? `${Math.min(syncStatus.progress, syncStatus.total).toLocaleString()} / ${syncStatus.total.toLocaleString()}`
-                    : syncStatus.inboundFound > 0
-                      ? `${syncStatus.inboundFound.toLocaleString()} emails`
-                      : ''}
-                </span>
               </div>
 
-              {syncStatus.total > 0 && (
-                <Progress
-                  value={Math.min(100, Math.round((syncStatus.progress / Math.max(syncStatus.total, 1)) * 100))}
-                  className="h-2"
-                />
-              )}
-
-              {syncStatus.inboundFound > 0 && (
-                <div className="text-xs text-muted-foreground space-y-1">
+              {/* Show email counts */}
+              <div className="text-xs text-muted-foreground space-y-1">
+                {syncStatus.inboundFound > 0 && (
                   <div className="flex justify-between">
-                    <span>Inbox emails scanned:</span>
+                    <span>Inbox emails found:</span>
                     <span>{syncStatus.inboundFound.toLocaleString()}</span>
                   </div>
-                  {syncStatus.outboundFound > 0 && (
-                    <div className="flex justify-between">
-                      <span>Your replies found:</span>
-                      <span>{syncStatus.outboundFound}</span>
-                    </div>
-                  )}
-                  {syncStatus.threadsLinked > 0 && (
-                    <div className="flex justify-between">
-                      <span>Conversations linked:</span>
-                      <span>{syncStatus.threadsLinked}</span>
-                    </div>
-                  )}
-                </div>
-              )}
+                )}
+                {syncStatus.outboundFound > 0 && (
+                  <div className="flex justify-between">
+                    <span>Sent emails found:</span>
+                    <span>{syncStatus.outboundFound.toLocaleString()}</span>
+                  </div>
+                )}
+                {syncStatus.threadsLinked > 0 && (
+                  <div className="flex justify-between">
+                    <span>Conversations linked:</span>
+                    <span>{syncStatus.threadsLinked.toLocaleString()}</span>
+                  </div>
+                )}
+              </div>
+
               <p className="text-xs text-muted-foreground">
                 {syncStatus.voiceProfileStatus === 'analyzing'
                   ? 'BizzyBee is learning how you write so it can match your style.'
                   : 'You can continue while we import your emails in the background.'}
               </p>
-
             </div>
           )}
 
