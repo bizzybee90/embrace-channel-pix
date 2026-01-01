@@ -8,10 +8,12 @@ function redirectTo(url: string): Response {
   });
 }
 
-function buildRedirectUrl(origin: string, status: string, message?: string): string {
+function buildRedirectUrl(origin: string, status: string, message?: string, errorCode?: string, errorDescription?: string): string {
   const url = new URL("/onboarding", origin);
   url.searchParams.set("email_status", status);
   if (message) url.searchParams.set("message", message);
+  if (errorCode) url.searchParams.set("error_code", errorCode);
+  if (errorDescription) url.searchParams.set("error_description", errorDescription);
   return url.toString();
 }
 
@@ -38,10 +40,13 @@ serve(async (req) => {
     }
   }
 
-  // Handle OAuth errors
+  // Handle OAuth errors - capture all error details from Google
+  const errorDescription = url.searchParams.get("error_description");
   if (error) {
-    console.error("OAuth error:", error);
-    return redirectTo(buildRedirectUrl(origin, "error", `OAuth error: ${error}`));
+    console.error("OAuth error:", error, "Description:", errorDescription);
+    return redirectTo(
+      buildRedirectUrl(origin, "error", `Google OAuth error: ${error}`, error, errorDescription || undefined)
+    );
   }
 
   if (!code || !workspaceId) {

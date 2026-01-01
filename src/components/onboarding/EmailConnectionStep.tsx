@@ -398,10 +398,29 @@ export function EmailConnectionStep({
       checkEmailConnection();
     }
     if (emailStatus === 'error') {
-      toast.error(params.get('message') || 'Email connection failed');
+      const errorMessage = params.get('message') || 'Email connection failed';
+      const errorCode = params.get('error_code');
+      const errorDescription = params.get('error_description');
+      
+      // Show detailed error for debugging
+      if (errorCode === 'access_denied') {
+        toast.error(
+          `Google blocked access: ${errorDescription || 'Access was denied'}. Make sure the Google account you're using is listed as a "Test user" in Google Cloud Console.`,
+          { duration: 10000 }
+        );
+      } else if (errorCode) {
+        toast.error(`${errorMessage} (${errorCode}: ${errorDescription || 'No details'})`, { duration: 8000 });
+      } else {
+        toast.error(errorMessage);
+      }
+      
+      console.error('Gmail OAuth error:', { errorCode, errorDescription, errorMessage });
+      
       localStorage.removeItem('onboarding_email_pending');
       params.delete('email_status');
       params.delete('message');
+      params.delete('error_code');
+      params.delete('error_description');
       const newUrl = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ''}`;
       window.history.replaceState({}, '', newUrl);
       setIsConnecting(false);
