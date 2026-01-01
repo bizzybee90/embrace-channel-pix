@@ -112,11 +112,12 @@ export function EmailConnectionStep({
     outboundFound: number;
     threadsLinked: number;
     voiceProfileStatus: string;
+    activeJobId?: string | null;
     lastSyncAt?: string | null;
     syncStartedAt?: string | null;
     syncError?: string | null;
   } | null>(null);
-  
+
   const [onboardingProgress, setOnboardingProgress] = useState<{
     emailImportStatus: string;
     emailImportProgress: number;
@@ -136,6 +137,7 @@ export function EmailConnectionStep({
   const connectTimeoutRef = useRef<number | undefined>(undefined);
   const popupRef = useRef<Window | null>(null);
   const popupPollRef = useRef<number | undefined>(undefined);
+  const lastProgressRef = useRef<{ progress: number; at: number }>({ progress: 0, at: Date.now() });
 
   useEffect(() => {
     connectedEmailRef.current = connectedEmail;
@@ -227,11 +229,13 @@ export function EmailConnectionStep({
     try {
       const { data, error } = await supabase
         .from('email_provider_configs')
-        .select('id, import_mode, email_address, sync_status, sync_stage, sync_progress, sync_total, inbound_emails_found, outbound_emails_found, threads_linked, voice_profile_status, last_sync_at, sync_started_at, sync_error')
+        .select('id, import_mode, email_address, sync_status, sync_stage, sync_progress, sync_total, inbound_emails_found, outbound_emails_found, threads_linked, voice_profile_status, last_sync_at, sync_started_at, sync_error, active_job_id')
         .eq('workspace_id', workspaceId)
         .order('created_at', { ascending: false })
         .limit(1)
         .single();
+
+      if (error) throw error;
 
       if (data?.email_address) {
         setConnectedEmail(data.email_address);
@@ -248,7 +252,7 @@ export function EmailConnectionStep({
 
         // Update sync status with detailed info
         if (data.sync_status) {
-          setSyncStatus({
+          const next = {
             status: data.sync_status,
             stage: data.sync_stage || 'pending',
             progress: data.sync_progress || 0,
@@ -257,10 +261,18 @@ export function EmailConnectionStep({
             outboundFound: data.outbound_emails_found || 0,
             threadsLinked: data.threads_linked || 0,
             voiceProfileStatus: data.voice_profile_status || 'pending',
+            activeJobId: data.active_job_id || null,
             lastSyncAt: data.last_sync_at || null,
             syncStartedAt: data.sync_started_at || null,
             syncError: data.sync_error || null,
-          });
+          };
+
+          setSyncStatus(next);
+
+          // Track last progress movement to detect stalls
+          if (next.progress !== lastProgressRef.current.progress) {
+            lastProgressRef.current = { progress: next.progress, at: Date.now() };
+          }
         }
 
         if (!connectedEmail) {
@@ -273,6 +285,21 @@ export function EmailConnectionStep({
       console.error('Error checking connection:', error);
     } finally {
       setCheckingConnection(false);
+    }
+  };
+
+  const handleResumeSync = async () => {
+    if (!connectedConfigId || !syncStatus?.activeJobId) return;
+    try {
+      toast.message('Resuming email scan…');
+      const { error } = await supabase.functions.invoke('email-sync-worker', {
+        body: { jobId: syncStatus.activeJobId, configId: connectedConfigId },
+      });
+      if (error) throw error;
+      lastProgressRef.current = { progress: syncStatus.progress ?? 0, at: Date.now() };
+    } catch (e) {
+      console.error(e);
+      toast.error('Could not resume the email scan.');
     }
   };
 
@@ -304,7 +331,7 @@ export function EmailConnectionStep({
         const [configResult, progressResult] = await Promise.all([
           supabase
             .from('email_provider_configs')
-            .select('sync_status, sync_stage, sync_progress, sync_total, inbound_emails_found, outbound_emails_found, threads_linked, voice_profile_status, last_sync_at, sync_started_at, sync_error')
+            .select('sync_status, sync_stage, sync_progress, sync_total, inbound_emails_found, outbound_emails_found, threads_linked, voice_profile_status, last_sync_at, sync_started_at, sync_error, active_job_id')
             .eq('workspace_id', workspaceId)
             .order('created_at', { ascending: false })
             .limit(1)
@@ -313,11 +340,11 @@ export function EmailConnectionStep({
             .from('onboarding_progress')
             .select('*')
             .eq('workspace_id', workspaceId)
-            .single()
+            .single(),
         ]);
 
         if (configResult.data) {
-          setSyncStatus({
+          const next = {
             status: configResult.data.sync_status || 'pending',
             stage: configResult.data.sync_stage || 'pending',
             progress: configResult.data.sync_progress || 0,
@@ -326,10 +353,17 @@ export function EmailConnectionStep({
             outboundFound: configResult.data.outbound_emails_found || 0,
             threadsLinked: configResult.data.threads_linked || 0,
             voiceProfileStatus: configResult.data.voice_profile_status || 'pending',
+            activeJobId: configResult.data.active_job_id || null,
             lastSyncAt: configResult.data.last_sync_at || null,
             syncStartedAt: configResult.data.sync_started_at || null,
             syncError: configResult.data.sync_error || null,
-          });
+          };
+
+          setSyncStatus(next);
+
+          if (next.progress !== lastProgressRef.current.progress) {
+            lastProgressRef.current = { progress: next.progress, at: Date.now() };
+          }
 
           // Stop polling when complete
           if (configResult.data.voice_profile_status === 'complete' || configResult.data.sync_status === 'error') {
@@ -337,7 +371,7 @@ export function EmailConnectionStep({
           }
         }
 
-          if (progressResult.data) {
+        if (progressResult.data) {
           setOnboardingProgress({
             emailImportStatus: progressResult.data.email_import_status || 'pending',
             emailImportProgress: progressResult.data.email_import_progress || 0,

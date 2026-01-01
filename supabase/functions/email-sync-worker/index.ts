@@ -6,6 +6,19 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Edge runtime helper (type shim for TS)
+declare const EdgeRuntime:
+  | { waitUntil: (promise: Promise<unknown>) => void }
+  | undefined;
+
+const waitUntil = (promise: Promise<unknown>) => {
+  try {
+    EdgeRuntime?.waitUntil(promise);
+  } catch {
+    // no-op (shouldn't happen in production edge runtime)
+  }
+};
+
 // Safe batch size to avoid timeouts (process ~50 messages per invocation)
 const BATCH_SIZE = 50;
 const MAX_RUNTIME_MS = 25000; // 25 seconds, leave buffer before 30s timeout
@@ -457,16 +470,34 @@ serve(async (req) => {
 
       // Trigger thread matching (Phase 2 of training)
       console.log('Starting thread matching phase...');
-      supabase.functions.invoke('match-email-threads', {
-        body: { workspace_id: config.workspace_id }
-      }).catch(err => console.error('Thread matching failed:', err));
+      // Ensure the background invocation isn't dropped during function shutdown
+      EdgeRuntime.waitUntil(
+        supabase.functions
+          .invoke('match-email-threads', {
+            body: { workspace_id: config.workspace_id },
+          })
+          .then(({ data, error }) => {
+            if (error) console.error('Thread matching failed:', error);
+            else console.log('Thread matching started:', data);
+          })
+          .catch((err) => console.error('Thread matching failed:', err))
+      );
 
     } else if (needsContinuation) {
       // Schedule next batch (self-invoke)
       console.log('Scheduling next batch...');
-      supabase.functions.invoke('email-sync-worker', {
-        body: { jobId, configId }
-      }).catch(err => console.error('Failed to schedule next batch:', err));
+      // Ensure the self-invocation isn't dropped during function shutdown
+      EdgeRuntime.waitUntil(
+        supabase.functions
+          .invoke('email-sync-worker', {
+            body: { jobId, configId },
+          })
+          .then(({ data, error }) => {
+            if (error) console.error('Failed to schedule next batch:', error);
+            else console.log('Next batch scheduled:', data);
+          })
+          .catch((err) => console.error('Failed to schedule next batch:', err))
+      );
     }
 
     return new Response(JSON.stringify({ 
