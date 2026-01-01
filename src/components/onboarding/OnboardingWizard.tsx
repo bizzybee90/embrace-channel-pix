@@ -25,7 +25,18 @@ type Step = 'welcome' | 'email' | 'business' | 'knowledge' | 'competitors' | 'se
 const STEPS: Step[] = ['welcome', 'email', 'business', 'knowledge', 'competitors', 'senders', 'triage', 'automation', 'review', 'complete'];
 
 export function OnboardingWizard({ workspaceId, onComplete }: OnboardingWizardProps) {
-  const [currentStep, setCurrentStep] = useState<Step>('welcome');
+  const storageKey = `bizzybee:onboarding:${workspaceId}`;
+
+  const [currentStep, setCurrentStep] = useState<Step>(() => {
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (!raw) return 'welcome';
+      const parsed = JSON.parse(raw) as { step?: Step };
+      return parsed.step && STEPS.includes(parsed.step) ? parsed.step : 'welcome';
+    } catch {
+      return 'welcome';
+    }
+  });
   const [businessContext, setBusinessContext] = useState({
     companyName: '',
     businessType: '',
@@ -41,8 +52,17 @@ export function OnboardingWizard({ workspaceId, onComplete }: OnboardingWizardPr
   const [competitorResults, setCompetitorResults] = useState({ sitesScraped: 0, faqsGenerated: 0 });
   const [connectedEmail, setConnectedEmail] = useState<string | null>(null);
 
+  const persistStepLocally = (step: Step) => {
+    try {
+      localStorage.setItem(storageKey, JSON.stringify({ step, updatedAt: Date.now() }));
+    } catch {
+      // ignore
+    }
+  };
+
   // Save progress to database
   const saveProgress = async (step: Step) => {
+    persistStepLocally(step);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
@@ -67,9 +87,11 @@ export function OnboardingWizard({ workspaceId, onComplete }: OnboardingWizardPr
             .select('onboarding_step')
             .eq('id', user.id)
             .single();
-          
+
           if (data?.onboarding_step && STEPS.includes(data.onboarding_step as Step)) {
-            setCurrentStep(data.onboarding_step as Step);
+            const dbStep = data.onboarding_step as Step;
+            setCurrentStep(dbStep);
+            persistStepLocally(dbStep);
           }
 
           // Check if email is already connected
@@ -79,7 +101,7 @@ export function OnboardingWizard({ workspaceId, onComplete }: OnboardingWizardPr
             .eq('workspace_id', workspaceId)
             .limit(1)
             .single();
-          
+
           if (emailConfig?.email_address) {
             setConnectedEmail(emailConfig.email_address);
           }
@@ -89,6 +111,7 @@ export function OnboardingWizard({ workspaceId, onComplete }: OnboardingWizardPr
       }
     };
     loadProgress();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workspaceId]);
 
   const stepIndex = STEPS.indexOf(currentStep);
