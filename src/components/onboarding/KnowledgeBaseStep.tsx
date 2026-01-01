@@ -176,10 +176,16 @@ export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, on
           </div>
         )}
 
-        <Button onClick={handleContinue} className="w-full">
-          Continue
-          <ChevronRight className="h-4 w-4 ml-2" />
-        </Button>
+        <div className="flex gap-3">
+          <Button variant="outline" onClick={onBack} className="flex-1">
+            <ChevronLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
+          <Button onClick={handleContinue} className="flex-1">
+            Continue
+            <ChevronRight className="h-4 w-4 ml-2" />
+          </Button>
+        </div>
       </div>
     );
   }
