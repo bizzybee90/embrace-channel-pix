@@ -254,9 +254,23 @@ serve(async (req) => {
         status: (newCursor === 'DONE' && !nextPageToken) ? 'running' : 'running'
       }).eq('id', jobId);
 
+      // Update provider config progress monotonically (avoid jumping backwards if multiple jobs run)
+      const { data: currentCounts } = await supabase
+        .from('email_provider_configs')
+        .select('inbound_emails_found, outbound_emails_found, threads_linked, sync_progress')
+        .eq('id', configId)
+        .single();
+
+      const inboundFound = Math.max(currentCounts?.inbound_emails_found ?? 0, inboundProcessed);
+      const outboundFound = Math.max(currentCounts?.outbound_emails_found ?? 0, sentProcessed);
+      const linkedCount = Math.max(currentCounts?.threads_linked ?? 0, threadsLinked);
+      const progressCount = Math.max(currentCounts?.sync_progress ?? 0, inboundFound + outboundFound);
+
       await supabase.from('email_provider_configs').update({
-        inbound_emails_found: inboundProcessed,
-        sync_progress: inboundProcessed + sentProcessed,
+        inbound_emails_found: inboundFound,
+        outbound_emails_found: outboundFound,
+        threads_linked: linkedCount,
+        sync_progress: progressCount,
       }).eq('id', configId);
 
       needsContinuation = needsContinuation || !!nextPageToken;
@@ -366,10 +380,23 @@ serve(async (req) => {
           last_batch_at: new Date().toISOString(),
         }).eq('id', jobId);
 
+        // Update provider config progress monotonically (avoid jumping backwards if multiple jobs run)
+        const { data: currentCounts } = await supabase
+          .from('email_provider_configs')
+          .select('inbound_emails_found, outbound_emails_found, threads_linked, sync_progress')
+          .eq('id', configId)
+          .single();
+
+        const inboundFound = Math.max(currentCounts?.inbound_emails_found ?? 0, inboundProcessed);
+        const outboundFound = Math.max(currentCounts?.outbound_emails_found ?? 0, sentProcessed);
+        const linkedCount = Math.max(currentCounts?.threads_linked ?? 0, threadsLinked);
+        const progressCount = Math.max(currentCounts?.sync_progress ?? 0, inboundFound + outboundFound);
+
         await supabase.from('email_provider_configs').update({
-          outbound_emails_found: sentProcessed,
-          threads_linked: threadsLinked,
-          sync_progress: inboundProcessed + sentProcessed,
+          inbound_emails_found: inboundFound,
+          outbound_emails_found: outboundFound,
+          threads_linked: linkedCount,
+          sync_progress: progressCount,
         }).eq('id', configId);
 
         needsContinuation = needsContinuation || !!nextPageToken;
