@@ -13,93 +13,38 @@ const redirectTo = (baseUrl: string, path: string, params?: Record<string, strin
   });
 };
 
-const getStyledHTML = (type: 'cancelled' | 'error' | 'success', message?: string, origin?: string) => {
-  const errorDetail = message ? `<div class="error-detail">${escapeHtml(message)}</div>` : '';
-  const errorPostMessage = type === 'error' && message ? `, error: '${message.replace(/'/g, "\\'").replace(/\n/g, ' ')}'` : '';
-  const appUrl = origin ? `${origin}/onboarding?step=email` : '/onboarding?step=email';
-  
-  const titles: Record<string, string> = {
-    success: 'Connected!',
-    cancelled: 'Cancelled',
-    error: 'Error'
-  };
-  
-  const icons: Record<string, string> = {
-    success: '&#10003;',  // checkmark
-    cancelled: '&#10005;', // X
-    error: '&#9888;'       // warning
-  };
-  
-  const iconClasses: Record<string, string> = {
-    success: 'success-icon',
-    cancelled: '',
-    error: 'error-icon'
-  };
-  
-  const headings: Record<string, string> = {
-    success: 'Email Connected!',
-    cancelled: 'Connection Cancelled',
-    error: 'Connection Failed'
-  };
-  
-  const descriptions: Record<string, string> = {
-    success: 'Closing automatically...',
-    cancelled: 'No worries! You can connect your email anytime.',
-    error: ''
-  };
-
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>${titles[type]}</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;background:linear-gradient(135deg,#f5a623 0%,#3b82f6 100%)}
-.card{background:#fff;padding:48px;border-radius:16px;box-shadow:0 10px 40px rgba(0,0,0,.15);text-align:center;max-width:400px;margin:20px}
-.icon{font-size:48px;margin-bottom:16px}
-h2{color:#1a1a1a;margin-bottom:12px;font-size:24px;font-weight:600}
-p{color:#666;margin-bottom:24px;line-height:1.5;font-size:14px}
-.error-detail{background:#fef2f2;color:#991b1b;padding:12px 16px;border-radius:8px;margin-bottom:24px;font-size:13px;word-break:break-word}
-.closing{color:#3b82f6;font-weight:500}
-button{background:#3b82f6;color:#fff;border:none;padding:12px 32px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:500;transition:background .2s}
-button:hover{background:#2563eb}
-.success-icon{color:#22c55e}
-.error-icon{color:#ef4444}
-</style>
-</head>
-<body>
-<div class="card">
-<div class="icon ${iconClasses[type]}">${icons[type]}</div>
-<h2>${headings[type]}</h2>
-${type === 'error' ? errorDetail : `<p class="${type === 'success' ? 'closing' : ''}">${descriptions[type]}</p>`}
-${type !== 'success' ? '<button onclick="goBack()">Return to App</button>' : ''}
-</div>
-<script>
-var appUrl='${appUrl}';
-function goBack(){if(window.opener){window.opener.postMessage({type:'aurinko-auth-${type}'${errorPostMessage}},'*');try{window.close()}catch(e){}}window.location.href=appUrl}
-${type === 'success' ? `(function(){if(window.opener){window.opener.postMessage({type:'aurinko-auth-success'},'*');try{window.close()}catch(e){}}setTimeout(function(){window.location.href=appUrl},1500)})();` : ''}
-</script>
-</body>
-</html>`;
+const buildRedirectUrl = (
+  origin: string,
+  type: 'cancelled' | 'error' | 'success',
+  message?: string
+) => {
+  const url = new URL('/onboarding', origin);
+  url.searchParams.set('step', 'email');
+  url.searchParams.set('aurinko', type);
+  if (message) url.searchParams.set('message', message.slice(0, 200));
+  return url.toString();
 };
 
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
+const redirectToApp = (
+  origin: string,
+  type: 'cancelled' | 'error' | 'success',
+  message?: string
+) => {
+  return new Response(null, {
+    status: 302,
+    headers: {
+      Location: buildRedirectUrl(origin, type, message),
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+    },
+  });
+};
+
+function safeMessage(text: string): string {
+  // keep URL safe and short
+  return text.replace(/\s+/g, ' ').trim().slice(0, 200);
 }
 
-const htmlHeaders = new Headers({
-  // NOTE: Some gateways will coerce unknown/unsafe content types.
-  // Using lowercase header name + explicit html helps ensure browsers render this page.
-  'content-type': 'text/html; charset=utf-8',
-  'cache-control': 'no-cache, no-store, must-revalidate',
-});
+const defaultOrigin = 'https://ikioetqbrybnofqkdcib.lovable.app';
 
 Deno.serve(async (req) => {
   try {
@@ -113,30 +58,31 @@ Deno.serve(async (req) => {
     // Handle cancellation scenarios
     if (error === 'access_denied' || error === 'user_cancelled' || error === 'consent_required') {
       console.log('User cancelled OAuth flow:', error);
-      // Try to get origin from state if available
-      let cancelOrigin = '';
+      let cancelOrigin = defaultOrigin;
       try {
         if (state) {
           const stateData = JSON.parse(atob(state));
-          cancelOrigin = stateData.origin || '';
+          cancelOrigin = stateData.origin || defaultOrigin;
         }
-      } catch(e) {}
-      return new Response(getStyledHTML('cancelled', undefined, cancelOrigin), { status: 200, headers: htmlHeaders });
+      } catch (e) {
+        // ignore
+      }
+      return redirectToApp(cancelOrigin, 'cancelled');
     }
 
     // If no code and no explicit error, treat as cancellation
     if (!code) {
       console.log('No code provided, treating as cancellation');
-      return new Response(getStyledHTML('cancelled'), { status: 200, headers: htmlHeaders });
+      return redirectToApp(defaultOrigin, 'cancelled');
     }
 
     if (error) {
       console.error('Aurinko auth error:', error);
-      return new Response(getStyledHTML('error', error), { status: 200, headers: htmlHeaders });
+      return redirectToApp(defaultOrigin, 'error', safeMessage(error));
     }
 
     if (!state) {
-      return new Response(getStyledHTML('error', 'Missing state parameter'), { status: 200, headers: htmlHeaders });
+      return redirectToApp(defaultOrigin, 'error', 'Missing state');
     }
 
     // Decode state
@@ -144,7 +90,7 @@ Deno.serve(async (req) => {
     try {
       stateData = JSON.parse(atob(state));
     } catch (e) {
-      return new Response(getStyledHTML('error', 'Invalid state parameter'), { status: 200, headers: htmlHeaders });
+      return redirectToApp(defaultOrigin, 'error', 'Invalid state');
     }
 
     const { workspaceId, importMode, provider, origin } = stateData;
@@ -157,7 +103,7 @@ Deno.serve(async (req) => {
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
     if (!AURINKO_CLIENT_ID || !AURINKO_CLIENT_SECRET) {
-      return new Response(getStyledHTML('error', 'Aurinko credentials not configured'), { status: 200, headers: htmlHeaders });
+      return redirectToApp(appOrigin, 'error', 'Aurinko credentials not configured');
     }
 
     // Exchange code for access token
@@ -172,7 +118,7 @@ Deno.serve(async (req) => {
     if (!tokenResponse.ok) {
       const errorText = await tokenResponse.text();
       console.error('Token exchange failed:', errorText);
-      return new Response(getStyledHTML('error', 'Failed to exchange authorization code. Please try again.'), { status: 200, headers: htmlHeaders });
+      return redirectToApp(appOrigin, 'error', 'Failed to exchange authorization code. Please try again.');
     }
 
     const tokenData = await tokenResponse.json();
@@ -273,7 +219,7 @@ Deno.serve(async (req) => {
 
     if (dbError) {
       console.error('Database error:', dbError);
-      return new Response(getStyledHTML('error', 'Failed to save email configuration'), { status: 200, headers: htmlHeaders });
+      return redirectToApp(appOrigin, 'error', 'Failed to save email configuration');
     }
 
     console.log('Email provider config saved successfully with', aliases.length, 'aliases, configId:', configData?.id);
@@ -320,12 +266,12 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Return success HTML that posts message to opener window
-    // This allows the onboarding flow to continue seamlessly
-    return new Response(getStyledHTML('success', undefined, appOrigin), { status: 200, headers: htmlHeaders });
+    // Redirect back into the app instead of showing an inline HTML page.
+    // This avoids browsers showing raw HTML (text/plain) and keeps the UX consistent.
+    return redirectToApp(appOrigin, 'success');
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('Error in aurinko-auth-callback:', error);
-    return new Response(getStyledHTML('error', errorMessage), { status: 200, headers: htmlHeaders });
+    return redirectToApp(defaultOrigin, 'error', safeMessage(errorMessage));
   }
 });

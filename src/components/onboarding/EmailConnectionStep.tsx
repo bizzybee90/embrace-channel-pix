@@ -224,10 +224,25 @@ export function EmailConnectionStep({
 
   // Check on mount and poll for sync progress
   useEffect(() => {
-    if (localStorage.getItem('onboarding_email_pending') === 'true') {
+    const pending = localStorage.getItem('onboarding_email_pending') === 'true';
+    if (pending) {
       checkEmailConnection();
     }
-    
+
+    // While connecting, keep checking in case the OAuth flow redirected in-tab
+    // (popup not closed => previous polling never fires).
+    let connectInterval: number | undefined;
+    if (isConnecting || pending) {
+      connectInterval = window.setInterval(() => {
+        checkEmailConnection();
+      }, 2000);
+
+      // stop after 2 minutes to avoid infinite polling
+      window.setTimeout(() => {
+        if (connectInterval) window.clearInterval(connectInterval);
+      }, 120000);
+    }
+
     // Poll for sync progress when connected
     if (connectedEmail) {
       const interval = setInterval(async () => {
@@ -238,7 +253,7 @@ export function EmailConnectionStep({
           .order('created_at', { ascending: false })
           .limit(1)
           .single();
-        
+
         if (data) {
           setSyncStatus({
             status: data.sync_status || 'pending',
@@ -253,7 +268,7 @@ export function EmailConnectionStep({
             syncStartedAt: data.sync_started_at || null,
             syncError: data.sync_error || null,
           });
-          
+
           // Stop polling when complete (including voice profile)
           if (data.sync_status === 'completed' && data.voice_profile_status === 'complete') {
             clearInterval(interval);
@@ -263,10 +278,37 @@ export function EmailConnectionStep({
           }
         }
       }, 2000);
-      
-      return () => clearInterval(interval);
+
+      return () => {
+        clearInterval(interval);
+        if (connectInterval) window.clearInterval(connectInterval);
+      };
     }
-  }, [connectedEmail, workspaceId, connectedConfigId, connectedImportMode]);
+
+    return () => {
+      if (connectInterval) window.clearInterval(connectInterval);
+    };
+  }, [isConnecting, connectedEmail, workspaceId, connectedConfigId, connectedImportMode]);
+
+  // If OAuth redirected back to the app (no postMessage), show a toast on success/error.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const aurinko = params.get('aurinko');
+    if (aurinko === 'success') {
+      toast.success('Email connected');
+      params.delete('aurinko');
+      params.delete('message');
+      const newUrl = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ''}`;
+      window.history.replaceState({}, '', newUrl);
+    }
+    if (aurinko === 'error') {
+      toast.error(params.get('message') || 'Email connection failed');
+      params.delete('aurinko');
+      params.delete('message');
+      const newUrl = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ''}`;
+      window.history.replaceState({}, '', newUrl);
+    }
+  }, []);
 
   // Listen for OAuth completion message from popup
   useEffect(() => {
@@ -275,7 +317,7 @@ export function EmailConnectionStep({
         checkEmailConnection();
       }
     };
-    
+
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
   }, []);
