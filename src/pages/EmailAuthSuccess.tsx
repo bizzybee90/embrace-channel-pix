@@ -29,7 +29,33 @@ export default function EmailAuthSuccess() {
     }
   }, [status, message, navigate]);
 
+  // If opened as a popup, notify the opener and try to close automatically.
+  useEffect(() => {
+    if (status !== 'success') return;
+
+    try {
+      if (window.opener && !window.opener.closed) {
+        window.opener.postMessage({ type: 'aurinko-auth-success' }, window.location.origin);
+        window.setTimeout(() => {
+          window.close();
+        }, 150);
+      }
+    } catch {
+      // ignore
+    }
+  }, [status]);
+
   const handleReturnToOnboarding = () => {
+    try {
+      if (window.opener && !window.opener.closed) {
+        window.opener.postMessage({ type: 'aurinko-auth-success' }, window.location.origin);
+        window.close();
+        return;
+      }
+    } catch {
+      // ignore
+    }
+
     navigate('/onboarding?step=email&aurinko=success');
   };
 

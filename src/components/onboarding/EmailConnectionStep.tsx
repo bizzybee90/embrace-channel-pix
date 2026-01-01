@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { CardTitle, CardDescription } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
@@ -132,58 +132,84 @@ export function EmailConnectionStep({
     topCategories: Array<{ category: string; count: number }>;
   } | null>(null);
 
+  const connectedEmailRef = useRef<string | null>(null);
+  const connectTimeoutRef = useRef<number | undefined>(undefined);
+  const popupRef = useRef<Window | null>(null);
+  const popupPollRef = useRef<number | undefined>(undefined);
+
+  useEffect(() => {
+    connectedEmailRef.current = connectedEmail;
+  }, [connectedEmail]);
+
+  const parseTopCategories = (value: unknown): Array<{ category: string; count: number }> => {
+    if (!Array.isArray(value)) return [];
+    return value
+      .map((v) => ({
+        category: typeof (v as any)?.category === 'string' ? (v as any).category : '',
+        count: typeof (v as any)?.count === 'number' ? (v as any).count : 0,
+      }))
+      .filter((v) => v.category);
+  };
+
   const handleConnect = async (provider: Provider) => {
     setIsConnecting(true);
     setSelectedProvider(provider);
-    
+
+    // Clear any previous attempt timers
+    if (connectTimeoutRef.current) window.clearTimeout(connectTimeoutRef.current);
+    if (popupPollRef.current) window.clearInterval(popupPollRef.current);
+    popupPollRef.current = undefined;
+    connectTimeoutRef.current = undefined;
+    popupRef.current = null;
+
     try {
       const { data, error } = await supabase.functions.invoke('aurinko-auth-start', {
-        body: { 
+        body: {
           workspaceId,
           provider,
           importMode,
-          origin: window.location.origin
-        }
+          origin: window.location.origin,
+        },
       });
 
       if (error) throw error;
-      
+
       if (data?.authUrl) {
         // Store that we're expecting a callback
         localStorage.setItem('onboarding_email_pending', 'true');
         localStorage.setItem('onboarding_workspace_id', workspaceId);
-        
+
         // Open OAuth in popup
-        const popup = window.open(
-          data.authUrl, 
-          'email_oauth', 
-          'width=600,height=700,left=200,top=100'
-        );
-        
+        const popup = window.open(data.authUrl, 'email_oauth', 'width=600,height=700,left=200,top=100');
+        popupRef.current = popup;
+
         // Check if popup was blocked
         if (!popup || popup.closed || typeof popup.closed === 'undefined') {
           toast.info('Opening in new tab instead...');
-          // Fallback: open in new tab (will redirect back to onboarding on success)
           window.open(data.authUrl, '_blank');
           setIsConnecting(false);
           return;
         }
-        
+
         // Poll for completion
-        const pollInterval = setInterval(async () => {
+        popupPollRef.current = window.setInterval(async () => {
           if (popup?.closed) {
-            clearInterval(pollInterval);
+            if (popupPollRef.current) window.clearInterval(popupPollRef.current);
+            popupPollRef.current = undefined;
             setIsConnecting(false);
-            
-            // Check if connection was successful
             await checkEmailConnection();
           }
         }, 1000);
-        
-        // Timeout after 5 minutes
-        setTimeout(() => {
-          clearInterval(pollInterval);
-          if (!connectedEmail) {
+
+        // Timeout after 5 minutes (but don't false-alarm if it actually succeeded)
+        connectTimeoutRef.current = window.setTimeout(async () => {
+          if (popupPollRef.current) window.clearInterval(popupPollRef.current);
+          popupPollRef.current = undefined;
+
+          // One last check before showing any error
+          await checkEmailConnection();
+          const stillPending = localStorage.getItem('onboarding_email_pending') === 'true';
+          if (stillPending && !connectedEmailRef.current) {
             setIsConnecting(false);
             toast.error('Connection timed out. Please try again.');
           }
@@ -212,7 +238,14 @@ export function EmailConnectionStep({
         setConnectedConfigId(data.id);
         setConnectedImportMode((data.import_mode as ImportMode) || null);
         onEmailConnected(data.email_address);
-        
+
+        // Stop any connection timers (prevents false "timed out" toasts)
+        if (connectTimeoutRef.current) window.clearTimeout(connectTimeoutRef.current);
+        if (popupPollRef.current) window.clearInterval(popupPollRef.current);
+        connectTimeoutRef.current = undefined;
+        popupPollRef.current = undefined;
+        popupRef.current = null;
+
         // Update sync status with detailed info
         if (data.sync_status) {
           setSyncStatus({
@@ -229,7 +262,7 @@ export function EmailConnectionStep({
             syncError: data.sync_error || null,
           });
         }
-        
+
         if (!connectedEmail) {
           toast.success(`Connected to ${data.email_address}`);
         }
@@ -304,7 +337,7 @@ export function EmailConnectionStep({
           }
         }
 
-        if (progressResult.data) {
+          if (progressResult.data) {
           setOnboardingProgress({
             emailImportStatus: progressResult.data.email_import_status || 'pending',
             emailImportProgress: progressResult.data.email_import_progress || 0,
@@ -317,7 +350,7 @@ export function EmailConnectionStep({
             fewShotStatus: progressResult.data.few_shot_status || 'pending',
             responseRatePercent: progressResult.data.response_rate_percent,
             avgResponseTimeHours: progressResult.data.avg_response_time_hours,
-            topCategories: (progressResult.data.top_categories as unknown as { category: string; count: number }[]) || [],
+            topCategories: parseTopCategories(progressResult.data.top_categories),
           });
         }
       }, 2000); // 2-second polling
