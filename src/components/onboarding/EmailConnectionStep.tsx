@@ -506,12 +506,26 @@ export function EmailConnectionStep({
               {/* Always show email counts */}
               <div className="grid grid-cols-2 gap-3 text-xs">
                 <div className="bg-background/50 rounded p-2">
-                  <div className="font-semibold text-foreground">{syncStatus.inboundFound.toLocaleString()}</div>
-                  <div className="text-muted-foreground">Inbox emails</div>
+                  <div className="font-semibold text-foreground flex items-center gap-1">
+                    {syncStatus.inboundFound.toLocaleString()}
+                    {syncStatus.stage === 'fetching_inbox' && (
+                      <span className="text-muted-foreground animate-pulse">+</span>
+                    )}
+                  </div>
+                  <div className="text-muted-foreground">
+                    Inbox emails {syncStatus.stage === 'fetching_inbox' ? 'scanned' : ''}
+                  </div>
                 </div>
                 <div className="bg-background/50 rounded p-2">
-                  <div className="font-semibold text-foreground">{syncStatus.outboundFound.toLocaleString()}</div>
-                  <div className="text-muted-foreground">Your replies</div>
+                  <div className="font-semibold text-foreground flex items-center gap-1">
+                    {syncStatus.outboundFound.toLocaleString()}
+                    {syncStatus.stage === 'fetching_sent' && (
+                      <span className="text-muted-foreground animate-pulse">+</span>
+                    )}
+                  </div>
+                  <div className="text-muted-foreground">
+                    Sent emails {syncStatus.stage === 'fetching_sent' ? 'scanned' : syncStatus.stage === 'fetching_inbox' ? '(next)' : ''}
+                  </div>
                 </div>
               </div>
 
