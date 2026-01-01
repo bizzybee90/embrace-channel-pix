@@ -98,11 +98,11 @@ const getStyledHTML = (type: 'cancelled' | 'error' | 'success', message?: string
 </html>`;
 };
 
-const htmlHeaders = new Headers({
+const htmlHeaders = {
   'Content-Type': 'text/html; charset=utf-8',
   'Cache-Control': 'no-cache, no-store, must-revalidate',
   'X-Content-Type-Options': 'nosniff',
-});
+};
 
 serve(async (req) => {
   try {
