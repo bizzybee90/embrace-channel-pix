@@ -951,11 +951,125 @@ export type Database = {
           },
         ]
       }
+      email_pairs: {
+        Row: {
+          category: string | null
+          conversation_id: string | null
+          created_at: string | null
+          embedding: string | null
+          id: string
+          inbound_body: string | null
+          inbound_from: string | null
+          inbound_message_id: string | null
+          inbound_received_at: string | null
+          inbound_subject: string | null
+          led_to_booking: boolean | null
+          led_to_reply: boolean | null
+          outbound_body: string | null
+          outbound_message_id: string | null
+          outbound_sent_at: string | null
+          quality_score: number | null
+          response_has_cta: boolean | null
+          response_has_price: boolean | null
+          response_has_question: boolean | null
+          response_time_minutes: number | null
+          response_word_count: number | null
+          sentiment_inbound: string | null
+          sentiment_outbound: string | null
+          subcategory: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          category?: string | null
+          conversation_id?: string | null
+          created_at?: string | null
+          embedding?: string | null
+          id?: string
+          inbound_body?: string | null
+          inbound_from?: string | null
+          inbound_message_id?: string | null
+          inbound_received_at?: string | null
+          inbound_subject?: string | null
+          led_to_booking?: boolean | null
+          led_to_reply?: boolean | null
+          outbound_body?: string | null
+          outbound_message_id?: string | null
+          outbound_sent_at?: string | null
+          quality_score?: number | null
+          response_has_cta?: boolean | null
+          response_has_price?: boolean | null
+          response_has_question?: boolean | null
+          response_time_minutes?: number | null
+          response_word_count?: number | null
+          sentiment_inbound?: string | null
+          sentiment_outbound?: string | null
+          subcategory?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          category?: string | null
+          conversation_id?: string | null
+          created_at?: string | null
+          embedding?: string | null
+          id?: string
+          inbound_body?: string | null
+          inbound_from?: string | null
+          inbound_message_id?: string | null
+          inbound_received_at?: string | null
+          inbound_subject?: string | null
+          led_to_booking?: boolean | null
+          led_to_reply?: boolean | null
+          outbound_body?: string | null
+          outbound_message_id?: string | null
+          outbound_sent_at?: string | null
+          quality_score?: number | null
+          response_has_cta?: boolean | null
+          response_has_price?: boolean | null
+          response_has_question?: boolean | null
+          response_time_minutes?: number | null
+          response_word_count?: number | null
+          sentiment_inbound?: string | null
+          sentiment_outbound?: string | null
+          subcategory?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_pairs_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_pairs_inbound_message_id_fkey"
+            columns: ["inbound_message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_pairs_outbound_message_id_fkey"
+            columns: ["outbound_message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_pairs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_provider_configs: {
         Row: {
           access_token: string | null
           access_token_encrypted: string | null
           account_id: string
+          active_job_id: string | null
           aliases: string[] | null
           automation_level: string | null
           connected_at: string | null
@@ -986,6 +1100,7 @@ export type Database = {
           access_token?: string | null
           access_token_encrypted?: string | null
           account_id: string
+          active_job_id?: string | null
           aliases?: string[] | null
           automation_level?: string | null
           connected_at?: string | null
@@ -1016,6 +1131,7 @@ export type Database = {
           access_token?: string | null
           access_token_encrypted?: string | null
           account_id?: string
+          active_job_id?: string | null
           aliases?: string[] | null
           automation_level?: string | null
           connected_at?: string | null
@@ -1313,6 +1429,63 @@ export type Database = {
           },
         ]
       }
+      few_shot_examples: {
+        Row: {
+          category: string
+          created_at: string | null
+          email_pair_id: string | null
+          embedding: string | null
+          id: string
+          inbound_text: string | null
+          outbound_text: string | null
+          quality_score: number | null
+          rank_in_category: number | null
+          selection_reason: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          category: string
+          created_at?: string | null
+          email_pair_id?: string | null
+          embedding?: string | null
+          id?: string
+          inbound_text?: string | null
+          outbound_text?: string | null
+          quality_score?: number | null
+          rank_in_category?: number | null
+          selection_reason?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          email_pair_id?: string | null
+          embedding?: string | null
+          id?: string
+          inbound_text?: string | null
+          outbound_text?: string | null
+          quality_score?: number | null
+          rank_in_category?: number | null
+          selection_reason?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "few_shot_examples_email_pair_id_fkey"
+            columns: ["email_pair_id"]
+            isOneToOne: false
+            referencedRelation: "email_pairs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "few_shot_examples_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       gmail_channel_configs: {
         Row: {
           access_token: string | null
@@ -1371,6 +1544,51 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "gmail_channel_configs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ignored_emails: {
+        Row: {
+          created_at: string | null
+          from_domain: string | null
+          id: string
+          ignore_reason: string | null
+          inbound_message_id: string | null
+          subject_pattern: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          from_domain?: string | null
+          id?: string
+          ignore_reason?: string | null
+          inbound_message_id?: string | null
+          subject_pattern?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          from_domain?: string | null
+          id?: string
+          ignore_reason?: string | null
+          inbound_message_id?: string | null
+          subject_pattern?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ignored_emails_inbound_message_id_fkey"
+            columns: ["inbound_message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ignored_emails_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -1717,6 +1935,89 @@ export type Database = {
             foreignKeyName: "notifications_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      onboarding_progress: {
+        Row: {
+          avg_response_time_hours: number | null
+          categorization_progress: number | null
+          categorization_status: string | null
+          completed_at: string | null
+          created_at: string | null
+          email_import_count: number | null
+          email_import_progress: number | null
+          email_import_status: string | null
+          estimated_completion_at: string | null
+          few_shot_status: string | null
+          id: string
+          ignored_email_count: number | null
+          pairs_categorized: number | null
+          pairs_matched: number | null
+          response_rate_percent: number | null
+          started_at: string | null
+          style_analysis_status: string | null
+          thread_matching_progress: number | null
+          thread_matching_status: string | null
+          top_categories: Json | null
+          updated_at: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          avg_response_time_hours?: number | null
+          categorization_progress?: number | null
+          categorization_status?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          email_import_count?: number | null
+          email_import_progress?: number | null
+          email_import_status?: string | null
+          estimated_completion_at?: string | null
+          few_shot_status?: string | null
+          id?: string
+          ignored_email_count?: number | null
+          pairs_categorized?: number | null
+          pairs_matched?: number | null
+          response_rate_percent?: number | null
+          started_at?: string | null
+          style_analysis_status?: string | null
+          thread_matching_progress?: number | null
+          thread_matching_status?: string | null
+          top_categories?: Json | null
+          updated_at?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          avg_response_time_hours?: number | null
+          categorization_progress?: number | null
+          categorization_status?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          email_import_count?: number | null
+          email_import_progress?: number | null
+          email_import_status?: string | null
+          estimated_completion_at?: string | null
+          few_shot_status?: string | null
+          id?: string
+          ignored_email_count?: number | null
+          pairs_categorized?: number | null
+          pairs_matched?: number | null
+          response_rate_percent?: number | null
+          started_at?: string | null
+          style_analysis_status?: string | null
+          thread_matching_progress?: number | null
+          thread_matching_status?: string | null
+          top_categories?: Json | null
+          updated_at?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_progress_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
             referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
@@ -2350,58 +2651,109 @@ export type Database = {
         Row: {
           analysis_status: string | null
           avg_response_length: number | null
+          avg_response_time_minutes: number | null
+          avg_sentences: number | null
+          avg_words_per_sentence: number | null
+          avoided_words: string[] | null
+          booking_confirmation_style: string | null
           common_phrases: Json | null
           created_at: string | null
+          directness_level: number | null
           emails_analyzed: number | null
+          emoji_frequency: string | null
+          exclamation_frequency: number | null
           formality_score: number | null
           greeting_patterns: Json | null
           id: string
+          ignore_patterns: Json | null
           last_analyzed_at: string | null
+          objection_handling_style: string | null
           outbound_emails_found: number | null
+          price_mention_style: string | null
+          reply_triggers: Json | null
+          response_patterns: Json | null
+          response_rate_percent: number | null
           sample_responses: Json | null
           signoff_patterns: Json | null
+          style_confidence: number | null
           tone_descriptors: string[] | null
+          total_pairs_analyzed: number | null
           updated_at: string | null
           uses_emojis: boolean | null
           uses_exclamations: boolean | null
+          warmth_level: number | null
           workspace_id: string | null
         }
         Insert: {
           analysis_status?: string | null
           avg_response_length?: number | null
+          avg_response_time_minutes?: number | null
+          avg_sentences?: number | null
+          avg_words_per_sentence?: number | null
+          avoided_words?: string[] | null
+          booking_confirmation_style?: string | null
           common_phrases?: Json | null
           created_at?: string | null
+          directness_level?: number | null
           emails_analyzed?: number | null
+          emoji_frequency?: string | null
+          exclamation_frequency?: number | null
           formality_score?: number | null
           greeting_patterns?: Json | null
           id?: string
+          ignore_patterns?: Json | null
           last_analyzed_at?: string | null
+          objection_handling_style?: string | null
           outbound_emails_found?: number | null
+          price_mention_style?: string | null
+          reply_triggers?: Json | null
+          response_patterns?: Json | null
+          response_rate_percent?: number | null
           sample_responses?: Json | null
           signoff_patterns?: Json | null
+          style_confidence?: number | null
           tone_descriptors?: string[] | null
+          total_pairs_analyzed?: number | null
           updated_at?: string | null
           uses_emojis?: boolean | null
           uses_exclamations?: boolean | null
+          warmth_level?: number | null
           workspace_id?: string | null
         }
         Update: {
           analysis_status?: string | null
           avg_response_length?: number | null
+          avg_response_time_minutes?: number | null
+          avg_sentences?: number | null
+          avg_words_per_sentence?: number | null
+          avoided_words?: string[] | null
+          booking_confirmation_style?: string | null
           common_phrases?: Json | null
           created_at?: string | null
+          directness_level?: number | null
           emails_analyzed?: number | null
+          emoji_frequency?: string | null
+          exclamation_frequency?: number | null
           formality_score?: number | null
           greeting_patterns?: Json | null
           id?: string
+          ignore_patterns?: Json | null
           last_analyzed_at?: string | null
+          objection_handling_style?: string | null
           outbound_emails_found?: number | null
+          price_mention_style?: string | null
+          reply_triggers?: Json | null
+          response_patterns?: Json | null
+          response_rate_percent?: number | null
           sample_responses?: Json | null
           signoff_patterns?: Json | null
+          style_confidence?: number | null
           tone_descriptors?: string[] | null
+          total_pairs_analyzed?: number | null
           updated_at?: string | null
           uses_emojis?: boolean | null
           uses_exclamations?: boolean | null
+          warmth_level?: number | null
           workspace_id?: string | null
         }
         Relationships: [

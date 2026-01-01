@@ -110,6 +110,21 @@ export function EmailConnectionStep({
     syncStartedAt?: string | null;
     syncError?: string | null;
   } | null>(null);
+  
+  const [onboardingProgress, setOnboardingProgress] = useState<{
+    emailImportStatus: string;
+    emailImportProgress: number;
+    threadMatchingStatus: string;
+    threadMatchingProgress: number;
+    pairsMatched: number;
+    categorizationStatus: string;
+    categorizationProgress: number;
+    styleAnalysisStatus: string;
+    fewShotStatus: string;
+    responseRatePercent: number | null;
+    avgResponseTimeHours: number | null;
+    topCategories: Array<{ category: string; count: number }>;
+  } | null>(null);
 
   const handleConnect = async (provider: Provider) => {
     setIsConnecting(true);
@@ -243,41 +258,63 @@ export function EmailConnectionStep({
       }, 120000);
     }
 
-    // Poll for sync progress when connected
+    // Poll for sync progress when connected (every 2 seconds)
     if (connectedEmail) {
       const interval = setInterval(async () => {
-        const { data } = await supabase
-          .from('email_provider_configs')
-          .select('sync_status, sync_stage, sync_progress, sync_total, inbound_emails_found, outbound_emails_found, threads_linked, voice_profile_status, last_sync_at, sync_started_at, sync_error')
-          .eq('workspace_id', workspaceId)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .single();
+        // Fetch both email config and onboarding progress
+        const [configResult, progressResult] = await Promise.all([
+          supabase
+            .from('email_provider_configs')
+            .select('sync_status, sync_stage, sync_progress, sync_total, inbound_emails_found, outbound_emails_found, threads_linked, voice_profile_status, last_sync_at, sync_started_at, sync_error')
+            .eq('workspace_id', workspaceId)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single(),
+          supabase
+            .from('onboarding_progress')
+            .select('*')
+            .eq('workspace_id', workspaceId)
+            .single()
+        ]);
 
-        if (data) {
+        if (configResult.data) {
           setSyncStatus({
-            status: data.sync_status || 'pending',
-            stage: data.sync_stage || 'pending',
-            progress: data.sync_progress || 0,
-            total: data.sync_total || 0,
-            inboundFound: data.inbound_emails_found || 0,
-            outboundFound: data.outbound_emails_found || 0,
-            threadsLinked: data.threads_linked || 0,
-            voiceProfileStatus: data.voice_profile_status || 'pending',
-            lastSyncAt: data.last_sync_at || null,
-            syncStartedAt: data.sync_started_at || null,
-            syncError: data.sync_error || null,
+            status: configResult.data.sync_status || 'pending',
+            stage: configResult.data.sync_stage || 'pending',
+            progress: configResult.data.sync_progress || 0,
+            total: configResult.data.sync_total || 0,
+            inboundFound: configResult.data.inbound_emails_found || 0,
+            outboundFound: configResult.data.outbound_emails_found || 0,
+            threadsLinked: configResult.data.threads_linked || 0,
+            voiceProfileStatus: configResult.data.voice_profile_status || 'pending',
+            lastSyncAt: configResult.data.last_sync_at || null,
+            syncStartedAt: configResult.data.sync_started_at || null,
+            syncError: configResult.data.sync_error || null,
           });
 
-          // Stop polling when complete (including voice profile)
-          if (data.sync_status === 'completed' && data.voice_profile_status === 'complete') {
-            clearInterval(interval);
-          }
-          if (data.sync_status === 'error') {
+          // Stop polling when complete
+          if (configResult.data.voice_profile_status === 'complete' || configResult.data.sync_status === 'error') {
             clearInterval(interval);
           }
         }
-      }, 2000);
+
+        if (progressResult.data) {
+          setOnboardingProgress({
+            emailImportStatus: progressResult.data.email_import_status || 'pending',
+            emailImportProgress: progressResult.data.email_import_progress || 0,
+            threadMatchingStatus: progressResult.data.thread_matching_status || 'pending',
+            threadMatchingProgress: progressResult.data.thread_matching_progress || 0,
+            pairsMatched: progressResult.data.pairs_matched || 0,
+            categorizationStatus: progressResult.data.categorization_status || 'pending',
+            categorizationProgress: progressResult.data.categorization_progress || 0,
+            styleAnalysisStatus: progressResult.data.style_analysis_status || 'pending',
+            fewShotStatus: progressResult.data.few_shot_status || 'pending',
+            responseRatePercent: progressResult.data.response_rate_percent,
+            avgResponseTimeHours: progressResult.data.avg_response_time_hours,
+            topCategories: progressResult.data.top_categories || [],
+          });
+        }
+      }, 2000); // 2-second polling
 
       return () => {
         clearInterval(interval);
@@ -355,50 +392,56 @@ export function EmailConnectionStep({
             </div>
           </div>
 
-          {/* Sync Progress Indicator */}
+          {/* Multi-Phase Sync Progress Indicator */}
           {syncStatus && (syncStatus.status !== 'completed' || syncStatus.voiceProfileStatus !== 'complete') && syncStatus.status !== 'error' && (
-            <div className="space-y-3 p-4 bg-muted/50 rounded-lg border">
-              <div className="flex items-center justify-between text-sm">
-                <div className="flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                  <span className="font-medium">
-                    {syncStatus.stage === 'fetching_inbox' && 'Scanning inbox...'}
-                    {syncStatus.stage === 'fetching_sent' && 'Scanning sent emails...'}
-                    {syncStatus.stage === 'analyzing_voice' && 'Learning your writing style...'}
-                    {syncStatus.stage === 'complete' && syncStatus.voiceProfileStatus === 'analyzing' && 'Analyzing your writing style...'}
-                    {syncStatus.stage === 'pending' && 'Starting import...'}
-                    {syncStatus.stage === 'queued' && 'Queued...'}
-                    {!['fetching_inbox', 'fetching_sent', 'analyzing_voice', 'complete', 'pending', 'queued'].includes(syncStatus.stage) && 'Processing...'}
-                  </span>
+            <div className="space-y-4 p-4 bg-muted/50 rounded-lg border">
+              {/* Current phase indicator */}
+              <div className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                <span className="font-medium text-sm">
+                  {syncStatus.stage === 'fetching_inbox' && 'Phase 1 of 5: Scanning inbox...'}
+                  {syncStatus.stage === 'fetching_sent' && 'Phase 1 of 5: Scanning sent emails...'}
+                  {syncStatus.stage === 'matching_threads' && 'Phase 2 of 5: Matching conversations...'}
+                  {syncStatus.stage === 'categorizing_emails' && 'Phase 3 of 5: Categorizing emails...'}
+                  {syncStatus.stage === 'analyzing_style' && 'Phase 4 of 5: Learning your writing style...'}
+                  {syncStatus.stage === 'building_examples' && 'Phase 5 of 5: Building AI training data...'}
+                  {syncStatus.stage === 'pending' && 'Starting import...'}
+                  {!['fetching_inbox', 'fetching_sent', 'matching_threads', 'categorizing_emails', 'analyzing_style', 'building_examples', 'pending'].includes(syncStatus.stage) && 'Processing...'}
+                </span>
+              </div>
+
+              {/* Always show email counts */}
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div className="bg-background/50 rounded p-2">
+                  <div className="font-semibold text-foreground">{syncStatus.inboundFound.toLocaleString()}</div>
+                  <div className="text-muted-foreground">Inbox emails</div>
+                </div>
+                <div className="bg-background/50 rounded p-2">
+                  <div className="font-semibold text-foreground">{syncStatus.outboundFound.toLocaleString()}</div>
+                  <div className="text-muted-foreground">Your replies</div>
                 </div>
               </div>
 
-              {/* Show email counts */}
-              <div className="text-xs text-muted-foreground space-y-1">
-                {syncStatus.inboundFound > 0 && (
-                  <div className="flex justify-between">
-                    <span>Inbox emails found:</span>
-                    <span>{syncStatus.inboundFound.toLocaleString()}</span>
+              {/* Insights preview when available */}
+              {onboardingProgress?.responseRatePercent != null && (
+                <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 space-y-1">
+                  <p className="text-xs font-medium text-primary">Email Insights</p>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>Response rate: <strong>{onboardingProgress.responseRatePercent}%</strong></div>
+                    {onboardingProgress.avgResponseTimeHours != null && (
+                      <div>Avg response: <strong>{onboardingProgress.avgResponseTimeHours}h</strong></div>
+                    )}
                   </div>
-                )}
-                {syncStatus.outboundFound > 0 && (
-                  <div className="flex justify-between">
-                    <span>Sent emails found:</span>
-                    <span>{syncStatus.outboundFound.toLocaleString()}</span>
-                  </div>
-                )}
-                {syncStatus.threadsLinked > 0 && (
-                  <div className="flex justify-between">
-                    <span>Conversations linked:</span>
-                    <span>{syncStatus.threadsLinked.toLocaleString()}</span>
-                  </div>
-                )}
-              </div>
+                  {onboardingProgress.pairsMatched > 0 && (
+                    <div className="text-muted-foreground">
+                      {onboardingProgress.pairsMatched.toLocaleString()} conversations matched
+                    </div>
+                  )}
+                </div>
+              )}
 
               <p className="text-xs text-muted-foreground">
-                {syncStatus.voiceProfileStatus === 'analyzing'
-                  ? 'BizzyBee is learning how you write so it can match your style.'
-                  : 'You can continue while we import your emails in the background.'}
+                You can continue while we build your AI clone in the background.
               </p>
             </div>
           )}
