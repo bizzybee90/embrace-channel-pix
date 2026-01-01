@@ -45,8 +45,11 @@ serve(async (req) => {
     }));
 
     // Aurinko OAuth authorize URL
-    // Using standard email scopes
-    const scopes = 'Mail.Read Mail.Send Mail.ReadWrite';
+    // Use Aurinko's unified scopes - they handle provider-specific translation
+    // For Google: these map to Gmail API scopes internally
+    const scopes = serviceType === 'Google' 
+      ? 'Mail.Read Mail.ReadWrite Mail.Send' 
+      : 'Mail.Read Mail.Send Mail.ReadWrite';
     
     const authUrl = new URL('https://api.aurinko.io/v1/auth/authorize');
     authUrl.searchParams.set('clientId', AURINKO_CLIENT_ID);
