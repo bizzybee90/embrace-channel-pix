@@ -19,9 +19,10 @@ interface OnboardingWizardProps {
   onComplete: () => void;
 }
 
-type Step = 'welcome' | 'email' | 'business' | 'knowledge' | 'competitors' | 'senders' | 'triage' | 'review' | 'automation' | 'complete';
+type Step = 'welcome' | 'email' | 'business' | 'knowledge' | 'competitors' | 'senders' | 'triage' | 'automation' | 'review' | 'complete';
 
-const STEPS: Step[] = ['welcome', 'email', 'business', 'knowledge', 'competitors', 'senders', 'triage', 'review', 'automation', 'complete'];
+// Review step moved AFTER automation - it should be the final step before complete
+const STEPS: Step[] = ['welcome', 'email', 'business', 'knowledge', 'competitors', 'senders', 'triage', 'automation', 'review', 'complete'];
 
 export function OnboardingWizard({ workspaceId, onComplete }: OnboardingWizardProps) {
   const [currentStep, setCurrentStep] = useState<Step>('welcome');
@@ -117,12 +118,12 @@ export function OnboardingWizard({ workspaceId, onComplete }: OnboardingWizardPr
     <div className="min-h-screen bg-muted/30 flex items-center justify-center p-6">
       <Card className={`w-full max-w-2xl shadow-lg shadow-black/5 border-border/50 ${currentStep === 'welcome' ? 'p-10' : ''}`}>
         <CardHeader className="text-center pb-2">
-          {/* Logo - Emotional anchor, hero element */}
+          {/* Logo - Bold, prominent brand presence */}
           <div className={`flex justify-center ${currentStep === 'welcome' ? 'pt-4 mb-14' : 'mb-8'}`}>
             <img 
               src={bizzybeelogo} 
               alt="BizzyBee" 
-              className={currentStep === 'welcome' ? 'h-44 w-auto' : 'h-20 w-auto'}
+              className={currentStep === 'welcome' ? 'h-56 w-auto' : 'h-24 w-auto'}
             />
           </div>
           {currentStep !== 'welcome' && currentStep !== 'complete' && (

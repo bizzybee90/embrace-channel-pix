@@ -26,6 +26,12 @@ interface InboxLearningStepProps {
   onBack: () => void;
 }
 
+interface EmailCounts {
+  inbound: number;
+  outbound: number;
+  total: number;
+}
+
 interface LearningPhase {
   id: string;
   label: string;
@@ -47,15 +53,52 @@ interface LearningSummary {
 }
 
 export function InboxLearningStep({ workspaceId, onComplete, onBack }: InboxLearningStepProps) {
-  const [status, setStatus] = useState<'idle' | 'running' | 'complete'>('idle');
+  const [status, setStatus] = useState<'loading' | 'idle' | 'running' | 'complete'>('loading');
   const [currentPhaseIndex, setCurrentPhaseIndex] = useState(0);
   const [summary, setSummary] = useState<LearningSummary | null>(null);
+  const [emailCounts, setEmailCounts] = useState<EmailCounts | null>(null);
   const [phases, setPhases] = useState<LearningPhase[]>([
     { id: 'categorize', label: 'Categorizing your emails', icon: <Mail className="h-4 w-4" />, status: 'pending' },
     { id: 'voice_profile', label: 'Learning your writing style', icon: <MessageSquare className="h-4 w-4" />, status: 'pending' },
     { id: 'patterns', label: 'Analyzing email patterns', icon: <TrendingUp className="h-4 w-4" />, status: 'pending' },
     { id: 'responses', label: 'Extracting best practices', icon: <Sparkles className="h-4 w-4" />, status: 'pending' },
   ]);
+
+  // Fetch email count on mount
+  useEffect(() => {
+    const fetchEmailCount = async () => {
+      try {
+        const { data } = await supabase.functions.invoke('learn-from-inbox', {
+          body: { workspace_id: workspaceId, phase: 'init' }
+        });
+        
+        if (data?.totals) {
+          setEmailCounts({
+            inbound: data.totals.conversations || 0,
+            outbound: data.totals.outbound || 0,
+            total: (data.totals.conversations || 0) + (data.totals.outbound || 0),
+          });
+        }
+        setStatus('idle');
+      } catch (error) {
+        console.error('Error fetching email count:', error);
+        setStatus('idle');
+      }
+    };
+    
+    fetchEmailCount();
+  }, [workspaceId]);
+
+  // Estimate time based on email count
+  const getTimeEstimate = () => {
+    if (!emailCounts) return 'a few minutes';
+    const total = emailCounts.total;
+    if (total < 1000) return '1-2 minutes';
+    if (total < 3000) return '2-5 minutes';
+    if (total < 5000) return '5-10 minutes';
+    if (total < 10000) return '10-15 minutes';
+    return '15-20 minutes';
+  };
 
   const updatePhase = (id: string, updates: Partial<LearningPhase>) => {
     setPhases(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
@@ -198,16 +241,43 @@ export function InboxLearningStep({ workspaceId, onComplete, onBack }: InboxLear
         </p>
       </div>
 
+      {status === 'loading' && (
+        <Card className="p-8 text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-sm text-muted-foreground">Checking your inbox...</p>
+        </Card>
+      )}
+
       {status === 'idle' && (
         <Card className="p-8 text-center">
           <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
             <Brain className="h-8 w-8 text-primary" />
           </div>
           <h3 className="font-semibold mb-2">Ready to learn</h3>
-          <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
-            BizzyBee will analyze your entire inbox to understand your communication style, 
-            common inquiries, and successful response patterns.
-          </p>
+          
+          {/* Show email count upfront */}
+          {emailCounts && emailCounts.total > 0 ? (
+            <div className="space-y-3 mb-6">
+              <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                BizzyBee will analyze <span className="font-semibold text-foreground">{emailCounts.total.toLocaleString()} emails</span> to 
+                understand your communication style and successful response patterns.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Estimated time: <span className="font-medium">{getTimeEstimate()}</span>
+              </p>
+              {emailCounts.total > 5000 && (
+                <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-3 text-sm text-amber-700 dark:text-amber-300">
+                  ☕ That's a lot of emails! Perfect time to grab a cup of tea.
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
+              BizzyBee will analyze your entire inbox to understand your communication style, 
+              common inquiries, and successful response patterns.
+            </p>
+          )}
+          
           <Button onClick={runLearning} size="lg">
             <Brain className="h-4 w-4 mr-2" />
             Start Learning
@@ -220,7 +290,14 @@ export function InboxLearningStep({ workspaceId, onComplete, onBack }: InboxLear
           <div className="space-y-6">
             <div className="flex items-center gap-3">
               <Loader2 className="h-5 w-5 animate-spin text-primary" />
-              <span className="font-medium">Learning from your emails...</span>
+              <div>
+                <span className="font-medium">Learning from your emails...</span>
+                {emailCounts && (
+                  <p className="text-xs text-muted-foreground">
+                    Analyzing {emailCounts.total.toLocaleString()} emails
+                  </p>
+                )}
+              </div>
             </div>
             
             <Progress value={overallProgress} className="h-2" />
@@ -267,6 +344,21 @@ export function InboxLearningStep({ workspaceId, onComplete, onBack }: InboxLear
                   )}
                 </div>
               ))}
+            </div>
+
+            {/* Navigation buttons during running state */}
+            <div className="flex gap-3 pt-2">
+              <Button variant="outline" onClick={onBack}>
+                <ChevronLeft className="h-4 w-4 mr-2" />
+                Back
+              </Button>
+              <Button 
+                variant="ghost" 
+                onClick={() => onComplete({ emailsAnalyzed: 0, patternsLearned: 0, voiceProfileBuilt: false })} 
+                className="ml-auto"
+              >
+                Continue in background
+              </Button>
             </div>
           </div>
         </Card>
@@ -388,9 +480,9 @@ export function InboxLearningStep({ workspaceId, onComplete, onBack }: InboxLear
         </div>
       )}
 
-      {status === 'idle' && (
+      {(status === 'idle' || status === 'loading') && (
         <div className="flex gap-3">
-          <Button variant="outline" onClick={onBack}>
+          <Button variant="outline" onClick={onBack} disabled={status === 'loading'}>
             <ChevronLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
@@ -398,6 +490,7 @@ export function InboxLearningStep({ workspaceId, onComplete, onBack }: InboxLear
             variant="ghost" 
             onClick={() => onComplete({ emailsAnalyzed: 0, patternsLearned: 0, voiceProfileBuilt: false })} 
             className="ml-auto"
+            disabled={status === 'loading'}
           >
             Skip this step
           </Button>

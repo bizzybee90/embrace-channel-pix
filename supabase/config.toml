@@ -149,3 +149,6 @@ verify_jwt = false
 
 [functions.learn-from-inbox]
 verify_jwt = false
+
+[functions.competitor-discover-smart]
+verify_jwt = false
