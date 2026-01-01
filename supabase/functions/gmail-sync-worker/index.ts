@@ -288,29 +288,44 @@ serve(async (req) => {
             customerId = newCustomer.id;
           }
 
-          // Create conversation
-          const { data: conversation, error: convError } = await supabase
+          // Check if conversation already exists for this thread (proper threading!)
+          let conversationId: string;
+          const { data: existingConv } = await supabase
             .from("conversations")
-            .insert({
-              workspace_id: config.workspace_id,
-              customer_id: customerId,
-              channel: "email",
-              status: "open",
-              title: subject || "No Subject",
-              external_conversation_id: fullMsg.threadId,
-              created_at: date ? new Date(date).toISOString() : new Date().toISOString(),
-            })
             .select("id")
+            .eq("workspace_id", config.workspace_id)
+            .eq("external_conversation_id", fullMsg.threadId)
             .single();
 
-          if (convError || !conversation) {
-            console.error("Failed to create conversation:", convError);
-            continue;
+          if (existingConv) {
+            // Add message to existing conversation thread
+            conversationId = existingConv.id;
+          } else {
+            // Create new conversation only if thread doesn't exist
+            const { data: conversation, error: convError } = await supabase
+              .from("conversations")
+              .insert({
+                workspace_id: config.workspace_id,
+                customer_id: customerId,
+                channel: "email",
+                status: "open",
+                title: subject || "No Subject",
+                external_conversation_id: fullMsg.threadId,
+                created_at: date ? new Date(date).toISOString() : new Date().toISOString(),
+              })
+              .select("id")
+              .single();
+
+            if (convError || !conversation) {
+              console.error("Failed to create conversation:", convError);
+              continue;
+            }
+            conversationId = conversation.id;
           }
 
-          // Create message
+          // Create message in the conversation
           await supabase.from("messages").insert({
-            conversation_id: conversation.id,
+            conversation_id: conversationId,
             direction: "inbound",
             channel: "email",
             actor_type: "customer",

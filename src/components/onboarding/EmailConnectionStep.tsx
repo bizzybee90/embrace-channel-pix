@@ -548,13 +548,24 @@ export function EmailConnectionStep({
                 </div>
               </div>
 
-              {/* Real progress bar when totals are available */}
-              {syncStatus.total > 0 && (syncStatus.stage === 'fetching_inbox' || syncStatus.stage === 'fetching_sent') && (
+              {/* Real progress bar - only when we have totals for accurate percentage */}
+              {(syncStatus.stage === 'fetching_inbox' || syncStatus.stage === 'fetching_sent') && (
                 <div className="space-y-1">
-                  <Progress value={syncStatus.progress} className="h-2" />
-                  <p className="text-xs text-center text-muted-foreground">
-                    {syncStatus.progress}% complete
-                  </p>
+                  {syncStatus.inboundTotal > 0 || syncStatus.outboundTotal > 0 ? (
+                    <>
+                      <Progress value={syncStatus.progress} className="h-2" />
+                      <p className="text-xs text-center text-muted-foreground">
+                        {syncStatus.progress}% complete
+                      </p>
+                    </>
+                  ) : (
+                    /* Indeterminate progress when totals not available (Aurinko fallback) */
+                    <div className="relative h-2 bg-muted rounded-full overflow-hidden">
+                      <div className="absolute inset-0 bg-primary/30 animate-pulse" />
+                      <div className="absolute h-full w-1/3 bg-primary rounded-full animate-[slide_1.5s_ease-in-out_infinite]" 
+                           style={{ animation: 'slide 1.5s ease-in-out infinite' }} />
+                    </div>
+                  )}
                 </div>
               )}
 
