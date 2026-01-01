@@ -273,83 +273,119 @@ export function InboxLearningStep({ workspaceId, onComplete, onBack }: InboxLear
       )}
 
       {status === 'complete' && summary && (
-        <Card className="p-8">
-          <div className="text-center space-y-6">
-            <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto">
-              <CheckCircle2 className="h-8 w-8 text-green-600" />
-            </div>
-            <div className="space-y-2">
-              <h3 className="font-semibold text-lg">Learning Complete!</h3>
-              <p className="text-sm text-muted-foreground">
-                BizzyBee now understands your communication style
-              </p>
-            </div>
+        <div className="space-y-4">
+          <Card className="p-6">
+            <div className="text-center space-y-4">
+              <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto">
+                <CheckCircle2 className="h-8 w-8 text-green-600" />
+              </div>
+              <div className="space-y-2">
+                <h3 className="font-semibold text-lg">Learning Complete!</h3>
+                <p className="text-sm text-muted-foreground">
+                  BizzyBee now understands your communication style
+                </p>
+              </div>
 
-            {/* Summary stats */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="bg-muted/30 rounded-lg p-3 text-center">
-                <div className="text-xl font-bold text-foreground">
-                  {summary.totalEmailsAnalyzed.toLocaleString()}
+              {/* Summary stats */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="bg-muted/30 rounded-lg p-3 text-center">
+                  <div className="text-xl font-bold text-foreground">
+                    {summary.totalEmailsAnalyzed.toLocaleString()}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Emails analyzed</p>
                 </div>
-                <p className="text-xs text-muted-foreground">Emails analyzed</p>
+                <div className="bg-muted/30 rounded-lg p-3 text-center">
+                  <div className="text-xl font-bold text-foreground">
+                    {summary.outboundAnalyzed.toLocaleString()}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Responses studied</p>
+                </div>
+                <div className="bg-muted/30 rounded-lg p-3 text-center">
+                  <div className="text-xl font-bold text-green-600">
+                    {summary.patternsLearned}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Patterns learned</p>
+                </div>
+                <div className="bg-muted/30 rounded-lg p-3 text-center">
+                  <div className="text-xl font-bold text-amber-600">
+                    {summary.topCategories?.length || 0}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Inquiry types</p>
+                </div>
               </div>
-              <div className="bg-muted/30 rounded-lg p-3 text-center">
-                <div className="text-xl font-bold text-foreground">
-                  {summary.outboundAnalyzed.toLocaleString()}
-                </div>
-                <p className="text-xs text-muted-foreground">Responses studied</p>
-              </div>
-              <div className="bg-muted/30 rounded-lg p-3 text-center">
-                <div className="text-xl font-bold text-green-600">
-                  {summary.patternsLearned}
-                </div>
-                <p className="text-xs text-muted-foreground">Patterns learned</p>
-              </div>
-              <div className="bg-muted/30 rounded-lg p-3 text-center">
-                <div className="text-xl font-bold text-amber-600">
-                  {summary.topCategories?.length || 0}
-                </div>
-                <p className="text-xs text-muted-foreground">Inquiry types</p>
+
+              {/* Voice profile */}
+              <div className="bg-primary/5 rounded-lg p-4 text-left">
+                <p className="text-xs text-muted-foreground mb-1">Your communication style</p>
+                <p className="font-medium text-primary">
+                  {getToneLabel(summary.toneDescriptors)}
+                </p>
               </div>
             </div>
+          </Card>
 
-            {/* Voice profile */}
-            <div className="bg-primary/5 rounded-lg p-4 text-left">
-              <p className="text-xs text-muted-foreground mb-1">Your communication style</p>
-              <p className="font-medium text-primary">
-                {getToneLabel(summary.toneDescriptors)}
-              </p>
-              {summary.topCategories && summary.topCategories.length > 0 && (
-                <div className="mt-3 pt-3 border-t border-primary/10">
-                  <p className="text-xs text-muted-foreground mb-2">Most common inquiries</p>
-                  <div className="flex flex-wrap gap-2">
-                    {summary.topCategories.slice(0, 4).map((cat, i) => (
-                      <span 
-                        key={i}
-                        className="text-xs bg-background px-2 py-1 rounded-full"
-                      >
-                        {cat.category} ({cat.count})
-                      </span>
-                    ))}
+          {/* Detailed Insights Card */}
+          {summary.topCategories && summary.topCategories.length > 0 && (
+            <Card className="p-4">
+              <h4 className="font-medium mb-3 flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-primary" />
+                What BizzyBee Learned
+              </h4>
+              
+              <div className="space-y-4">
+                {/* Top inquiry types with bars */}
+                <div>
+                  <p className="text-xs text-muted-foreground mb-2">Your most common inquiry types</p>
+                  <div className="space-y-2">
+                    {summary.topCategories.slice(0, 5).map((cat, i) => {
+                      const maxCount = summary.topCategories[0]?.count || 1;
+                      const percentage = Math.round((cat.count / maxCount) * 100);
+                      return (
+                        <div key={i} className="flex items-center gap-2">
+                          <div className="flex-1">
+                            <div className="flex justify-between text-sm mb-1">
+                              <span className="capitalize">{cat.category.replace(/_/g, ' ')}</span>
+                              <span className="text-muted-foreground">{cat.count}</span>
+                            </div>
+                            <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                              <div 
+                                className="h-full bg-primary rounded-full transition-all"
+                                style={{ width: `${percentage}%` }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
-              )}
-            </div>
 
-            <Button 
-              onClick={() => onComplete({ 
-                emailsAnalyzed: summary.totalEmailsAnalyzed,
-                patternsLearned: summary.patternsLearned,
-                voiceProfileBuilt: summary.outboundAnalyzed > 0
-              })} 
-              size="lg" 
-              className="w-full"
-            >
-              Continue
-              <ChevronRight className="h-4 w-4 ml-2" />
-            </Button>
-          </div>
-        </Card>
+                {/* Average response time if available */}
+                {summary.avgResponseTimeHours && (
+                  <div className="pt-3 border-t">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Your avg response time</span>
+                      <span className="font-medium">{Math.round(summary.avgResponseTimeHours)} hours</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </Card>
+          )}
+
+          <Button 
+            onClick={() => onComplete({ 
+              emailsAnalyzed: summary.totalEmailsAnalyzed,
+              patternsLearned: summary.patternsLearned,
+              voiceProfileBuilt: summary.outboundAnalyzed > 0
+            })} 
+            size="lg" 
+            className="w-full"
+          >
+            Continue
+            <ChevronRight className="h-4 w-4 ml-2" />
+          </Button>
+        </div>
       )}
 
       {status === 'idle' && (

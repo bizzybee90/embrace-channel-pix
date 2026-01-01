@@ -26,6 +26,7 @@ import { BehaviorStatsPanel } from '@/components/settings/BehaviorStatsPanel';
 import { NotificationPreferencesPanel } from '@/components/settings/NotificationPreferencesPanel';
 import { LowConfidenceWizard } from '@/components/settings/LowConfidenceWizard';
 import { LearningAnalyticsDashboard } from '@/components/settings/LearningAnalyticsDashboard';
+import { InboxLearningInsightsPanel } from '@/components/settings/InboxLearningInsightsPanel';
 import { DataResetPanel } from '@/components/settings/DataResetPanel';
 import { TestMessageGenerator } from '@/components/TestMessageGenerator';
 import { BackButton } from '@/components/shared/BackButton';
@@ -63,6 +64,9 @@ export default function Settings() {
           </SettingsSection>
           <SettingsSection title="Knowledge Base" description="FAQs, pricing, and business facts">
             <KnowledgeBasePanel />
+          </SettingsSection>
+          <SettingsSection title="Inbox Learning Insights" description="What BizzyBee learned from your emails">
+            <InboxLearningInsightsPanel />
           </SettingsSection>
           <SettingsSection title="Learning Analytics" description="Track AI improvement over time">
             <LearningAnalyticsDashboard />
