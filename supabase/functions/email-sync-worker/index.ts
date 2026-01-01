@@ -471,7 +471,7 @@ serve(async (req) => {
       // Trigger thread matching (Phase 2 of training)
       console.log('Starting thread matching phase...');
       // Ensure the background invocation isn't dropped during function shutdown
-      EdgeRuntime.waitUntil(
+      waitUntil(
         supabase.functions
           .invoke('match-email-threads', {
             body: { workspace_id: config.workspace_id },
@@ -487,7 +487,7 @@ serve(async (req) => {
       // Schedule next batch (self-invoke)
       console.log('Scheduling next batch...');
       // Ensure the self-invocation isn't dropped during function shutdown
-      EdgeRuntime.waitUntil(
+      waitUntil(
         supabase.functions
           .invoke('email-sync-worker', {
             body: { jobId, configId },
