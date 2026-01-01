@@ -168,8 +168,8 @@ export function EmailConnectionStep({
     popupRef.current = null;
 
     try {
-      // Use Gmail direct API for Gmail, Aurinko for others
-      const authEndpoint = provider === 'gmail' ? 'gmail-auth-start' : 'aurinko-auth-start';
+      // Use Aurinko for all providers (avoids Google OAuth verification requirements)
+      const authEndpoint = 'aurinko-auth-start';
       
       const { data, error } = await supabase.functions.invoke(authEndpoint, {
         body: {
