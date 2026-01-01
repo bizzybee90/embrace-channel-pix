@@ -186,42 +186,11 @@ export function EmailConnectionStep({
         // Store that we're expecting a callback
         localStorage.setItem('onboarding_email_pending', 'true');
         localStorage.setItem('onboarding_workspace_id', workspaceId);
+        localStorage.setItem('onboarding_import_mode', importMode);
 
-        // Open OAuth in popup
-        const popup = window.open(data.authUrl, 'email_oauth', 'width=600,height=700,left=200,top=100');
-        popupRef.current = popup;
-
-        // Check if popup was blocked
-        if (!popup || popup.closed || typeof popup.closed === 'undefined') {
-          toast.info('Opening in new tab instead...');
-          window.open(data.authUrl, '_blank');
-          setIsConnecting(false);
-          return;
-        }
-
-        // Poll for completion
-        popupPollRef.current = window.setInterval(async () => {
-          if (popup?.closed) {
-            if (popupPollRef.current) window.clearInterval(popupPollRef.current);
-            popupPollRef.current = undefined;
-            setIsConnecting(false);
-            await checkEmailConnection();
-          }
-        }, 1000);
-
-        // Timeout after 5 minutes (but don't false-alarm if it actually succeeded)
-        connectTimeoutRef.current = window.setTimeout(async () => {
-          if (popupPollRef.current) window.clearInterval(popupPollRef.current);
-          popupPollRef.current = undefined;
-
-          // One last check before showing any error
-          await checkEmailConnection();
-          const stillPending = localStorage.getItem('onboarding_email_pending') === 'true';
-          if (stillPending && !connectedEmailRef.current) {
-            setIsConnecting(false);
-            toast.error('Connection timed out. Please try again.');
-          }
-        }, 300000);
+        // Use direct navigation instead of popup for better Safari/COOP compatibility
+        // The callback will redirect back to /onboarding with status params
+        window.location.href = data.authUrl;
       }
     } catch (error) {
       console.error('Error starting OAuth:', error);
@@ -411,9 +380,34 @@ export function EmailConnectionStep({
     };
   }, [isConnecting, connectedEmail, workspaceId, connectedConfigId, connectedImportMode]);
 
-  // If OAuth redirected back to the app (no postMessage), show a toast on success/error.
+  // Handle OAuth redirect back to the app (both Aurinko and Gmail direct)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    
+    // Handle Gmail direct OAuth callback
+    const emailStatus = params.get('email_status');
+    if (emailStatus === 'success') {
+      toast.success('Email connected successfully');
+      localStorage.removeItem('onboarding_email_pending');
+      // Clean up URL params
+      params.delete('email_status');
+      params.delete('message');
+      const newUrl = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ''}`;
+      window.history.replaceState({}, '', newUrl);
+      // Refresh connection status
+      checkEmailConnection();
+    }
+    if (emailStatus === 'error') {
+      toast.error(params.get('message') || 'Email connection failed');
+      localStorage.removeItem('onboarding_email_pending');
+      params.delete('email_status');
+      params.delete('message');
+      const newUrl = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ''}`;
+      window.history.replaceState({}, '', newUrl);
+      setIsConnecting(false);
+    }
+    
+    // Handle Aurinko OAuth callback (legacy)
     const aurinko = params.get('aurinko');
     if (aurinko === 'success') {
       toast.success('Email connected');
