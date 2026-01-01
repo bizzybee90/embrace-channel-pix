@@ -23,6 +23,7 @@ import ActivityPage from "./pages/ActivityPage";
 import Diagnostics from "./pages/Diagnostics";
 import LearningPage from "./pages/LearningPage";
 import GDPRPortal from "./pages/GDPRPortal";
+import EmailAuthSuccess from "./pages/EmailAuthSuccess";
 
 
 const queryClient = new QueryClient();
@@ -32,6 +33,7 @@ const RouterContent = () => {
     <Routes>
       <Route path="/auth" element={<Auth />} />
       <Route path="/onboarding" element={<Onboarding />} />
+      <Route path="/email-auth-success" element={<EmailAuthSuccess />} />
       
       {/* Home - Calm reassurance screen */}
       <Route 

@@ -53,34 +53,40 @@ const importModes = [
   { 
     value: 'all_history' as ImportMode, 
     label: 'Entire email history', 
-    description: 'Import everything — best for maximum AI accuracy (may take longer for large inboxes)',
+    description: 'Import everything — best for maximum AI accuracy',
+    timeEstimate: '30-45 mins',
     recommended: false
   },
   { 
     value: 'last_1000' as ImportMode, 
     label: 'Last 1,000 emails', 
     description: 'Great balance of learning data and speed',
+    timeEstimate: '5-10 mins',
     recommended: true
   },
   { 
     value: 'all_historical_90_days' as ImportMode, 
     label: 'Last 90 days', 
-    description: 'Import all emails from the past 3 months' 
+    description: 'Import all emails from the past 3 months',
+    timeEstimate: '10-20 mins'
   },
   { 
     value: 'all_historical_30_days' as ImportMode, 
     label: 'Last 30 days', 
-    description: 'A lighter import for smaller inboxes' 
+    description: 'A lighter import for smaller inboxes',
+    timeEstimate: '5-10 mins'
   },
   { 
     value: 'unread_only' as ImportMode, 
     label: 'Unread emails only', 
-    description: 'Quick start — just your current unread messages' 
+    description: 'Quick start — just your current unread messages',
+    timeEstimate: '1-2 mins'
   },
   { 
     value: 'new_only' as ImportMode, 
     label: 'New emails only', 
-    description: 'Only receive new emails going forward (no history)' 
+    description: 'Only receive new emails going forward (no history)',
+    timeEstimate: 'Instant'
   },
 ];
 
@@ -311,7 +317,7 @@ export function EmailConnectionStep({
             fewShotStatus: progressResult.data.few_shot_status || 'pending',
             responseRatePercent: progressResult.data.response_rate_percent,
             avgResponseTimeHours: progressResult.data.avg_response_time_hours,
-            topCategories: progressResult.data.top_categories || [],
+            topCategories: (progressResult.data.top_categories as unknown as { category: string; count: number }[]) || [],
           });
         }
       }, 2000); // 2-second polling
@@ -440,9 +446,14 @@ export function EmailConnectionStep({
                 </div>
               )}
 
-              <p className="text-xs text-muted-foreground">
-                You can continue while we build your AI clone in the background.
-              </p>
+              <div className="text-center space-y-1">
+                <p className="text-xs text-muted-foreground">
+                  You can continue while we build your AI clone in the background.
+                </p>
+                <p className="text-xs text-muted-foreground/70 italic">
+                  ☕ Perfect time for a coffee break!
+                </p>
+              </div>
             </div>
           )}
 
@@ -513,13 +524,20 @@ export function EmailConnectionStep({
                 >
                   <RadioGroupItem value={mode.value} id={mode.value} className="mt-1" />
                   <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <Label htmlFor={mode.value} className="font-medium cursor-pointer">
-                        {mode.label}
-                      </Label>
-                      {mode.recommended && (
-                        <span className="text-[10px] font-medium text-primary bg-primary/10 px-1.5 py-0.5 rounded">
-                          Recommended
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor={mode.value} className="font-medium cursor-pointer">
+                          {mode.label}
+                        </Label>
+                        {mode.recommended && (
+                          <span className="text-[10px] font-medium text-primary bg-primary/10 px-1.5 py-0.5 rounded">
+                            Recommended
+                          </span>
+                        )}
+                      </div>
+                      {'timeEstimate' in mode && mode.timeEstimate && (
+                        <span className="text-[10px] text-muted-foreground bg-muted px-2 py-0.5 rounded whitespace-nowrap">
+                          {mode.timeEstimate}
                         </span>
                       )}
                     </div>
