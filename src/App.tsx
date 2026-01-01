@@ -9,6 +9,7 @@ import NotFound from "./pages/NotFound";
 import Settings from "./pages/Settings";
 import WebhookLogs from "./pages/WebhookLogs";
 import Privacy from "./pages/Privacy";
+import Terms from "./pages/Terms";
 import Escalations from "./pages/Escalations";
 import { EscalationHub } from "./pages/EscalationHub";
 import ConversationView from "./pages/ConversationView";
@@ -247,6 +248,7 @@ const RouterContent = () => {
         } 
       />
       <Route path="/privacy" element={<Privacy />} />
+      <Route path="/terms" element={<Terms />} />
       
       {/* Public GDPR Self-Service Portal */}
       <Route path="/gdpr-portal" element={<GDPRPortal />} />
