@@ -27,17 +27,7 @@ const STEPS: Step[] = ['welcome', 'email', 'business', 'knowledge', 'competitors
 export function OnboardingWizard({ workspaceId, onComplete }: OnboardingWizardProps) {
   const storageKey = `bizzybee:onboarding:${workspaceId}`;
 
-  const [currentStep, setCurrentStep] = useState<Step>(() => {
-    try {
-      const raw = localStorage.getItem(storageKey);
-      if (!raw) return 'welcome';
-      const parsed = JSON.parse(raw) as { step?: Step };
-      return parsed.step && STEPS.includes(parsed.step) ? parsed.step : 'welcome';
-    } catch {
-      return 'welcome';
-    }
-  });
-  const [businessContext, setBusinessContext] = useState({
+  const businessContextDefaults = {
     companyName: '',
     businessType: '',
     isHiring: false,
@@ -45,6 +35,43 @@ export function OnboardingWizard({ workspaceId, onComplete }: OnboardingWizardPr
     emailDomain: '',
     websiteUrl: '',
     serviceArea: '',
+  };
+
+  type StoredOnboardingDraft = {
+    step?: Step;
+    businessContext?: typeof businessContextDefaults;
+    updatedAt?: number;
+  };
+
+  const readStored = (): StoredOnboardingDraft => {
+    try {
+      const raw = localStorage.getItem(storageKey);
+      return raw ? (JSON.parse(raw) as StoredOnboardingDraft) : {};
+    } catch {
+      return {};
+    }
+  };
+
+  const writeStored = (patch: Partial<StoredOnboardingDraft>) => {
+    try {
+      const prev = readStored();
+      localStorage.setItem(
+        storageKey,
+        JSON.stringify({ ...prev, ...patch, updatedAt: Date.now() } satisfies StoredOnboardingDraft)
+      );
+    } catch {
+      // ignore
+    }
+  };
+
+  const stored = readStored();
+
+  const [currentStep, setCurrentStep] = useState<Step>(() => {
+    return stored.step && STEPS.includes(stored.step) ? stored.step : 'welcome';
+  });
+
+  const [businessContext, setBusinessContext] = useState(() => {
+    return { ...businessContextDefaults, ...(stored.businessContext ?? {}) };
   });
   const [senderRulesCreated, setSenderRulesCreated] = useState(0);
   const [triageResults, setTriageResults] = useState({ processed: 0, changed: 0 });
@@ -52,17 +79,14 @@ export function OnboardingWizard({ workspaceId, onComplete }: OnboardingWizardPr
   const [competitorResults, setCompetitorResults] = useState({ sitesScraped: 0, faqsGenerated: 0 });
   const [connectedEmail, setConnectedEmail] = useState<string | null>(null);
 
-  const persistStepLocally = (step: Step) => {
-    try {
-      localStorage.setItem(storageKey, JSON.stringify({ step, updatedAt: Date.now() }));
-    } catch {
-      // ignore
-    }
-  };
+  useEffect(() => {
+    writeStored({ businessContext });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [businessContext, workspaceId]);
 
   // Save progress to database
   const saveProgress = async (step: Step) => {
-    persistStepLocally(step);
+    writeStored({ step });
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
@@ -91,7 +115,7 @@ export function OnboardingWizard({ workspaceId, onComplete }: OnboardingWizardPr
           if (data?.onboarding_step && STEPS.includes(data.onboarding_step as Step)) {
             const dbStep = data.onboarding_step as Step;
             setCurrentStep(dbStep);
-            persistStepLocally(dbStep);
+            writeStored({ step: dbStep });
           }
 
           // Check if email is already connected
