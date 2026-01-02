@@ -6,13 +6,14 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const BATCH_SIZE = 100;
+// Smaller batch to avoid rate limits
+const BATCH_SIZE = 50;
 const MAX_RUNTIME_MS = 25000;
 
-// Rate limiting configuration
+// Rate limiting configuration - be conservative
 const MAX_RETRIES = 3;
 const RATE_LIMIT_WAIT_MS = 60000; // 60 seconds on 429
-const REQUEST_DELAY_MS = 200; // 200ms between requests
+const REQUEST_DELAY_MS = 500; // 500ms between batch requests (increased from 200ms)
 const INITIAL_RETRY_DELAY_MS = 5000; // 5 seconds for other retries
 
 declare const EdgeRuntime: { waitUntil: (promise: Promise<unknown>) => void } | undefined;
