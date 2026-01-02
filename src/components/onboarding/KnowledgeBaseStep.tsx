@@ -219,9 +219,15 @@ export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, on
         </div>
       </div>
 
-      <Button variant="ghost" onClick={handleSkip} className="w-full text-muted-foreground">
-        Skip this step
-      </Button>
+      <div className="flex gap-3">
+        <Button variant="outline" onClick={onBack} className="flex-1">
+          <ChevronLeft className="h-4 w-4 mr-2" />
+          Back
+        </Button>
+        <Button variant="ghost" onClick={handleSkip} className="flex-1 text-muted-foreground">
+          Skip this step
+        </Button>
+      </div>
     </div>
   );
 }
