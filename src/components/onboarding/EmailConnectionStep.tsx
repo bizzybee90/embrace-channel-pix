@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { CardTitle, CardDescription } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Mail, CheckCircle2, Loader2, RefreshCw, ArrowRight, AlertCircle, RotateCcw } from 'lucide-react';
+import { Mail, CheckCircle2, Loader2, RefreshCw, ArrowRight, AlertCircle, RotateCcw, StopCircle } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
@@ -327,6 +327,39 @@ export function EmailConnectionStep({
     } catch (e) {
       console.error(e);
       toast.error('Could not resume the email scan.');
+    }
+  };
+
+  const handleStopSync = async () => {
+    if (!connectedConfigId || !syncStatus?.activeJobId) return;
+    try {
+      toast.message('Stopping sync…');
+      
+      // Cancel the active job
+      await supabase
+        .from('email_sync_jobs')
+        .update({ 
+          status: 'cancelled',
+          error_message: 'Stopped by user'
+        })
+        .eq('id', syncStatus.activeJobId);
+      
+      // Update config to show completed (we have enough data)
+      await supabase
+        .from('email_provider_configs')
+        .update({
+          sync_status: 'completed',
+          sync_stage: 'complete',
+          sync_completed_at: new Date().toISOString(),
+          active_job_id: null,
+        })
+        .eq('id', connectedConfigId);
+      
+      toast.success('Sync stopped. You can continue with the imported emails.');
+      await checkEmailConnection();
+    } catch (e) {
+      console.error(e);
+      toast.error('Could not stop the sync.');
     }
   };
 
@@ -707,6 +740,17 @@ export function EmailConnectionStep({
                 </span>
                 <span>Actively syncing</span>
               </div>
+
+              {/* Stop sync button */}
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleStopSync}
+                className="gap-1 text-xs"
+              >
+                <StopCircle className="h-3 w-3" />
+                Stop & use imported emails
+              </Button>
 
               <div className="text-center space-y-1">
                 <p className="text-xs text-muted-foreground">

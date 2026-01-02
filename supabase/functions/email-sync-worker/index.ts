@@ -23,6 +23,16 @@ const waitUntil = (promise: Promise<unknown>) => {
 const BATCH_SIZE = 50;
 const MAX_RUNTIME_MS = 25000; // 25 seconds, leave buffer before 30s timeout
 
+// Import mode limits - stop fetching when limit is reached
+const IMPORT_MODE_LIMITS: Record<string, number | null> = {
+  'last_1000': 1000,
+  'all_historical_30_days': null, // Use date filter instead
+  'all_historical_90_days': null, // Use date filter instead
+  'unread_only': null, // Handled differently
+  'new_only': null, // No historical import
+  'all_history': null, // No limit
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -49,6 +59,15 @@ serve(async (req) => {
       console.error('Job not found:', jobError);
       return new Response(JSON.stringify({ error: 'Job not found' }), {
         status: 404,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Check if job was cancelled by user
+    if (job.status === 'cancelled') {
+      console.log('[Worker] Job was cancelled by user, exiting');
+      return new Response(JSON.stringify({ cancelled: true, reason: 'user_cancelled' }), {
+        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
@@ -95,6 +114,10 @@ serve(async (req) => {
       started_at: job.started_at || new Date().toISOString()
     }).eq('id', jobId);
 
+    // Determine import limit based on mode
+    const importLimit = IMPORT_MODE_LIMITS[job.import_mode] ?? null;
+    console.log('[Worker] Import mode:', job.import_mode, 'Limit:', importLimit);
+
     const allConnectedEmails = [
       config.email_address.toLowerCase(), 
       ...(config.aliases || []).map((a: string) => a.toLowerCase())
@@ -117,12 +140,18 @@ serve(async (req) => {
     let batchCount = 0;
     let needsContinuation = false;
 
+    // Check if we've already hit the import limit (for resuming jobs)
+    const limitReached = importLimit !== null && inboundProcessed >= importLimit;
+    if (limitReached) {
+      console.log('[Worker] Import limit already reached:', inboundProcessed, '>=', importLimit);
+    }
+
     // Determine which phase we're in
     const isInboundPhase = !job.inbound_cursor || job.inbound_cursor !== 'DONE';
     
-    if (isInboundPhase) {
+    if (isInboundPhase && !limitReached) {
       // INBOUND PHASE
-      console.log('Processing inbound emails, cursor:', job.inbound_cursor);
+      console.log('Processing inbound emails, cursor:', job.inbound_cursor, 'Processed so far:', inboundProcessed);
       
       await supabase.from('email_provider_configs').update({ 
         sync_stage: 'fetching_inbox' 
@@ -214,9 +243,16 @@ serve(async (req) => {
       console.log(`Fetched ${messages.length} messages, nextPage: ${!!nextPageToken}`);
 
       for (const messageSummary of messages) {
+        // Check timeout
         if (Date.now() - startTime > MAX_RUNTIME_MS) {
           console.log('Approaching timeout, saving progress');
           needsContinuation = true;
+          break;
+        }
+
+        // Check import limit
+        if (importLimit !== null && inboundProcessed >= importLimit) {
+          console.log('[Worker] Import limit reached:', inboundProcessed, '>=', importLimit);
           break;
         }
 
@@ -324,16 +360,25 @@ serve(async (req) => {
         }
       }
 
+      // Check if we hit the import limit
+      const hitLimit = importLimit !== null && inboundProcessed >= importLimit;
+      
       // Update job with progress
-      const newCursor = needsContinuation 
-        ? (job.inbound_cursor || 'START')  // Keep same cursor if interrupted
-        : (nextPageToken || 'DONE');
+      const newCursor = hitLimit
+        ? 'DONE'  // Mark inbound as done when limit is reached
+        : needsContinuation 
+          ? (job.inbound_cursor || 'START')  // Keep same cursor if interrupted
+          : (nextPageToken || 'DONE');
+      
+      if (hitLimit) {
+        console.log('[Worker] Marking inbound DONE due to limit:', inboundProcessed);
+      }
       
       await supabase.from('email_sync_jobs').update({
         inbound_cursor: newCursor,
         inbound_processed: inboundProcessed,
         last_batch_at: new Date().toISOString(),
-        status: (newCursor === 'DONE' && !nextPageToken) ? 'running' : 'running'
+        status: 'running'
       }).eq('id', jobId);
 
       // Update provider config progress monotonically (avoid jumping backwards if multiple jobs run)
@@ -355,8 +400,16 @@ serve(async (req) => {
         sync_progress: progressCount,
       }).eq('id', configId);
 
-      needsContinuation = needsContinuation || !!nextPageToken;
+      // Only continue if we haven't hit the limit and there's more pages
+      needsContinuation = (needsContinuation || !!nextPageToken) && !(importLimit !== null && inboundProcessed >= importLimit);
 
+    } else if (limitReached) {
+      // If limit was already reached on job resume, mark inbound done
+      console.log('[Worker] Limit was already reached, marking inbound DONE');
+      await supabase.from('email_sync_jobs').update({
+        inbound_cursor: 'DONE',
+        last_batch_at: new Date().toISOString(),
+      }).eq('id', jobId);
     } else {
       // SENT PHASE
       console.log('Processing sent emails, cursor:', job.sent_cursor);
