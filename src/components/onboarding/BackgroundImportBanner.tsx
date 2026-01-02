@@ -1,4 +1,4 @@
-import { Mail, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { Mail, CheckCircle2, AlertCircle, Loader2, Inbox, Send } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { useEmailImportStatus } from '@/hooks/useEmailImportStatus';
 import { cn } from '@/lib/utils';
@@ -9,12 +9,21 @@ interface BackgroundImportBannerProps {
 }
 
 export function BackgroundImportBanner({ workspaceId, className }: BackgroundImportBannerProps) {
-  const { isImporting, progress, statusMessage, phase } = useEmailImportStatus(workspaceId);
+  const { 
+    isImporting, 
+    progress, 
+    statusMessage, 
+    phase,
+    inboxCount,
+    inboxTotal,
+    sentCount,
+    sentTotal,
+  } = useEmailImportStatus(workspaceId);
 
   // Don't show if idle or no import has been started
   if (phase === 'idle') return null;
 
-  // Show success briefly then hide (we'll let toast handle long-term notification)
+  // Show success briefly
   if (phase === 'complete') {
     return (
       <div className={cn(
@@ -40,24 +49,67 @@ export function BackgroundImportBanner({ workspaceId, className }: BackgroundImp
     );
   }
 
-  // Active import state
+  // Active import state with inbox/sent breakdown
   return (
     <div className={cn(
-      "flex items-center gap-3 px-4 py-2.5 rounded-lg bg-primary/5 border border-primary/20 text-sm",
+      "flex flex-col gap-2 px-4 py-3 rounded-lg bg-primary/5 border border-primary/20 text-sm",
       className
     )}>
-      <div className="relative flex-shrink-0">
-        <Mail className="h-4 w-4 text-primary" />
-        <span className="absolute -top-0.5 -right-0.5 h-2 w-2 bg-primary rounded-full animate-pulse" />
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-foreground truncate">{statusMessage}</span>
-          <Loader2 className="h-3 w-3 animate-spin text-muted-foreground flex-shrink-0" />
+      {/* Header */}
+      <div className="flex items-center gap-2">
+        <div className="relative flex-shrink-0">
+          <Mail className="h-4 w-4 text-primary" />
+          <span className="absolute -top-0.5 -right-0.5 h-2 w-2 bg-primary rounded-full animate-pulse" />
         </div>
-        <Progress value={progress} className="h-1" />
+        <span className="font-medium text-foreground">Importing emails...</span>
+        <Loader2 className="h-3 w-3 animate-spin text-muted-foreground ml-auto" />
       </div>
-      <span className="text-xs text-muted-foreground flex-shrink-0">{progress}%</span>
+
+      {/* Progress breakdown */}
+      <div className="grid grid-cols-2 gap-3 text-xs">
+        <div className="flex items-center gap-2">
+          <Inbox className={cn(
+            "h-3.5 w-3.5",
+            phase === 'fetching_inbox' ? "text-primary" : "text-muted-foreground"
+          )} />
+          <span className={cn(
+            phase === 'fetching_inbox' ? "text-foreground font-medium" : "text-muted-foreground"
+          )}>
+            Inbox: {inboxCount.toLocaleString()}
+            {inboxTotal > 0 && ` / ${inboxTotal.toLocaleString()}`}
+          </span>
+          {phase === 'fetching_inbox' && (
+            <span className="text-primary text-[10px]">●</span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <Send className={cn(
+            "h-3.5 w-3.5",
+            phase === 'fetching_sent' ? "text-primary" : "text-muted-foreground"
+          )} />
+          <span className={cn(
+            phase === 'fetching_sent' ? "text-foreground font-medium" : "text-muted-foreground"
+          )}>
+            {phase === 'fetching_inbox' ? (
+              'Sent: Pending...'
+            ) : (
+              <>
+                Sent: {sentCount.toLocaleString()}
+                {sentTotal > 0 && ` / ${sentTotal.toLocaleString()}`}
+              </>
+            )}
+          </span>
+          {phase === 'fetching_sent' && (
+            <span className="text-primary text-[10px]">●</span>
+          )}
+        </div>
+      </div>
+
+      {/* Progress bar */}
+      <div className="flex items-center gap-2">
+        <Progress value={progress} className="h-1.5 flex-1" />
+        <span className="text-xs text-muted-foreground w-8 text-right">{progress}%</span>
+      </div>
     </div>
   );
 }

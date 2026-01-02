@@ -8,14 +8,15 @@ const corsHeaders = {
 
 // ============================================
 // SIMPLIFIED LEARN FROM INBOX
-// Does everything in ONE call:
+// Uses Claude for superior voice analysis
 // 1. Sample 75 outbound emails
-// 2. ONE AI call to analyze voice profile
+// 2. ONE Claude call to analyze voice profile
 // 3. Save results
 // 4. Done in ~15 seconds
 // ============================================
 
 const SAMPLE_SIZE = 75;
+const MIN_EMAILS_REQUIRED = 10;
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -34,11 +35,11 @@ serve(async (req) => {
       });
     }
 
-    console.log('[LearnFromInbox] Starting simplified learning for workspace:', workspace_id);
+    console.log('[LearnFromInbox] Starting voice learning for workspace:', workspace_id);
 
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
     
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -83,14 +84,18 @@ serve(async (req) => {
 
     console.log(`[LearnFromInbox] Sampled ${qualityEmails.length} quality outbound emails`);
 
-    if (qualityEmails.length < 5) {
-      console.log('[LearnFromInbox] Not enough emails for analysis');
+    // CRITICAL: Fail if not enough emails - never show fake success
+    if (qualityEmails.length < MIN_EMAILS_REQUIRED) {
+      console.log(`[LearnFromInbox] Not enough emails: ${qualityEmails.length} < ${MIN_EMAILS_REQUIRED}`);
       return new Response(JSON.stringify({
-        success: true,
-        emailsAnalyzed: qualityEmails.length,
-        message: 'Not enough outbound emails for voice analysis',
-        profile: null,
+        success: false,
+        error: 'not_enough_emails',
+        message: `Need at least ${MIN_EMAILS_REQUIRED} sent emails for voice analysis. Found: ${qualityEmails.length}`,
+        emailsFound: qualityEmails.length,
+        totalOutbound: totalOutbound || 0,
+        minRequired: MIN_EMAILS_REQUIRED,
       }), {
+        status: 200, // 200 so it's not a hard error, but success: false
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -127,114 +132,119 @@ Create a voice profile. Return ONLY valid JSON:
   "confidence_score": 0.0-1.0
 }`;
 
-    // Step 4: ONE AI call using Lovable AI gateway
-    console.log('[LearnFromInbox] Making AI call for voice analysis...');
+    // Step 4: Use Claude for superior voice analysis
+    console.log('[LearnFromInbox] Making Claude API call for voice analysis...');
     
     let profile: any = null;
     
-    if (LOVABLE_API_KEY) {
-      const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'google/gemini-2.5-flash',
-          messages: [
-            { role: 'system', content: 'You are an expert at analyzing communication styles. Return only valid JSON.' },
-            { role: 'user', content: prompt }
-          ],
-        }),
+    if (!ANTHROPIC_API_KEY) {
+      console.error('[LearnFromInbox] ANTHROPIC_API_KEY not configured');
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'configuration_error',
+        message: 'Claude API key not configured. Voice learning requires Claude for best results.',
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
+    }
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('[LearnFromInbox] AI API error:', response.status, errorText);
-        throw new Error(`AI API error: ${response.status}`);
-      }
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 2048,
+        messages: [
+          { 
+            role: 'user', 
+            content: prompt 
+          }
+        ],
+        system: 'You are an expert at analyzing communication styles. Return only valid JSON with no markdown formatting.',
+      }),
+    });
 
-      const data = await response.json();
-      const content = data.choices?.[0]?.message?.content || '';
-      
-      // Parse JSON from response
-      try {
-        let jsonText = content.trim();
-        // Handle markdown code blocks
-        if (jsonText.includes('```')) {
-          jsonText = jsonText.replace(/```json?\n?/g, '').replace(/```$/g, '').trim();
-        }
-        // Find JSON object
-        const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          profile = JSON.parse(jsonMatch[0]);
-        }
-      } catch (parseError) {
-        console.error('[LearnFromInbox] Failed to parse AI response:', parseError);
-        console.log('[LearnFromInbox] Raw response:', content.substring(0, 500));
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[LearnFromInbox] Claude API error:', response.status, errorText);
+      throw new Error(`Claude API error: ${response.status} - ${errorText}`);
+    }
+
+    const data = await response.json();
+    const content = data.content?.[0]?.text || '';
+    
+    console.log('[LearnFromInbox] Claude response received, parsing...');
+    
+    // Parse JSON from response
+    try {
+      let jsonText = content.trim();
+      // Handle markdown code blocks
+      if (jsonText.includes('```')) {
+        jsonText = jsonText.replace(/```json?\n?/g, '').replace(/```$/g, '').trim();
       }
-    } else {
-      console.log('[LearnFromInbox] No LOVABLE_API_KEY, using basic analysis');
-      // Basic fallback analysis without AI
-      profile = {
-        tone: 'professional',
-        tone_description: 'Professional communication style based on email samples.',
-        greeting_style: 'Hi,',
-        sign_off_style: 'Thanks',
-        common_phrases: [],
-        avg_response_length: 'moderate',
-        uses_emojis: false,
-        uses_exclamations: false,
-        formality_level: 5,
-        confidence_score: 0.3,
-      };
+      // Find JSON object
+      const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        profile = JSON.parse(jsonMatch[0]);
+        console.log('[LearnFromInbox] Successfully parsed voice profile');
+      }
+    } catch (parseError) {
+      console.error('[LearnFromInbox] Failed to parse Claude response:', parseError);
+      console.log('[LearnFromInbox] Raw response:', content.substring(0, 500));
+    }
+
+    if (!profile) {
+      throw new Error('Failed to parse voice profile from Claude response');
     }
 
     // Step 5: Save voice profile
-    if (profile) {
-      console.log('[LearnFromInbox] Saving voice profile...');
-      
-      const { error: upsertError } = await supabase
-        .from('voice_profiles')
-        .upsert({
-          workspace_id,
-          // Core profile
-          tone_descriptors: profile.tone ? [profile.tone] : ['professional'],
-          formality_score: (profile.formality_level || 5) * 10,
-          
-          // Patterns
-          greeting_patterns: profile.greeting_style ? [{ text: profile.greeting_style, frequency: 0.8 }] : [],
-          signoff_patterns: profile.sign_off_style ? [{ text: profile.sign_off_style, frequency: 0.8 }] : [],
-          common_phrases: (profile.common_phrases || []).map((p: string) => ({ phrase: p, frequency: 0.5 })),
-          
-          // Writing stats
-          avg_response_length: profile.avg_response_length === 'brief' ? 30 : 
-                               profile.avg_response_length === 'detailed' ? 100 : 50,
-          uses_emojis: profile.uses_emojis || false,
-          uses_exclamations: profile.uses_exclamations || false,
-          
-          // Category-specific handling
-          response_patterns: {
-            pricing: profile.how_they_handle_pricing || null,
-            scheduling: profile.how_they_handle_scheduling || null,
-            complaints: profile.how_they_handle_complaints || null,
-            declining: profile.how_they_decline_requests || null,
-          },
-          
-          // Example responses for few-shot prompting
-          example_responses: profile.example_responses || [],
-          
-          // Metrics
-          emails_analyzed: qualityEmails.length,
-          style_confidence: profile.confidence_score || 0.7,
-          analysis_status: 'complete',
-          last_analyzed_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        }, { onConflict: 'workspace_id' });
+    console.log('[LearnFromInbox] Saving voice profile...');
+    
+    const { error: upsertError } = await supabase
+      .from('voice_profiles')
+      .upsert({
+        workspace_id,
+        // Core profile
+        tone_descriptors: profile.tone ? [profile.tone] : ['professional'],
+        formality_score: (profile.formality_level || 5) * 10,
+        
+        // Patterns
+        greeting_patterns: profile.greeting_style ? [{ text: profile.greeting_style, frequency: 0.8 }] : [],
+        signoff_patterns: profile.sign_off_style ? [{ text: profile.sign_off_style, frequency: 0.8 }] : [],
+        common_phrases: (profile.common_phrases || []).map((p: string) => ({ phrase: p, frequency: 0.5 })),
+        
+        // Writing stats
+        avg_response_length: profile.avg_response_length === 'brief' ? 30 : 
+                             profile.avg_response_length === 'detailed' ? 100 : 50,
+        uses_emojis: profile.uses_emojis || false,
+        uses_exclamations: profile.uses_exclamations || false,
+        
+        // Category-specific handling
+        response_patterns: {
+          pricing: profile.how_they_handle_pricing || null,
+          scheduling: profile.how_they_handle_scheduling || null,
+          complaints: profile.how_they_handle_complaints || null,
+          declining: profile.how_they_decline_requests || null,
+        },
+        
+        // Example responses for few-shot prompting
+        example_responses: profile.example_responses || [],
+        
+        // Metrics
+        emails_analyzed: qualityEmails.length,
+        style_confidence: profile.confidence_score || 0.7,
+        analysis_status: 'complete',
+        last_analyzed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'workspace_id' });
 
-      if (upsertError) {
-        console.error('[LearnFromInbox] Error saving profile:', upsertError);
-      }
+    if (upsertError) {
+      console.error('[LearnFromInbox] Error saving profile:', upsertError);
     }
 
     // Step 6: Quick pattern analysis from conversations
@@ -267,14 +277,14 @@ Create a voice profile. Return ONLY valid JSON:
         learning_phases_completed: { 
           voice_profile: true, 
           patterns: true,
-          single_call: true 
+          claude_analysis: true 
         },
         analyzed_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }, { onConflict: 'workspace_id' });
 
     const processingTime = Date.now() - startTime;
-    console.log(`[LearnFromInbox] Complete in ${processingTime}ms`);
+    console.log(`[LearnFromInbox] Complete in ${processingTime}ms using Claude`);
 
     return new Response(JSON.stringify({
       success: true,
@@ -295,7 +305,10 @@ Create a voice profile. Return ONLY valid JSON:
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('[LearnFromInbox] Error:', error);
-    return new Response(JSON.stringify({ error: errorMessage }), {
+    return new Response(JSON.stringify({ 
+      success: false,
+      error: errorMessage 
+    }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
