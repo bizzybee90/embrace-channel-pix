@@ -145,22 +145,65 @@ serve(async (req) => {
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Fetch failed:', response.status, errorText);
-        const errorMessage = `API error: ${response.status}`;
-        
-        // Update both job AND config to reflect error state
-        await supabase.from('email_sync_jobs').update({ 
-          status: 'error', 
-          error_message: errorMessage 
+
+        const snippet = (errorText || '').slice(0, 300);
+        const errorMessage = `API error: ${response.status}${snippet ? ` - ${snippet}` : ''}`;
+
+        // If Aurinko rejects an older pageToken (HTTP 400), restart from the beginning once.
+        // This is safe because we de-dupe by external ids and prevents “stuck forever” imports.
+        if (
+          response.status === 400 &&
+          job.inbound_cursor &&
+          job.inbound_cursor !== 'START' &&
+          job.inbound_cursor !== 'DONE'
+        ) {
+          console.log('[Worker] Page token rejected (400). Restarting inbound scan from START.', {
+            previousCursor: job.inbound_cursor,
+          });
+
+          await supabase.from('email_sync_jobs').update({
+            inbound_cursor: 'START',
+            last_batch_at: new Date().toISOString(),
+            // Keep status running; surface context for debugging without halting.
+            status: 'running',
+            error_message: `Cursor rejected (400). Restarting from START. ${snippet}`.slice(0, 1000),
+          }).eq('id', jobId);
+
+          // Keep config in "syncing" state (this is a recoverable issue)
+          await supabase.from('email_provider_configs').update({
+            sync_status: 'syncing',
+            sync_error: null,
+          }).eq('id', configId);
+
+          // Schedule a continuation immediately
+          waitUntil(
+            supabase.functions.invoke('email-sync-worker', {
+              body: { jobId, configId },
+            }).then(({ error }) => {
+              if (error) console.error('Failed to schedule recovery batch:', error);
+            })
+          );
+
+          return new Response(JSON.stringify({ recovered: true, reason: 'cursor_rejected' }), {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        // Non-recoverable error: update both job AND config to reflect error state
+        await supabase.from('email_sync_jobs').update({
+          status: 'error',
+          error_message: errorMessage.slice(0, 1000),
         }).eq('id', jobId);
-        
+
         await supabase.from('email_provider_configs').update({
           sync_status: 'error',
-          sync_error: errorMessage,
+          sync_error: errorMessage.slice(0, 1000),
         }).eq('id', configId);
-        
-        return new Response(JSON.stringify({ error: 'API fetch failed' }), {
+
+        return new Response(JSON.stringify({ error: 'API fetch failed', details: errorMessage }), {
           status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
