@@ -1,4 +1,4 @@
-import { Mail, CheckCircle2, AlertCircle, Loader2, Inbox, Send } from 'lucide-react';
+import { Mail, CheckCircle2, AlertCircle, Loader2, Inbox, Send, Clock } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { useEmailImportStatus } from '@/hooks/useEmailImportStatus';
 import { cn } from '@/lib/utils';
@@ -9,10 +9,9 @@ interface BackgroundImportBannerProps {
 }
 
 export function BackgroundImportBanner({ workspaceId, className }: BackgroundImportBannerProps) {
-  const { 
-    isImporting, 
-    progress, 
-    statusMessage, 
+  const {
+    progress,
+    statusMessage,
     phase,
     inboxCount,
     inboxTotal,
@@ -26,12 +25,29 @@ export function BackgroundImportBanner({ workspaceId, className }: BackgroundImp
   // Show success briefly
   if (phase === 'complete') {
     return (
-      <div className={cn(
-        "flex items-center gap-3 px-4 py-2.5 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800/50 text-green-700 dark:text-green-300 text-sm",
-        className
-      )}>
+      <div
+        className={cn(
+          'flex items-center gap-3 px-4 py-2.5 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800/50 text-green-700 dark:text-green-300 text-sm',
+          className
+        )}
+      >
         <CheckCircle2 className="h-4 w-4 flex-shrink-0" />
         <span className="flex-1">{statusMessage}</span>
+      </div>
+    );
+  }
+
+  // Show rate limit as a non-blocking warning (not a hard error)
+  if (phase === 'rate_limited') {
+    return (
+      <div
+        className={cn(
+          'flex items-center gap-3 px-4 py-2.5 rounded-lg bg-amber-500/10 border border-amber-500/25 text-amber-700 dark:text-amber-300 text-sm',
+          className
+        )}
+      >
+        <Clock className="h-4 w-4 flex-shrink-0" />
+        <span className="flex-1 truncate">{statusMessage}</span>
       </div>
     );
   }
@@ -39,10 +55,12 @@ export function BackgroundImportBanner({ workspaceId, className }: BackgroundImp
   // Show error state
   if (phase === 'error') {
     return (
-      <div className={cn(
-        "flex items-center gap-3 px-4 py-2.5 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-sm",
-        className
-      )}>
+      <div
+        className={cn(
+          'flex items-center gap-3 px-4 py-2.5 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-sm',
+          className
+        )}
+      >
         <AlertCircle className="h-4 w-4 flex-shrink-0" />
         <span className="flex-1 truncate">{statusMessage}</span>
       </div>
@@ -51,10 +69,12 @@ export function BackgroundImportBanner({ workspaceId, className }: BackgroundImp
 
   // Active import state with inbox/sent breakdown
   return (
-    <div className={cn(
-      "flex flex-col gap-2 px-4 py-3 rounded-lg bg-primary/5 border border-primary/20 text-sm",
-      className
-    )}>
+    <div
+      className={cn(
+        'flex flex-col gap-2 px-4 py-3 rounded-lg bg-primary/5 border border-primary/20 text-sm',
+        className
+      )}
+    >
       {/* Header */}
       <div className="flex items-center gap-2">
         <div className="relative flex-shrink-0">
@@ -68,28 +88,34 @@ export function BackgroundImportBanner({ workspaceId, className }: BackgroundImp
       {/* Progress breakdown */}
       <div className="grid grid-cols-2 gap-3 text-xs">
         <div className="flex items-center gap-2">
-          <Inbox className={cn(
-            "h-3.5 w-3.5",
-            phase === 'fetching_inbox' ? "text-primary" : "text-muted-foreground"
-          )} />
-          <span className={cn(
-            phase === 'fetching_inbox' ? "text-foreground font-medium" : "text-muted-foreground"
-          )}>
+          <Inbox
+            className={cn(
+              'h-3.5 w-3.5',
+              phase === 'fetching_inbox' ? 'text-primary' : 'text-muted-foreground'
+            )}
+          />
+          <span
+            className={cn(
+              phase === 'fetching_inbox' ? 'text-foreground font-medium' : 'text-muted-foreground'
+            )}
+          >
             Inbox: {inboxCount.toLocaleString()}
             {inboxTotal > 0 && ` / ${inboxTotal.toLocaleString()}`}
           </span>
-          {phase === 'fetching_inbox' && (
-            <span className="text-primary text-[10px]">●</span>
-          )}
+          {phase === 'fetching_inbox' && <span className="text-primary text-[10px]">●</span>}
         </div>
         <div className="flex items-center gap-2">
-          <Send className={cn(
-            "h-3.5 w-3.5",
-            phase === 'fetching_sent' ? "text-primary" : "text-muted-foreground"
-          )} />
-          <span className={cn(
-            phase === 'fetching_sent' ? "text-foreground font-medium" : "text-muted-foreground"
-          )}>
+          <Send
+            className={cn(
+              'h-3.5 w-3.5',
+              phase === 'fetching_sent' ? 'text-primary' : 'text-muted-foreground'
+            )}
+          />
+          <span
+            className={cn(
+              phase === 'fetching_sent' ? 'text-foreground font-medium' : 'text-muted-foreground'
+            )}
+          >
             {phase === 'fetching_inbox' ? (
               'Sent: Pending...'
             ) : (
@@ -99,9 +125,7 @@ export function BackgroundImportBanner({ workspaceId, className }: BackgroundImp
               </>
             )}
           </span>
-          {phase === 'fetching_sent' && (
-            <span className="text-primary text-[10px]">●</span>
-          )}
+          {phase === 'fetching_sent' && <span className="text-primary text-[10px]">●</span>}
         </div>
       </div>
 
@@ -113,3 +137,4 @@ export function BackgroundImportBanner({ workspaceId, className }: BackgroundImp
     </div>
   );
 }
+
