@@ -6,9 +6,14 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const BATCH_SIZE = 30;
+// Smaller batch to stay within rate limits
+const BATCH_SIZE = 20;
 const MAX_RUNTIME_MS = 25000;
-const RETRY_DELAYS = [1000, 3000, 10000];
+
+// Rate limiting - be conservative to avoid 429
+const DELAY_BETWEEN_FETCHES_MS = 500; // 500ms between body fetches
+const RATE_LIMIT_WAIT_MS = 60000; // 60 seconds on 429
+const MAX_RETRIES = 3;
 
 declare const EdgeRuntime: { waitUntil: (promise: Promise<unknown>) => void } | undefined;
 const waitUntil = (p: Promise<unknown>) => { try { EdgeRuntime?.waitUntil(p); } catch {} };
@@ -41,32 +46,46 @@ const extractBody = (message: any): string => {
   return stripped.length > 10 ? stripped : body.trim();
 };
 
-async function fetchWithRetry(externalId: string, accessToken: string): Promise<any | null> {
-  for (let attempt = 0; attempt < RETRY_DELAYS.length; attempt++) {
+async function fetchWithRetry(externalId: string, accessToken: string): Promise<{ data: any | null; rateLimited: boolean }> {
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     try {
       const response = await fetch(`https://api.aurinko.io/v1/email/messages/${externalId}`, {
         headers: { 'Authorization': `Bearer ${accessToken}` }
       });
       
       if (response.ok) {
-        return await response.json();
+        return { data: await response.json(), rateLimited: false };
       }
       
-      if (response.status === 429 || response.status >= 500) {
-        console.log(`[email-fetch-bodies] Retry ${attempt + 1} for ${externalId} (status ${response.status})`);
-        await sleep(RETRY_DELAYS[attempt]);
+      // Handle rate limiting specially
+      if (response.status === 429) {
+        if (attempt < MAX_RETRIES - 1) {
+          const retryAfter = response.headers.get('Retry-After');
+          const waitMs = retryAfter ? parseInt(retryAfter, 10) * 1000 : RATE_LIMIT_WAIT_MS;
+          console.log(`[email-fetch-bodies] Rate limited, waiting ${waitMs / 1000}s...`);
+          await sleep(waitMs);
+          continue;
+        }
+        // Last retry failed with 429 - signal to pause the batch
+        return { data: null, rateLimited: true };
+      }
+      
+      // Server errors - retry with backoff
+      if (response.status >= 500) {
+        console.log(`[email-fetch-bodies] Server error ${response.status}, retry ${attempt + 1}`);
+        await sleep(5000 * Math.pow(2, attempt));
         continue;
       }
       
       // 4xx errors (except 429) - don't retry
       console.log(`[email-fetch-bodies] Skipping ${externalId}: status ${response.status}`);
-      return null;
+      return { data: null, rateLimited: false };
     } catch (err) {
-      console.log(`[email-fetch-bodies] Retry ${attempt + 1} for ${externalId}:`, err);
-      await sleep(RETRY_DELAYS[attempt]);
+      console.log(`[email-fetch-bodies] Network error, retry ${attempt + 1}:`, err);
+      await sleep(3000 * Math.pow(2, attempt));
     }
   }
-  return null;
+  return { data: null, rateLimited: false };
 }
 
 serve(async (req) => {
@@ -135,7 +154,7 @@ serve(async (req) => {
       });
     }
 
-    console.log(`[email-fetch-bodies] Fetching ${emailsToFetch.length} email bodies...`);
+    console.log(`[email-fetch-bodies] Fetching ${emailsToFetch.length} email bodies with ${DELAY_BETWEEN_FETCHES_MS}ms delay...`);
 
     const connectedEmails = [
       config.email_address.toLowerCase(), 
@@ -144,14 +163,34 @@ serve(async (req) => {
     
     let bodiesFetched = 0;
     let messagesCreated = 0;
+    let wasRateLimited = false;
 
     for (const email of emailsToFetch) {
+      // Check time limit
       if (Date.now() - startTime > MAX_RUNTIME_MS) {
         console.log('[email-fetch-bodies] Time limit reached');
         break;
       }
 
-      const fullMessage = await fetchWithRetry(email.external_id, config.access_token);
+      // Delay between fetches to respect rate limits
+      if (bodiesFetched > 0) {
+        await sleep(DELAY_BETWEEN_FETCHES_MS);
+      }
+
+      const { data: fullMessage, rateLimited } = await fetchWithRetry(email.external_id, config.access_token);
+      
+      // If rate limited, stop this batch and wait before continuing
+      if (rateLimited) {
+        console.log('[email-fetch-bodies] Rate limited, pausing batch for 60s...');
+        wasRateLimited = true;
+        
+        // Update status to show rate limiting
+        await supabase.from('email_provider_configs').update({
+          sync_error: 'Rate limited - pausing briefly...',
+        }).eq('id', configId);
+        
+        break;
+      }
       
       if (!fullMessage) {
         await supabase.from('email_import_queue').update({ 
@@ -296,6 +335,15 @@ serve(async (req) => {
     console.log(`[email-fetch-bodies] Fetched ${bodiesFetched}, created ${messagesCreated} messages, ${remainingCount} remaining`);
 
     if (remainingCount && remainingCount > 0) {
+      // If rate limited, wait 60s before continuing
+      if (wasRateLimited) {
+        console.log('[email-fetch-bodies] Scheduling retry after rate limit wait...');
+        await sleep(RATE_LIMIT_WAIT_MS);
+        await supabase.from('email_provider_configs').update({
+          sync_error: null,
+        }).eq('id', configId);
+      }
+      
       // Continue fetching
       waitUntil(supabase.functions.invoke('email-fetch-bodies', { body: { jobId, configId } }));
     } else {
@@ -310,6 +358,7 @@ serve(async (req) => {
       await supabase.from('email_provider_configs').update({ 
         sync_status: 'completed',
         sync_stage: 'complete', 
+        sync_error: null,
         sync_completed_at: new Date().toISOString() 
       }).eq('id', configId);
     }
@@ -318,7 +367,8 @@ serve(async (req) => {
       success: true, 
       bodiesFetched, 
       messagesCreated, 
-      remaining: remainingCount 
+      remaining: remainingCount,
+      wasRateLimited 
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
