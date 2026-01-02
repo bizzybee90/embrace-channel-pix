@@ -1,13 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
 import { supabase } from '@/integrations/supabase/client';
+import { useEmailImportStatus } from '@/hooks/useEmailImportStatus';
 import { 
   ChevronLeft, 
   Loader2, 
   Brain, 
   CheckCircle2,
-  Sparkles
+  Sparkles,
+  Clock,
+  Send,
+  AlertCircle
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -37,13 +42,23 @@ export function InboxLearningStep({ workspaceId, onComplete, onBack }: InboxLear
   const [status, setStatus] = useState<'idle' | 'running' | 'complete' | 'error'>('idle');
   const [result, setResult] = useState<LearningResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  
+  // Check email import status
+  const { 
+    isImporting, 
+    phase: importPhase, 
+    progress: importProgress,
+    inboxCount,
+    sentCount,
+    hasSentEmails 
+  } = useEmailImportStatus(workspaceId);
 
   const runLearning = async () => {
     setStatus('running');
     setError(null);
 
     try {
-      console.log('[InboxLearning] Starting simplified learning...');
+      console.log('[InboxLearning] Starting voice learning with Claude...');
       
       const { data, error: fnError } = await supabase.functions.invoke('learn-from-inbox', {
         body: { workspace_id: workspaceId }
@@ -54,7 +69,14 @@ export function InboxLearningStep({ workspaceId, onComplete, onBack }: InboxLear
         throw fnError;
       }
 
-      if (data?.error) {
+      // Check for not enough emails error
+      if (data?.success === false && data?.error === 'not_enough_emails') {
+        setError(data.message);
+        setStatus('error');
+        return;
+      }
+
+      if (data?.error && data?.success === false) {
         throw new Error(data.error);
       }
 
@@ -69,7 +91,7 @@ export function InboxLearningStep({ workspaceId, onComplete, onBack }: InboxLear
       });
       
       setStatus('complete');
-      toast.success('Learning complete!');
+      toast.success('Voice learning complete!');
 
     } catch (err) {
       console.error('[InboxLearning] Error:', err);
@@ -87,6 +109,14 @@ export function InboxLearningStep({ workspaceId, onComplete, onBack }: InboxLear
     });
   };
 
+  const handleSkip = () => {
+    onComplete({ 
+      emailsAnalyzed: 0, 
+      patternsLearned: 0, 
+      voiceProfileBuilt: false 
+    });
+  };
+
   const getToneLabel = (tone: string) => {
     const labels: Record<string, string> = {
       friendly: '😊 Friendly & Approachable',
@@ -97,25 +127,104 @@ export function InboxLearningStep({ workspaceId, onComplete, onBack }: InboxLear
     return labels[tone] || tone;
   };
 
+  // Check if we need to wait for sent emails
+  const needsToWaitForSent = isImporting && importPhase === 'fetching_inbox';
+  const importDoneButNoSent = !isImporting && importPhase === 'complete' && !hasSentEmails;
+
   return (
     <div className="space-y-6">
       <div className="text-center space-y-2">
         <h2 className="text-xl font-semibold">Learn from Your Emails</h2>
         <p className="text-sm text-muted-foreground">
-          BizzyBee will study your inbox to understand how you communicate
+          BizzyBee will study your sent emails to understand how you communicate
         </p>
       </div>
 
-      {status === 'idle' && (
+      {/* Waiting for sent emails to import */}
+      {needsToWaitForSent && status === 'idle' && (
+        <Card className="p-6">
+          <div className="text-center space-y-4">
+            <div className="w-16 h-16 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center mx-auto">
+              <Clock className="h-8 w-8 text-amber-600" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="font-semibold">Waiting for your sent emails...</h3>
+              <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                Voice learning needs your sent emails to analyze your writing style. 
+                We're currently importing your inbox.
+              </p>
+            </div>
+
+            {/* Import progress */}
+            <div className="bg-muted/30 rounded-lg p-4 max-w-sm mx-auto">
+              <div className="flex items-center justify-between text-sm mb-2">
+                <span className="text-muted-foreground">Import progress</span>
+                <span className="font-medium">{importProgress}%</span>
+              </div>
+              <Progress value={importProgress} className="h-2 mb-3" />
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-primary">●</span>
+                  <span>Inbox: {inboxCount.toLocaleString()}</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-muted-foreground">
+                  <Send className="h-3 w-3" />
+                  <span>Sent: Pending...</span>
+                </div>
+              </div>
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              This step will be available once sent emails are imported
+            </p>
+
+            <Button variant="ghost" onClick={handleSkip} className="mt-2">
+              Skip for now
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      {/* Import done but no sent emails found */}
+      {importDoneButNoSent && status === 'idle' && (
+        <Card className="p-6">
+          <div className="text-center space-y-4">
+            <div className="w-16 h-16 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center mx-auto">
+              <AlertCircle className="h-8 w-8 text-amber-600" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="font-semibold">No sent emails found</h3>
+              <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                Voice learning requires examples of your replies to analyze your communication style. 
+                We couldn't find sent emails in your connected account.
+              </p>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              You can continue without voice learning - BizzyBee will use a default professional style.
+            </p>
+            <Button onClick={handleSkip}>
+              Continue without voice profile
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      {/* Ready to learn (has sent emails or still importing sent) */}
+      {status === 'idle' && !needsToWaitForSent && !importDoneButNoSent && (
         <Card className="p-8 text-center">
           <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
             <Brain className="h-8 w-8 text-primary" />
           </div>
           <h3 className="font-semibold mb-2">Ready to learn your style</h3>
           <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
-            We'll analyze a sample of your emails to understand your tone, 
+            We'll analyze your sent emails using Claude AI to understand your tone, 
             common phrases, and how you handle different situations.
           </p>
+          {sentCount > 0 && (
+            <p className="text-xs text-muted-foreground mb-4">
+              Found {sentCount.toLocaleString()} sent emails to analyze
+            </p>
+          )}
           <p className="text-xs text-muted-foreground mb-4">
             This usually takes about 15 seconds
           </p>
@@ -131,7 +240,7 @@ export function InboxLearningStep({ workspaceId, onComplete, onBack }: InboxLear
           <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
           <h3 className="font-semibold mb-2">Learning from your emails...</h3>
           <p className="text-sm text-muted-foreground">
-            Analyzing your communication style with AI
+            Analyzing your communication style with Claude AI
           </p>
           <p className="text-xs text-muted-foreground mt-4">
             This should only take about 15 seconds
@@ -152,7 +261,7 @@ export function InboxLearningStep({ workspaceId, onComplete, onBack }: InboxLear
             <Button variant="outline" onClick={runLearning}>
               Try Again
             </Button>
-            <Button onClick={() => onComplete({ emailsAnalyzed: 0, patternsLearned: 0, voiceProfileBuilt: false })}>
+            <Button onClick={handleSkip}>
               Continue Anyway
             </Button>
           </div>
@@ -235,21 +344,28 @@ export function InboxLearningStep({ workspaceId, onComplete, onBack }: InboxLear
         </div>
       )}
 
-      {/* Back button for idle and running states */}
-      {(status === 'idle' || status === 'running') && (
+      {/* Back button for idle and running states (when not waiting) */}
+      {(status === 'idle' || status === 'running') && !needsToWaitForSent && !importDoneButNoSent && (
         <div className="flex justify-between">
           <Button variant="outline" onClick={onBack}>
             <ChevronLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
           {status === 'running' && (
-            <Button 
-              variant="ghost" 
-              onClick={() => onComplete({ emailsAnalyzed: 0, patternsLearned: 0, voiceProfileBuilt: false })}
-            >
+            <Button variant="ghost" onClick={handleSkip}>
               Skip for now
             </Button>
           )}
+        </div>
+      )}
+
+      {/* Back button when waiting for sent emails */}
+      {needsToWaitForSent && status === 'idle' && (
+        <div className="flex justify-start">
+          <Button variant="outline" onClick={onBack}>
+            <ChevronLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
         </div>
       )}
     </div>

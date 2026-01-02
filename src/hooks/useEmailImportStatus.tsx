@@ -1,54 +1,59 @@
-import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 
-export interface EmailImportJob {
+interface EmailProviderConfig {
   id: string;
-  status: string;
-  inbox_emails_scanned: number | null;
-  sent_emails_scanned: number | null;
-  conversation_threads: number | null;
-  bodies_fetched: number | null;
-  messages_created: number | null;
-  error_message: string | null;
-  started_at: string | null;
-  completed_at: string | null;
+  sync_status: string | null;
+  sync_stage: string | null;
+  sync_progress: number | null;
+  inbound_emails_found: number | null;
+  outbound_emails_found: number | null;
+  inbound_total: number | null;
+  outbound_total: number | null;
+  sync_error: string | null;
+  sync_started_at: string | null;
+  sync_completed_at: string | null;
 }
 
 interface UseEmailImportStatusResult {
   isImporting: boolean;
-  job: EmailImportJob | null;
   progress: number;
   statusMessage: string;
-  phase: 'scanning' | 'analyzing' | 'fetching' | 'complete' | 'error' | 'idle';
+  phase: 'idle' | 'fetching_inbox' | 'fetching_sent' | 'complete' | 'error';
+  inboxCount: number;
+  inboxTotal: number;
+  sentCount: number;
+  sentTotal: number;
+  hasSentEmails: boolean;
+  config: EmailProviderConfig | null;
 }
 
 export function useEmailImportStatus(workspaceId: string | null): UseEmailImportStatusResult {
-  const { data: job, isLoading } = useQuery({
-    queryKey: ['email-import-status', workspaceId],
+  const { data: config } = useQuery({
+    queryKey: ['email-provider-config', workspaceId],
     queryFn: async () => {
       if (!workspaceId) return null;
       
       const { data, error } = await supabase
-        .from('email_import_jobs')
-        .select('id, status, inbox_emails_scanned, sent_emails_scanned, conversation_threads, bodies_fetched, messages_created, error_message, started_at, completed_at')
+        .from('email_provider_configs')
+        .select('id, sync_status, sync_stage, sync_progress, inbound_emails_found, outbound_emails_found, inbound_total, outbound_total, sync_error, sync_started_at, sync_completed_at')
         .eq('workspace_id', workspaceId)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
       
       if (error) {
-        console.error('Error fetching import job:', error);
+        console.error('Error fetching email config:', error);
         return null;
       }
       
-      return data as EmailImportJob | null;
+      return data as EmailProviderConfig | null;
     },
     enabled: !!workspaceId,
     refetchInterval: (query) => {
       const data = query.state.data;
-      // Poll every 3s while importing, stop when done
-      if (data && ['scanning', 'analyzing', 'fetching', 'pending'].includes(data.status)) {
+      // Poll every 3s while syncing, stop when done
+      if (data && data.sync_status === 'syncing') {
         return 3000;
       }
       return false;
@@ -56,80 +61,86 @@ export function useEmailImportStatus(workspaceId: string | null): UseEmailImport
     staleTime: 2000,
   });
 
-  const getPhase = (status: string | undefined): UseEmailImportStatusResult['phase'] => {
-    if (!status) return 'idle';
-    if (status === 'scanning') return 'scanning';
-    if (status === 'analyzing') return 'analyzing';
-    if (status === 'fetching') return 'fetching';
-    if (status === 'completed') return 'complete';
-    if (status === 'error' || status === 'failed') return 'error';
-    if (status === 'pending') return 'scanning';
-    return 'idle';
+  const getPhase = (config: EmailProviderConfig | null): UseEmailImportStatusResult['phase'] => {
+    if (!config) return 'idle';
+    if (config.sync_error) return 'error';
+    if (config.sync_status === 'completed' || config.sync_completed_at) return 'complete';
+    if (config.sync_status !== 'syncing') return 'idle';
+    
+    // Determine stage based on sync_stage field
+    const stage = config.sync_stage?.toLowerCase() || '';
+    if (stage.includes('sent') || stage.includes('outbound')) return 'fetching_sent';
+    return 'fetching_inbox';
   };
 
-  const calculateProgress = (job: EmailImportJob | null): number => {
-    if (!job) return 0;
+  const calculateProgress = (config: EmailProviderConfig | null, phase: string): number => {
+    if (!config) return 0;
+    if (phase === 'complete') return 100;
+    if (phase === 'error') return 0;
+    if (phase === 'idle') return 0;
     
-    const phase = getPhase(job.status);
-    const scanned = (job.inbox_emails_scanned || 0) + (job.sent_emails_scanned || 0);
-    const threads = job.conversation_threads || 0;
-    const fetched = job.bodies_fetched || 0;
+    const inboxFound = config.inbound_emails_found || 0;
+    const inboxTotal = config.inbound_total || inboxFound || 1;
+    const sentFound = config.outbound_emails_found || 0;
+    const sentTotal = config.outbound_total || 0;
     
-    switch (phase) {
-      case 'scanning':
-        // 0-40% for scanning phase
-        return Math.min(40, Math.floor(scanned / 50)); // Rough estimate
-      case 'analyzing':
-        // 40-50% for analyzing
-        return 45;
-      case 'fetching':
-        // 50-95% for fetching bodies
-        if (threads > 0) {
-          return 50 + Math.floor((fetched / threads) * 45);
-        }
-        return 50;
-      case 'complete':
-        return 100;
-      case 'error':
-        return 0;
-      default:
-        return 0;
+    if (phase === 'fetching_inbox') {
+      // Inbox is 0-50%
+      const inboxProgress = inboxTotal > 0 ? (inboxFound / inboxTotal) : 0;
+      return Math.min(50, Math.floor(inboxProgress * 50));
     }
+    
+    if (phase === 'fetching_sent') {
+      // Sent is 50-100%
+      if (sentTotal === 0) return 50;
+      const sentProgress = sentTotal > 0 ? (sentFound / sentTotal) : 0;
+      return 50 + Math.min(50, Math.floor(sentProgress * 50));
+    }
+    
+    return config.sync_progress || 0;
   };
 
-  const getStatusMessage = (job: EmailImportJob | null): string => {
-    if (!job) return '';
+  const getStatusMessage = (config: EmailProviderConfig | null, phase: string): string => {
+    if (!config) return '';
     
-    const phase = getPhase(job.status);
-    const scanned = (job.inbox_emails_scanned || 0) + (job.sent_emails_scanned || 0);
-    const threads = job.conversation_threads || 0;
-    const fetched = job.bodies_fetched || 0;
-    const created = job.messages_created || 0;
+    const inboxFound = config.inbound_emails_found || 0;
+    const inboxTotal = config.inbound_total || 0;
+    const sentFound = config.outbound_emails_found || 0;
+    const sentTotal = config.outbound_total || 0;
     
     switch (phase) {
-      case 'scanning':
-        return `Scanning emails... ${scanned.toLocaleString()} found`;
-      case 'analyzing':
-        return `Analyzing threads... ${threads} conversations`;
-      case 'fetching':
-        return `Importing... ${fetched}/${threads} emails`;
+      case 'fetching_inbox':
+        if (inboxTotal > 0) {
+          return `Importing inbox... ${inboxFound.toLocaleString()} / ${inboxTotal.toLocaleString()}`;
+        }
+        return `Importing inbox... ${inboxFound.toLocaleString()} found`;
+      case 'fetching_sent':
+        if (sentTotal > 0) {
+          return `Importing sent emails... ${sentFound.toLocaleString()} / ${sentTotal.toLocaleString()}`;
+        }
+        return `Importing sent emails... ${sentFound.toLocaleString()} found`;
       case 'complete':
-        return `Import complete! ${created} messages`;
+        return `Import complete! ${inboxFound.toLocaleString()} inbox, ${sentFound.toLocaleString()} sent`;
       case 'error':
-        return job.error_message || 'Import failed';
+        return config.sync_error || 'Import failed';
       default:
         return '';
     }
   };
 
-  const phase = getPhase(job?.status);
-  const isImporting = ['scanning', 'analyzing', 'fetching'].includes(phase);
+  const phase = getPhase(config);
+  const isImporting = phase === 'fetching_inbox' || phase === 'fetching_sent';
 
   return {
     isImporting,
-    job,
-    progress: calculateProgress(job),
-    statusMessage: getStatusMessage(job),
+    config,
+    progress: calculateProgress(config, phase),
+    statusMessage: getStatusMessage(config, phase),
     phase,
+    inboxCount: config?.inbound_emails_found || 0,
+    inboxTotal: config?.inbound_total || 0,
+    sentCount: config?.outbound_emails_found || 0,
+    sentTotal: config?.outbound_total || 0,
+    hasSentEmails: (config?.outbound_emails_found || 0) > 0,
   };
 }
