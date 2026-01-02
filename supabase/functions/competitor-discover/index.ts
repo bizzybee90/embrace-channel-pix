@@ -6,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const MAX_RUNTIME_MS = 25000;
+const MAX_RUNTIME_MS = 50000; // Extended for more thorough discovery
 
 // Blocked domains (directories, not actual businesses)
 const BLOCKED_DOMAINS = [
@@ -17,7 +17,16 @@ const BLOCKED_DOMAINS = [
   'gumtree.com', 'freeindex.co.uk', 'thomsonlocal.com', 'cylex-uk.co.uk',
   'hotfrog.co.uk', 'misterwhat.co.uk', 'brownbook.net', 'uksmallbusinessdirectory.co.uk',
   'ratedpeople.com', 'trustpilot.com', 'reviews.co.uk', 'glassdoor.com', 'indeed.com',
-  'x.com', 'gov.uk', 'amazon.com', 'ebay.com', 'reed.co.uk', 'thebestof.co.uk'
+  'x.com', 'gov.uk', 'amazon.com', 'ebay.com', 'reed.co.uk', 'thebestof.co.uk',
+  'nextdoor.com', 'nextdoor.co.uk', 'which.co.uk', 'moneysupermarket.com'
+];
+
+// Non-UK domains that indicate wrong country
+const NON_UK_TLD_PATTERNS = [
+  '.com.au', '.com.nz', '.co.nz', '.ca', '.com.sg', '.ie', '.de', '.fr', '.es',
+  '.it', '.nl', '.be', '.at', '.ch', '.pl', '.cz', '.hu', '.ro', '.bg', '.gr',
+  '.pt', '.se', '.no', '.dk', '.fi', '.ru', '.ua', '.in', '.jp', '.kr', '.cn',
+  '.hk', '.tw', '.ph', '.my', '.th', '.id', '.vn', '.za', '.br', '.mx', '.ar'
 ];
 
 declare const EdgeRuntime: { waitUntil: (p: Promise<unknown>) => void } | undefined;
@@ -29,7 +38,7 @@ serve(async (req) => {
   const startTime = Date.now();
 
   try {
-    const { jobId, workspaceId, nicheQuery, serviceArea, targetCount = 100 } = await req.json();
+    const { jobId, workspaceId, nicheQuery, serviceArea, targetCount = 50 } = await req.json();
     console.log('[competitor-discover] Starting:', { jobId, nicheQuery, serviceArea, targetCount });
 
     const supabase = createClient(
@@ -51,50 +60,69 @@ serve(async (req) => {
     }).eq('id', jobId);
 
     const discoveredSites = new Map<string, Record<string, unknown>>();
+    let centerLat: number | null = null;
+    let centerLng: number | null = null;
 
-    // Try Google Places API first (preferred - gets real local businesses)
+    // STEP 1: Geocode the location first
     if (GOOGLE_API_KEY && serviceArea) {
-      console.log('[competitor-discover] Using Google Places API');
-      
-      // Geocode the location
       const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(serviceArea + ', UK')}&key=${GOOGLE_API_KEY}`;
       const geocodeRes = await fetch(geocodeUrl);
       const geocodeData = await geocodeRes.json();
       
       if (geocodeData.results?.[0]?.geometry?.location) {
-        const { lat, lng } = geocodeData.results[0].geometry.location;
-        const radiusMeters = 20 * 1609; // 20 miles in meters
+        centerLat = geocodeData.results[0].geometry.location.lat;
+        centerLng = geocodeData.results[0].geometry.location.lng;
+        console.log(`[competitor-discover] Geocoded: ${serviceArea} -> ${centerLat}, ${centerLng}`);
+      } else {
+        console.log('[competitor-discover] Geocoding failed:', geocodeData.status, geocodeData.error_message);
+      }
+    }
+
+    // STEP 2: Use Google Places API for discovery (PRIMARY method)
+    if (GOOGLE_API_KEY && centerLat && centerLng) {
+      console.log('[competitor-discover] Using Google Places API for local business discovery');
+      
+      const radiusMeters = 32186; // 20 miles in meters
+
+      // Multiple search variations to maximize results
+      const searchQueries = [
+        nicheQuery,
+        `${nicheQuery} services`,
+        `${nicheQuery} company`,
+        `professional ${nicheQuery}`,
+        `local ${nicheQuery}`,
+      ];
+
+      for (const query of searchQueries) {
+        if (Date.now() - startTime > MAX_RUNTIME_MS) break;
+        if (discoveredSites.size >= targetCount) break;
+
+        const fullQuery = `${query} near ${serviceArea}`;
+        console.log(`[competitor-discover] Google Places search: "${fullQuery}"`);
         
-        console.log(`[competitor-discover] Location: ${serviceArea} -> ${lat}, ${lng}`);
+        // Text search with location bias
+        const searchUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?` +
+          `query=${encodeURIComponent(fullQuery)}&` +
+          `location=${centerLat},${centerLng}&` +
+          `radius=${radiusMeters}&` +
+          `region=uk&` +
+          `key=${GOOGLE_API_KEY}`;
 
-        const searchQueries = [
-          `${nicheQuery} ${serviceArea}`,
-          `${nicheQuery} services ${serviceArea}`,
-          `${nicheQuery} company ${serviceArea}`,
-          `best ${nicheQuery} ${serviceArea}`,
-        ];
+        const searchRes = await fetch(searchUrl);
+        const searchData = await searchRes.json();
 
-        for (const query of searchQueries) {
+        console.log(`[competitor-discover] Google Places returned ${searchData.results?.length || 0} results for "${query}"`);
+
+        if (searchData.status !== 'OK' && searchData.status !== 'ZERO_RESULTS') {
+          console.error('[competitor-discover] Google Places API error:', searchData.status, searchData.error_message);
+        }
+
+        for (const place of searchData.results || []) {
           if (Date.now() - startTime > MAX_RUNTIME_MS) break;
           if (discoveredSites.size >= targetCount) break;
-
-          console.log(`[competitor-discover] Searching: ${query}`);
           
-          const searchUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?` +
-            `query=${encodeURIComponent(query)}&` +
-            `location=${lat},${lng}&` +
-            `radius=${radiusMeters}&` +
-            `region=uk&` +
-            `key=${GOOGLE_API_KEY}`;
-
-          const searchRes = await fetch(searchUrl);
-          const searchData = await searchRes.json();
-
-          for (const place of searchData.results || []) {
-            if (Date.now() - startTime > MAX_RUNTIME_MS) break;
-            if (discoveredSites.size >= targetCount) break;
-            
-            // Get place details to get website
+          // Get place details to get website
+          try {
             const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?` +
               `place_id=${place.place_id}&` +
               `fields=website,formatted_phone_number,url&` +
@@ -104,21 +132,29 @@ serve(async (req) => {
             const detailsData = await detailsRes.json();
             const website = detailsData.result?.website;
 
-            if (!website) continue;
+            if (!website) {
+              console.log(`[competitor-discover] ${place.name}: No website found`);
+              continue;
+            }
 
             let domain: string;
             try {
               domain = new URL(website).hostname.replace('www.', '').toLowerCase();
             } catch { continue; }
 
-            if (BLOCKED_DOMAINS.some(blocked => domain.includes(blocked))) continue;
+            if (BLOCKED_DOMAINS.some(blocked => domain.includes(blocked))) {
+              console.log(`[competitor-discover] ${domain}: Blocked domain`);
+              continue;
+            }
             if (discoveredSites.has(domain)) continue;
 
             const placeLat = place.geometry?.location?.lat;
             const placeLng = place.geometry?.location?.lng;
             const distance = placeLat && placeLng 
-              ? haversineDistance(lat, lng, placeLat, placeLng)
+              ? haversineDistance(centerLat, centerLng, placeLat, placeLng)
               : null;
+
+            console.log(`[competitor-discover] Found: ${place.name} (${domain}) - ${distance?.toFixed(1)} miles`);
 
             discoveredSites.set(domain, {
               workspace_id: workspaceId,
@@ -141,27 +177,40 @@ serve(async (req) => {
               status: 'approved',
               scrape_status: 'pending',
             });
+          } catch (err) {
+            console.error('[competitor-discover] Place details error:', err);
           }
 
-          await new Promise(r => setTimeout(r, 200));
+          // Small delay between detail requests
+          await new Promise(r => setTimeout(r, 100));
         }
+
+        // Delay between search queries
+        await new Promise(r => setTimeout(r, 300));
       }
+
+      console.log(`[competitor-discover] Google Places found ${discoveredSites.size} sites with websites`);
     }
 
-    // Fallback to Firecrawl search if Google didn't find enough
+    // STEP 3: Supplement with Firecrawl ONLY for UK sites if needed
     if (discoveredSites.size < targetCount && FIRECRAWL_API_KEY) {
-      console.log('[competitor-discover] Supplementing with Firecrawl search');
+      console.log('[competitor-discover] Supplementing with Firecrawl (UK-focused)');
       
-      const searchQueries = [
-        `${nicheQuery} ${serviceArea || ''}`,
-        `${nicheQuery} services ${serviceArea || ''}`,
-        `best ${nicheQuery} near me ${serviceArea || ''}`,
+      // Force UK-specific searches
+      const ukSearchQueries = [
+        `${nicheQuery} ${serviceArea} UK`,
+        `${nicheQuery} near ${serviceArea} site:.co.uk`,
+        `${nicheQuery} company ${serviceArea} UK`,
+        `best ${nicheQuery} ${serviceArea} England`,
       ];
 
-      for (const query of searchQueries) {
-        if (discoveredSites.size >= targetCount * 1.5) break;
+      for (const query of ukSearchQueries) {
+        if (discoveredSites.size >= targetCount) break;
+        if (Date.now() - startTime > MAX_RUNTIME_MS) break;
 
         try {
+          console.log(`[competitor-discover] Firecrawl search: "${query}"`);
+          
           const searchResponse = await fetch('https://api.firecrawl.dev/v1/search', {
             method: 'POST',
             headers: {
@@ -170,20 +219,56 @@ serve(async (req) => {
             },
             body: JSON.stringify({
               query,
-              limit: 20,
+              limit: 15,
             }),
           });
 
-          if (!searchResponse.ok) continue;
+          if (!searchResponse.ok) {
+            console.error('[competitor-discover] Firecrawl error:', searchResponse.status);
+            continue;
+          }
 
           const searchData = await searchResponse.json();
+          console.log(`[competitor-discover] Firecrawl returned ${searchData.data?.length || 0} results`);
+
           for (const result of searchData.data || []) {
             try {
               const url = new URL(result.url);
               const domain = url.hostname.replace(/^www\./, '').toLowerCase();
 
+              // Skip blocked domains
               if (BLOCKED_DOMAINS.some(blocked => domain.includes(blocked))) continue;
               if (discoveredSites.has(domain)) continue;
+
+              // CRITICAL: Filter out non-UK domains
+              const isNonUkDomain = NON_UK_TLD_PATTERNS.some(tld => domain.endsWith(tld));
+              if (isNonUkDomain) {
+                console.log(`[competitor-discover] Skipping non-UK domain: ${domain}`);
+                continue;
+              }
+
+              // Strongly prefer .co.uk domains
+              const isUkDomain = domain.endsWith('.co.uk') || domain.endsWith('.uk');
+              
+              // For .com domains, check if they look UK-specific
+              if (!isUkDomain && domain.endsWith('.com')) {
+                // Check title/description for UK indicators
+                const text = `${result.title || ''} ${result.description || ''}`.toLowerCase();
+                const hasUkIndicators = text.includes('uk') || 
+                                        text.includes('england') || 
+                                        text.includes('london') || 
+                                        text.includes('luton') ||
+                                        text.includes(serviceArea?.toLowerCase() || '') ||
+                                        text.includes('£') ||
+                                        text.includes('british');
+                
+                if (!hasUkIndicators) {
+                  console.log(`[competitor-discover] Skipping likely non-UK .com: ${domain}`);
+                  continue;
+                }
+              }
+
+              console.log(`[competitor-discover] Firecrawl found: ${domain} (UK: ${isUkDomain})`);
 
               discoveredSites.set(domain, {
                 workspace_id: workspaceId,
@@ -194,32 +279,40 @@ serve(async (req) => {
                 description: result.description || '',
                 discovery_source: 'firecrawl',
                 discovery_query: query,
-                is_valid: null, // Needs validation
-                status: 'pending',
+                is_valid: isUkDomain ? true : null, // .co.uk pre-approved, others need validation
+                status: isUkDomain ? 'approved' : 'pending',
                 scrape_status: 'pending',
               });
             } catch { /* invalid URL */ }
           }
         } catch (err) {
-          console.error('Firecrawl search error:', err);
+          console.error('[competitor-discover] Firecrawl search error:', err);
         }
+
+        await new Promise(r => setTimeout(r, 500));
       }
     }
 
-    console.log(`[competitor-discover] Found ${discoveredSites.size} unique sites`);
+    console.log(`[competitor-discover] Total discovered: ${discoveredSites.size} sites`);
 
-    // Filter with AI if we have Firecrawl-sourced sites needing validation
+    // STEP 4: AI validation for sites that need it (Firecrawl .com sites)
     const sitesNeedingValidation = Array.from(discoveredSites.entries()).filter(([_, s]) => s.is_valid === null);
     
     if (sitesNeedingValidation.length > 0 && LOVABLE_API_KEY) {
-      console.log(`[competitor-discover] AI filtering ${sitesNeedingValidation.length} sites`);
+      console.log(`[competitor-discover] AI validating ${sitesNeedingValidation.length} sites`);
       
-      const filterPrompt = `Classify each website as COMPANY (genuine ${nicheQuery} business), DIRECTORY, or IRRELEVANT.
-      
-Sites:
-${sitesNeedingValidation.map(([domain, info], i) => `${i + 1}. ${domain} - "${info.title || ''}" - ${String(info.description || '').substring(0, 80)}`).join('\n')}
+      const filterPrompt = `You are validating if websites are genuine UK ${nicheQuery} businesses near ${serviceArea}.
 
-Return ONLY JSON array: [{"domain": "example.com", "type": "COMPANY"}, ...]`;
+Classify each as:
+- COMPANY: Genuine UK ${nicheQuery} business (approve)
+- DIRECTORY: Business directory or aggregator (reject)
+- NON_UK: Not a UK business (reject)
+- IRRELEVANT: Not related to ${nicheQuery} (reject)
+
+Sites to classify:
+${sitesNeedingValidation.map(([domain, info], i) => `${i + 1}. ${domain} - "${info.title || ''}" - ${String(info.description || '').substring(0, 100)}`).join('\n')}
+
+Return ONLY a JSON array: [{"domain": "example.com", "type": "COMPANY"}, ...]`;
 
       try {
         const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
@@ -248,27 +341,31 @@ Return ONLY JSON array: [{"domain": "example.com", "type": "COMPANY"}, ...]`;
                 site.status = c.type === 'COMPANY' ? 'approved' : 'rejected';
                 site.is_directory = c.type === 'DIRECTORY';
                 site.validation_reason = c.type !== 'COMPANY' ? c.type : null;
+                console.log(`[competitor-discover] AI classified ${c.domain}: ${c.type}`);
               }
             }
           }
         }
       } catch (err) {
-        console.error('AI filtering error:', err);
-        // Approve all on error
-        for (const [_, site] of sitesNeedingValidation) {
-          site.is_valid = true;
-          site.status = 'approved';
+        console.error('[competitor-discover] AI filtering error:', err);
+        // Reject ambiguous sites on error (safer for UK-focused results)
+        for (const [domain, site] of sitesNeedingValidation) {
+          site.is_valid = false;
+          site.status = 'rejected';
+          site.validation_reason = 'validation_failed';
         }
       }
     }
 
-    // Insert sites into database
+    // STEP 5: Insert approved sites into database
     const approvedSites = Array.from(discoveredSites.values())
       .filter(s => s.is_valid !== false)
       .slice(0, targetCount);
     
     const rejectedSites = Array.from(discoveredSites.values())
       .filter(s => s.is_valid === false);
+
+    console.log(`[competitor-discover] Approved: ${approvedSites.length}, Rejected: ${rejectedSites.length}`);
 
     if (approvedSites.length > 0) {
       const { error: insertError } = await supabase
@@ -284,7 +381,7 @@ Return ONLY JSON array: [{"domain": "example.com", "type": "COMPANY"}, ...]`;
       sites_approved: approvedSites.length,
       sites_validated: approvedSites.length,
       status: approvedSites.length > 0 ? 'scraping' : 'error',
-      error_message: approvedSites.length === 0 ? 'No competitor sites found' : null,
+      error_message: approvedSites.length === 0 ? 'No UK competitor sites found in your area' : null,
       heartbeat_at: new Date().toISOString(),
     }).eq('id', jobId);
 
@@ -298,6 +395,8 @@ Return ONLY JSON array: [{"domain": "example.com", "type": "COMPANY"}, ...]`;
       discovered: discoveredSites.size,
       approved: approvedSites.length,
       rejected: rejectedSites.length,
+      googlePlacesCount: Array.from(discoveredSites.values()).filter(s => s.discovery_source === 'google_places').length,
+      firecrawlCount: Array.from(discoveredSites.values()).filter(s => s.discovery_source === 'firecrawl').length,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
@@ -311,7 +410,7 @@ Return ONLY JSON array: [{"domain": "example.com", "type": "COMPANY"}, ...]`;
 });
 
 function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 3959;
+  const R = 3959; // Earth's radius in miles
   const dLat = (lat2 - lat1) * Math.PI / 180;
   const dLon = (lon2 - lon1) * Math.PI / 180;
   const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
