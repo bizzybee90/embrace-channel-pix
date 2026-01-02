@@ -9,14 +9,19 @@ const corsHeaders = {
 const BATCH_SIZE = 100;
 const MAX_RUNTIME_MS = 25000;
 
-// Retry configuration for rate limits
+// Rate limiting configuration
 const MAX_RETRIES = 3;
-const INITIAL_RETRY_DELAY_MS = 2000; // 2 seconds
+const RATE_LIMIT_WAIT_MS = 60000; // 60 seconds on 429
+const REQUEST_DELAY_MS = 200; // 200ms between requests
+const INITIAL_RETRY_DELAY_MS = 5000; // 5 seconds for other retries
 
 declare const EdgeRuntime: { waitUntil: (promise: Promise<unknown>) => void } | undefined;
 const waitUntil = (p: Promise<unknown>) => { try { EdgeRuntime?.waitUntil(p); } catch {} };
 
-// Helper function to fetch with exponential backoff retry
+// Helper: delay between requests
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Helper function to fetch with rate limit handling
 async function fetchWithRetry(
   url: string, 
   options: RequestInit, 
@@ -26,25 +31,30 @@ async function fetchWithRetry(
   
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
+      // Add delay between requests to avoid hitting rate limits
+      if (attempt > 0) {
+        console.log(`[email-scan] Retry attempt ${attempt}/${maxRetries}...`);
+      }
+      
       const response = await fetch(url, options);
       
-      // If rate limited (429), wait and retry
+      // If rate limited (429), wait 60 seconds and retry
       if (response.status === 429 && attempt < maxRetries) {
         const retryAfter = response.headers.get('Retry-After');
         const delayMs = retryAfter 
           ? parseInt(retryAfter, 10) * 1000 
-          : INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt);
+          : RATE_LIMIT_WAIT_MS; // 60 seconds
         
-        console.log(`[email-scan] Rate limited (429), waiting ${delayMs}ms before retry ${attempt + 1}/${maxRetries}`);
-        await new Promise(resolve => setTimeout(resolve, delayMs));
+        console.log(`[email-scan] Rate limited (429), waiting ${delayMs / 1000}s before retry ${attempt + 1}/${maxRetries}`);
+        await delay(delayMs);
         continue;
       }
       
-      // If server error (5xx), wait and retry
+      // If server error (5xx), wait and retry with backoff
       if (response.status >= 500 && attempt < maxRetries) {
         const delayMs = INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt);
-        console.log(`[email-scan] Server error (${response.status}), waiting ${delayMs}ms before retry ${attempt + 1}/${maxRetries}`);
-        await new Promise(resolve => setTimeout(resolve, delayMs));
+        console.log(`[email-scan] Server error (${response.status}), waiting ${delayMs / 1000}s before retry ${attempt + 1}/${maxRetries}`);
+        await delay(delayMs);
         continue;
       }
       
@@ -53,8 +63,8 @@ async function fetchWithRetry(
       lastError = err as Error;
       if (attempt < maxRetries) {
         const delayMs = INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt);
-        console.log(`[email-scan] Network error, waiting ${delayMs}ms before retry ${attempt + 1}/${maxRetries}:`, err);
-        await new Promise(resolve => setTimeout(resolve, delayMs));
+        console.log(`[email-scan] Network error, waiting ${delayMs / 1000}s before retry ${attempt + 1}/${maxRetries}:`, err);
+        await delay(delayMs);
       }
     }
   }
@@ -209,6 +219,9 @@ serve(async (req) => {
         inbound_emails_found: inboxScanned,
         outbound_emails_found: sentScanned,
       }).eq('id', configId);
+
+      // Add delay between batch requests to avoid rate limits
+      await delay(REQUEST_DELAY_MS);
 
       if (Date.now() - startTime > MAX_RUNTIME_MS) {
         console.log('[email-scan] Time limit reached, continuing...');
