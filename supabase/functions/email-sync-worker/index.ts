@@ -23,6 +23,10 @@ const waitUntil = (promise: Promise<unknown>) => {
 const BATCH_SIZE = 50;
 const MAX_RUNTIME_MS = 25000; // 25 seconds, leave buffer before 30s timeout
 
+// Retry configuration for rate limits
+const MAX_RETRIES = 3;
+const INITIAL_RETRY_DELAY_MS = 2000; // 2 seconds
+
 // Import mode limits - stop fetching when limit is reached
 const IMPORT_MODE_LIMITS: Record<string, number | null> = {
   'last_1000': 1000,
@@ -32,6 +36,52 @@ const IMPORT_MODE_LIMITS: Record<string, number | null> = {
   'new_only': null, // No historical import
   'all_history': null, // No limit
 };
+
+// Helper function to fetch with exponential backoff retry
+async function fetchWithRetry(
+  url: string, 
+  options: RequestInit, 
+  maxRetries = MAX_RETRIES
+): Promise<Response> {
+  let lastError: Error | null = null;
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await fetch(url, options);
+      
+      // If rate limited (429), wait and retry
+      if (response.status === 429 && attempt < maxRetries) {
+        const retryAfter = response.headers.get('Retry-After');
+        const delayMs = retryAfter 
+          ? parseInt(retryAfter, 10) * 1000 
+          : INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt);
+        
+        console.log(`[Retry] Rate limited (429), waiting ${delayMs}ms before retry ${attempt + 1}/${maxRetries}`);
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+        continue;
+      }
+      
+      // If server error (5xx), wait and retry
+      if (response.status >= 500 && attempt < maxRetries) {
+        const delayMs = INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt);
+        console.log(`[Retry] Server error (${response.status}), waiting ${delayMs}ms before retry ${attempt + 1}/${maxRetries}`);
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+        continue;
+      }
+      
+      return response;
+    } catch (err) {
+      lastError = err as Error;
+      if (attempt < maxRetries) {
+        const delayMs = INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt);
+        console.log(`[Retry] Network error, waiting ${delayMs}ms before retry ${attempt + 1}/${maxRetries}:`, err);
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+      }
+    }
+  }
+  
+  throw lastError || new Error('Max retries exceeded');
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -167,7 +217,7 @@ serve(async (req) => {
       const fetchUrl = `${baseUrl}?${queryParams.join('&')}`;
       console.log('Fetching:', fetchUrl);
 
-      const response = await fetch(fetchUrl, {
+      const response = await fetchWithRetry(fetchUrl, {
         headers: { 'Authorization': `Bearer ${config.access_token}` },
       });
 
@@ -272,8 +322,8 @@ serve(async (req) => {
 
           if (existing) continue;
 
-          // Fetch full message
-          const fullResp = await fetch(`https://api.aurinko.io/v1/email/messages/${externalId}`, {
+          // Fetch full message with retry
+          const fullResp = await fetchWithRetry(`https://api.aurinko.io/v1/email/messages/${externalId}`, {
             headers: { 'Authorization': `Bearer ${config.access_token}` },
           });
 
@@ -429,7 +479,7 @@ serve(async (req) => {
       const fetchUrl = `${baseUrl}?${queryParams.join('&')}`;
       console.log('[Worker] Fetching sent emails from:', fetchUrl);
       
-      const response = await fetch(fetchUrl, {
+      const response = await fetchWithRetry(fetchUrl, {
         headers: { 'Authorization': `Bearer ${config.access_token}` },
       });
 
@@ -460,8 +510,8 @@ serve(async (req) => {
 
             if (existingMsg) continue;
 
-            // Fetch full message
-            const fullResp = await fetch(`https://api.aurinko.io/v1/email/messages/${externalId}`, {
+            // Fetch full message with retry
+            const fullResp = await fetchWithRetry(`https://api.aurinko.io/v1/email/messages/${externalId}`, {
               headers: { 'Authorization': `Bearer ${config.access_token}` },
             });
 
