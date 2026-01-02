@@ -164,3 +164,18 @@ verify_jwt = false
 
 [functions.gmail-sync-worker]
 verify_jwt = false
+
+[functions.start-email-import]
+verify_jwt = false
+
+[functions.email-scan]
+verify_jwt = false
+
+[functions.email-analyze]
+verify_jwt = false
+
+[functions.email-fetch-bodies]
+verify_jwt = false
+
+[functions.import-watchdog]
+verify_jwt = false
