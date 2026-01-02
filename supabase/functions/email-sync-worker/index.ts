@@ -403,13 +403,14 @@ serve(async (req) => {
       // Only continue if we haven't hit the limit and there's more pages
       needsContinuation = (needsContinuation || !!nextPageToken) && !(importLimit !== null && inboundProcessed >= importLimit);
 
-    } else if (limitReached) {
-      // If limit was already reached on job resume, mark inbound done
+    } else if (isInboundPhase && limitReached) {
+      // If limit was already reached on job resume but inbound wasn't marked done yet
       console.log('[Worker] Limit was already reached, marking inbound DONE');
       await supabase.from('email_sync_jobs').update({
         inbound_cursor: 'DONE',
         last_batch_at: new Date().toISOString(),
       }).eq('id', jobId);
+      // Don't set needsContinuation - let this batch complete, next call will hit sent phase
     } else {
       // SENT PHASE
       console.log('Processing sent emails, cursor:', job.sent_cursor);
@@ -426,14 +427,19 @@ serve(async (req) => {
       }
 
       const fetchUrl = `${baseUrl}?${queryParams.join('&')}`;
+      console.log('[Worker] Fetching sent emails from:', fetchUrl);
+      
       const response = await fetch(fetchUrl, {
         headers: { 'Authorization': `Bearer ${config.access_token}` },
       });
 
+      console.log('[Worker] Sent API response status:', response.status);
+      
       if (response.ok) {
         const data = await response.json();
         const messages = data.records || [];
         const nextPageToken = data.nextPageToken || null;
+        console.log('[Worker] Sent messages fetched:', messages.length, 'nextPage:', !!nextPageToken);
 
         for (const message of messages) {
           if (Date.now() - startTime > MAX_RUNTIME_MS) {
@@ -474,17 +480,35 @@ serve(async (req) => {
 
             if (!body || body.length < 20) continue;
 
-            // Find conversation
-            const { data: conversation } = await supabase
+            // Find conversation by thread_id OR external_conversation_id
+            let conversationId: string | null = null;
+            
+            // Try metadata->thread_id first
+            const { data: conv1 } = await supabase
               .from('conversations')
               .select('id')
               .eq('metadata->>thread_id', threadId)
               .eq('workspace_id', config.workspace_id)
-              .single();
+              .limit(1)
+              .maybeSingle();
+            
+            if (conv1) {
+              conversationId = conv1.id;
+            } else {
+              // Try external_conversation_id
+              const { data: conv2 } = await supabase
+                .from('conversations')
+                .select('id')
+                .eq('external_conversation_id', threadId)
+                .eq('workspace_id', config.workspace_id)
+                .limit(1)
+                .maybeSingle();
+              if (conv2) conversationId = conv2.id;
+            }
 
-            if (conversation) {
+            if (conversationId) {
               await supabase.from('messages').insert({
-                conversation_id: conversation.id,
+                conversation_id: conversationId,
                 body: body.substring(0, 10000),
                 direction: 'outbound',
                 channel: 'email',
@@ -494,6 +518,8 @@ serve(async (req) => {
                 raw_payload: fullMsg,
               });
               threadsLinked++;
+            } else {
+              console.log('[Worker] No matching conversation for sent email, threadId:', threadId);
             }
 
             sentProcessed++;
