@@ -145,10 +145,19 @@ serve(async (req) => {
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Fetch failed:', response.status, errorText);
+        const errorMessage = `API error: ${response.status}`;
+        
+        // Update both job AND config to reflect error state
         await supabase.from('email_sync_jobs').update({ 
           status: 'error', 
-          error_message: `API error: ${response.status}` 
+          error_message: errorMessage 
         }).eq('id', jobId);
+        
+        await supabase.from('email_provider_configs').update({
+          sync_status: 'error',
+          sync_error: errorMessage,
+        }).eq('id', configId);
+        
         return new Response(JSON.stringify({ error: 'API fetch failed' }), {
           status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -514,6 +523,31 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Worker error:', error);
+    
+    // Try to update config status on unhandled errors too
+    try {
+      const { jobId, configId } = await req.clone().json().catch(() => ({}));
+      if (configId) {
+        const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+        const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+        const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+        
+        await supabase.from('email_provider_configs').update({
+          sync_status: 'error',
+          sync_error: String(error),
+        }).eq('id', configId);
+        
+        if (jobId) {
+          await supabase.from('email_sync_jobs').update({
+            status: 'error',
+            error_message: String(error),
+          }).eq('id', jobId);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to update error status:', e);
+    }
+    
     return new Response(JSON.stringify({ error: String(error) }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
