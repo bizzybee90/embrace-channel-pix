@@ -304,45 +304,28 @@ export function EmailConnectionStep({
   const handleRetrySync = async () => {
     if (!connectedConfigId) return;
     try {
-      toast.message('Creating new sync job…');
-      
-      // Create new sync job first (so we don't leave the config stuck in "syncing" if this fails)
-      const { data: newJob, error: jobError } = await supabase
-        .from('email_sync_jobs')
-        .insert({
-          config_id: connectedConfigId,
-          workspace_id: workspaceId,
-          status: 'queued',
-          import_mode: connectedImportMode || 'last_1000',
-          inbound_cursor: 'START',
-          sent_cursor: null,
-        })
-        .select()
-        .single();
+      toast.message('Restarting sync…');
 
-      if (jobError) throw jobError;
-
-      // Clear the error state and attach the new job
-      await supabase
-        .from('email_provider_configs')
-        .update({
-          sync_status: 'syncing',
-          sync_error: null,
-          active_job_id: newJob.id,
-          sync_started_at: new Date().toISOString(),
-        })
-        .eq('id', connectedConfigId);
-      // Start the worker
-      const { error } = await supabase.functions.invoke('email-sync-worker', {
-        body: { jobId: newJob.id, configId: connectedConfigId },
+      // Prefer the backend starter which:
+      // - cancels any existing jobs
+      // - creates a fresh job with service credentials
+      // - updates the provider config consistently
+      const { data, error } = await supabase.functions.invoke('email-sync', {
+        body: {
+          configId: connectedConfigId,
+          mode: connectedImportMode || 'last_1000',
+        },
       });
-      
+
       if (error) throw error;
-      
+
+      // Immediately refresh status from DB (avoid relying on optimistic UI)
+      await checkEmailConnection();
+
       // Reset tracking
       lastProgressRef.current = { progress: 0, at: Date.now() };
-      setSyncStatus(prev => prev ? { ...prev, status: 'syncing', syncError: null } : null);
-      
+      setSyncStatus((prev) => (prev ? { ...prev, status: 'syncing', syncError: null } : null));
+
       toast.success('Sync restarted!');
     } catch (e: any) {
       console.error(e);
