@@ -18,6 +18,18 @@ interface EmailConnectionStepProps {
 type Provider = 'gmail' | 'outlook' | 'icloud' | 'yahoo';
 type ImportMode = 'new_only' | 'unread_only' | 'all_historical_30_days' | 'all_historical_90_days' | 'last_1000' | 'all_history';
 
+interface ImportJob {
+  id: string;
+  status: string;
+  inbox_emails_scanned: number;
+  sent_emails_scanned: number;
+  total_threads_found: number;
+  conversation_threads: number;
+  bodies_fetched: number;
+  messages_created: number;
+  error_message: string | null;
+}
+
 const emailProviders = [
   { 
     id: 'gmail' as Provider, 
@@ -54,7 +66,7 @@ const importModes = [
     value: 'all_history' as ImportMode, 
     label: 'Entire email history', 
     description: 'Import everything — best for maximum AI accuracy',
-    timeEstimate: '30-45 mins',
+    timeEstimate: '15-20 mins',
     recommended: false
   },
   { 
@@ -68,7 +80,7 @@ const importModes = [
     value: 'all_historical_90_days' as ImportMode, 
     label: 'Last 90 days', 
     description: 'Import all emails from the past 3 months',
-    timeEstimate: '10-20 mins'
+    timeEstimate: '10-15 mins'
   },
   { 
     value: 'all_historical_30_days' as ImportMode, 
@@ -90,6 +102,39 @@ const importModes = [
   },
 ];
 
+// Calculate progress percentage based on job status
+function calculateProgress(job: ImportJob): number {
+  switch (job.status) {
+    case 'queued': return 0;
+    case 'scanning_inbox':
+    case 'scanning_sent':
+      return Math.min(30, Math.floor((job.inbox_emails_scanned + job.sent_emails_scanned) / 500));
+    case 'analyzing': return 35;
+    case 'fetching':
+      if (job.conversation_threads > 0) {
+        return Math.min(95, 40 + (job.bodies_fetched / job.conversation_threads) * 55);
+      }
+      return 40;
+    case 'completed': return 100;
+    case 'error': return -1;
+    default: return 0;
+  }
+}
+
+// Get human-readable status message
+function getStatusMessage(job: ImportJob): string {
+  switch (job.status) {
+    case 'queued': return 'Preparing...';
+    case 'scanning_inbox': return `Scanning inbox... ${job.inbox_emails_scanned.toLocaleString()} found`;
+    case 'scanning_sent': return `Scanning sent... ${job.sent_emails_scanned.toLocaleString()} found`;
+    case 'analyzing': return `Analyzing ${(job.inbox_emails_scanned + job.sent_emails_scanned).toLocaleString()} emails...`;
+    case 'fetching': return `Importing ${job.bodies_fetched} of ${job.conversation_threads} conversations`;
+    case 'completed': return `Done! ${job.messages_created} messages imported`;
+    case 'error': return 'Failed: ' + (job.error_message || 'Unknown error');
+    default: return job.status;
+  }
+}
+
 export function EmailConnectionStep({ 
   workspaceId, 
   onNext, 
@@ -104,76 +149,23 @@ export function EmailConnectionStep({
   const [importMode, setImportMode] = useState<ImportMode>('last_1000');
   const [checkingConnection, setCheckingConnection] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
-  const [syncStatus, setSyncStatus] = useState<{
-    status: string;
-    stage: string;
-    progress: number;
-    total: number;
-    inboundFound: number;
-    outboundFound: number;
-    inboundTotal: number;
-    outboundTotal: number;
-    threadsLinked: number;
-    voiceProfileStatus: string;
-    activeJobId?: string | null;
-    lastSyncAt?: string | null;
-    syncStartedAt?: string | null;
-    syncError?: string | null;
-  } | null>(null);
-
-  const [onboardingProgress, setOnboardingProgress] = useState<{
-    emailImportStatus: string;
-    emailImportProgress: number;
-    threadMatchingStatus: string;
-    threadMatchingProgress: number;
-    pairsMatched: number;
-    categorizationStatus: string;
-    categorizationProgress: number;
-    styleAnalysisStatus: string;
-    fewShotStatus: string;
-    responseRatePercent: number | null;
-    avgResponseTimeHours: number | null;
-    topCategories: Array<{ category: string; count: number }>;
-  } | null>(null);
+  
+  // New job-based state
+  const [importJob, setImportJob] = useState<ImportJob | null>(null);
 
   const connectedEmailRef = useRef<string | null>(null);
   const connectTimeoutRef = useRef<number | undefined>(undefined);
   const popupRef = useRef<Window | null>(null);
   const popupPollRef = useRef<number | undefined>(undefined);
-  const lastProgressRef = useRef<{ progress: number; at: number }>({ progress: 0, at: Date.now() });
 
   useEffect(() => {
     connectedEmailRef.current = connectedEmail;
   }, [connectedEmail]);
 
-  const parseTopCategories = (value: unknown): Array<{ category: string; count: number }> => {
-    if (!Array.isArray(value)) return [];
-    return value
-      .map((v) => ({
-        category: typeof (v as any)?.category === 'string' ? (v as any).category : '',
-        count: typeof (v as any)?.count === 'number' ? (v as any).count : 0,
-      }))
-      .filter((v) => v.category);
-  };
-
-  const fetchLatestSyncJob = async (configId: string) => {
-    const { data, error } = await supabase
-      .from('email_sync_jobs')
-      .select('id, status, error_message')
-      .eq('config_id', configId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (error) throw error;
-    return data;
-  };
-
   const handleConnect = async (provider: Provider) => {
     setIsConnecting(true);
     setSelectedProvider(provider);
 
-    // Clear any previous attempt timers
     if (connectTimeoutRef.current) window.clearTimeout(connectTimeoutRef.current);
     if (popupPollRef.current) window.clearInterval(popupPollRef.current);
     popupPollRef.current = undefined;
@@ -181,7 +173,6 @@ export function EmailConnectionStep({
     popupRef.current = null;
 
     try {
-      // Use Aurinko for all providers (avoids Google OAuth verification requirements)
       const authEndpoint = 'aurinko-auth-start';
       
       const { data, error } = await supabase.functions.invoke(authEndpoint, {
@@ -196,13 +187,10 @@ export function EmailConnectionStep({
       if (error) throw error;
 
       if (data?.authUrl) {
-        // Store that we're expecting a callback
         localStorage.setItem('onboarding_email_pending', 'true');
         localStorage.setItem('onboarding_workspace_id', workspaceId);
         localStorage.setItem('onboarding_import_mode', importMode);
 
-        // In embedded previews (iframe), Google blocks the auth UI and shows a 403.
-        // Open OAuth in a new tab so it runs in a top-level browsing context.
         const isEmbedded = (() => {
           try {
             return window.self !== window.top;
@@ -219,9 +207,7 @@ export function EmailConnectionStep({
             return;
           }
           toast.message('Complete the email connection in the new tab, then come back here.');
-          // Keep isConnecting=true so we keep polling for the connection.
         } else {
-          // Direct navigation for normal (non-iframe) environments.
           window.location.href = data.authUrl;
         }
       }
@@ -237,7 +223,7 @@ export function EmailConnectionStep({
     try {
       const { data, error } = await supabase
         .from('email_provider_configs')
-        .select('id, import_mode, email_address, sync_status, sync_stage, sync_progress, sync_total, inbound_emails_found, outbound_emails_found, inbound_total, outbound_total, threads_linked, voice_profile_status, last_sync_at, sync_started_at, sync_error, active_job_id')
+        .select('id, import_mode, email_address, sync_status, sync_error')
         .eq('workspace_id', workspaceId)
         .order('created_at', { ascending: false })
         .limit(1)
@@ -251,55 +237,14 @@ export function EmailConnectionStep({
         setConnectedImportMode((data.import_mode as ImportMode) || null);
         onEmailConnected(data.email_address);
 
-        // Stop any connection timers (prevents false "timed out" toasts)
         if (connectTimeoutRef.current) window.clearTimeout(connectTimeoutRef.current);
         if (popupPollRef.current) window.clearInterval(popupPollRef.current);
         connectTimeoutRef.current = undefined;
         popupPollRef.current = undefined;
         popupRef.current = null;
 
-        // Update sync status with detailed info
-        if (data.sync_status) {
-          const next = {
-            status: data.sync_status,
-            stage: data.sync_stage || 'pending',
-            progress: data.sync_progress || 0,
-            total: data.sync_total || 0,
-            inboundFound: data.inbound_emails_found || 0,
-            outboundFound: data.outbound_emails_found || 0,
-            inboundTotal: data.inbound_total || 0,
-            outboundTotal: data.outbound_total || 0,
-            threadsLinked: data.threads_linked || 0,
-            voiceProfileStatus: data.voice_profile_status || 'pending',
-            activeJobId: data.active_job_id || null,
-            lastSyncAt: data.last_sync_at || null,
-            syncStartedAt: data.sync_started_at || null,
-            syncError: data.sync_error || null,
-          };
-
-          // Reconcile stuck UI state: if the latest job errored but the config didn't get updated,
-          // surface the job error so the user can retry.
-          if (next.status === 'syncing' && !next.syncError) {
-            try {
-              const latestJob = await fetchLatestSyncJob(data.id);
-              if (latestJob?.status === 'error') {
-                next.status = 'error';
-                next.syncError = latestJob.error_message || 'Sync failed';
-                next.activeJobId = latestJob.id;
-              }
-            } catch (e) {
-              // Non-fatal: keep showing config-derived status
-              console.warn('Could not reconcile latest sync job:', e);
-            }
-          }
-
-          setSyncStatus(next);
-
-          // Track last progress movement to detect stalls
-          if (next.progress !== lastProgressRef.current.progress) {
-            lastProgressRef.current = { progress: next.progress, at: Date.now() };
-          }
-        }
+        // Fetch the latest import job
+        await fetchLatestImportJob(data.id);
 
         if (!connectedEmail) {
           toast.success(`Connected to ${data.email_address}`);
@@ -315,36 +260,33 @@ export function EmailConnectionStep({
     }
   };
 
-  const handleResumeSync = async () => {
-    if (!connectedConfigId || !syncStatus?.activeJobId) return;
-    try {
-      toast.message('Resuming email scan…');
-      const { error } = await supabase.functions.invoke('email-sync-worker', {
-        body: { jobId: syncStatus.activeJobId, configId: connectedConfigId },
-      });
-      if (error) throw error;
-      lastProgressRef.current = { progress: syncStatus.progress ?? 0, at: Date.now() };
-    } catch (e) {
-      console.error(e);
-      toast.error('Could not resume the email scan.');
+  const fetchLatestImportJob = async (configId: string) => {
+    const { data: job, error } = await supabase
+      .from('email_import_jobs')
+      .select('id, status, inbox_emails_scanned, sent_emails_scanned, total_threads_found, conversation_threads, bodies_fetched, messages_created, error_message')
+      .eq('config_id', configId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!error && job) {
+      setImportJob(job as ImportJob);
     }
   };
 
   const handleStopSync = async () => {
-    if (!connectedConfigId || !syncStatus?.activeJobId) return;
+    if (!connectedConfigId || !importJob?.id) return;
     try {
       toast.message('Stopping sync…');
       
-      // Cancel the active job
       await supabase
-        .from('email_sync_jobs')
+        .from('email_import_jobs')
         .update({ 
           status: 'cancelled',
           error_message: 'Stopped by user'
         })
-        .eq('id', syncStatus.activeJobId);
+        .eq('id', importJob.id);
       
-      // Update config to show completed (we have enough data)
       await supabase
         .from('email_provider_configs')
         .update({
@@ -356,7 +298,7 @@ export function EmailConnectionStep({
         .eq('id', connectedConfigId);
       
       toast.success('Sync stopped. You can continue with the imported emails.');
-      await checkEmailConnection();
+      await fetchLatestImportJob(connectedConfigId);
     } catch (e) {
       console.error(e);
       toast.error('Could not stop the sync.');
@@ -368,26 +310,17 @@ export function EmailConnectionStep({
     try {
       toast.message('Restarting sync…');
 
-      // Prefer the backend starter which:
-      // - cancels any existing jobs
-      // - creates a fresh job with service credentials
-      // - updates the provider config consistently
-      const { data, error } = await supabase.functions.invoke('email-sync', {
+      // Use the new 3-phase import system
+      const { data, error } = await supabase.functions.invoke('start-email-import', {
         body: {
           configId: connectedConfigId,
-          mode: connectedImportMode || 'last_1000',
+          mode: connectedImportMode || 'all',
         },
       });
 
       if (error) throw error;
 
-      // Immediately refresh status from DB (avoid relying on optimistic UI)
-      await checkEmailConnection();
-
-      // Reset tracking
-      lastProgressRef.current = { progress: 0, at: Date.now() };
-      setSyncStatus((prev) => (prev ? { ...prev, status: 'syncing', syncError: null } : null));
-
+      await fetchLatestImportJob(connectedConfigId);
       toast.success('Sync restarted!');
     } catch (e: any) {
       console.error(e);
@@ -396,107 +329,28 @@ export function EmailConnectionStep({
     }
   };
 
-  // Check on mount and poll for sync progress
+  // Poll for job status when connected
   useEffect(() => {
-    // Always check for an existing connection on mount (restores state when navigating back)
     checkEmailConnection();
 
     const pending = localStorage.getItem('onboarding_email_pending') === 'true';
 
-    // While connecting, keep checking in case the OAuth flow redirected in-tab
-    // (popup not closed => previous polling never fires).
     let connectInterval: number | undefined;
     if (isConnecting || pending) {
       connectInterval = window.setInterval(() => {
         checkEmailConnection();
       }, 2000);
 
-      // stop after 2 minutes to avoid infinite polling
       window.setTimeout(() => {
         if (connectInterval) window.clearInterval(connectInterval);
       }, 120000);
     }
 
-    // Poll for sync progress when connected (every 2 seconds)
-    if (connectedEmail) {
+    // Poll for import job progress
+    if (connectedConfigId) {
       const interval = setInterval(async () => {
-        // Fetch both email config and onboarding progress
-        const [configResult, progressResult] = await Promise.all([
-          supabase
-            .from('email_provider_configs')
-            .select('sync_status, sync_stage, sync_progress, sync_total, inbound_emails_found, outbound_emails_found, inbound_total, outbound_total, threads_linked, voice_profile_status, last_sync_at, sync_started_at, sync_error, active_job_id')
-            .eq('workspace_id', workspaceId)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single(),
-          supabase
-            .from('onboarding_progress')
-            .select('*')
-            .eq('workspace_id', workspaceId)
-            .single(),
-        ]);
-
-         if (configResult.data) {
-           const next = {
-             status: configResult.data.sync_status || 'pending',
-             stage: configResult.data.sync_stage || 'pending',
-             progress: configResult.data.sync_progress || 0,
-             total: configResult.data.sync_total || 0,
-             inboundFound: configResult.data.inbound_emails_found || 0,
-             outboundFound: configResult.data.outbound_emails_found || 0,
-             inboundTotal: configResult.data.inbound_total || 0,
-             outboundTotal: configResult.data.outbound_total || 0,
-             threadsLinked: configResult.data.threads_linked || 0,
-             voiceProfileStatus: configResult.data.voice_profile_status || 'pending',
-             activeJobId: configResult.data.active_job_id || null,
-             lastSyncAt: configResult.data.last_sync_at || null,
-             syncStartedAt: configResult.data.sync_started_at || null,
-             syncError: configResult.data.sync_error || null,
-           };
-
-            // Same reconciliation during polling
-            if (next.status === 'syncing' && !next.syncError && connectedConfigId) {
-              try {
-                const latestJob = await fetchLatestSyncJob(connectedConfigId);
-                if (latestJob?.status === 'error') {
-                  next.status = 'error';
-                  next.syncError = latestJob.error_message || 'Sync failed';
-                  next.activeJobId = latestJob.id;
-                }
-              } catch (e) {
-                console.warn('Could not reconcile latest sync job:', e);
-              }
-            }
-
-           setSyncStatus(next);
-
-           if (next.progress !== lastProgressRef.current.progress) {
-             lastProgressRef.current = { progress: next.progress, at: Date.now() };
-           }
-
-           // Stop polling when complete
-           if (configResult.data.voice_profile_status === 'complete' || next.status === 'error') {
-             clearInterval(interval);
-           }
-         }
-
-        if (progressResult.data) {
-          setOnboardingProgress({
-            emailImportStatus: progressResult.data.email_import_status || 'pending',
-            emailImportProgress: progressResult.data.email_import_progress || 0,
-            threadMatchingStatus: progressResult.data.thread_matching_status || 'pending',
-            threadMatchingProgress: progressResult.data.thread_matching_progress || 0,
-            pairsMatched: progressResult.data.pairs_matched || 0,
-            categorizationStatus: progressResult.data.categorization_status || 'pending',
-            categorizationProgress: progressResult.data.categorization_progress || 0,
-            styleAnalysisStatus: progressResult.data.style_analysis_status || 'pending',
-            fewShotStatus: progressResult.data.few_shot_status || 'pending',
-            responseRatePercent: progressResult.data.response_rate_percent,
-            avgResponseTimeHours: progressResult.data.avg_response_time_hours,
-            topCategories: parseTopCategories(progressResult.data.top_categories),
-          });
-        }
-      }, 2000); // 2-second polling
+        await fetchLatestImportJob(connectedConfigId);
+      }, 2000);
 
       return () => {
         clearInterval(interval);
@@ -507,13 +361,12 @@ export function EmailConnectionStep({
     return () => {
       if (connectInterval) window.clearInterval(connectInterval);
     };
-  }, [isConnecting, connectedEmail, workspaceId, connectedConfigId, connectedImportMode]);
+  }, [isConnecting, connectedConfigId, connectedImportMode]);
 
-  // Handle Aurinko OAuth redirect back to the app
+  // Handle OAuth redirect
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     
-    // Handle Aurinko OAuth callback
     const aurinko = params.get('aurinko');
     if (aurinko === 'success') {
       toast.success('Email connected successfully');
@@ -558,7 +411,6 @@ export function EmailConnectionStep({
     return () => window.removeEventListener('message', handleMessage);
   }, []);
 
-  // Show loading state while checking for existing connection
   if (initialLoading) {
     return (
       <div className="space-y-6">
@@ -576,6 +428,12 @@ export function EmailConnectionStep({
     );
   }
 
+  const isImporting = importJob && ['queued', 'scanning_inbox', 'scanning_sent', 'analyzing', 'fetching'].includes(importJob.status);
+  const importComplete = importJob?.status === 'completed';
+  const importError = importJob?.status === 'error';
+  const progress = importJob ? calculateProgress(importJob) : 0;
+  const statusMessage = importJob ? getStatusMessage(importJob) : '';
+
   return (
     <div className="space-y-6">
       <div className="text-center">
@@ -585,7 +443,6 @@ export function EmailConnectionStep({
         </CardDescription>
       </div>
 
-      {/* Popup guidance - shown when not connected */}
       {!connectedEmail && !isConnecting && (
         <div className="flex items-start gap-3 p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800 text-sm">
           <div className="shrink-0 mt-0.5">
@@ -609,139 +466,99 @@ export function EmailConnectionStep({
             </div>
           </div>
 
-          {/* Sync Error State */}
-          {syncStatus?.status === 'error' && (
+          {/* Error State */}
+          {importError && importJob && (
             <div className="space-y-4 p-4 bg-destructive/10 rounded-lg border border-destructive/30">
               <div className="flex items-center gap-2 text-destructive">
                 <AlertCircle className="h-5 w-5" />
-                <span className="font-medium">Sync encountered an error</span>
+                <span className="font-medium">Import encountered an error</span>
               </div>
               
-              {syncStatus.syncError && (
+              {importJob.error_message && (
                 <p className="text-sm text-muted-foreground">
-                  {syncStatus.syncError}
+                  {importJob.error_message}
                 </p>
               )}
               
               <div className="text-sm text-muted-foreground">
                 <p>Progress before error:</p>
-                <p className="font-medium">{syncStatus.inboundFound.toLocaleString()} inbox emails, {syncStatus.outboundFound.toLocaleString()} sent emails</p>
+                <p className="font-medium">
+                  {importJob.inbox_emails_scanned.toLocaleString()} inbox, {importJob.sent_emails_scanned.toLocaleString()} sent scanned
+                </p>
               </div>
               
               <Button onClick={handleRetrySync} className="w-full gap-2">
                 <RotateCcw className="h-4 w-4" />
-                Retry Sync
+                Retry Import
               </Button>
-              
-              <p className="text-xs text-muted-foreground text-center">
-                This usually happens if the connection was interrupted. Retrying will resume from where it stopped.
-              </p>
             </div>
           )}
 
-          {/* Multi-Phase Sync Progress Indicator */}
-          {syncStatus && (syncStatus.status !== 'completed' || syncStatus.voiceProfileStatus !== 'complete') && syncStatus.status !== 'error' && (
+          {/* Import Progress */}
+          {isImporting && importJob && (
             <div className="space-y-4 p-4 bg-muted/50 rounded-lg border">
               {/* Current phase indicator */}
               <div className="flex items-center gap-2">
                 <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                <span className="font-medium text-sm">
-                  {syncStatus.stage === 'fetching_inbox' && 'Phase 1 of 5: Scanning inbox...'}
-                  {syncStatus.stage === 'fetching_sent' && 'Phase 1 of 5: Scanning sent emails...'}
-                  {syncStatus.stage === 'matching_threads' && 'Phase 2 of 5: Matching conversations...'}
-                  {syncStatus.stage === 'categorizing_emails' && 'Phase 3 of 5: Categorizing emails...'}
-                  {syncStatus.stage === 'analyzing_style' && 'Phase 4 of 5: Learning your writing style...'}
-                  {syncStatus.stage === 'building_examples' && 'Phase 5 of 5: Building AI training data...'}
-                  {syncStatus.stage === 'pending' && 'Starting import...'}
-                  {!['fetching_inbox', 'fetching_sent', 'matching_threads', 'categorizing_emails', 'analyzing_style', 'building_examples', 'pending'].includes(syncStatus.stage) && 'Processing...'}
-                </span>
+                <span className="font-medium text-sm">{statusMessage}</span>
               </div>
 
-              {/* Always show email counts with real progress */}
+              {/* Progress stats */}
               <div className="grid grid-cols-2 gap-3 text-xs">
                 <div className="bg-background/50 rounded p-2">
                   <div className="font-semibold text-foreground flex items-center gap-1">
-                    {syncStatus.inboundFound.toLocaleString()}
-                    {syncStatus.inboundTotal > 0 && (
-                      <span className="text-muted-foreground">/ {syncStatus.inboundTotal.toLocaleString()}</span>
-                    )}
-                    {syncStatus.stage === 'fetching_inbox' && (
+                    {importJob.inbox_emails_scanned.toLocaleString()}
+                    {importJob.status === 'scanning_inbox' && (
                       <span className="text-muted-foreground animate-pulse">+</span>
                     )}
                   </div>
-                  <div className="text-muted-foreground">
-                    Inbox emails {syncStatus.inboundTotal > 0 && syncStatus.stage === 'fetching_inbox' 
-                      ? `(${Math.round((syncStatus.inboundFound / syncStatus.inboundTotal) * 100)}%)` 
-                      : syncStatus.stage === 'fetching_inbox' ? 'scanned' : ''}
-                  </div>
+                  <div className="text-muted-foreground">Inbox emails</div>
                 </div>
                 <div className="bg-background/50 rounded p-2">
                   <div className="font-semibold text-foreground flex items-center gap-1">
-                    {syncStatus.outboundFound.toLocaleString()}
-                    {syncStatus.outboundTotal > 0 && (
-                      <span className="text-muted-foreground">/ {syncStatus.outboundTotal.toLocaleString()}</span>
-                    )}
-                    {syncStatus.stage === 'fetching_sent' && (
+                    {importJob.sent_emails_scanned.toLocaleString()}
+                    {importJob.status === 'scanning_sent' && (
                       <span className="text-muted-foreground animate-pulse">+</span>
                     )}
                   </div>
-                  <div className="text-muted-foreground">
-                    Sent emails {syncStatus.outboundTotal > 0 && syncStatus.stage === 'fetching_sent'
-                      ? `(${Math.round((syncStatus.outboundFound / syncStatus.outboundTotal) * 100)}%)`
-                      : syncStatus.stage === 'fetching_sent' ? 'scanned' : syncStatus.stage === 'fetching_inbox' ? '(next)' : ''}
-                  </div>
+                  <div className="text-muted-foreground">Sent emails</div>
                 </div>
               </div>
 
-              {/* Real progress bar - only when we have totals for accurate percentage */}
-              {(syncStatus.stage === 'fetching_inbox' || syncStatus.stage === 'fetching_sent') && (
+              {/* Show conversation threads after analysis */}
+              {importJob.conversation_threads > 0 && (
+                <div className="bg-primary/5 border border-primary/20 rounded-lg p-3">
+                  <p className="text-xs font-medium text-primary">
+                    Found {importJob.conversation_threads.toLocaleString()} conversations with your replies
+                  </p>
+                  {importJob.status === 'fetching' && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Importing {importJob.bodies_fetched} of {importJob.conversation_threads}...
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Progress bar */}
+              {progress > 0 && progress < 100 && (
                 <div className="space-y-1">
-                  {syncStatus.inboundTotal > 0 || syncStatus.outboundTotal > 0 ? (
-                    <>
-                      <Progress value={syncStatus.progress} className="h-2" />
-                      <p className="text-xs text-center text-muted-foreground">
-                        {syncStatus.progress}% complete
-                      </p>
-                    </>
-                  ) : (
-                    /* Indeterminate progress when totals not available (Aurinko fallback) */
-                    <div className="relative h-2 bg-muted rounded-full overflow-hidden">
-                      <div className="absolute inset-0 bg-primary/30 animate-pulse" />
-                      <div className="absolute h-full w-1/3 bg-primary rounded-full animate-[slide_1.5s_ease-in-out_infinite]" 
-                           style={{ animation: 'slide 1.5s ease-in-out infinite' }} />
-                    </div>
-                  )}
+                  <Progress value={progress} className="h-2" />
+                  <p className="text-xs text-center text-muted-foreground">
+                    {progress}% complete
+                  </p>
                 </div>
               )}
 
-              {/* Insights preview when available */}
-              {onboardingProgress?.responseRatePercent != null && (
-                <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 space-y-1">
-                  <p className="text-xs font-medium text-primary">Email Insights</p>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div>Response rate: <strong>{onboardingProgress.responseRatePercent}%</strong></div>
-                    {onboardingProgress.avgResponseTimeHours != null && (
-                      <div>Avg response: <strong>{onboardingProgress.avgResponseTimeHours}h</strong></div>
-                    )}
-                  </div>
-                  {onboardingProgress.pairsMatched > 0 && (
-                    <div className="text-muted-foreground">
-                      {onboardingProgress.pairsMatched.toLocaleString()} conversations matched
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Live activity indicator */}
+              {/* Live indicator */}
               <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
                 <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
                 </span>
-                <span>Actively syncing</span>
+                <span>Actively importing</span>
               </div>
 
-              {/* Stop sync button */}
+              {/* Stop button */}
               <Button 
                 variant="outline" 
                 size="sm" 
@@ -754,7 +571,7 @@ export function EmailConnectionStep({
 
               <div className="text-center space-y-1">
                 <p className="text-xs text-muted-foreground">
-                  You can continue while we build your AI clone in the background.
+                  You can continue while we import in the background.
                 </p>
                 <p className="text-xs text-muted-foreground/70 italic">
                   ☕ Perfect time for a coffee break!
@@ -763,7 +580,8 @@ export function EmailConnectionStep({
             </div>
           )}
 
-          {syncStatus?.status === 'completed' && syncStatus.voiceProfileStatus === 'complete' && (
+          {/* Import Complete */}
+          {importComplete && importJob && (
             <div className="space-y-2">
               <div className="flex items-center justify-center gap-2 p-3 bg-success/5 rounded-lg border border-success/20 text-success text-sm">
                 <CheckCircle2 className="h-4 w-4" />
@@ -771,30 +589,18 @@ export function EmailConnectionStep({
               </div>
               <div className="grid grid-cols-3 gap-2 text-center text-xs">
                 <div className="bg-muted/30 rounded p-2">
-                  <div className="font-semibold text-foreground">{syncStatus.inboundFound}</div>
-                  <div className="text-muted-foreground">Inbox emails</div>
+                  <div className="font-semibold text-foreground">{importJob.inbox_emails_scanned.toLocaleString()}</div>
+                  <div className="text-muted-foreground">Inbox scanned</div>
                 </div>
                 <div className="bg-muted/30 rounded p-2">
-                  <div className="font-semibold text-foreground">{syncStatus.outboundFound}</div>
-                  <div className="text-muted-foreground">Your replies</div>
+                  <div className="font-semibold text-foreground">{importJob.conversation_threads.toLocaleString()}</div>
+                  <div className="text-muted-foreground">Conversations</div>
                 </div>
                 <div className="bg-muted/30 rounded p-2">
-                  <div className="font-semibold text-foreground">✓</div>
-                  <div className="text-muted-foreground">Style learned</div>
+                  <div className="font-semibold text-foreground">{importJob.messages_created.toLocaleString()}</div>
+                  <div className="text-muted-foreground">Messages</div>
                 </div>
               </div>
-            </div>
-          )}
-
-          {syncStatus?.voiceProfileStatus === 'insufficient_data' && syncStatus.status === 'completed' && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-center gap-2 p-3 bg-success/5 rounded-lg border border-success/20 text-success text-sm">
-                <CheckCircle2 className="h-4 w-4" />
-                <span>Import complete! {syncStatus.inboundFound} emails imported.</span>
-              </div>
-              <p className="text-xs text-center text-muted-foreground">
-                Not enough sent emails to learn your style yet. BizzyBee will learn as you use it!
-              </p>
             </div>
           )}
 
