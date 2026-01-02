@@ -9,8 +9,58 @@ const corsHeaders = {
 const BATCH_SIZE = 100;
 const MAX_RUNTIME_MS = 25000;
 
+// Retry configuration for rate limits
+const MAX_RETRIES = 3;
+const INITIAL_RETRY_DELAY_MS = 2000; // 2 seconds
+
 declare const EdgeRuntime: { waitUntil: (promise: Promise<unknown>) => void } | undefined;
 const waitUntil = (p: Promise<unknown>) => { try { EdgeRuntime?.waitUntil(p); } catch {} };
+
+// Helper function to fetch with exponential backoff retry
+async function fetchWithRetry(
+  url: string, 
+  options: RequestInit, 
+  maxRetries = MAX_RETRIES
+): Promise<Response> {
+  let lastError: Error | null = null;
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await fetch(url, options);
+      
+      // If rate limited (429), wait and retry
+      if (response.status === 429 && attempt < maxRetries) {
+        const retryAfter = response.headers.get('Retry-After');
+        const delayMs = retryAfter 
+          ? parseInt(retryAfter, 10) * 1000 
+          : INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt);
+        
+        console.log(`[email-scan] Rate limited (429), waiting ${delayMs}ms before retry ${attempt + 1}/${maxRetries}`);
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+        continue;
+      }
+      
+      // If server error (5xx), wait and retry
+      if (response.status >= 500 && attempt < maxRetries) {
+        const delayMs = INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt);
+        console.log(`[email-scan] Server error (${response.status}), waiting ${delayMs}ms before retry ${attempt + 1}/${maxRetries}`);
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+        continue;
+      }
+      
+      return response;
+    } catch (err) {
+      lastError = err as Error;
+      if (attempt < maxRetries) {
+        const delayMs = INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt);
+        console.log(`[email-scan] Network error, waiting ${delayMs}ms before retry ${attempt + 1}/${maxRetries}:`, err);
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+      }
+    }
+  }
+  
+  throw lastError || new Error('Max retries exceeded');
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -72,7 +122,7 @@ serve(async (req) => {
 
       console.log(`[email-scan] Fetching ${folder} page...`);
 
-      const response = await fetch(url, {
+      const response = await fetchWithRetry(url, {
         headers: { 'Authorization': `Bearer ${config.access_token}` }
       });
 
