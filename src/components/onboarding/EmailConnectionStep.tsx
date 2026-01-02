@@ -156,6 +156,19 @@ export function EmailConnectionStep({
       .filter((v) => v.category);
   };
 
+  const fetchLatestSyncJob = async (configId: string) => {
+    const { data, error } = await supabase
+      .from('email_sync_jobs')
+      .select('id, status, error_message')
+      .eq('config_id', configId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data;
+  };
+
   const handleConnect = async (provider: Provider) => {
     setIsConnecting(true);
     setSelectedProvider(provider);
@@ -263,6 +276,22 @@ export function EmailConnectionStep({
             syncStartedAt: data.sync_started_at || null,
             syncError: data.sync_error || null,
           };
+
+          // Reconcile stuck UI state: if the latest job errored but the config didn't get updated,
+          // surface the job error so the user can retry.
+          if (next.status === 'syncing' && !next.syncError) {
+            try {
+              const latestJob = await fetchLatestSyncJob(data.id);
+              if (latestJob?.status === 'error') {
+                next.status = 'error';
+                next.syncError = latestJob.error_message || 'Sync failed';
+                next.activeJobId = latestJob.id;
+              }
+            } catch (e) {
+              // Non-fatal: keep showing config-derived status
+              console.warn('Could not reconcile latest sync job:', e);
+            }
+          }
 
           setSyncStatus(next);
 
@@ -374,35 +403,49 @@ export function EmailConnectionStep({
             .single(),
         ]);
 
-        if (configResult.data) {
-          const next = {
-            status: configResult.data.sync_status || 'pending',
-            stage: configResult.data.sync_stage || 'pending',
-            progress: configResult.data.sync_progress || 0,
-            total: configResult.data.sync_total || 0,
-            inboundFound: configResult.data.inbound_emails_found || 0,
-            outboundFound: configResult.data.outbound_emails_found || 0,
-            inboundTotal: configResult.data.inbound_total || 0,
-            outboundTotal: configResult.data.outbound_total || 0,
-            threadsLinked: configResult.data.threads_linked || 0,
-            voiceProfileStatus: configResult.data.voice_profile_status || 'pending',
-            activeJobId: configResult.data.active_job_id || null,
-            lastSyncAt: configResult.data.last_sync_at || null,
-            syncStartedAt: configResult.data.sync_started_at || null,
-            syncError: configResult.data.sync_error || null,
-          };
+         if (configResult.data) {
+           const next = {
+             status: configResult.data.sync_status || 'pending',
+             stage: configResult.data.sync_stage || 'pending',
+             progress: configResult.data.sync_progress || 0,
+             total: configResult.data.sync_total || 0,
+             inboundFound: configResult.data.inbound_emails_found || 0,
+             outboundFound: configResult.data.outbound_emails_found || 0,
+             inboundTotal: configResult.data.inbound_total || 0,
+             outboundTotal: configResult.data.outbound_total || 0,
+             threadsLinked: configResult.data.threads_linked || 0,
+             voiceProfileStatus: configResult.data.voice_profile_status || 'pending',
+             activeJobId: configResult.data.active_job_id || null,
+             lastSyncAt: configResult.data.last_sync_at || null,
+             syncStartedAt: configResult.data.sync_started_at || null,
+             syncError: configResult.data.sync_error || null,
+           };
 
-          setSyncStatus(next);
+            // Same reconciliation during polling
+            if (next.status === 'syncing' && !next.syncError && connectedConfigId) {
+              try {
+                const latestJob = await fetchLatestSyncJob(connectedConfigId);
+                if (latestJob?.status === 'error') {
+                  next.status = 'error';
+                  next.syncError = latestJob.error_message || 'Sync failed';
+                  next.activeJobId = latestJob.id;
+                }
+              } catch (e) {
+                console.warn('Could not reconcile latest sync job:', e);
+              }
+            }
 
-          if (next.progress !== lastProgressRef.current.progress) {
-            lastProgressRef.current = { progress: next.progress, at: Date.now() };
-          }
+           setSyncStatus(next);
 
-          // Stop polling when complete
-          if (configResult.data.voice_profile_status === 'complete' || configResult.data.sync_status === 'error') {
-            clearInterval(interval);
-          }
-        }
+           if (next.progress !== lastProgressRef.current.progress) {
+             lastProgressRef.current = { progress: next.progress, at: Date.now() };
+           }
+
+           // Stop polling when complete
+           if (configResult.data.voice_profile_status === 'complete' || next.status === 'error') {
+             clearInterval(interval);
+           }
+         }
 
         if (progressResult.data) {
           setOnboardingProgress({
