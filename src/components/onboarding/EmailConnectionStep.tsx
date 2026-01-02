@@ -306,35 +306,32 @@ export function EmailConnectionStep({
     try {
       toast.message('Creating new sync job…');
       
-      // Clear the error state and create a fresh job
-      await supabase.from('email_provider_configs').update({
-        sync_status: 'syncing',
-        sync_error: null,
-        active_job_id: null,
-      }).eq('id', connectedConfigId);
-      
-      // Create new sync job
+      // Create new sync job first (so we don't leave the config stuck in "syncing" if this fails)
       const { data: newJob, error: jobError } = await supabase
         .from('email_sync_jobs')
         .insert({
           config_id: connectedConfigId,
           workspace_id: workspaceId,
-          status: 'pending',
+          status: 'queued',
           import_mode: connectedImportMode || 'last_1000',
           inbound_cursor: 'START',
           sent_cursor: null,
         })
         .select()
         .single();
-      
+
       if (jobError) throw jobError;
-      
-      // Update config with new job ID
-      await supabase.from('email_provider_configs').update({
-        active_job_id: newJob.id,
-        sync_started_at: new Date().toISOString(),
-      }).eq('id', connectedConfigId);
-      
+
+      // Clear the error state and attach the new job
+      await supabase
+        .from('email_provider_configs')
+        .update({
+          sync_status: 'syncing',
+          sync_error: null,
+          active_job_id: newJob.id,
+          sync_started_at: new Date().toISOString(),
+        })
+        .eq('id', connectedConfigId);
       // Start the worker
       const { error } = await supabase.functions.invoke('email-sync-worker', {
         body: { jobId: newJob.id, configId: connectedConfigId },
@@ -347,9 +344,10 @@ export function EmailConnectionStep({
       setSyncStatus(prev => prev ? { ...prev, status: 'syncing', syncError: null } : null);
       
       toast.success('Sync restarted!');
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      toast.error('Could not restart the sync.');
+      const msg = typeof e?.message === 'string' ? e.message : 'Could not restart the sync.';
+      toast.error(msg);
     }
   };
 
