@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Search, Globe, Loader2, CheckCircle2, ArrowRight, XCircle, Sparkles, FileText, Brain, Wand2 } from 'lucide-react';
+import { Search, Globe, Loader2, CheckCircle2, ArrowRight, XCircle, Sparkles, FileText, Brain, Wand2, MapPin } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 
 interface CompetitorResearchStepProps {
@@ -20,6 +20,11 @@ interface CompetitorResearchStepProps {
   onBack: () => void;
 }
 
+interface PlacePrediction {
+  description: string;
+  place_id: string;
+}
+
 type Status = 'idle' | 'discovering' | 'validating' | 'scraping' | 'extracting' | 'deduplicating' | 'refining' | 'embedding' | 'completed' | 'error';
 
 const targetCountOptions = [
@@ -27,6 +32,18 @@ const targetCountOptions = [
   { value: 100, label: '100 competitors', description: 'Recommended balance (10-20 min)', recommended: true },
   { value: 250, label: '250 competitors', description: 'Comprehensive (30-45 min)' },
 ];
+
+// Extract clean service area name (first location without radius)
+const parseServiceArea = (serviceArea?: string): string => {
+  if (!serviceArea) return '';
+  // Support both pipe and comma format
+  const parts = serviceArea.includes(' | ') 
+    ? serviceArea.split(' | ')
+    : serviceArea.split(',');
+  const first = parts[0]?.trim() || '';
+  // Remove radius if present: "Luton (20 miles)" -> "Luton"
+  return first.replace(/\s*\(\d+\s*miles?\)$/i, '').trim();
+};
 
 export function CompetitorResearchStep({ 
   workspaceId, 
@@ -51,7 +68,7 @@ export function CompetitorResearchStep({
 
   const [status, setStatus] = useState<Status>('idle');
   const [nicheQuery, setNicheQuery] = useState(draft.nicheQuery ?? businessContext.businessType ?? '');
-  const [serviceArea, setServiceArea] = useState(draft.serviceArea ?? businessContext.serviceArea ?? '');
+  const [serviceArea, setServiceArea] = useState(draft.serviceArea ?? parseServiceArea(businessContext.serviceArea) ?? '');
   const [targetCount, setTargetCount] = useState(draft.targetCount ?? 100);
   const [jobId, setJobId] = useState<string | null>(null);
   const [progress, setProgress] = useState({
@@ -66,6 +83,64 @@ export function CompetitorResearchStep({
     currentSite: null as string | null,
   });
   const [error, setError] = useState<string | null>(null);
+
+  // Google Places autocomplete state
+  const [serviceAreaSearch, setServiceAreaSearch] = useState('');
+  const [serviceAreaFocused, setServiceAreaFocused] = useState(false);
+  const [placePredictions, setPlacePredictions] = useState<PlacePrediction[]>([]);
+  const [isLoadingPlaces, setIsLoadingPlaces] = useState(false);
+
+  // Google Places search
+  const searchPlaces = useCallback(async (input: string) => {
+    if (!input || input.trim().length < 2) {
+      setPlacePredictions([]);
+      return;
+    }
+
+    setIsLoadingPlaces(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('google-places-autocomplete', {
+        body: { input: input.trim() }
+      });
+
+      if (error) {
+        console.error('Places API error:', error);
+        setPlacePredictions([]);
+        return;
+      }
+
+      setPlacePredictions(data.predictions || []);
+    } catch (err) {
+      console.error('Error fetching places:', err);
+      setPlacePredictions([]);
+    } finally {
+      setIsLoadingPlaces(false);
+    }
+  }, []);
+
+  // Debounce places search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (serviceAreaSearch) {
+        searchPlaces(serviceAreaSearch);
+      } else {
+        setPlacePredictions([]);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [serviceAreaSearch, searchPlaces]);
+
+  const handleSelectLocation = (location: string) => {
+    // Clean up country suffix
+    let cleanLocation = location.trim();
+    const countryPattern = /, (UK|United Kingdom|USA|United States|Australia|Canada|Ireland|Germany|France|Italy|Spain|Netherlands|New Zealand|India|Poland|Czechia|South Korea|Malaysia|Belarus|England|Scotland|Wales|Northern Ireland)$/i;
+    cleanLocation = cleanLocation.replace(countryPattern, '');
+    
+    setServiceArea(cleanLocation);
+    setServiceAreaSearch('');
+    setPlacePredictions([]);
+  };
 
   // Persist form inputs
   useEffect(() => {
@@ -414,15 +489,50 @@ export function CompetitorResearchStep({
         <div className="space-y-2">
           <Label htmlFor="area">Service Area</Label>
           <div className="relative">
-            <Globe className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground z-10" />
             <Input
               id="area"
-              value={serviceArea}
-              onChange={(e) => setServiceArea(e.target.value)}
-              placeholder="e.g., London, Manchester, Birmingham"
+              value={serviceAreaFocused ? serviceAreaSearch : serviceArea}
+              onChange={(e) => {
+                setServiceAreaSearch(e.target.value);
+                if (!serviceAreaFocused) setServiceArea(e.target.value);
+              }}
+              onFocus={() => {
+                setServiceAreaFocused(true);
+                setServiceAreaSearch(serviceArea);
+              }}
+              onBlur={() => {
+                // Delay to allow click on dropdown
+                setTimeout(() => setServiceAreaFocused(false), 200);
+              }}
+              placeholder="Search for a city or town..."
               className="pl-10"
             />
+            {isLoadingPlaces && (
+              <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+            )}
+            {serviceAreaFocused && placePredictions.length > 0 && (
+              <div className="absolute z-50 w-full mt-1 bg-background border rounded-md shadow-lg max-h-48 overflow-auto">
+                {placePredictions.map((prediction) => (
+                  <button
+                    key={prediction.place_id}
+                    type="button"
+                    className="w-full px-3 py-2 text-left text-sm hover:bg-accent flex items-center gap-2"
+                    onClick={() => handleSelectLocation(prediction.description)}
+                  >
+                    <MapPin className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                    {prediction.description}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
+          {serviceArea && !serviceAreaFocused && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <MapPin className="h-3 w-3" />
+              <span>Selected: <strong className="text-foreground">{serviceArea}</strong></span>
+            </div>
+          )}
           <p className="text-xs text-muted-foreground">
             We'll find real local competitors in your area using Google Places
           </p>
