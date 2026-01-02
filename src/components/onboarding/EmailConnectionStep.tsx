@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { CardTitle, CardDescription } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Mail, CheckCircle2, Loader2, RefreshCw, ArrowRight } from 'lucide-react';
+import { Mail, CheckCircle2, Loader2, RefreshCw, ArrowRight, AlertCircle, RotateCcw } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
@@ -301,6 +301,58 @@ export function EmailConnectionStep({
     }
   };
 
+  const handleRetrySync = async () => {
+    if (!connectedConfigId) return;
+    try {
+      toast.message('Creating new sync job…');
+      
+      // Clear the error state and create a fresh job
+      await supabase.from('email_provider_configs').update({
+        sync_status: 'syncing',
+        sync_error: null,
+        active_job_id: null,
+      }).eq('id', connectedConfigId);
+      
+      // Create new sync job
+      const { data: newJob, error: jobError } = await supabase
+        .from('email_sync_jobs')
+        .insert({
+          config_id: connectedConfigId,
+          workspace_id: workspaceId,
+          status: 'pending',
+          import_mode: connectedImportMode || 'last_1000',
+          inbound_cursor: 'START',
+          sent_cursor: null,
+        })
+        .select()
+        .single();
+      
+      if (jobError) throw jobError;
+      
+      // Update config with new job ID
+      await supabase.from('email_provider_configs').update({
+        active_job_id: newJob.id,
+        sync_started_at: new Date().toISOString(),
+      }).eq('id', connectedConfigId);
+      
+      // Start the worker
+      const { error } = await supabase.functions.invoke('email-sync-worker', {
+        body: { jobId: newJob.id, configId: connectedConfigId },
+      });
+      
+      if (error) throw error;
+      
+      // Reset tracking
+      lastProgressRef.current = { progress: 0, at: Date.now() };
+      setSyncStatus(prev => prev ? { ...prev, status: 'syncing', syncError: null } : null);
+      
+      toast.success('Sync restarted!');
+    } catch (e) {
+      console.error(e);
+      toast.error('Could not restart the sync.');
+    }
+  };
+
   // Check on mount and poll for sync progress
   useEffect(() => {
     // Always check for an existing connection on mount (restores state when navigating back)
@@ -499,6 +551,36 @@ export function EmailConnectionStep({
               <p className="text-sm text-muted-foreground">{connectedEmail}</p>
             </div>
           </div>
+
+          {/* Sync Error State */}
+          {syncStatus?.status === 'error' && (
+            <div className="space-y-4 p-4 bg-destructive/10 rounded-lg border border-destructive/30">
+              <div className="flex items-center gap-2 text-destructive">
+                <AlertCircle className="h-5 w-5" />
+                <span className="font-medium">Sync encountered an error</span>
+              </div>
+              
+              {syncStatus.syncError && (
+                <p className="text-sm text-muted-foreground">
+                  {syncStatus.syncError}
+                </p>
+              )}
+              
+              <div className="text-sm text-muted-foreground">
+                <p>Progress before error:</p>
+                <p className="font-medium">{syncStatus.inboundFound.toLocaleString()} inbox emails, {syncStatus.outboundFound.toLocaleString()} sent emails</p>
+              </div>
+              
+              <Button onClick={handleRetrySync} className="w-full gap-2">
+                <RotateCcw className="h-4 w-4" />
+                Retry Sync
+              </Button>
+              
+              <p className="text-xs text-muted-foreground text-center">
+                This usually happens if the connection was interrupted. Retrying will resume from where it stopped.
+              </p>
+            </div>
+          )}
 
           {/* Multi-Phase Sync Progress Indicator */}
           {syncStatus && (syncStatus.status !== 'completed' || syncStatus.voiceProfileStatus !== 'complete') && syncStatus.status !== 'error' && (
