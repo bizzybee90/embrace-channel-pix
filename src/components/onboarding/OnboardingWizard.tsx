@@ -20,10 +20,10 @@ interface OnboardingWizardProps {
   onComplete: () => void;
 }
 
-type Step = 'welcome' | 'email' | 'business' | 'knowledge' | 'competitors' | 'senders' | 'triage' | 'automation' | 'review' | 'complete';
+type Step = 'welcome' | 'email' | 'business' | 'knowledge' | 'competitors' | 'senders' | 'triage' | 'automation' | 'complete';
 
-// Review step moved AFTER automation - it should be the final step before complete
-const STEPS: Step[] = ['welcome', 'email', 'business', 'knowledge', 'competitors', 'senders', 'triage', 'automation', 'review', 'complete'];
+// Simplified steps - review removed (users can access in Settings later)
+const STEPS: Step[] = ['welcome', 'email', 'business', 'knowledge', 'competitors', 'senders', 'triage', 'automation', 'complete'];
 
 export function OnboardingWizard({ workspaceId, onComplete }: OnboardingWizardProps) {
   const storageKey = `bizzybee:onboarding:${workspaceId}`;
@@ -279,13 +279,6 @@ export function OnboardingWizard({ workspaceId, onComplete }: OnboardingWizardPr
             />
           )}
 
-          {currentStep === 'review' && (
-            <ReviewLearningStep
-              workspaceId={workspaceId}
-              onComplete={handleNext}
-              onBack={handleBack}
-            />
-          )}
 
           {currentStep === 'automation' && (
             <AutomationLevelStep
