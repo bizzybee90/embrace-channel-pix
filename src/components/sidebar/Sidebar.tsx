@@ -1,12 +1,13 @@
 import { Home, Mail, CheckCircle2, Clock, ChevronDown, ChevronRight, ChevronLeft, Send, Inbox, BarChart3, MessageSquare, Settings, ClipboardCheck } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { Button } from '@/components/ui/button';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import bizzybeelogo from '@/assets/bizzybee-logo.png';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
+import { EmailImportIndicator } from './EmailImportIndicator';
 interface SidebarProps {
   forceCollapsed?: boolean;
   onNavigate?: () => void;
@@ -21,12 +22,12 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
   // In mobile drawer mode, never collapse - always show full sidebar with labels
   const isCollapsed = isMobileDrawer ? false : (forceCollapsed || collapsed);
 
-  // Fetch view counts
-  const { data: viewCounts } = useQuery({
+  // Fetch view counts and workspace ID
+  const { data: viewData } = useQuery({
     queryKey: ['sidebar-view-counts'],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return { toReply: 0, done: 0, snoozed: 0, review: 0 };
+      if (!user) return { toReply: 0, done: 0, snoozed: 0, review: 0, workspaceId: null };
 
       const { data: userData } = await supabase
         .from('users')
@@ -34,7 +35,7 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
         .eq('id', user.id)
         .single();
 
-      if (!userData?.workspace_id) return { toReply: 0, done: 0, snoozed: 0, review: 0 };
+      if (!userData?.workspace_id) return { toReply: 0, done: 0, snoozed: 0, review: 0, workspaceId: null };
 
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -75,11 +76,14 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
         done: doneResult.count || 0,
         snoozed: snoozedResult.count || 0,
         review: reviewResult.count || 0,
+        workspaceId: userData.workspace_id,
       };
     },
     staleTime: 30000,
     refetchInterval: 60000,
   });
+
+  const viewCounts = viewData;
 
   return (
     <TooltipProvider>
@@ -262,6 +266,9 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
               </TooltipContent>
             )}
           </Tooltip>
+
+          {/* Email Import Progress Indicator */}
+          <EmailImportIndicator workspaceId={viewData?.workspaceId || null} isCollapsed={isCollapsed} />
 
           {/* More Section - Collapsible */}
           {!isCollapsed && (

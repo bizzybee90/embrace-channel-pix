@@ -10,6 +10,7 @@ import { ReviewLearningStep } from './ReviewLearningStep';
 import { AutomationLevelStep } from './AutomationLevelStep';
 import { EmailConnectionStep } from './EmailConnectionStep';
 import { CompetitorResearchStep } from './CompetitorResearchStep';
+import { BackgroundImportBanner } from './BackgroundImportBanner';
 import bizzybeelogo from '@/assets/bizzybee-logo.png';
 import { CheckCircle2, Mail, BookOpen } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -179,6 +180,11 @@ export function OnboardingWizard({ workspaceId, onComplete }: OnboardingWizardPr
         </CardHeader>
 
         <CardContent className="space-y-6">
+          {/* Background import banner - shows on all steps after email connection */}
+          {currentStep !== 'welcome' && currentStep !== 'email' && (
+            <BackgroundImportBanner workspaceId={workspaceId} />
+          )}
+          
           {currentStep === 'welcome' && (
             <div className="text-center space-y-10 py-2">
               {/* Headline - Reassuring and confident */}
