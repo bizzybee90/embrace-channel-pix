@@ -138,6 +138,9 @@ verify_jwt = false
 [functions.competitor-discover]
 verify_jwt = false
 
+[functions.competitor-discover-smart]
+verify_jwt = false
+
 [functions.competitor-scrape-worker]
 verify_jwt = false
 
@@ -148,9 +151,6 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.learn-from-inbox]
-verify_jwt = false
-
-[functions.competitor-discover-smart]
 verify_jwt = false
 
 [functions.match-email-threads]
@@ -178,4 +178,22 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.import-watchdog]
+verify_jwt = false
+
+[functions.start-competitor-research]
+verify_jwt = false
+
+[functions.competitor-scrape]
+verify_jwt = false
+
+[functions.competitor-extract-faqs]
+verify_jwt = false
+
+[functions.competitor-dedupe-faqs]
+verify_jwt = false
+
+[functions.competitor-refine-faqs]
+verify_jwt = false
+
+[functions.competitor-research-watchdog]
 verify_jwt = false
