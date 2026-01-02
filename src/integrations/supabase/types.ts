@@ -170,6 +170,89 @@ export type Database = {
           },
         ]
       }
+      business_profile: {
+        Row: {
+          address: string | null
+          business_name: string
+          cancellation_policy: string | null
+          created_at: string | null
+          email: string | null
+          guarantee: string | null
+          id: string
+          industry: string | null
+          payment_methods: string | null
+          phone: string | null
+          price_summary: string | null
+          pricing_model: string | null
+          service_area: string | null
+          service_radius_miles: number | null
+          services: Json | null
+          tagline: string | null
+          tone: string | null
+          tone_description: string | null
+          updated_at: string | null
+          usps: Json | null
+          website: string | null
+          workspace_id: string
+        }
+        Insert: {
+          address?: string | null
+          business_name: string
+          cancellation_policy?: string | null
+          created_at?: string | null
+          email?: string | null
+          guarantee?: string | null
+          id?: string
+          industry?: string | null
+          payment_methods?: string | null
+          phone?: string | null
+          price_summary?: string | null
+          pricing_model?: string | null
+          service_area?: string | null
+          service_radius_miles?: number | null
+          services?: Json | null
+          tagline?: string | null
+          tone?: string | null
+          tone_description?: string | null
+          updated_at?: string | null
+          usps?: Json | null
+          website?: string | null
+          workspace_id: string
+        }
+        Update: {
+          address?: string | null
+          business_name?: string
+          cancellation_policy?: string | null
+          created_at?: string | null
+          email?: string | null
+          guarantee?: string | null
+          id?: string
+          industry?: string | null
+          payment_methods?: string | null
+          phone?: string | null
+          price_summary?: string | null
+          pricing_model?: string | null
+          service_area?: string | null
+          service_radius_miles?: number | null
+          services?: Json | null
+          tagline?: string | null
+          tone?: string | null
+          tone_description?: string | null
+          updated_at?: string | null
+          usps?: Json | null
+          website?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_profile_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       competitor_faq_candidates: {
         Row: {
           answer: string
@@ -241,21 +324,187 @@ export type Database = {
           },
         ]
       }
+      competitor_faqs_raw: {
+        Row: {
+          answer: string
+          category: string | null
+          created_at: string | null
+          duplicate_of: string | null
+          embedding: string | null
+          id: string
+          is_duplicate: boolean | null
+          is_refined: boolean | null
+          job_id: string | null
+          page_id: string | null
+          question: string
+          refined_faq_id: string | null
+          similarity_score: number | null
+          site_id: string | null
+          source_business: string | null
+          source_url: string | null
+          workspace_id: string
+        }
+        Insert: {
+          answer: string
+          category?: string | null
+          created_at?: string | null
+          duplicate_of?: string | null
+          embedding?: string | null
+          id?: string
+          is_duplicate?: boolean | null
+          is_refined?: boolean | null
+          job_id?: string | null
+          page_id?: string | null
+          question: string
+          refined_faq_id?: string | null
+          similarity_score?: number | null
+          site_id?: string | null
+          source_business?: string | null
+          source_url?: string | null
+          workspace_id: string
+        }
+        Update: {
+          answer?: string
+          category?: string | null
+          created_at?: string | null
+          duplicate_of?: string | null
+          embedding?: string | null
+          id?: string
+          is_duplicate?: boolean | null
+          is_refined?: boolean | null
+          job_id?: string | null
+          page_id?: string | null
+          question?: string
+          refined_faq_id?: string | null
+          similarity_score?: number | null
+          site_id?: string | null
+          source_business?: string | null
+          source_url?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "competitor_faqs_raw_duplicate_of_fkey"
+            columns: ["duplicate_of"]
+            isOneToOne: false
+            referencedRelation: "competitor_faqs_raw"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "competitor_faqs_raw_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "competitor_research_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "competitor_faqs_raw_page_id_fkey"
+            columns: ["page_id"]
+            isOneToOne: false
+            referencedRelation: "competitor_pages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "competitor_faqs_raw_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "competitor_sites"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "competitor_faqs_raw_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      competitor_pages: {
+        Row: {
+          content: string | null
+          faq_count: number | null
+          faqs_extracted: boolean | null
+          id: string
+          page_type: string | null
+          scraped_at: string | null
+          site_id: string
+          title: string | null
+          url: string
+          word_count: number | null
+          workspace_id: string
+        }
+        Insert: {
+          content?: string | null
+          faq_count?: number | null
+          faqs_extracted?: boolean | null
+          id?: string
+          page_type?: string | null
+          scraped_at?: string | null
+          site_id: string
+          title?: string | null
+          url: string
+          word_count?: number | null
+          workspace_id: string
+        }
+        Update: {
+          content?: string | null
+          faq_count?: number | null
+          faqs_extracted?: boolean | null
+          id?: string
+          page_type?: string | null
+          scraped_at?: string | null
+          site_id?: string
+          title?: string | null
+          url?: string
+          word_count?: number | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "competitor_pages_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "competitor_sites"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "competitor_pages_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       competitor_research_jobs: {
         Row: {
+          checkpoint: Json | null
           completed_at: string | null
           created_at: string | null
           current_scraping_domain: string | null
           error_message: string | null
           exclude_domains: string[] | null
           faqs_added: number | null
+          faqs_after_dedup: number | null
+          faqs_embedded: number | null
+          faqs_extracted: number | null
           faqs_generated: number | null
+          faqs_refined: number | null
+          heartbeat_at: string | null
           id: string
+          industry: string | null
+          location: string | null
           niche_query: string
+          pages_scraped: number | null
+          radius_miles: number | null
+          retry_count: number | null
+          search_queries: Json | null
           service_area: string | null
           sites_approved: number | null
           sites_discovered: number | null
           sites_scraped: number | null
+          sites_validated: number | null
           started_at: string | null
           status: string
           target_count: number | null
@@ -263,19 +512,32 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          checkpoint?: Json | null
           completed_at?: string | null
           created_at?: string | null
           current_scraping_domain?: string | null
           error_message?: string | null
           exclude_domains?: string[] | null
           faqs_added?: number | null
+          faqs_after_dedup?: number | null
+          faqs_embedded?: number | null
+          faqs_extracted?: number | null
           faqs_generated?: number | null
+          faqs_refined?: number | null
+          heartbeat_at?: string | null
           id?: string
+          industry?: string | null
+          location?: string | null
           niche_query: string
+          pages_scraped?: number | null
+          radius_miles?: number | null
+          retry_count?: number | null
+          search_queries?: Json | null
           service_area?: string | null
           sites_approved?: number | null
           sites_discovered?: number | null
           sites_scraped?: number | null
+          sites_validated?: number | null
           started_at?: string | null
           status?: string
           target_count?: number | null
@@ -283,19 +545,32 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          checkpoint?: Json | null
           completed_at?: string | null
           created_at?: string | null
           current_scraping_domain?: string | null
           error_message?: string | null
           exclude_domains?: string[] | null
           faqs_added?: number | null
+          faqs_after_dedup?: number | null
+          faqs_embedded?: number | null
+          faqs_extracted?: number | null
           faqs_generated?: number | null
+          faqs_refined?: number | null
+          heartbeat_at?: string | null
           id?: string
+          industry?: string | null
+          location?: string | null
           niche_query?: string
+          pages_scraped?: number | null
+          radius_miles?: number | null
+          retry_count?: number | null
+          search_queries?: Json | null
           service_area?: string | null
           sites_approved?: number | null
           sites_discovered?: number | null
           sites_scraped?: number | null
+          sites_validated?: number | null
           started_at?: string | null
           status?: string
           target_count?: number | null
@@ -314,54 +589,120 @@ export type Database = {
       }
       competitor_sites: {
         Row: {
+          address: string | null
+          business_name: string | null
+          city: string | null
           content_extracted: string | null
           created_at: string | null
           description: string | null
+          discovered_at: string | null
+          discovery_query: string | null
+          discovery_source: string | null
+          distance_miles: number | null
           domain: string
+          domain_type: string | null
           faqs_generated: number | null
+          has_faq_page: boolean | null
+          has_pricing_page: boolean | null
           id: string
           is_directory: boolean | null
+          is_valid: boolean | null
           job_id: string
+          latitude: number | null
+          longitude: number | null
           pages_scraped: number | null
+          phone: string | null
+          place_id: string | null
+          postcode: string | null
+          rating: number | null
           rejection_reason: string | null
+          review_count: number | null
+          scrape_error: string | null
+          scrape_status: string | null
           scraped_at: string | null
           status: string
           title: string | null
+          total_words: number | null
           url: string
+          validation_reason: string | null
           workspace_id: string
         }
         Insert: {
+          address?: string | null
+          business_name?: string | null
+          city?: string | null
           content_extracted?: string | null
           created_at?: string | null
           description?: string | null
+          discovered_at?: string | null
+          discovery_query?: string | null
+          discovery_source?: string | null
+          distance_miles?: number | null
           domain: string
+          domain_type?: string | null
           faqs_generated?: number | null
+          has_faq_page?: boolean | null
+          has_pricing_page?: boolean | null
           id?: string
           is_directory?: boolean | null
+          is_valid?: boolean | null
           job_id: string
+          latitude?: number | null
+          longitude?: number | null
           pages_scraped?: number | null
+          phone?: string | null
+          place_id?: string | null
+          postcode?: string | null
+          rating?: number | null
           rejection_reason?: string | null
+          review_count?: number | null
+          scrape_error?: string | null
+          scrape_status?: string | null
           scraped_at?: string | null
           status?: string
           title?: string | null
+          total_words?: number | null
           url: string
+          validation_reason?: string | null
           workspace_id: string
         }
         Update: {
+          address?: string | null
+          business_name?: string | null
+          city?: string | null
           content_extracted?: string | null
           created_at?: string | null
           description?: string | null
+          discovered_at?: string | null
+          discovery_query?: string | null
+          discovery_source?: string | null
+          distance_miles?: number | null
           domain?: string
+          domain_type?: string | null
           faqs_generated?: number | null
+          has_faq_page?: boolean | null
+          has_pricing_page?: boolean | null
           id?: string
           is_directory?: boolean | null
+          is_valid?: boolean | null
           job_id?: string
+          latitude?: number | null
+          longitude?: number | null
           pages_scraped?: number | null
+          phone?: string | null
+          place_id?: string | null
+          postcode?: string | null
+          rating?: number | null
           rejection_reason?: string | null
+          review_count?: number | null
+          scrape_error?: string | null
+          scrape_status?: string | null
           scraped_at?: string | null
           status?: string
           title?: string | null
+          total_words?: number | null
           url?: string
+          validation_reason?: string | null
           workspace_id?: string
         }
         Relationships: [
@@ -1708,8 +2049,12 @@ export type Database = {
           is_industry_standard: boolean | null
           is_own_content: boolean | null
           keywords: string[] | null
+          original_faq_id: string | null
           priority: number | null
           question: string
+          refined_at: string | null
+          relevance_score: number | null
+          source_business: string | null
           source_company: string | null
           source_url: string | null
           updated_at: string | null
@@ -1729,8 +2074,12 @@ export type Database = {
           is_industry_standard?: boolean | null
           is_own_content?: boolean | null
           keywords?: string[] | null
+          original_faq_id?: string | null
           priority?: number | null
           question: string
+          refined_at?: string | null
+          relevance_score?: number | null
+          source_business?: string | null
           source_company?: string | null
           source_url?: string | null
           updated_at?: string | null
@@ -1750,8 +2099,12 @@ export type Database = {
           is_industry_standard?: boolean | null
           is_own_content?: boolean | null
           keywords?: string[] | null
+          original_faq_id?: string | null
           priority?: number | null
           question?: string
+          refined_at?: string | null
+          relevance_score?: number | null
+          source_business?: string | null
           source_company?: string | null
           source_url?: string | null
           updated_at?: string | null
@@ -3384,7 +3737,29 @@ export type Database = {
         Args: { secret: string; token: string }
         Returns: string
       }
+      find_duplicate_faqs: {
+        Args: {
+          p_job_id: string
+          p_similarity_threshold?: number
+          p_workspace_id: string
+        }
+        Returns: number
+      }
       get_my_workspace_id: { Args: never; Returns: string }
+      get_research_job_stats: {
+        Args: { p_job_id: string }
+        Returns: {
+          faqs_extracted: number
+          faqs_refined: number
+          faqs_unique: number
+          pages_scraped: number
+          progress_percent: number
+          sites_discovered: number
+          sites_scraped: number
+          sites_validated: number
+          status: string
+        }[]
+      }
       get_sent_conversations: {
         Args: { p_limit?: number; p_offset?: number; p_user_id: string }
         Returns: {
@@ -3447,6 +3822,22 @@ export type Database = {
           category: string
           id: string
           is_own_content: boolean
+          priority: number
+          question: string
+          similarity: number
+        }[]
+      }
+      search_faqs_with_priority: {
+        Args: {
+          p_embedding: string
+          p_match_count?: number
+          p_match_threshold?: number
+          p_workspace_id: string
+        }
+        Returns: {
+          answer: string
+          category: string
+          id: string
           priority: number
           question: string
           similarity: number

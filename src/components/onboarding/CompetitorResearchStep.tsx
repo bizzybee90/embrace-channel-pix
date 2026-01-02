@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Search, Globe, Loader2, CheckCircle2, ArrowRight, XCircle, Sparkles } from 'lucide-react';
+import { Search, Globe, Loader2, CheckCircle2, ArrowRight, XCircle, Sparkles, FileText, Brain, Wand2 } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 
 interface CompetitorResearchStepProps {
@@ -20,7 +20,7 @@ interface CompetitorResearchStepProps {
   onBack: () => void;
 }
 
-type Status = 'idle' | 'discovering' | 'scraping' | 'generating' | 'complete' | 'error';
+type Status = 'idle' | 'discovering' | 'validating' | 'scraping' | 'extracting' | 'deduplicating' | 'refining' | 'embedding' | 'completed' | 'error';
 
 const targetCountOptions = [
   { value: 50, label: '50 competitors', description: 'Quick research (5-10 min)' },
@@ -56,15 +56,18 @@ export function CompetitorResearchStep({
   const [jobId, setJobId] = useState<string | null>(null);
   const [progress, setProgress] = useState({
     sitesDiscovered: 0,
-    sitesApproved: 0,
+    sitesValidated: 0,
     sitesScraped: 0,
-    faqsGenerated: 0,
+    pagesScraped: 0,
+    faqsExtracted: 0,
+    faqsAfterDedup: 0,
+    faqsRefined: 0,
     faqsAdded: 0,
     currentSite: null as string | null,
   });
   const [error, setError] = useState<string | null>(null);
 
-  // Persist form inputs so Back/refresh doesn't wipe them
+  // Persist form inputs
   useEffect(() => {
     if (status !== 'idle') return;
     try {
@@ -72,14 +75,12 @@ export function CompetitorResearchStep({
         draftKey,
         JSON.stringify({ nicheQuery, serviceArea, targetCount, updatedAt: Date.now() })
       );
-    } catch {
-      // ignore
-    }
+    } catch { /* ignore */ }
   }, [draftKey, nicheQuery, serviceArea, targetCount, status]);
 
   // Poll for job progress
   useEffect(() => {
-    if (!jobId || status === 'complete' || status === 'error' || status === 'idle') return;
+    if (!jobId || status === 'completed' || status === 'error' || status === 'idle') return;
 
     const interval = setInterval(async () => {
       const { data } = await supabase
@@ -91,15 +92,18 @@ export function CompetitorResearchStep({
       if (data) {
         setProgress({
           sitesDiscovered: data.sites_discovered || 0,
-          sitesApproved: data.sites_approved || 0,
+          sitesValidated: data.sites_validated || data.sites_approved || 0,
           sitesScraped: data.sites_scraped || 0,
-          faqsGenerated: data.faqs_generated || 0,
-          faqsAdded: data.faqs_added || 0,
+          pagesScraped: data.pages_scraped || 0,
+          faqsExtracted: data.faqs_extracted || data.faqs_generated || 0,
+          faqsAfterDedup: data.faqs_after_dedup || 0,
+          faqsRefined: data.faqs_refined || 0,
+          faqsAdded: data.faqs_added || data.faqs_refined || 0,
           currentSite: data.current_scraping_domain || null,
         });
 
         if (data.status === 'completed') {
-          setStatus('complete');
+          setStatus('completed');
           clearInterval(interval);
         } else if (data.status === 'error') {
           setStatus('error');
@@ -132,6 +136,8 @@ export function CompetitorResearchStep({
           niche_query: nicheQuery,
           service_area: serviceArea || null,
           target_count: targetCount,
+          industry: nicheQuery,
+          location: serviceArea,
           status: 'queued',
         })
         .select()
@@ -141,8 +147,8 @@ export function CompetitorResearchStep({
 
       setJobId(job.id);
 
-      // Start the discovery process using smart Gemini-powered discovery
-      const { error: invokeError } = await supabase.functions.invoke('competitor-discover-smart', {
+      // Start the discovery process
+      const { error: invokeError } = await supabase.functions.invoke('competitor-discover', {
         body: {
           jobId: job.id,
           workspaceId,
@@ -176,14 +182,52 @@ export function CompetitorResearchStep({
   };
 
   const getProgressPercent = () => {
-    if (status === 'discovering') return 10 + (progress.sitesDiscovered / targetCount) * 20;
-    if (status === 'scraping') return 30 + (progress.sitesScraped / Math.max(progress.sitesApproved, 1)) * 50;
-    if (status === 'generating') return 80 + (progress.faqsGenerated > 0 ? 15 : 0);
-    if (status === 'complete') return 100;
-    return 0;
+    switch (status) {
+      case 'discovering': return 5 + Math.min(10, (progress.sitesDiscovered / targetCount) * 10);
+      case 'validating': return 15 + Math.min(10, (progress.sitesValidated / Math.max(progress.sitesDiscovered, 1)) * 10);
+      case 'scraping': return 25 + Math.min(25, (progress.sitesScraped / Math.max(progress.sitesValidated, 1)) * 25);
+      case 'extracting': return 50 + Math.min(15, (progress.faqsExtracted / 100) * 15);
+      case 'deduplicating': return 70;
+      case 'refining': return 75 + Math.min(20, (progress.faqsRefined / Math.max(progress.faqsAfterDedup, 1)) * 20);
+      case 'embedding': return 95;
+      case 'completed': return 100;
+      default: return 0;
+    }
   };
 
-  if (status === 'complete') {
+  const getStatusLabel = () => {
+    switch (status) {
+      case 'discovering': return 'Discovering competitors...';
+      case 'validating': return 'Validating business websites...';
+      case 'scraping': return progress.currentSite ? `Scraping ${progress.currentSite}...` : 'Scraping websites...';
+      case 'extracting': return 'Extracting FAQs from content...';
+      case 'deduplicating': return 'Removing duplicate FAQs...';
+      case 'refining': return 'Refining FAQs for your business...';
+      case 'embedding': return 'Generating search embeddings...';
+      default: return 'Processing...';
+    }
+  };
+
+  const getStatusIcon = () => {
+    switch (status) {
+      case 'discovering':
+      case 'validating':
+        return <Search className="h-5 w-5 animate-pulse text-primary" />;
+      case 'scraping':
+        return <Globe className="h-5 w-5 animate-spin text-blue-500" />;
+      case 'extracting':
+        return <FileText className="h-5 w-5 animate-pulse text-amber-500" />;
+      case 'deduplicating':
+        return <Brain className="h-5 w-5 animate-pulse text-purple-500" />;
+      case 'refining':
+      case 'embedding':
+        return <Wand2 className="h-5 w-5 animate-pulse text-green-500" />;
+      default:
+        return <Loader2 className="h-5 w-5 animate-spin text-primary" />;
+    }
+  };
+
+  if (status === 'completed') {
     return (
       <div className="space-y-6">
         <div className="text-center">
@@ -199,24 +243,28 @@ export function CompetitorResearchStep({
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-3 text-center">
-          <div className="bg-muted/30 rounded-lg p-4">
-            <div className="text-2xl font-bold text-primary">{progress.sitesApproved}</div>
-            <div className="text-xs text-muted-foreground">Competitors found</div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+          <div className="bg-muted/30 rounded-lg p-3">
+            <div className="text-xl font-bold text-primary">{progress.sitesDiscovered}</div>
+            <div className="text-[10px] text-muted-foreground">Discovered</div>
           </div>
-          <div className="bg-muted/30 rounded-lg p-4">
-            <div className="text-2xl font-bold text-blue-600">{progress.sitesScraped}</div>
-            <div className="text-xs text-muted-foreground">Sites analyzed</div>
+          <div className="bg-muted/30 rounded-lg p-3">
+            <div className="text-xl font-bold text-blue-600">{progress.sitesScraped}</div>
+            <div className="text-[10px] text-muted-foreground">Scraped</div>
           </div>
-          <div className="bg-muted/30 rounded-lg p-4">
-            <div className="text-2xl font-bold text-green-600">{progress.faqsAdded}</div>
-            <div className="text-xs text-muted-foreground">FAQs added</div>
+          <div className="bg-muted/30 rounded-lg p-3">
+            <div className="text-xl font-bold text-amber-600">{progress.faqsExtracted}</div>
+            <div className="text-[10px] text-muted-foreground">FAQs Found</div>
+          </div>
+          <div className="bg-muted/30 rounded-lg p-3">
+            <div className="text-xl font-bold text-green-600">{progress.faqsAdded}</div>
+            <div className="text-[10px] text-muted-foreground">Refined FAQs</div>
           </div>
         </div>
 
         {progress.faqsAdded > 0 && (
           <p className="text-center text-sm text-muted-foreground">
-            Your knowledge base now includes insights from {progress.sitesScraped} competitor websites.
+            Your knowledge base now includes {progress.faqsAdded} business-specific FAQs from {progress.sitesScraped} competitor websites.
           </p>
         )}
 
@@ -274,50 +322,44 @@ export function CompetitorResearchStep({
         <div className="text-center">
           <CardTitle className="text-xl">Researching Competitors</CardTitle>
           <CardDescription className="mt-2">
-            {status === 'discovering' && 'Finding competitors in your niche...'}
-            {status === 'scraping' && 'Analyzing competitor websites...'}
-            {status === 'generating' && 'Generating FAQs from insights...'}
+            Building your competitive knowledge base...
           </CardDescription>
         </div>
 
         <div className="space-y-4 p-4 bg-muted/30 rounded-lg">
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-3">
-              <Loader2 className="h-5 w-5 animate-spin text-primary" />
-              <span className="font-medium">
-                {status === 'discovering' && `Discovering competitors...`}
-                {status === 'scraping' && progress.currentSite 
-                  ? `Scraping ${progress.currentSite}...`
-                  : `Scraping competitors...`}
-                {status === 'generating' && 'Generating FAQs...'}
-              </span>
-            </div>
-            {status === 'scraping' && (
-              <span className="text-xs text-muted-foreground ml-8">
-                {progress.sitesScraped} of {progress.sitesApproved} sites completed
-                {progress.faqsGenerated > 0 && ` • ${progress.faqsGenerated} FAQs generated`}
-              </span>
-            )}
+          <div className="flex items-center gap-3">
+            {getStatusIcon()}
+            <span className="font-medium">{getStatusLabel()}</span>
           </div>
 
           <Progress value={getProgressPercent()} className="h-2" />
 
           <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
             <div className="flex justify-between">
-              <span>Competitors found:</span>
-              <span className="font-medium text-foreground">{progress.sitesApproved}</span>
+              <span>Sites discovered:</span>
+              <span className="font-medium text-foreground">{progress.sitesDiscovered}</span>
             </div>
             <div className="flex justify-between">
               <span>Sites scraped:</span>
               <span className="font-medium text-foreground">{progress.sitesScraped}</span>
             </div>
             <div className="flex justify-between">
-              <span>FAQs generated:</span>
-              <span className="font-medium text-green-600">{progress.faqsGenerated}</span>
+              <span>Pages scraped:</span>
+              <span className="font-medium text-foreground">{progress.pagesScraped}</span>
             </div>
             <div className="flex justify-between">
-              <span>FAQs added:</span>
-              <span className="font-medium text-green-600">{progress.faqsAdded}</span>
+              <span>FAQs extracted:</span>
+              <span className="font-medium text-amber-600">{progress.faqsExtracted}</span>
+            </div>
+            {progress.faqsAfterDedup > 0 && (
+              <div className="flex justify-between">
+                <span>After dedup:</span>
+                <span className="font-medium text-purple-600">{progress.faqsAfterDedup}</span>
+              </div>
+            )}
+            <div className="flex justify-between">
+              <span>Refined FAQs:</span>
+              <span className="font-medium text-green-600">{progress.faqsRefined}</span>
             </div>
           </div>
         </div>
@@ -370,17 +412,20 @@ export function CompetitorResearchStep({
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="area">Service Area (optional)</Label>
+          <Label htmlFor="area">Service Area</Label>
           <div className="relative">
             <Globe className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               id="area"
               value={serviceArea}
               onChange={(e) => setServiceArea(e.target.value)}
-              placeholder="e.g., London, Manchester, UK"
+              placeholder="e.g., London, Manchester, Birmingham"
               className="pl-10"
             />
           </div>
+          <p className="text-xs text-muted-foreground">
+            We'll find real local competitors in your area using Google Places
+          </p>
         </div>
 
         <div className="space-y-2">
@@ -420,9 +465,9 @@ export function CompetitorResearchStep({
 
       <div className="bg-blue-50 dark:bg-blue-950/30 rounded-lg p-3 text-sm border border-blue-200 dark:border-blue-800">
         <p className="text-blue-800 dark:text-blue-200">
-          <strong>What happens:</strong> We search for real {nicheQuery || 'businesses'} websites, 
-          filter out directories, scrape their FAQs and pricing pages, then generate synthesized 
-          FAQs for your knowledge base.
+          <strong>What happens:</strong> We discover real {nicheQuery || 'businesses'} via Google Places, 
+          scrape their websites, extract FAQs, remove duplicates, then refine each FAQ 
+          to match YOUR business voice.
         </p>
       </div>
 
