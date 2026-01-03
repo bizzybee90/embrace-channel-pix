@@ -15,8 +15,7 @@ interface MailboxStats {
     total: number;
   };
   timeEstimate: {
-    importMinutes: number;
-    classifyMinutes: number;
+    importClassifyMinutes: number;
     learningMinutes: number;
     totalMinutes: number;
   };
@@ -140,8 +139,7 @@ export function EmailImportPreview({ workspaceId, onStartImport, onSkip }: Email
           <span className="font-medium">SENT folder first</span> — for better voice learning
         </p>
         <p>
-          Import: ~{stats.timeEstimate.importMinutes}min • 
-          Classify: ~{stats.timeEstimate.classifyMinutes}min • 
+          Import: ~{stats.timeEstimate.importClassifyMinutes}min • 
           Learn: ~{stats.timeEstimate.learningMinutes}min
         </p>
       </div>
