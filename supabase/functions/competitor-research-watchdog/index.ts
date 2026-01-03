@@ -60,11 +60,9 @@ serve(async (req) => {
       // Determine which function to restart based on status
       let functionToCall: string;
       switch (job.status) {
+        case 'queued':
         case 'discovering':
           functionToCall = 'competitor-discover';
-          break;
-        case 'validating':
-          functionToCall = 'competitor-validate';
           break;
         case 'scraping':
           functionToCall = 'competitor-scrape';
@@ -76,10 +74,11 @@ serve(async (req) => {
           functionToCall = 'competitor-dedupe-faqs';
           break;
         case 'refining':
-        case 'embedding':
           functionToCall = 'competitor-refine-faqs';
           break;
         default:
+          // Unknown or terminal status - skip
+          console.log(`[research-watchdog] Skipping job ${job.id} with status ${job.status}`);
           continue;
       }
 
