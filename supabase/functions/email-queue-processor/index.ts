@@ -10,9 +10,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const BATCH_SIZE = 100; // Increased from 50
-const CLASSIFICATION_BATCH = 15; // Increased from 10
-const PARALLEL_WORKERS = 5; // Number of parallel workers to spawn
+const BATCH_SIZE = 100;
+const CLASSIFICATION_BATCH = 15;
+const PARALLEL_WORKERS = 5;
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -29,6 +29,17 @@ serve(async (req) => {
     );
 
     const openai = new OpenAI({ apiKey: Deno.env.get('OPENAI_API_KEY')! });
+
+    // Get connected email for direction detection
+    let connectedEmail: string | null = null;
+    if (workspaceId) {
+      const { data: config } = await supabase
+        .from('email_provider_configs')
+        .select('email_address')
+        .eq('workspace_id', workspaceId)
+        .single();
+      connectedEmail = config?.email_address?.toLowerCase() || null;
+    }
 
     // Build query - optionally filter by workspace
     let query = supabase
@@ -48,7 +59,7 @@ serve(async (req) => {
     if (!emails || emails.length === 0) {
       console.log('[queue-processor] No pending emails');
       
-      // Check if we should trigger Phase 2 (analyze conversations)
+      // Check if we should trigger Phase 2
       if (workspaceId) {
         await checkAndTriggerPhase2(supabase, workspaceId);
       }
@@ -58,7 +69,7 @@ serve(async (req) => {
       });
     }
 
-    console.log(`[queue-processor] Processing ${emails.length} emails`);
+    console.log(`[queue-processor] Processing ${emails.length} emails for workspace: ${workspaceId || 'all'}`);
 
     // Mark as processing
     const emailIds = emails.map(e => e.id);
@@ -68,13 +79,12 @@ serve(async (req) => {
 
     let classifiedCount = 0;
 
-    // Process in batches of CLASSIFICATION_BATCH
+    // Process in batches
     for (let i = 0; i < emails.length; i += CLASSIFICATION_BATCH) {
       const batch = emails.slice(i, i + CLASSIFICATION_BATCH);
       
       const classifications = await classifyBatch(openai, batch);
 
-      // Bulk update classified emails
       const classifiedEmails: any[] = [];
       const failedEmails: any[] = [];
 
@@ -101,7 +111,7 @@ serve(async (req) => {
           processing_completed_at: new Date().toISOString()
         }).eq('id', email.id);
 
-        await createConversationAndMessage(supabase, email, result);
+        await createConversationAndMessage(supabase, email, result, connectedEmail);
       }));
 
       // Update failed emails
@@ -114,7 +124,7 @@ serve(async (req) => {
         ));
       }
       
-      // Minimal delay between classification batches (just for rate limiting)
+      // Minimal delay between classification batches
       if (i + CLASSIFICATION_BATCH < emails.length) {
         await new Promise(r => setTimeout(r, 100));
       }
@@ -138,7 +148,6 @@ serve(async (req) => {
     if (remainingCount && remainingCount > 0) {
       console.log(`[queue-processor] ${remainingCount} emails remaining, spawning ${PARALLEL_WORKERS} parallel workers...`);
       
-      // Spawn multiple parallel workers immediately (no delay)
       EdgeRuntime.waitUntil((async () => {
         const workers = [];
         const workersToSpawn = Math.min(PARALLEL_WORKERS, Math.ceil(remainingCount / BATCH_SIZE));
@@ -153,6 +162,9 @@ serve(async (req) => {
         
         await Promise.all(workers);
       })());
+    } else if (workspaceId) {
+      // No more pending emails - check if we should trigger Phase 2
+      await checkAndTriggerPhase2(supabase, workspaceId);
     }
 
     return new Response(JSON.stringify({ 
@@ -173,7 +185,7 @@ serve(async (req) => {
 
 async function classifyBatch(openai: OpenAI, emails: any[]) {
   const emailText = emails.map((e, i) => 
-    `[${i}] From: ${e.from_email} | Subject: ${e.subject || '(none)'} | Body: ${(e.body_text || '').substring(0, 400)}`
+    `[${i}] Folder: ${e.folder || 'INBOX'} | From: ${e.from_email} | Subject: ${e.subject || '(none)'} | Body: ${(e.body_text || '').substring(0, 400)}`
   ).join('\n\n');
 
   try {
@@ -211,11 +223,40 @@ Lanes:
   }
 }
 
-async function createConversationAndMessage(supabase: any, email: any, classification: any) {
-  // Only create conversations for customer emails
-  if (classification.email_type !== 'customer') return;
+async function createConversationAndMessage(
+  supabase: any, 
+  email: any, 
+  classification: any,
+  connectedEmail: string | null
+) {
+  // Determine direction using email addresses (most reliable)
+  const fromEmail = (email.from_email || '').toLowerCase();
+  const folder = (email.folder || '').toUpperCase();
+  
+  let direction: 'inbound' | 'outbound' = 'inbound';
+  
+  // SENT folder emails are always outbound
+  if (folder === 'SENT' || folder === 'SENT MAIL' || folder === 'SENT ITEMS') {
+    direction = 'outbound';
+  } 
+  // If we have the connected email, compare against it
+  else if (connectedEmail && fromEmail === connectedEmail) {
+    direction = 'outbound';
+  }
+  // Use the direction stored during import if available
+  else if (email.direction) {
+    direction = email.direction;
+  }
 
-  const direction = email.folder?.toUpperCase().includes('SENT') ? 'outbound' : 'inbound';
+  // CRITICAL FIX: Create messages for ALL SENT/outbound emails (needed for voice learning)
+  // Only skip inbound non-customer emails
+  if (direction === 'inbound' && classification.email_type !== 'customer') {
+    return; // Skip newsletters, spam, receipts that are inbound
+  }
+
+  // For outbound emails from SENT folder, we always create (for voice learning)
+  // For inbound customer emails, we create (for conversation tracking)
+
   const customerEmail = direction === 'inbound' ? email.from_email : email.to_email;
 
   if (!customerEmail) return;
@@ -284,7 +325,7 @@ async function createConversationAndMessage(supabase: any, email: any, classific
     body_html: email.body_html,
     subject: email.subject,
     received_at: email.received_at,
-    metadata: { classification }
+    metadata: { classification, folder: email.folder }
   }, { onConflict: 'workspace_id,external_id' });
 
   // Update conversation timestamp
@@ -306,7 +347,11 @@ async function updateProgress(supabase: any, workspaceId: string) {
     .from('raw_emails').select('*', { count: 'exact', head: true })
     .eq('workspace_id', workspaceId).eq('status', 'pending');
 
-  const isComplete = pending === 0 && (classified || 0) > 0;
+  const { count: processing } = await supabase
+    .from('raw_emails').select('*', { count: 'exact', head: true })
+    .eq('workspace_id', workspaceId).eq('status', 'processing');
+
+  const isComplete = pending === 0 && processing === 0 && (classified || 0) > 0;
 
   await supabase.from('email_import_progress').upsert({
     workspace_id: workspaceId,
@@ -322,17 +367,36 @@ async function updateProgress(supabase: any, workspaceId: string) {
 }
 
 async function checkAndTriggerPhase2(supabase: any, workspaceId: string) {
+  // Check both pending AND processing counts - must both be 0
   const { count: pending } = await supabase
     .from('raw_emails').select('*', { count: 'exact', head: true })
     .eq('workspace_id', workspaceId)
     .eq('status', 'pending');
+
+  const { count: processing } = await supabase
+    .from('raw_emails').select('*', { count: 'exact', head: true })
+    .eq('workspace_id', workspaceId)
+    .eq('status', 'processing');
 
   const { count: classified } = await supabase
     .from('raw_emails').select('*', { count: 'exact', head: true })
     .eq('workspace_id', workspaceId)
     .eq('status', 'classified');
 
-  if (pending === 0 && (classified || 0) > 0) {
+  // All emails must be classified (pending=0, processing=0, classified>0)
+  if (pending === 0 && processing === 0 && (classified || 0) > 0) {
+    // Check if Phase 2 is already running or complete - prevent double trigger
+    const { data: progress } = await supabase
+      .from('email_import_progress')
+      .select('phase2_status')
+      .eq('workspace_id', workspaceId)
+      .single();
+
+    if (progress?.phase2_status === 'running' || progress?.phase2_status === 'complete') {
+      console.log('[queue-processor] Phase 2 already triggered, skipping');
+      return;
+    }
+
     console.log('[queue-processor] Phase 1 complete, triggering Phase 2 (analyze-conversations)');
     
     await supabase.from('email_import_progress').update({
