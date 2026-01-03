@@ -25,6 +25,7 @@ interface MailboxStats {
 
 interface EmailImportPreviewProps {
   workspaceId: string;
+  importMode?: string;
   onStartImport: () => void;
   onSkip: () => void;
 }
@@ -44,7 +45,7 @@ function formatTime(minutes: number): string {
   return `${hours}h ${remainingMins}m`;
 }
 
-export function EmailImportPreview({ workspaceId, onStartImport, onSkip }: EmailImportPreviewProps) {
+export function EmailImportPreview({ workspaceId, importMode, onStartImport, onSkip }: EmailImportPreviewProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState<MailboxStats | null>(null);
@@ -104,18 +105,45 @@ export function EmailImportPreview({ workspaceId, onStartImport, onSkip }: Email
 
   if (!stats) return null;
 
+  const fallbackTotal = (() => {
+    if (!importMode) return 0;
+    if (importMode === 'last_30000') return 30000;
+    if (importMode === 'last_10000') return 10000;
+    if (importMode === 'last_1000') return 1000;
+    return 0;
+  })();
+
+  const effectiveStats: MailboxStats = (() => {
+    if (stats.estimatedCounts.total > 0 || fallbackTotal === 0) return stats;
+
+    const emailsPerMinute = 500 / 1.3; // ~385/min
+    const importClassifyMinutes = Math.ceil(fallbackTotal / emailsPerMinute);
+    const learningMinutes = 8;
+    const totalMinutes = importClassifyMinutes + learningMinutes;
+
+    const inbox = Math.ceil(fallbackTotal * 0.5);
+    const sent = fallbackTotal - inbox;
+
+    return {
+      ...stats,
+      rawCounts: { inbox: 0, sent: 0, total: 0 },
+      estimatedCounts: { inbox, sent, total: fallbackTotal },
+      timeEstimate: { importClassifyMinutes, learningMinutes, totalMinutes },
+    };
+  })();
+
   return (
     <div className="space-y-6">
       {/* Email counts */}
       <div className="grid grid-cols-2 gap-4">
         <div className="flex flex-col items-center p-4 bg-muted/50 rounded-lg border">
           <Inbox className="h-8 w-8 text-blue-500 mb-2" />
-          <span className="text-2xl font-bold">{stats.estimatedCounts.inbox.toLocaleString()}</span>
+          <span className="text-2xl font-bold">{effectiveStats.estimatedCounts.inbox.toLocaleString()}</span>
           <span className="text-sm text-muted-foreground">Inbox emails</span>
         </div>
         <div className="flex flex-col items-center p-4 bg-muted/50 rounded-lg border">
           <Send className="h-8 w-8 text-green-500 mb-2" />
-          <span className="text-2xl font-bold">{stats.estimatedCounts.sent.toLocaleString()}</span>
+          <span className="text-2xl font-bold">{effectiveStats.estimatedCounts.sent.toLocaleString()}</span>
           <span className="text-sm text-muted-foreground">Sent emails</span>
         </div>
       </div>
@@ -125,10 +153,10 @@ export function EmailImportPreview({ workspaceId, onStartImport, onSkip }: Email
         <Clock className="h-6 w-6 text-primary" />
         <div className="text-center">
           <p className="font-medium text-foreground">
-            Estimated time: {formatTime(stats.timeEstimate.totalMinutes)}
+            Estimated time: {formatTime(effectiveStats.timeEstimate.totalMinutes)}
           </p>
           <p className="text-sm text-muted-foreground">
-            {stats.estimatedCounts.total.toLocaleString()} emails to process (last 6 months)
+            {effectiveStats.estimatedCounts.total.toLocaleString()} emails to process (last 6 months)
           </p>
         </div>
       </div>
@@ -139,8 +167,8 @@ export function EmailImportPreview({ workspaceId, onStartImport, onSkip }: Email
           <span className="font-medium">SENT folder first</span> — for better voice learning
         </p>
         <p>
-          Import: ~{stats.timeEstimate.importClassifyMinutes}min • 
-          Learn: ~{stats.timeEstimate.learningMinutes}min
+          Import: ~{effectiveStats.timeEstimate.importClassifyMinutes}min • 
+          Learn: ~{effectiveStats.timeEstimate.learningMinutes}min
         </p>
       </div>
 
