@@ -66,9 +66,6 @@ verify_jwt = false
 [functions.aurinko-webhook]
 verify_jwt = false
 
-[functions.email-sync]
-verify_jwt = false
-
 [functions.email-triage-agent]
 verify_jwt = false
 
@@ -129,12 +126,6 @@ verify_jwt = false
 [functions.google-places-autocomplete]
 verify_jwt = false
 
-[functions.analyze-voice-profile]
-verify_jwt = false
-
-[functions.email-sync-worker]
-verify_jwt = false
-
 [functions.competitor-discover]
 verify_jwt = false
 
@@ -150,9 +141,6 @@ verify_jwt = false
 [functions.competitor-faq-per-site]
 verify_jwt = false
 
-[functions.learn-from-inbox]
-verify_jwt = false
-
 [functions.match-email-threads]
 verify_jwt = false
 
@@ -166,9 +154,6 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.start-email-import]
-verify_jwt = false
-
-[functions.email-scan]
 verify_jwt = false
 
 [functions.email-analyze]
@@ -196,4 +181,16 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.competitor-research-watchdog]
+verify_jwt = false
+
+[functions.email-webhook-receiver]
+verify_jwt = false
+
+[functions.email-queue-processor]
+verify_jwt = false
+
+[functions.email-analyze-conversations]
+verify_jwt = false
+
+[functions.email-deep-learning]
 verify_jwt = false
