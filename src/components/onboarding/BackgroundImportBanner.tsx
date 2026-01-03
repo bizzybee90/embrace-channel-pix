@@ -1,6 +1,7 @@
-import { Mail, CheckCircle2, AlertCircle, Loader2, Inbox, Send, Clock } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Mail, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
-import { useEmailImportStatus } from '@/hooks/useEmailImportStatus';
+import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 
 interface BackgroundImportBannerProps {
@@ -8,21 +9,101 @@ interface BackgroundImportBannerProps {
   className?: string;
 }
 
+interface ImportProgress {
+  current_phase: string | null;
+  emails_received: number | null;
+  emails_classified: number | null;
+  conversations_found: number | null;
+  conversations_with_replies: number | null;
+  pairs_analyzed: number | null;
+  voice_profile_complete: boolean | null;
+  playbook_complete: boolean | null;
+  last_error: string | null;
+}
+
+function getPhaseLabel(p: ImportProgress): string {
+  switch (p.current_phase) {
+    case 'importing':
+      return `Importing emails… ${(p.emails_received || 0).toLocaleString()} received`;
+    case 'classifying':
+      return `Classifying… ${(p.emails_classified || 0).toLocaleString()} / ${(p.emails_received || 0).toLocaleString()}`;
+    case 'analyzing':
+      return `Analyzing… ${(p.conversations_with_replies || 0).toLocaleString()} conversations with replies`;
+    case 'learning':
+      return `Learning your style… ${(p.pairs_analyzed || 0).toLocaleString()} pairs analyzed`;
+    case 'complete':
+      return 'Import complete!';
+    case 'error':
+      return p.last_error || 'Import failed';
+    default:
+      return 'Preparing…';
+  }
+}
+
+function getPercent(p: ImportProgress): number {
+  const phase = p.current_phase;
+  if (!phase || phase === 'connecting') return 0;
+  if (phase === 'complete') return 100;
+  if (phase === 'error') return 0;
+
+  if (phase === 'importing') {
+    const received = p.emails_received || 0;
+    // Lightweight estimate: 0-40% while importing.
+    return Math.min(40, Math.round((received / 500) * 40));
+  }
+
+  if (phase === 'classifying') {
+    const received = Math.max(p.emails_received || 0, 1);
+    const classified = p.emails_classified || 0;
+    return 40 + Math.round((classified / received) * 20);
+  }
+
+  if (phase === 'analyzing') return 65;
+  if (phase === 'learning') return 85;
+  return 0;
+}
+
 export function BackgroundImportBanner({ workspaceId, className }: BackgroundImportBannerProps) {
-  const {
-    progress,
-    statusMessage,
-    phase,
-    inboxCount,
-    inboxTotal,
-    sentCount,
-    sentTotal,
-  } = useEmailImportStatus(workspaceId);
+  const [progress, setProgress] = useState<ImportProgress | null>(null);
 
-  // Don't show if idle or no import has been started
-  if (phase === 'idle') return null;
+  useEffect(() => {
+    if (!workspaceId) return;
 
-  // Show success briefly
+    const fetchInitial = async () => {
+      const { data } = await supabase
+        .from('email_import_progress')
+        .select(
+          'current_phase, emails_received, emails_classified, conversations_found, conversations_with_replies, pairs_analyzed, voice_profile_complete, playbook_complete, last_error'
+        )
+        .eq('workspace_id', workspaceId)
+        .maybeSingle();
+
+      if (data) setProgress(data as ImportProgress);
+    };
+
+    fetchInitial();
+
+    const channel = supabase
+      .channel('onboarding-import-banner')
+      .on(
+        'postgres_changes',
+        { schema: 'public', table: 'email_import_progress', event: '*', filter: `workspace_id=eq.${workspaceId}` },
+        (payload) => {
+          if (payload.new) setProgress(payload.new as ImportProgress);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [workspaceId]);
+
+  // Don’t show banner unless the new pipeline is running (or has a meaningful status).
+  if (!progress) return null;
+  const phase = progress.current_phase;
+  if (!phase || phase === 'idle') return null;
+
   if (phase === 'complete') {
     return (
       <div
@@ -32,27 +113,11 @@ export function BackgroundImportBanner({ workspaceId, className }: BackgroundImp
         )}
       >
         <CheckCircle2 className="h-4 w-4 flex-shrink-0" />
-        <span className="flex-1">{statusMessage}</span>
+        <span className="flex-1">{getPhaseLabel(progress)}</span>
       </div>
     );
   }
 
-  // Show rate limit as a non-blocking warning (not a hard error)
-  if (phase === 'rate_limited') {
-    return (
-      <div
-        className={cn(
-          'flex items-center gap-3 px-4 py-2.5 rounded-lg bg-amber-500/10 border border-amber-500/25 text-amber-700 dark:text-amber-300 text-sm',
-          className
-        )}
-      >
-        <Clock className="h-4 w-4 flex-shrink-0" />
-        <span className="flex-1 truncate">{statusMessage}</span>
-      </div>
-    );
-  }
-
-  // Show error state
   if (phase === 'error') {
     return (
       <div
@@ -62,77 +127,27 @@ export function BackgroundImportBanner({ workspaceId, className }: BackgroundImp
         )}
       >
         <AlertCircle className="h-4 w-4 flex-shrink-0" />
-        <span className="flex-1 truncate">{statusMessage}</span>
+        <span className="flex-1 truncate">{getPhaseLabel(progress)}</span>
       </div>
     );
   }
 
-  // Active import state with inbox/sent breakdown
+  const percent = getPercent(progress);
+
   return (
-    <div
-      className={cn(
-        'flex flex-col gap-2 px-4 py-3 rounded-lg bg-primary/5 border border-primary/20 text-sm',
-        className
-      )}
-    >
-      {/* Header */}
+    <div className={cn('flex flex-col gap-2 px-4 py-3 rounded-lg bg-primary/5 border border-primary/20 text-sm', className)}>
       <div className="flex items-center gap-2">
         <div className="relative flex-shrink-0">
           <Mail className="h-4 w-4 text-primary" />
           <span className="absolute -top-0.5 -right-0.5 h-2 w-2 bg-primary rounded-full animate-pulse" />
         </div>
-        <span className="font-medium text-foreground">Importing emails...</span>
+        <span className="font-medium text-foreground truncate">{getPhaseLabel(progress)}</span>
         <Loader2 className="h-3 w-3 animate-spin text-muted-foreground ml-auto" />
       </div>
 
-      {/* Progress breakdown */}
-      <div className="grid grid-cols-2 gap-3 text-xs">
-        <div className="flex items-center gap-2">
-          <Inbox
-            className={cn(
-              'h-3.5 w-3.5',
-              phase === 'fetching_inbox' ? 'text-primary' : 'text-muted-foreground'
-            )}
-          />
-          <span
-            className={cn(
-              phase === 'fetching_inbox' ? 'text-foreground font-medium' : 'text-muted-foreground'
-            )}
-          >
-            Inbox: {inboxCount.toLocaleString()}
-            {inboxTotal > 0 && ` / ${inboxTotal.toLocaleString()}`}
-          </span>
-          {phase === 'fetching_inbox' && <span className="text-primary text-[10px]">●</span>}
-        </div>
-        <div className="flex items-center gap-2">
-          <Send
-            className={cn(
-              'h-3.5 w-3.5',
-              phase === 'fetching_sent' ? 'text-primary' : 'text-muted-foreground'
-            )}
-          />
-          <span
-            className={cn(
-              phase === 'fetching_sent' ? 'text-foreground font-medium' : 'text-muted-foreground'
-            )}
-          >
-            {phase === 'fetching_inbox' ? (
-              'Sent: Pending...'
-            ) : (
-              <>
-                Sent: {sentCount.toLocaleString()}
-                {sentTotal > 0 && ` / ${sentTotal.toLocaleString()}`}
-              </>
-            )}
-          </span>
-          {phase === 'fetching_sent' && <span className="text-primary text-[10px]">●</span>}
-        </div>
-      </div>
-
-      {/* Progress bar */}
       <div className="flex items-center gap-2">
-        <Progress value={progress} className="h-1.5 flex-1" />
-        <span className="text-xs text-muted-foreground w-8 text-right">{progress}%</span>
+        <Progress value={percent} className="h-1.5 flex-1" />
+        <span className="text-xs text-muted-foreground w-10 text-right">{percent}%</span>
       </div>
     </div>
   );
