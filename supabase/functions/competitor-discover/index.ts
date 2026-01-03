@@ -180,21 +180,39 @@ serve(async (req) => {
 
     console.log(`[competitor-discover] Total unique competitors: ${discoveredUrls.size}`);
 
-    // Insert discovered sites
+    // Insert discovered sites one by one to handle any conflicts
+    let insertedCount = 0;
     if (discoveredUrls.size > 0) {
       const sites = Array.from(discoveredUrls.values());
       
-      const { error: insertError } = await supabase
-        .from('competitor_sites')
-        .upsert(sites, { 
-          onConflict: 'job_id,domain',
-          ignoreDuplicates: true 
-        });
+      for (const site of sites) {
+        // Check if site already exists for this job
+        const { data: existing } = await supabase
+          .from('competitor_sites')
+          .select('id')
+          .eq('job_id', jobId)
+          .eq('domain', site.domain)
+          .maybeSingle();
+        
+        if (existing) {
+          console.log(`[competitor-discover] Skipping duplicate: ${site.domain}`);
+          continue;
+        }
+        
+        const { error: insertError } = await supabase
+          .from('competitor_sites')
+          .insert(site);
 
-      if (insertError) {
-        console.error('[competitor-discover] Insert error:', insertError);
+        if (insertError) {
+          console.error(`[competitor-discover] Insert error for ${site.domain}:`, insertError);
+        } else {
+          insertedCount++;
+          console.log(`[competitor-discover] Inserted: ${site.domain}`);
+        }
       }
     }
+    
+    console.log(`[competitor-discover] Inserted ${insertedCount} sites`)
 
     // Update job
     await supabase.from('competitor_research_jobs').update({
