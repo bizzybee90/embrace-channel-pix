@@ -72,38 +72,39 @@ const emailProviders = [
   },
 ];
 
+// Time estimates based on ~500 emails per 1.3 minutes (appears faster than expected)
 const importModes = [
   { 
     value: 'all_history' as ImportMode, 
     label: 'Entire email history', 
     description: 'Import everything — best for maximum AI accuracy',
-    timeEstimate: '15-20 mins',
+    timeEstimate: '10-15 mins',
     recommended: false
   },
   { 
     value: 'last_1000' as ImportMode, 
     label: 'Last 1,000 emails', 
     description: 'Great balance of learning data and speed',
-    timeEstimate: '5-10 mins',
+    timeEstimate: '2-3 mins',
     recommended: true
   },
   { 
     value: 'all_historical_90_days' as ImportMode, 
     label: 'Last 90 days', 
     description: 'Import all emails from the past 3 months',
-    timeEstimate: '10-15 mins'
+    timeEstimate: '5-8 mins'
   },
   { 
     value: 'all_historical_30_days' as ImportMode, 
     label: 'Last 30 days', 
     description: 'A lighter import for smaller inboxes',
-    timeEstimate: '5-10 mins'
+    timeEstimate: '2-4 mins'
   },
   { 
     value: 'unread_only' as ImportMode, 
     label: 'Unread emails only', 
     description: 'Quick start — just your current unread messages',
-    timeEstimate: '1-2 mins'
+    timeEstimate: '< 1 min'
   },
   { 
     value: 'new_only' as ImportMode, 

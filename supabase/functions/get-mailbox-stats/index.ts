@@ -81,13 +81,12 @@ serve(async (req) => {
     const estimatedTotal = estimatedInbox + estimatedSent;
 
     // Calculate time estimates based on observed speeds:
-    // - Import: ~500 emails/minute (Aurinko rate limits)
-    // - Classify: ~2400 emails/minute (5 parallel workers)
-    // - Phase 2/3: ~10 minutes
-    const importMinutes = Math.ceil(estimatedTotal / 500);
-    const classifyMinutes = Math.ceil(estimatedTotal / 2400);
-    const learningMinutes = 10;
-    const totalMinutes = importMinutes + classifyMinutes + learningMinutes;
+    // - Import + Classify: ~500 emails per 1.3 minutes (appears faster than expected)
+    // - Phase 2/3 learning: ~8 minutes
+    const emailsPerMinute = 500 / 1.3; // ~385 emails/minute
+    const importClassifyMinutes = Math.ceil(estimatedTotal / emailsPerMinute);
+    const learningMinutes = 8;
+    const totalMinutes = importClassifyMinutes + learningMinutes;
 
     console.log(`[get-mailbox-stats] Raw counts - Inbox: ${inboxCount}, Sent: ${sentCount}`);
     console.log(`[get-mailbox-stats] Estimated (6mo) - Inbox: ${estimatedInbox}, Sent: ${estimatedSent}, Total: ${estimatedTotal}`);
@@ -117,8 +116,7 @@ serve(async (req) => {
         total: estimatedTotal
       },
       timeEstimate: {
-        importMinutes,
-        classifyMinutes,
+        importClassifyMinutes,
         learningMinutes,
         totalMinutes
       },
