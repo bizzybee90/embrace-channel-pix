@@ -1,13 +1,17 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+// Declare EdgeRuntime for Supabase Edge Functions
+declare const EdgeRuntime: { waitUntil: (promise: Promise<unknown>) => void };
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
 const BATCH_SIZE = 100;
-const DELAY_MS = 2000;  // 2 seconds between batches
+const DELAY_MS = 2000;
+const MAX_BATCHES_PER_INVOCATION = 20; // ~2000 emails per invocation to avoid timeout
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -37,28 +41,41 @@ serve(async (req) => {
       });
     }
 
+    // Get existing progress to check for resume token
+    const { data: existingProgress } = await supabase
+      .from('email_import_progress')
+      .select('aurinko_next_page_token, emails_received')
+      .eq('workspace_id', workspaceId)
+      .maybeSingle();
+
+    let nextPageToken: string | null = existingProgress?.aurinko_next_page_token || null;
+    let totalFetched = existingProgress?.emails_received || 0;
+    const isResuming = !!nextPageToken;
+
+    console.log(`[historical-import] ${isResuming ? 'Resuming' : 'Starting'} import, already fetched: ${totalFetched}`);
+
     // Create/update import progress
     await supabase.from('email_import_progress').upsert({
       workspace_id: workspaceId,
       current_phase: 'importing',
       phase1_status: 'running',
-      started_at: new Date().toISOString(),
-      emails_received: 0,
-      emails_classified: 0
+      started_at: isResuming ? undefined : new Date().toISOString(),
+      emails_received: totalFetched,
+      emails_classified: 0,
+      last_import_batch_at: new Date().toISOString()
     }, { onConflict: 'workspace_id' });
 
-    // Fetch emails from Aurinko in batches
-    let nextPageToken: string | null = null;
-    let totalFetched = 0;
+    let batchCount = 0;
+    let hasMoreEmails = true;
 
-    do {
-      // Build Aurinko API URL - fetch both INBOX and SENT
+    while (hasMoreEmails && batchCount < MAX_BATCHES_PER_INVOCATION) {
+      // Build Aurinko API URL
       let url = `https://api.aurinko.io/v1/email/messages?limit=${BATCH_SIZE}`;
       if (nextPageToken) {
         url += `&pageToken=${nextPageToken}`;
       }
 
-      console.log(`[historical-import] Fetching batch, total so far: ${totalFetched}`);
+      console.log(`[historical-import] Fetching batch ${batchCount + 1}, total so far: ${totalFetched}`);
 
       const response = await fetch(url, {
         headers: { 'Authorization': `Bearer ${config.access_token}` }
@@ -66,20 +83,50 @@ serve(async (req) => {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('[historical-import] Aurinko error:', errorText);
+        console.error('[historical-import] Aurinko error:', response.status, errorText);
         
         if (response.status === 429) {
-          // Rate limited - wait and retry
-          console.log('[historical-import] Rate limited, waiting 60s...');
-          await new Promise(r => setTimeout(r, 60000));
-          continue;
+          // Rate limited - save state and let it be resumed later
+          console.log('[historical-import] Rate limited, saving state for resume...');
+          await supabase.from('email_import_progress').update({
+            aurinko_next_page_token: nextPageToken,
+            last_error: 'Rate limited by email provider, will resume automatically',
+            updated_at: new Date().toISOString()
+          }).eq('workspace_id', workspaceId);
+          
+          // Schedule a retry by calling ourselves after a delay
+          EdgeRuntime.waitUntil((async () => {
+            await new Promise(r => setTimeout(r, 60000)); // Wait 60s
+            await supabase.functions.invoke('start-historical-import', {
+              body: { workspaceId }
+            });
+          })());
+          
+          return new Response(JSON.stringify({
+            success: true,
+            message: 'Rate limited, will resume in 60 seconds',
+            emailsFetched: totalFetched
+          }), {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
         }
+        
+        // Other error - log and stop
+        await supabase.from('email_import_progress').update({
+          last_error: `Aurinko error: ${response.status} - ${errorText}`,
+          updated_at: new Date().toISOString()
+        }).eq('workspace_id', workspaceId);
+        
         break;
       }
 
       const data = await response.json();
       const messages = data.records || data.messages || [];
-      nextPageToken = data.nextPageToken;
+      nextPageToken = data.nextPageToken || null;
+      hasMoreEmails = !!nextPageToken;
+
+      console.log(`[historical-import] Got ${messages.length} messages, hasMore: ${hasMoreEmails}`);
 
       // Insert emails into raw_emails queue
       for (const msg of messages) {
@@ -107,33 +154,73 @@ serve(async (req) => {
       }
 
       totalFetched += messages.length;
+      batchCount++;
 
-      // Update progress
+      // Update progress with current token for resume capability
       await supabase.from('email_import_progress').update({
         emails_received: totalFetched,
+        aurinko_next_page_token: nextPageToken,
+        last_import_batch_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       }).eq('workspace_id', workspaceId);
 
       // Delay between batches to respect rate limits
-      if (nextPageToken) {
+      if (hasMoreEmails && batchCount < MAX_BATCHES_PER_INVOCATION) {
         await new Promise(r => setTimeout(r, DELAY_MS));
       }
+    }
 
-    } while (nextPageToken);
+    // Check if we need to continue importing or start classification
+    if (hasMoreEmails) {
+      console.log(`[historical-import] Reached batch limit, scheduling continuation...`);
+      
+      // Continue importing in background
+      EdgeRuntime.waitUntil((async () => {
+        await new Promise(r => setTimeout(r, 1000)); // Brief pause
+        await supabase.functions.invoke('start-historical-import', {
+          body: { workspaceId }
+        });
+      })());
+      
+      return new Response(JSON.stringify({
+        success: true,
+        emailsFetched: totalFetched,
+        message: 'Import continuing in background...',
+        hasMore: true
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
 
-    // Update status - now ready for classification
+    // Import complete - clear resume token and trigger classification
+    console.log(`[historical-import] Complete! Fetched ${totalFetched} emails, triggering classification...`);
+    
     await supabase.from('email_import_progress').update({
       current_phase: 'classifying',
-      emails_received: totalFetched,
+      phase1_status: 'complete',
+      phase1_completed_at: new Date().toISOString(),
+      aurinko_next_page_token: null, // Clear resume token
+      last_error: null,
       updated_at: new Date().toISOString()
     }).eq('workspace_id', workspaceId);
 
-    console.log(`[historical-import] Complete. Fetched ${totalFetched} emails, now queued for classification`);
+    // Trigger the queue processor to start classification
+    EdgeRuntime.waitUntil((async () => {
+      console.log('[historical-import] Invoking email-queue-processor...');
+      const { error } = await supabase.functions.invoke('email-queue-processor', {
+        body: { workspaceId }
+      });
+      if (error) {
+        console.error('[historical-import] Failed to invoke queue processor:', error);
+      }
+    })());
 
     return new Response(JSON.stringify({
       success: true,
       emailsFetched: totalFetched,
-      message: 'Emails queued for classification. Queue processor will handle classification automatically.'
+      message: 'Import complete, classification starting...',
+      hasMore: false
     }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
