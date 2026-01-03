@@ -87,6 +87,7 @@ async function processScrape(params: StartBody) {
           website_scrape: {
             firecrawl_job_id: firecrawlJobId,
             url: formattedUrl,
+            pages_scraped: 0,
           },
         },
       })
@@ -131,6 +132,20 @@ async function processScrape(params: StartBody) {
   }
 
   console.log(`[scrape-customer-website] Crawl complete: ${crawlData.length} pages`);
+
+  // Update pages scraped count in custom_flags
+  await supabase
+    .from("business_context")
+    .update({
+      custom_flags: {
+        website_scrape: {
+          firecrawl_job_id: firecrawlJobId,
+          url: formattedUrl,
+          pages_scraped: crawlData.length,
+        },
+      },
+    })
+    .eq("workspace_id", workspaceId);
 
   // Build prompt content
   const allContent = crawlData

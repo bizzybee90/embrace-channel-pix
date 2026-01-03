@@ -65,7 +65,7 @@ export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, on
       const poll = async () => {
         const { data, error } = await supabase
           .from('business_context')
-          .select('knowledge_base_status, website_faqs_generated')
+          .select('knowledge_base_status, website_faqs_generated, custom_flags')
           .eq('workspace_id', workspaceId)
           .maybeSingle();
 
@@ -75,10 +75,12 @@ export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, on
 
         const kbStatus = (data?.knowledge_base_status || 'scraping') as Status;
         const faqs = data?.website_faqs_generated || 0;
+        const customFlags = data?.custom_flags as { website_scrape?: { pages_scraped?: number } } | null;
+        const pages = customFlags?.website_scrape?.pages_scraped || 0;
 
         if (kbStatus === 'complete') {
           setWebsiteFaqsGenerated(faqs);
-          setPagesScraped(faqs > 0 ? 1 : 0); // backend no longer returns pages; keep UI sane
+          setPagesScraped(pages);
           setProgress(100);
           setStatus('complete');
           return;
