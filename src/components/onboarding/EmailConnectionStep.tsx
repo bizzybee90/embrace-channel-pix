@@ -651,21 +651,55 @@ export function EmailConnectionStep({
 
       {connectedEmail ? (
         <div className="space-y-6">
-          <div className="flex items-center justify-center gap-3 p-4 bg-success/10 rounded-lg border border-success/30">
-            <CheckCircle2 className="h-6 w-6 text-success" />
-            <div className="text-center">
-              <p className="font-medium text-foreground">Email Connected!</p>
-              <p className="text-sm text-muted-foreground">{connectedEmail}</p>
+          <div className="flex items-center justify-between gap-3 p-4 bg-success/10 rounded-lg border border-success/30">
+            <div className="flex items-center gap-3">
+              <CheckCircle2 className="h-6 w-6 text-success" />
+              <div>
+                <p className="font-medium text-foreground">Email Connected!</p>
+                <p className="text-sm text-muted-foreground">{connectedEmail}</p>
+              </div>
             </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs text-muted-foreground hover:text-destructive"
+              onClick={async () => {
+                try {
+                  const { supabase } = await import('@/integrations/supabase/client');
+                  await supabase
+                    .from('email_provider_configs')
+                    .delete()
+                    .eq('workspace_id', workspaceId);
+                  await supabase
+                    .from('email_import_progress')
+                    .delete()
+                    .eq('workspace_id', workspaceId);
+                  setConnectedEmail(null);
+                  setImportProgress(null);
+                  setImportStarted(false);
+                  setShowPreview(false);
+                  toast.success('Email disconnected');
+                } catch (error) {
+                  toast.error('Failed to disconnect');
+                }
+              }}
+            >
+              Disconnect
+            </Button>
           </div>
 
           {/* Show Preview before import */}
           {showPreview && !importStarted && (
-            <EmailImportPreview 
-              workspaceId={workspaceId}
-              onStartImport={handleStartImportFromPreview}
-              onSkip={handleSkipPreview}
-            />
+            <>
+              <EmailImportPreview 
+                workspaceId={workspaceId}
+                onStartImport={handleStartImportFromPreview}
+                onSkip={handleSkipPreview}
+              />
+              <Button variant="outline" onClick={onBack} className="w-full">
+                Back
+              </Button>
+            </>
           )}
 
           {/* Error State */}
