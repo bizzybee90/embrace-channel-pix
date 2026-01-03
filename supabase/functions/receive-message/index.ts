@@ -1,10 +1,49 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
+import { createHmac } from "https://deno.land/std@0.168.0/node/crypto.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// Twilio signature verification
+// See: https://www.twilio.com/docs/usage/security#validating-requests
+function verifyTwilioSignature(
+  twilioSignature: string | null,
+  authToken: string,
+  url: string,
+  params: Record<string, string>
+): boolean {
+  if (!twilioSignature || !authToken) {
+    console.warn('[receive-message] Missing Twilio signature or auth token');
+    return false;
+  }
+
+  // Build the data string: URL + sorted params
+  let data = url;
+  const sortedKeys = Object.keys(params).sort();
+  for (const key of sortedKeys) {
+    data += key + params[key];
+  }
+
+  // Create HMAC-SHA1 signature
+  const hmac = createHmac('sha1', authToken);
+  hmac.update(data);
+  const expectedSignature = hmac.digest('base64');
+
+  // Constant-time comparison to prevent timing attacks
+  if (twilioSignature.length !== expectedSignature.length) {
+    return false;
+  }
+  
+  let mismatch = 0;
+  for (let i = 0; i < twilioSignature.length; i++) {
+    mismatch |= twilioSignature.charCodeAt(i) ^ expectedSignature.charCodeAt(i);
+  }
+  
+  return mismatch === 0;
+}
 
 interface NormalisedMessage {
   channel: "sms" | "whatsapp" | "email" | "web";
@@ -181,17 +220,44 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const twilioAuthToken = Deno.env.get('TWILIO_AUTH_TOKEN');
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const contentType = req.headers.get('content-type') || '';
     let rawBody: any;
+    let isTwilioWebhook = false;
 
     // Parse incoming request based on content type
     if (contentType.includes('application/x-www-form-urlencoded')) {
       const formData = await req.formData();
       rawBody = Object.fromEntries(formData);
+      isTwilioWebhook = true; // Form data typically comes from Twilio
     } else {
       rawBody = await req.json();
+    }
+
+    // Verify Twilio signature for Twilio webhooks
+    if (isTwilioWebhook && twilioAuthToken) {
+      const twilioSignature = req.headers.get('X-Twilio-Signature');
+      const requestUrl = req.url;
+      
+      const isValid = verifyTwilioSignature(
+        twilioSignature,
+        twilioAuthToken,
+        requestUrl,
+        rawBody as Record<string, string>
+      );
+
+      if (!isValid) {
+        console.error('❌ [receive-message] Invalid Twilio signature - rejecting request');
+        return new Response(JSON.stringify({ error: 'Invalid signature' }), {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      console.log('✅ [receive-message] Twilio signature verified');
+    } else if (isTwilioWebhook && !twilioAuthToken) {
+      console.warn('⚠️ [receive-message] TWILIO_AUTH_TOKEN not set - signature verification skipped');
     }
 
     console.log('📥 [receive-message] Incoming webhook:', JSON.stringify(rawBody, null, 2));
