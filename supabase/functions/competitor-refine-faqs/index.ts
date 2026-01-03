@@ -187,7 +187,7 @@ Return ONLY valid JSON:
         const embeddingData = await embeddingResponse.json();
         const embedding = embeddingData.data?.[0]?.embedding;
 
-        // Insert into final FAQ database
+        // Insert into final FAQ database with priority = 5 (competitor research = lower priority)
         const { data: newFaq } = await supabase
           .from('faq_database')
           .insert({
@@ -195,16 +195,17 @@ Return ONLY valid JSON:
             question: refined.rewritten_question.substring(0, 500),
             answer: refined.rewritten_answer.substring(0, 2000),
             category: refined.category || faq.category,
-            priority: refined.priority >= 8 ? 10 : 5,
+            priority: 5, // COMPETITOR RESEARCH = priority 5 (lower than own website at 10)
             confidence: refined.confidence || 0.8,
             relevance_score: refined.relevance_score / 10,
-            source: 'ai_refined',
+            source: 'competitor_research', // Mark as competitor research
             source_url: faq.source_url,
             source_business: faq.source_business,
             original_faq_id: faq.id,
             embedding: embedding,
             refined_at: new Date().toISOString(),
             is_active: true,
+            is_industry_standard: true, // This is industry knowledge
           })
           .select('id')
           .single();
@@ -254,7 +255,7 @@ Return ONLY valid JSON:
         .from('faq_database')
         .select('*', { count: 'exact', head: true })
         .eq('workspace_id', workspaceId)
-        .eq('source', 'ai_refined');
+        .eq('source', 'competitor_research');
 
       await supabase.from('competitor_research_jobs').update({
         status: 'completed',

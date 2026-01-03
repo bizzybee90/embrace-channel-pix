@@ -10,7 +10,6 @@ const corsHeaders = {
 const waitUntil = (promise: Promise<unknown>) => {
   const er = (globalThis as any).EdgeRuntime;
   if (er?.waitUntil) return er.waitUntil(promise);
-  // Fallback: at least start the promise
   promise.catch((e) => console.error("[scrape-customer-website] background error", e));
 };
 
@@ -19,7 +18,6 @@ type StartBody = {
   websiteUrl: string;
   businessName?: string;
   businessType?: string;
-  firecrawlJobId?: string;
 };
 
 async function processScrape(params: StartBody) {
@@ -28,14 +26,14 @@ async function processScrape(params: StartBody) {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
   );
 
-  const FIRECRAWL_API_KEY = Deno.env.get("FIRECRAWL_API_KEY");
+  const APIFY_API_KEY = Deno.env.get("APIFY_API_KEY");
   const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
   const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
 
   const { workspaceId, websiteUrl, businessName, businessType } = params;
 
   if (!websiteUrl) return;
-  if (!FIRECRAWL_API_KEY) throw new Error("Firecrawl not configured");
+  if (!APIFY_API_KEY) throw new Error("Apify API key not configured");
   if (!ANTHROPIC_API_KEY) throw new Error("Anthropic not configured");
   if (!OPENAI_API_KEY) throw new Error("OpenAI not configured");
 
@@ -45,78 +43,54 @@ async function processScrape(params: StartBody) {
     formattedUrl = `https://${formattedUrl}`;
   }
 
-  // Start or resume Firecrawl crawl
-  let firecrawlJobId = params.firecrawlJobId;
+  console.log("[scrape-customer-website] Starting Apify website-content-crawler...", formattedUrl);
 
-  if (!firecrawlJobId) {
-    console.log("[scrape-customer-website] Starting Firecrawl crawl...", formattedUrl);
-    const crawlResponse = await fetch("https://api.firecrawl.dev/v1/crawl", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
-        "Content-Type": "application/json",
+  // Update status to scraping
+  await supabase
+    .from("business_context")
+    .update({
+      knowledge_base_status: "scraping",
+      knowledge_base_started_at: new Date().toISOString(),
+      custom_flags: {
+        website_scrape: {
+          url: formattedUrl,
+          pages_scraped: 0,
+          status: "crawling",
+        },
       },
+    })
+    .eq("workspace_id", workspaceId);
+
+  // Call Apify Website Content Crawler (synchronous run)
+  const apifyResponse = await fetch(
+    `https://api.apify.com/v2/acts/apify~website-content-crawler/run-sync-get-dataset-items?token=${APIFY_API_KEY}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        url: formattedUrl,
-        limit: 30,
-        scrapeOptions: {
-          formats: ["markdown"],
-          onlyMainContent: true,
-        },
+        startUrls: [{ url: formattedUrl }],
+        maxCrawlPages: 30, // Crawl up to 30 pages
+        maxCrawlDepth: 3,
+        crawlerType: "cheerio", // Fast, lightweight
+        includeUrlGlobs: [],
+        excludeUrlGlobs: [
+          "**/privacy**", "**/terms**", "**/cookie**",
+          "**/login**", "**/register**", "**/cart**",
+          "**/checkout**", "**/*.pdf", "**/*.jpg", "**/*.png",
+          "**/wp-admin**", "**/wp-login**",
+        ],
       }),
-    });
-
-    if (!crawlResponse.ok) {
-      const errorText = await crawlResponse.text();
-      console.error("[scrape-customer-website] Firecrawl start error:", crawlResponse.status, errorText);
-      throw new Error(`Firecrawl error: ${crawlResponse.status}`);
     }
+  );
 
-    const started = await crawlResponse.json();
-    firecrawlJobId = started.id;
-
-    console.log("[scrape-customer-website] Crawl job started:", firecrawlJobId);
-
-    // Persist job id so UI can poll the DB even if the user refreshes
-    await supabase
-      .from("business_context")
-      .update({
-        knowledge_base_status: "scraping",
-        knowledge_base_started_at: new Date().toISOString(),
-        custom_flags: {
-          website_scrape: {
-            firecrawl_job_id: firecrawlJobId,
-            url: formattedUrl,
-            pages_scraped: 0,
-          },
-        },
-      })
-      .eq("workspace_id", workspaceId);
+  if (!apifyResponse.ok) {
+    const errorText = await apifyResponse.text();
+    console.error("[scrape-customer-website] Apify error:", apifyResponse.status, errorText);
+    throw new Error(`Apify error: ${apifyResponse.status}`);
   }
 
-  // Poll for completion (max ~3 minutes)
-  let crawlData: any[] | null = null;
-  for (let i = 0; i < 36; i++) {
-    await new Promise((r) => setTimeout(r, 5000));
-
-    const statusResponse = await fetch(`https://api.firecrawl.dev/v1/crawl/${firecrawlJobId}`, {
-      headers: { Authorization: `Bearer ${FIRECRAWL_API_KEY}` },
-    });
-
-    const status = await statusResponse.json();
-    console.log(
-      `[scrape-customer-website] Poll ${i + 1}: status=${status.status}, completed=${status.completed || 0}`
-    );
-
-    if (status.status === "completed") {
-      crawlData = status.data;
-      break;
-    }
-
-    if (status.status === "failed") {
-      throw new Error("Crawl failed");
-    }
-  }
+  const crawlData = await apifyResponse.json();
+  console.log(`[scrape-customer-website] Apify returned ${crawlData.length} pages`);
 
   if (!crawlData || crawlData.length === 0) {
     console.log("[scrape-customer-website] No content found from crawl");
@@ -126,33 +100,38 @@ async function processScrape(params: StartBody) {
         knowledge_base_status: "complete",
         knowledge_base_completed_at: new Date().toISOString(),
         website_faqs_generated: 0,
+        custom_flags: {
+          website_scrape: {
+            url: formattedUrl,
+            pages_scraped: 0,
+            status: "complete",
+          },
+        },
       })
       .eq("workspace_id", workspaceId);
     return;
   }
 
-  console.log(`[scrape-customer-website] Crawl complete: ${crawlData.length} pages`);
-
-  // Update pages scraped count in custom_flags
+  // Update pages scraped count
   await supabase
     .from("business_context")
     .update({
       custom_flags: {
         website_scrape: {
-          firecrawl_job_id: firecrawlJobId,
           url: formattedUrl,
           pages_scraped: crawlData.length,
+          status: "extracting",
         },
       },
     })
     .eq("workspace_id", workspaceId);
 
-  // Build prompt content
+  // Build prompt content from Apify results
   const allContent = crawlData
     .map((page: any) => {
-      const url = page.metadata?.sourceURL || page.url || "";
-      const markdown = page.markdown || "";
-      return `--- PAGE: ${url} ---\n${markdown}`;
+      const url = page.url || "";
+      const text = page.text || "";
+      return `--- PAGE: ${url} ---\n${text}`;
     })
     .filter((c: string) => c.length > 100)
     .join("\n\n")
@@ -240,12 +219,19 @@ OUTPUT FORMAT (JSON array only, no other text):
         knowledge_base_status: "complete",
         knowledge_base_completed_at: new Date().toISOString(),
         website_faqs_generated: 0,
+        custom_flags: {
+          website_scrape: {
+            url: formattedUrl,
+            pages_scraped: crawlData.length,
+            status: "complete",
+          },
+        },
       })
       .eq("workspace_id", workspaceId);
     return;
   }
 
-  // Embeddings + insert
+  // Embeddings + insert with priority = 10 (own website = highest priority)
   const faqsToInsert: any[] = [];
 
   for (const faq of faqs) {
@@ -284,14 +270,15 @@ OUTPUT FORMAT (JSON array only, no other text):
       is_industry_standard: false,
       source_company: businessName || null,
       source_url: formattedUrl,
+      source: "own_website", // Mark as own website content
       generation_source: "website_scrape",
-      priority: 10,
+      priority: 10, // HIGHEST PRIORITY - business-specific content
       is_active: true,
       enabled: true,
     });
   }
 
-  console.log(`[scrape-customer-website] Inserting ${faqsToInsert.length} FAQs`);
+  console.log(`[scrape-customer-website] Inserting ${faqsToInsert.length} FAQs with priority=10`);
 
   if (faqsToInsert.length > 0) {
     const { error: insertError } = await supabase.from("faq_database").insert(faqsToInsert);
@@ -304,6 +291,14 @@ OUTPUT FORMAT (JSON array only, no other text):
       knowledge_base_status: "complete",
       knowledge_base_completed_at: new Date().toISOString(),
       website_faqs_generated: faqsToInsert.length,
+      custom_flags: {
+        website_scrape: {
+          url: formattedUrl,
+          pages_scraped: crawlData.length,
+          faqs_generated: faqsToInsert.length,
+          status: "complete",
+        },
+      },
     })
     .eq("workspace_id", workspaceId);
 
@@ -318,7 +313,7 @@ serve(async (req) => {
   try {
     body = (await req.json()) as StartBody;
 
-    const { workspaceId, websiteUrl, businessName, businessType, firecrawlJobId } = body;
+    const { workspaceId, websiteUrl, businessName, businessType } = body;
 
     if (!websiteUrl) {
       return new Response(
@@ -331,7 +326,7 @@ serve(async (req) => {
     waitUntil(
       (async () => {
         try {
-          await processScrape({ workspaceId, websiteUrl, businessName, businessType, firecrawlJobId });
+          await processScrape({ workspaceId, websiteUrl, businessName, businessType });
         } catch (e: any) {
           console.error("[scrape-customer-website] Fatal error:", e);
 
@@ -342,7 +337,15 @@ serve(async (req) => {
             );
             await supabase
               .from("business_context")
-              .update({ knowledge_base_status: "error" })
+              .update({ 
+                knowledge_base_status: "error",
+                custom_flags: {
+                  website_scrape: {
+                    status: "error",
+                    error: e.message,
+                  },
+                },
+              })
               .eq("workspace_id", workspaceId);
           } catch {
             // ignore
