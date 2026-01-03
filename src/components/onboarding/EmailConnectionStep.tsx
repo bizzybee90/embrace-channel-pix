@@ -17,7 +17,15 @@ interface EmailConnectionStepProps {
 }
 
 type Provider = 'gmail' | 'outlook' | 'icloud' | 'yahoo';
-type ImportMode = 'new_only' | 'unread_only' | 'all_historical_30_days' | 'all_historical_90_days' | 'last_1000' | 'all_history';
+type ImportMode =
+  | 'new_only'
+  | 'unread_only'
+  | 'all_historical_30_days'
+  | 'all_historical_90_days'
+  | 'last_1000'
+  | 'last_10000'
+  | 'last_30000'
+  | 'all_history';
 
 interface ImportProgress {
   current_phase: string | null;
@@ -665,15 +673,18 @@ export function EmailConnectionStep({
               className="text-xs text-muted-foreground hover:text-destructive"
               onClick={async () => {
                 try {
-                  const { supabase } = await import('@/integrations/supabase/client');
-                  await supabase
+                  const { error: cfgErr } = await supabase
                     .from('email_provider_configs')
                     .delete()
                     .eq('workspace_id', workspaceId);
-                  await supabase
+
+                  const { error: progErr } = await supabase
                     .from('email_import_progress')
                     .delete()
                     .eq('workspace_id', workspaceId);
+
+                  if (cfgErr || progErr) throw cfgErr || progErr;
+
                   setConnectedEmail(null);
                   setImportProgress(null);
                   setImportStarted(false);
@@ -693,6 +704,7 @@ export function EmailConnectionStep({
             <>
               <EmailImportPreview 
                 workspaceId={workspaceId}
+                importMode={importMode}
                 onStartImport={handleStartImportFromPreview}
                 onSkip={handleSkipPreview}
               />
