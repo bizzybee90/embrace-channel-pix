@@ -13,6 +13,32 @@ interface GDPRRequest {
   workspace_slug: string;
 }
 
+// Create HMAC signature for token verification
+async function createHmacSignature(payload: string, secret: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const keyData = encoder.encode(secret);
+  const data = encoder.encode(payload);
+  
+  const key = await crypto.subtle.importKey(
+    'raw',
+    keyData,
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  
+  const signature = await crypto.subtle.sign('HMAC', key, data);
+  const signatureArray = new Uint8Array(signature);
+  return Array.from(signatureArray).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Create signed GDPR token
+async function createSignedToken(data: Record<string, unknown>, secret: string): Promise<string> {
+  const payload = btoa(JSON.stringify(data));
+  const signature = await createHmacSignature(payload, secret);
+  return `${payload}.${signature}`;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -22,7 +48,16 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const postmarkApiKey = Deno.env.get('POSTMARK_API_KEY');
+    const gdprSecret = Deno.env.get('GDPR_TOKEN_SECRET');
     const supabase = createClient(supabaseUrl, supabaseKey);
+
+    if (!gdprSecret) {
+      console.error('GDPR_TOKEN_SECRET not configured');
+      return new Response(
+        JSON.stringify({ error: 'GDPR service not configured' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     const { email, request_type, reason, workspace_slug }: GDPRRequest = await req.json();
 
@@ -62,12 +97,10 @@ serve(async (req) => {
       .eq('email', email.toLowerCase())
       .maybeSingle();
 
-    // Generate verification token
-    const token = crypto.randomUUID();
+    // Generate verification token with expiration
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
-    // Store the pending request in a temporary table or use metadata
-    // For simplicity, we'll encode the request in the token itself
+    // Create token data to be signed
     const requestData = {
       email: email.toLowerCase(),
       request_type,
@@ -78,9 +111,8 @@ serve(async (req) => {
       expires_at: expiresAt.toISOString()
     };
 
-    // Encode request data in base64 for the token
-    const encodedData = btoa(JSON.stringify(requestData));
-    const verificationToken = `${token}_${encodedData}`;
+    // Create HMAC-signed token (payload.signature format)
+    const verificationToken = await createSignedToken(requestData, gdprSecret);
 
     // Build verification URL
     const appUrl = Deno.env.get('APP_URL') || supabaseUrl.replace('.supabase.co', '.lovable.app');
@@ -159,10 +191,11 @@ serve(async (req) => {
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('Error processing GDPR request:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: errorMessage }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
