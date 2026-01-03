@@ -18,16 +18,20 @@ interface EmailConnectionStepProps {
 type Provider = 'gmail' | 'outlook' | 'icloud' | 'yahoo';
 type ImportMode = 'new_only' | 'unread_only' | 'all_historical_30_days' | 'all_historical_90_days' | 'last_1000' | 'all_history';
 
-interface ImportJob {
-  id: string;
-  status: string;
-  inbox_emails_scanned: number;
-  sent_emails_scanned: number;
-  total_threads_found: number;
-  conversation_threads: number;
-  bodies_fetched: number;
-  messages_created: number;
-  error_message: string | null;
+interface ImportProgress {
+  current_phase: string | null;
+  phase1_status: string | null;
+  phase2_status: string | null;
+  phase3_status: string | null;
+  emails_received: number | null;
+  emails_classified: number | null;
+  conversations_found: number | null;
+  conversations_with_replies: number | null;
+  pairs_analyzed: number | null;
+  voice_profile_complete: boolean | null;
+  playbook_complete: boolean | null;
+  last_error: string | null;
+  started_at: string | null;
 }
 
 const emailProviders = [
@@ -102,37 +106,73 @@ const importModes = [
   },
 ];
 
-// Calculate progress percentage based on job status
-function calculateProgress(job: ImportJob): number {
-  switch (job.status) {
-    case 'queued': return 0;
-    case 'scanning_inbox':
-    case 'scanning_sent':
-      return Math.min(30, Math.floor((job.inbox_emails_scanned + job.sent_emails_scanned) / 500));
-    case 'analyzing': return 35;
-    case 'fetching':
-      if (job.conversation_threads > 0) {
-        return Math.min(95, 40 + (job.bodies_fetched / job.conversation_threads) * 55);
-      }
-      return 40;
-    case 'completed': return 100;
-    case 'error': return -1;
-    default: return 0;
+// Calculate progress based on 3-phase system
+function calculateProgress(progress: ImportProgress): number {
+  const phase = progress.current_phase;
+  
+  if (phase === 'complete') return 100;
+  if (phase === 'error') return -1;
+  
+  // Phase 1: Importing (0-40%)
+  if (phase === 'importing') {
+    const received = progress.emails_received || 0;
+    // Estimate based on emails received (assume ~500 emails max for progress calculation)
+    return Math.min(40, Math.floor((received / 500) * 40));
   }
+  
+  // Phase 2: Classifying (40-60%)
+  if (phase === 'classifying') {
+    const received = progress.emails_received || 1;
+    const classified = progress.emails_classified || 0;
+    const classifyProgress = classified / received;
+    return 40 + Math.floor(classifyProgress * 20);
+  }
+  
+  // Phase 3: Analyzing (60-100%)
+  if (phase === 'analyzing') {
+    const pairs = progress.pairs_analyzed || 0;
+    const totalPairs = progress.conversations_with_replies || 1;
+    const analyzeProgress = pairs / totalPairs;
+    return 60 + Math.floor(analyzeProgress * 40);
+  }
+  
+  return 0;
 }
 
 // Get human-readable status message
-function getStatusMessage(job: ImportJob): string {
-  switch (job.status) {
-    case 'queued': return 'Preparing...';
-    case 'scanning_inbox': return `Scanning inbox... ${job.inbox_emails_scanned.toLocaleString()} found`;
-    case 'scanning_sent': return `Scanning sent... ${job.sent_emails_scanned.toLocaleString()} found`;
-    case 'analyzing': return `Analyzing ${(job.inbox_emails_scanned + job.sent_emails_scanned).toLocaleString()} emails...`;
-    case 'fetching': return `Importing ${job.bodies_fetched} of ${job.conversation_threads} conversations`;
-    case 'completed': return `Done! ${job.messages_created} messages imported`;
-    case 'error': return 'Failed: ' + (job.error_message || 'Unknown error');
-    default: return job.status;
+function getStatusMessage(progress: ImportProgress): string {
+  const phase = progress.current_phase;
+  
+  if (phase === 'importing') {
+    const received = progress.emails_received || 0;
+    return `Fetching emails... ${received.toLocaleString()} received`;
   }
+  
+  if (phase === 'classifying') {
+    const classified = progress.emails_classified || 0;
+    const received = progress.emails_received || 0;
+    return `Classifying emails... ${classified.toLocaleString()} of ${received.toLocaleString()}`;
+  }
+  
+  if (phase === 'analyzing') {
+    const pairs = progress.pairs_analyzed || 0;
+    const total = progress.conversations_with_replies || 0;
+    if (progress.voice_profile_complete) {
+      return 'Building response playbook...';
+    }
+    return `Learning your style... ${pairs} of ${total} conversations`;
+  }
+  
+  if (phase === 'complete') {
+    const conversations = progress.conversations_found || 0;
+    return `Done! Learned from ${conversations.toLocaleString()} conversations`;
+  }
+  
+  if (phase === 'error') {
+    return progress.last_error || 'Import failed';
+  }
+  
+  return 'Preparing...';
 }
 
 export function EmailConnectionStep({ 
@@ -144,14 +184,14 @@ export function EmailConnectionStep({
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectedEmail, setConnectedEmail] = useState<string | null>(null);
   const [connectedConfigId, setConnectedConfigId] = useState<string | null>(null);
-  const [connectedImportMode, setConnectedImportMode] = useState<ImportMode | null>(null);
   const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null);
   const [importMode, setImportMode] = useState<ImportMode>('last_1000');
   const [checkingConnection, setCheckingConnection] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
+  const [importStarted, setImportStarted] = useState(false);
   
-  // New job-based state
-  const [importJob, setImportJob] = useState<ImportJob | null>(null);
+  // New progress tracking
+  const [importProgress, setImportProgress] = useState<ImportProgress | null>(null);
 
   const connectedEmailRef = useRef<string | null>(null);
   const connectTimeoutRef = useRef<number | undefined>(undefined);
@@ -218,6 +258,31 @@ export function EmailConnectionStep({
     }
   };
 
+  // Start historical import after email is connected
+  const startHistoricalImport = async () => {
+    if (!workspaceId || importStarted) return;
+    
+    console.log('[EmailConnection] Starting historical import...');
+    setImportStarted(true);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('start-historical-import', {
+        body: { workspaceId }
+      });
+      
+      if (error) {
+        console.error('[EmailConnection] Historical import error:', error);
+        toast.error('Failed to start email import');
+        return;
+      }
+      
+      console.log('[EmailConnection] Historical import started:', data);
+      toast.success('Starting email import...');
+    } catch (error) {
+      console.error('[EmailConnection] Error starting import:', error);
+    }
+  };
+
   const checkEmailConnection = async () => {
     setCheckingConnection(true);
     try {
@@ -234,7 +299,6 @@ export function EmailConnectionStep({
       if (data?.email_address) {
         setConnectedEmail(data.email_address);
         setConnectedConfigId(data.id);
-        setConnectedImportMode((data.import_mode as ImportMode) || null);
         onEmailConnected(data.email_address);
 
         if (connectTimeoutRef.current) window.clearTimeout(connectTimeoutRef.current);
@@ -243,8 +307,13 @@ export function EmailConnectionStep({
         popupPollRef.current = undefined;
         popupRef.current = null;
 
-        // Fetch the latest import job
-        await fetchLatestImportJob(data.id);
+        // Fetch import progress
+        await fetchImportProgress();
+        
+        // Start historical import if not already started
+        if (!importStarted) {
+          await startHistoricalImport();
+        }
 
         if (!connectedEmail) {
           toast.success(`Connected to ${data.email_address}`);
@@ -260,76 +329,87 @@ export function EmailConnectionStep({
     }
   };
 
-  const fetchLatestImportJob = async (configId: string) => {
-    const { data: job, error } = await supabase
-      .from('email_import_jobs')
-      .select('id, status, inbox_emails_scanned, sent_emails_scanned, total_threads_found, conversation_threads, bodies_fetched, messages_created, error_message')
-      .eq('config_id', configId)
-      .order('created_at', { ascending: false })
-      .limit(1)
+  const fetchImportProgress = async () => {
+    const { data, error } = await supabase
+      .from('email_import_progress')
+      .select('*')
+      .eq('workspace_id', workspaceId)
       .maybeSingle();
 
-    if (!error && job) {
-      setImportJob(job as ImportJob);
+    if (!error && data) {
+      setImportProgress(data as ImportProgress);
     }
   };
 
   const handleStopSync = async () => {
-    if (!connectedConfigId || !importJob?.id) return;
     try {
-      toast.message('Stopping sync…');
+      toast.message('Stopping import…');
       
       await supabase
-        .from('email_import_jobs')
+        .from('email_import_progress')
         .update({ 
-          status: 'cancelled',
-          error_message: 'Stopped by user'
+          current_phase: 'complete',
+          last_error: 'Stopped by user'
         })
-        .eq('id', importJob.id);
+        .eq('workspace_id', workspaceId);
       
-      await supabase
-        .from('email_provider_configs')
-        .update({
-          sync_status: 'completed',
-          sync_stage: 'complete',
-          sync_completed_at: new Date().toISOString(),
-          active_job_id: null,
-        })
-        .eq('id', connectedConfigId);
-      
-      toast.success('Sync stopped. You can continue with the imported emails.');
-      await fetchLatestImportJob(connectedConfigId);
+      toast.success('Import stopped. You can continue with the imported emails.');
+      await fetchImportProgress();
     } catch (e) {
       console.error(e);
-      toast.error('Could not stop the sync.');
+      toast.error('Could not stop the import.');
     }
   };
 
   const handleRetrySync = async () => {
-    if (!connectedConfigId) return;
     try {
-      toast.message('Restarting sync…');
-
-      // Use the new 3-phase import system
-      const { data, error } = await supabase.functions.invoke('start-email-import', {
-        body: {
-          configId: connectedConfigId,
-          mode: connectedImportMode || 'all',
-        },
-      });
-
-      if (error) throw error;
-
-      await fetchLatestImportJob(connectedConfigId);
-      toast.success('Sync restarted!');
+      toast.message('Restarting import…');
+      setImportStarted(false);
+      
+      // Reset progress and start again
+      await supabase
+        .from('email_import_progress')
+        .delete()
+        .eq('workspace_id', workspaceId);
+      
+      await startHistoricalImport();
+      toast.success('Import restarted!');
     } catch (e: any) {
       console.error(e);
-      const msg = typeof e?.message === 'string' ? e.message : 'Could not restart the sync.';
+      const msg = typeof e?.message === 'string' ? e.message : 'Could not restart the import.';
       toast.error(msg);
     }
   };
 
-  // Poll for job status when connected
+  // Subscribe to realtime updates for import progress
+  useEffect(() => {
+    if (!workspaceId) return;
+
+    const channel = supabase
+      .channel('email-import-progress')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'email_import_progress',
+          filter: `workspace_id=eq.${workspaceId}`
+        },
+        (payload) => {
+          console.log('[EmailConnection] Progress update:', payload);
+          if (payload.new) {
+            setImportProgress(payload.new as ImportProgress);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [workspaceId]);
+
+  // Initial check and polling for connection
   useEffect(() => {
     checkEmailConnection();
 
@@ -346,22 +426,10 @@ export function EmailConnectionStep({
       }, 120000);
     }
 
-    // Poll for import job progress
-    if (connectedConfigId) {
-      const interval = setInterval(async () => {
-        await fetchLatestImportJob(connectedConfigId);
-      }, 2000);
-
-      return () => {
-        clearInterval(interval);
-        if (connectInterval) window.clearInterval(connectInterval);
-      };
-    }
-
     return () => {
       if (connectInterval) window.clearInterval(connectInterval);
     };
-  }, [isConnecting, connectedConfigId, connectedImportMode]);
+  }, [isConnecting]);
 
   // Handle OAuth redirect
   useEffect(() => {
@@ -428,11 +496,12 @@ export function EmailConnectionStep({
     );
   }
 
-  const isImporting = importJob && ['queued', 'scanning_inbox', 'scanning_sent', 'analyzing', 'fetching'].includes(importJob.status);
-  const importComplete = importJob?.status === 'completed';
-  const importError = importJob?.status === 'error';
-  const progress = importJob ? calculateProgress(importJob) : 0;
-  const statusMessage = importJob ? getStatusMessage(importJob) : '';
+  const phase = importProgress?.current_phase || 'idle';
+  const isImporting = ['importing', 'classifying', 'analyzing'].includes(phase);
+  const importComplete = phase === 'complete' && !importProgress?.last_error;
+  const importError = phase === 'error' || (phase === 'complete' && importProgress?.last_error);
+  const progress = importProgress ? calculateProgress(importProgress) : 0;
+  const statusMessage = importProgress ? getStatusMessage(importProgress) : '';
 
   return (
     <div className="space-y-6">
@@ -467,23 +536,23 @@ export function EmailConnectionStep({
           </div>
 
           {/* Error State */}
-          {importError && importJob && (
+          {importError && importProgress && (
             <div className="space-y-4 p-4 bg-destructive/10 rounded-lg border border-destructive/30">
               <div className="flex items-center gap-2 text-destructive">
                 <AlertCircle className="h-5 w-5" />
                 <span className="font-medium">Import encountered an error</span>
               </div>
               
-              {importJob.error_message && (
+              {importProgress.last_error && (
                 <p className="text-sm text-muted-foreground">
-                  {importJob.error_message}
+                  {importProgress.last_error}
                 </p>
               )}
               
               <div className="text-sm text-muted-foreground">
                 <p>Progress before error:</p>
                 <p className="font-medium">
-                  {importJob.inbox_emails_scanned.toLocaleString()} inbox, {importJob.sent_emails_scanned.toLocaleString()} sent scanned
+                  {(importProgress.emails_received || 0).toLocaleString()} emails received
                 </p>
               </div>
               
@@ -495,7 +564,7 @@ export function EmailConnectionStep({
           )}
 
           {/* Import Progress */}
-          {isImporting && importJob && (
+          {isImporting && importProgress && (
             <div className="space-y-4 p-4 bg-muted/50 rounded-lg border">
               {/* Current phase indicator */}
               <div className="flex items-center gap-2">
@@ -503,39 +572,43 @@ export function EmailConnectionStep({
                 <span className="font-medium text-sm">{statusMessage}</span>
               </div>
 
-              {/* Progress stats */}
-              <div className="grid grid-cols-2 gap-3 text-xs">
-                <div className="bg-background/50 rounded p-2">
-                  <div className="font-semibold text-foreground flex items-center gap-1">
-                    {importJob.inbox_emails_scanned.toLocaleString()}
-                    {importJob.status === 'scanning_inbox' && (
-                      <span className="text-muted-foreground animate-pulse">+</span>
-                    )}
-                  </div>
-                  <div className="text-muted-foreground">Inbox emails</div>
+              {/* Phase indicators */}
+              <div className="grid grid-cols-3 gap-2 text-xs">
+                <div className={`p-2 rounded text-center ${phase === 'importing' ? 'bg-primary/10 border border-primary/30' : phase === 'classifying' || phase === 'analyzing' ? 'bg-success/10' : 'bg-muted'}`}>
+                  <div className="font-semibold">Phase 1</div>
+                  <div className="text-muted-foreground">Import</div>
+                  {importProgress.emails_received !== null && (
+                    <div className="font-medium text-foreground mt-1">
+                      {importProgress.emails_received.toLocaleString()}
+                    </div>
+                  )}
                 </div>
-                <div className="bg-background/50 rounded p-2">
-                  <div className="font-semibold text-foreground flex items-center gap-1">
-                    {importJob.sent_emails_scanned.toLocaleString()}
-                    {importJob.status === 'scanning_sent' && (
-                      <span className="text-muted-foreground animate-pulse">+</span>
-                    )}
-                  </div>
-                  <div className="text-muted-foreground">Sent emails</div>
+                <div className={`p-2 rounded text-center ${phase === 'classifying' ? 'bg-primary/10 border border-primary/30' : phase === 'analyzing' ? 'bg-success/10' : 'bg-muted'}`}>
+                  <div className="font-semibold">Phase 2</div>
+                  <div className="text-muted-foreground">Classify</div>
+                  {importProgress.emails_classified !== null && (
+                    <div className="font-medium text-foreground mt-1">
+                      {importProgress.emails_classified.toLocaleString()}
+                    </div>
+                  )}
+                </div>
+                <div className={`p-2 rounded text-center ${phase === 'analyzing' ? 'bg-primary/10 border border-primary/30' : 'bg-muted'}`}>
+                  <div className="font-semibold">Phase 3</div>
+                  <div className="text-muted-foreground">Learn</div>
+                  {importProgress.pairs_analyzed !== null && (
+                    <div className="font-medium text-foreground mt-1">
+                      {importProgress.pairs_analyzed}
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* Show conversation threads after analysis */}
-              {importJob.conversation_threads > 0 && (
+              {/* Show conversation stats after phase 2 */}
+              {importProgress.conversations_with_replies !== null && importProgress.conversations_with_replies > 0 && (
                 <div className="bg-primary/5 border border-primary/20 rounded-lg p-3">
                   <p className="text-xs font-medium text-primary">
-                    Found {importJob.conversation_threads.toLocaleString()} conversations with your replies
+                    Found {importProgress.conversations_with_replies.toLocaleString()} conversations with your replies
                   </p>
-                  {importJob.status === 'fetching' && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Importing {importJob.bodies_fetched} of {importJob.conversation_threads}...
-                    </p>
-                  )}
                 </div>
               )}
 
@@ -581,7 +654,7 @@ export function EmailConnectionStep({
           )}
 
           {/* Import Complete */}
-          {importComplete && importJob && (
+          {importComplete && importProgress && (
             <div className="space-y-2">
               <div className="flex items-center justify-center gap-2 p-3 bg-success/5 rounded-lg border border-success/20 text-success text-sm">
                 <CheckCircle2 className="h-4 w-4" />
@@ -589,18 +662,23 @@ export function EmailConnectionStep({
               </div>
               <div className="grid grid-cols-3 gap-2 text-center text-xs">
                 <div className="bg-muted/30 rounded p-2">
-                  <div className="font-semibold text-foreground">{importJob.inbox_emails_scanned.toLocaleString()}</div>
-                  <div className="text-muted-foreground">Inbox scanned</div>
+                  <div className="font-semibold text-foreground">{(importProgress.emails_received || 0).toLocaleString()}</div>
+                  <div className="text-muted-foreground">Emails imported</div>
                 </div>
                 <div className="bg-muted/30 rounded p-2">
-                  <div className="font-semibold text-foreground">{importJob.conversation_threads.toLocaleString()}</div>
+                  <div className="font-semibold text-foreground">{(importProgress.conversations_found || 0).toLocaleString()}</div>
                   <div className="text-muted-foreground">Conversations</div>
                 </div>
                 <div className="bg-muted/30 rounded p-2">
-                  <div className="font-semibold text-foreground">{importJob.messages_created.toLocaleString()}</div>
-                  <div className="text-muted-foreground">Messages</div>
+                  <div className="font-semibold text-foreground">{(importProgress.pairs_analyzed || 0).toLocaleString()}</div>
+                  <div className="text-muted-foreground">Patterns learned</div>
                 </div>
               </div>
+              {importProgress.voice_profile_complete && (
+                <div className="text-xs text-center text-success">
+                  ✓ Voice profile built • ✓ Response playbook ready
+                </div>
+              )}
             </div>
           )}
 
