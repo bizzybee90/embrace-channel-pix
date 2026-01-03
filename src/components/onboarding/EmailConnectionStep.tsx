@@ -283,18 +283,37 @@ export function EmailConnectionStep({
     }
   };
 
-  const checkEmailConnection = async () => {
+  const checkEmailConnection = async (isInitialLoad = false) => {
     setCheckingConnection(true);
     try {
-      const { data, error } = await supabase
-        .from('email_provider_configs')
-        .select('id, import_mode, email_address, sync_status, sync_error')
-        .eq('workspace_id', workspaceId)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      // Fetch both email config and import progress in parallel
+      const [configResult, progressResult] = await Promise.all([
+        supabase
+          .from('email_provider_configs')
+          .select('id, import_mode, email_address, sync_status, sync_error')
+          .eq('workspace_id', workspaceId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from('email_import_progress')
+          .select('*')
+          .eq('workspace_id', workspaceId)
+          .maybeSingle()
+      ]);
 
-      if (error) throw error;
+      // Set import progress immediately if it exists
+      if (!progressResult.error && progressResult.data) {
+        setImportProgress(progressResult.data as ImportProgress);
+        // If import is already in progress, mark it as started
+        const phase = progressResult.data.current_phase;
+        if (phase && phase !== 'idle' && phase !== 'connecting') {
+          setImportStarted(true);
+        }
+      }
+
+      if (configResult.error) throw configResult.error;
+      const data = configResult.data;
 
       if (data?.email_address) {
         setConnectedEmail(data.email_address);
@@ -307,15 +326,15 @@ export function EmailConnectionStep({
         popupPollRef.current = undefined;
         popupRef.current = null;
 
-        // Fetch import progress
-        await fetchImportProgress();
+        // Only start historical import if there's no existing progress
+        const hasExistingProgress = progressResult.data?.current_phase && 
+          progressResult.data.current_phase !== 'idle';
         
-        // Start historical import if not already started
-        if (!importStarted) {
+        if (!hasExistingProgress && !importStarted) {
           await startHistoricalImport();
         }
 
-        if (!connectedEmail) {
+        if (!connectedEmail && !isInitialLoad) {
           toast.success(`Connected to ${data.email_address}`);
         }
         localStorage.removeItem('onboarding_email_pending');
@@ -338,6 +357,11 @@ export function EmailConnectionStep({
 
     if (!error && data) {
       setImportProgress(data as ImportProgress);
+      // Mark as started if there's active progress
+      const phase = data.current_phase;
+      if (phase && phase !== 'idle' && phase !== 'connecting') {
+        setImportStarted(true);
+      }
     }
   };
 
@@ -411,14 +435,14 @@ export function EmailConnectionStep({
 
   // Initial check and polling for connection
   useEffect(() => {
-    checkEmailConnection();
+    checkEmailConnection(true); // Pass true for initial load
 
     const pending = localStorage.getItem('onboarding_email_pending') === 'true';
 
     let connectInterval: number | undefined;
     if (isConnecting || pending) {
       connectInterval = window.setInterval(() => {
-        checkEmailConnection();
+        checkEmailConnection(false);
       }, 2000);
 
       window.setTimeout(() => {
