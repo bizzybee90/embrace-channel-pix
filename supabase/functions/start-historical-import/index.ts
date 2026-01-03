@@ -9,9 +9,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const BATCH_SIZE = 100;
-const DELAY_MS = 2000;
-const MAX_BATCHES_PER_INVOCATION = 20; // ~2000 emails per invocation to avoid timeout
+const BATCH_SIZE = 200; // Increased from 100
+const DELAY_MS = 500; // Reduced from 2000ms
+const MAX_BATCHES_PER_INVOCATION = 40; // Increased from 20 (~8000 emails per invocation)
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -62,6 +62,7 @@ serve(async (req) => {
       started_at: isResuming ? undefined : new Date().toISOString(),
       emails_received: totalFetched,
       emails_classified: 0,
+      last_error: null, // Clear any previous errors on resume
       last_import_batch_at: new Date().toISOString()
     }, { onConflict: 'workspace_id' });
 
@@ -90,7 +91,7 @@ serve(async (req) => {
           console.log('[historical-import] Rate limited, saving state for resume...');
           await supabase.from('email_import_progress').update({
             aurinko_next_page_token: nextPageToken,
-            last_error: 'Rate limited by email provider, will resume automatically',
+            last_error: 'Rate limited - click Resume to continue',
             updated_at: new Date().toISOString()
           }).eq('workspace_id', workspaceId);
           
@@ -105,7 +106,8 @@ serve(async (req) => {
           return new Response(JSON.stringify({
             success: true,
             message: 'Rate limited, will resume in 60 seconds',
-            emailsFetched: totalFetched
+            emailsFetched: totalFetched,
+            rateLimited: true
           }), {
             status: 200,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -128,29 +130,39 @@ serve(async (req) => {
 
       console.log(`[historical-import] Got ${messages.length} messages, hasMore: ${hasMoreEmails}`);
 
-      // Insert emails into raw_emails queue
-      for (const msg of messages) {
-        const folder = msg.folder || msg.labelIds?.[0] || 'INBOX';
-        
-        await supabase.from('raw_emails').upsert({
-          workspace_id: workspaceId,
-          external_id: msg.id,
-          thread_id: msg.threadId,
-          from_email: msg.from?.email || msg.from,
-          from_name: msg.from?.name,
-          to_email: msg.to?.[0]?.email || msg.to,
-          to_name: msg.to?.[0]?.name,
-          subject: msg.subject,
-          body_text: msg.body || msg.textBody || msg.snippet,
-          body_html: msg.htmlBody,
-          folder: folder,
-          received_at: msg.receivedAt || msg.date,
-          has_attachments: (msg.attachments?.length || 0) > 0,
-          status: 'pending'
-        }, {
-          onConflict: 'workspace_id,external_id',
-          ignoreDuplicates: true
+      // BULK INSERT - transform all messages at once
+      if (messages.length > 0) {
+        const emailsToInsert = messages.map((msg: any) => {
+          const folder = msg.folder || msg.labelIds?.[0] || 'INBOX';
+          return {
+            workspace_id: workspaceId,
+            external_id: msg.id,
+            thread_id: msg.threadId,
+            from_email: msg.from?.email || msg.from,
+            from_name: msg.from?.name,
+            to_email: msg.to?.[0]?.email || msg.to,
+            to_name: msg.to?.[0]?.name,
+            subject: msg.subject,
+            body_text: msg.body || msg.textBody || msg.snippet,
+            body_html: msg.htmlBody,
+            folder: folder,
+            received_at: msg.receivedAt || msg.date,
+            has_attachments: (msg.attachments?.length || 0) > 0,
+            status: 'pending'
+          };
         });
+
+        // Single bulk upsert instead of individual inserts
+        const { error: insertError } = await supabase
+          .from('raw_emails')
+          .upsert(emailsToInsert, {
+            onConflict: 'workspace_id,external_id',
+            ignoreDuplicates: true
+          });
+
+        if (insertError) {
+          console.error('[historical-import] Bulk insert error:', insertError);
+        }
       }
 
       totalFetched += messages.length;
@@ -172,11 +184,11 @@ serve(async (req) => {
 
     // Check if we need to continue importing or start classification
     if (hasMoreEmails) {
-      console.log(`[historical-import] Reached batch limit, scheduling continuation...`);
+      console.log(`[historical-import] Reached batch limit at ${totalFetched} emails, scheduling continuation...`);
       
       // Continue importing in background
       EdgeRuntime.waitUntil((async () => {
-        await new Promise(r => setTimeout(r, 1000)); // Brief pause
+        await new Promise(r => setTimeout(r, 500)); // Brief pause
         await supabase.functions.invoke('start-historical-import', {
           body: { workspaceId }
         });
