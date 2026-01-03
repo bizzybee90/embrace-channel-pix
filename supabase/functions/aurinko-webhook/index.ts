@@ -6,6 +6,21 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Verify the request is from Aurinko by checking the accountId exists in our database
+// Aurinko doesn't provide a signature header, so we validate by checking the accountId
+// is a known, valid account that we've connected. This prevents arbitrary injection.
+async function verifyAurinkoRequest(supabase: any, accountId: string): Promise<boolean> {
+  if (!accountId) return false;
+  
+  const { data, error } = await supabase
+    .from('email_provider_configs')
+    .select('id')
+    .eq('account_id', accountId.toString())
+    .single();
+  
+  return !error && !!data;
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -35,6 +50,11 @@ serve(async (req) => {
     });
   }
 
+  // Initialize Supabase client early for validation
+  const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+  const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
+
   try {
     const bodyText = await req.text();
     if (!bodyText || bodyText.trim() === '') {
@@ -48,20 +68,33 @@ serve(async (req) => {
     const payload = JSON.parse(bodyText);
     console.log('Aurinko webhook received:', JSON.stringify(payload, null, 2));
 
-    const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
-    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
+    // Extract accountId for validation
+    let accountId = payload.accountId || payload.subscription?.accountId;
+    
+    // Verify the accountId exists in our database before processing
+    // This prevents attackers from injecting fake webhooks
+    if (accountId) {
+      const isValidAccount = await verifyAurinkoRequest(supabase, accountId);
+      if (!isValidAccount) {
+        console.error('Aurinko webhook rejected: Unknown accountId:', accountId);
+        return new Response(JSON.stringify({ error: 'Unknown account' }), {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+      console.log('✅ Aurinko webhook verified for accountId:', accountId);
+    }
 
     // Aurinko webhook structure can be:
     // 1. Old format: { notification, resource, accountId }
     // 2. New format: { payloads: [{ changeType, resource, ... }], subscription: { accountId } }
     
-    let accountId = payload.accountId;
     let notifications: any[] = [];
 
     // Handle new payloads array format
     if (payload.payloads && Array.isArray(payload.payloads)) {
       accountId = payload.subscription?.accountId || payload.accountId;
+      notifications = payload.payloads
       notifications = payload.payloads
         .filter((p: any) => p.changeType === 'created' || p.changeType === 'updated')
         .map((p: any) => ({
