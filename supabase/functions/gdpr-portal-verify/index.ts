@@ -6,6 +6,61 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Verify HMAC signature
+async function verifyHmacSignature(payload: string, signature: string, secret: string): Promise<boolean> {
+  const encoder = new TextEncoder();
+  const keyData = encoder.encode(secret);
+  const data = encoder.encode(payload);
+  
+  const key = await crypto.subtle.importKey(
+    'raw',
+    keyData,
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  
+  const expectedSignature = await crypto.subtle.sign('HMAC', key, data);
+  const expectedSignatureHex = Array.from(new Uint8Array(expectedSignature))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+  
+  // Constant-time comparison to prevent timing attacks
+  if (signature.length !== expectedSignatureHex.length) {
+    return false;
+  }
+  
+  let result = 0;
+  for (let i = 0; i < signature.length; i++) {
+    result |= signature.charCodeAt(i) ^ expectedSignatureHex.charCodeAt(i);
+  }
+  return result === 0;
+}
+
+// Verify and decode signed token
+async function verifySignedToken(token: string, secret: string): Promise<Record<string, unknown> | null> {
+  const parts = token.split('.');
+  if (parts.length !== 2) {
+    console.error('Invalid token format - expected payload.signature');
+    return null;
+  }
+  
+  const [payload, signature] = parts;
+  
+  const isValid = await verifyHmacSignature(payload, signature, secret);
+  if (!isValid) {
+    console.error('Invalid token signature - possible tampering detected');
+    return null;
+  }
+  
+  try {
+    return JSON.parse(atob(payload));
+  } catch {
+    console.error('Failed to decode token payload');
+    return null;
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -15,7 +70,16 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const postmarkApiKey = Deno.env.get('POSTMARK_API_KEY');
+    const gdprSecret = Deno.env.get('GDPR_TOKEN_SECRET');
     const supabase = createClient(supabaseUrl, supabaseKey);
+
+    if (!gdprSecret) {
+      console.error('GDPR_TOKEN_SECRET not configured');
+      return new Response(
+        JSON.stringify({ error: 'GDPR service not configured' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     const { token, action } = await req.json();
 
@@ -26,28 +90,19 @@ serve(async (req) => {
       );
     }
 
-    // Parse the token
-    const [tokenId, encodedData] = token.split('_');
-    if (!tokenId || !encodedData) {
+    // Verify and decode the signed token
+    const requestData = await verifySignedToken(token, gdprSecret);
+    
+    if (!requestData) {
+      console.error('Token verification failed - rejecting request');
       return new Response(
-        JSON.stringify({ error: 'Invalid token format' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Decode request data
-    let requestData;
-    try {
-      requestData = JSON.parse(atob(encodedData));
-    } catch {
-      return new Response(
-        JSON.stringify({ error: 'Invalid token data' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: 'Invalid or tampered token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     // Check expiration
-    if (new Date(requestData.expires_at) < new Date()) {
+    if (new Date(requestData.expires_at as string) < new Date()) {
       return new Response(
         JSON.stringify({ error: 'Token has expired' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -68,7 +123,7 @@ serve(async (req) => {
     const { data: customer } = await supabase
       .from('customers')
       .select('id, name, email, phone, workspace_id')
-      .eq('email', requestData.email)
+      .eq('email', requestData.email as string)
       .maybeSingle();
 
     if (action === 'export') {
@@ -168,7 +223,7 @@ serve(async (req) => {
           .from('data_deletion_requests')
           .insert({
             customer_id: customer.id,
-            reason: requestData.reason || 'Customer portal request',
+            reason: (requestData.reason as string) || 'Customer portal request',
             deletion_type: 'full',
             status: 'pending'
           });
@@ -253,10 +308,11 @@ serve(async (req) => {
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('Error verifying GDPR request:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: errorMessage }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
