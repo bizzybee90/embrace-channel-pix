@@ -2,6 +2,9 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import OpenAI from "https://esm.sh/openai@4.28.0";
 
+// Declare EdgeRuntime for Supabase Edge Functions
+declare const EdgeRuntime: { waitUntil: (promise: Promise<unknown>) => void };
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -16,6 +19,9 @@ serve(async (req) => {
   }
 
   try {
+    const body = await req.json().catch(() => ({}));
+    const workspaceId = body.workspaceId;
+
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -23,8 +29,8 @@ serve(async (req) => {
 
     const openai = new OpenAI({ apiKey: Deno.env.get('OPENAI_API_KEY')! });
 
-    // Get pending emails
-    const { data: emails } = await supabase
+    // Build query - optionally filter by workspace
+    let query = supabase
       .from('raw_emails')
       .select('*')
       .eq('status', 'pending')
@@ -32,8 +38,20 @@ serve(async (req) => {
       .order('received_at', { ascending: true })
       .limit(BATCH_SIZE);
 
+    if (workspaceId) {
+      query = query.eq('workspace_id', workspaceId);
+    }
+
+    const { data: emails } = await query;
+
     if (!emails || emails.length === 0) {
       console.log('[queue-processor] No pending emails');
+      
+      // Check if we should trigger Phase 2 (analyze conversations)
+      if (workspaceId) {
+        await checkAndTriggerPhase2(supabase, workspaceId);
+      }
+      
       return new Response(JSON.stringify({ processed: 0 }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
@@ -75,7 +93,7 @@ serve(async (req) => {
         } else {
           await supabase.from('raw_emails').update({
             status: 'pending',
-            retry_count: email.retry_count + 1
+            retry_count: (email.retry_count || 0) + 1
           }).eq('id', email.id);
         }
       }
@@ -84,7 +102,7 @@ serve(async (req) => {
       await new Promise(r => setTimeout(r, 200));
     }
 
-    // Update progress
+    // Update progress for all affected workspaces
     const workspaceIds = [...new Set(emails.map(e => e.workspace_id))];
     for (const wsId of workspaceIds) {
       await updateProgress(supabase, wsId);
@@ -92,7 +110,30 @@ serve(async (req) => {
 
     console.log(`[queue-processor] Classified ${classifiedCount}/${emails.length} emails`);
 
-    return new Response(JSON.stringify({ processed: emails.length, classified: classifiedCount }), {
+    // Check if there are more pending emails - if so, continue processing
+    const { count: remainingCount } = await supabase
+      .from('raw_emails')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'pending')
+      .lt('retry_count', 3);
+
+    if (remainingCount && remainingCount > 0) {
+      console.log(`[queue-processor] ${remainingCount} emails remaining, scheduling continuation...`);
+      
+      // Continue processing in background
+      EdgeRuntime.waitUntil((async () => {
+        await new Promise(r => setTimeout(r, 500)); // Brief pause
+        await supabase.functions.invoke('email-queue-processor', {
+          body: { workspaceId }
+        });
+      })());
+    }
+
+    return new Response(JSON.stringify({ 
+      processed: emails.length, 
+      classified: classifiedCount,
+      remaining: remainingCount || 0
+    }), {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
 
@@ -239,20 +280,50 @@ async function updateProgress(supabase: any, workspaceId: string) {
     .from('raw_emails').select('*', { count: 'exact', head: true })
     .eq('workspace_id', workspaceId).eq('status', 'pending');
 
+  const isComplete = pending === 0 && (classified || 0) > 0;
+
   await supabase.from('email_import_progress').upsert({
     workspace_id: workspaceId,
-    current_phase: pending === 0 && classified > 0 ? 'analyzing' : 'classifying',
-    phase1_status: pending === 0 ? 'complete' : 'running',
+    current_phase: isComplete ? 'analyzing' : 'classifying',
+    phase1_status: isComplete ? 'complete' : 'running',
+    phase1_completed_at: isComplete ? new Date().toISOString() : undefined,
     emails_received: total || 0,
     emails_classified: classified || 0,
     updated_at: new Date().toISOString()
   }, { onConflict: 'workspace_id' });
 
-  // If Phase 1 complete, trigger Phase 2
+  return isComplete;
+}
+
+async function checkAndTriggerPhase2(supabase: any, workspaceId: string) {
+  const { count: pending } = await supabase
+    .from('raw_emails').select('*', { count: 'exact', head: true })
+    .eq('workspace_id', workspaceId)
+    .eq('status', 'pending');
+
+  const { count: classified } = await supabase
+    .from('raw_emails').select('*', { count: 'exact', head: true })
+    .eq('workspace_id', workspaceId)
+    .eq('status', 'classified');
+
   if (pending === 0 && (classified || 0) > 0) {
-    console.log('[queue-processor] Phase 1 complete, triggering Phase 2');
-    await supabase.functions.invoke('email-analyze-conversations', {
-      body: { workspaceId }
-    });
+    console.log('[queue-processor] Phase 1 complete, triggering Phase 2 (analyze-conversations)');
+    
+    await supabase.from('email_import_progress').update({
+      current_phase: 'analyzing',
+      phase1_status: 'complete',
+      phase1_completed_at: new Date().toISOString(),
+      phase2_status: 'running',
+      updated_at: new Date().toISOString()
+    }).eq('workspace_id', workspaceId);
+
+    EdgeRuntime.waitUntil((async () => {
+      const { error } = await supabase.functions.invoke('email-analyze-conversations', {
+        body: { workspaceId }
+      });
+      if (error) {
+        console.error('[queue-processor] Failed to invoke analyze-conversations:', error);
+      }
+    })());
   }
 }

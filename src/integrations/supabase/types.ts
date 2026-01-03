@@ -1548,6 +1548,7 @@ export type Database = {
       }
       email_import_progress: {
         Row: {
+          aurinko_next_page_token: string | null
           conversations_found: number | null
           conversations_with_replies: number | null
           created_at: string | null
@@ -1558,6 +1559,7 @@ export type Database = {
           estimated_completion_at: string | null
           id: string
           last_error: string | null
+          last_import_batch_at: string | null
           pairs_analyzed: number | null
           phase1_completed_at: string | null
           phase1_status: string | null
@@ -1572,6 +1574,7 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          aurinko_next_page_token?: string | null
           conversations_found?: number | null
           conversations_with_replies?: number | null
           created_at?: string | null
@@ -1582,6 +1585,7 @@ export type Database = {
           estimated_completion_at?: string | null
           id?: string
           last_error?: string | null
+          last_import_batch_at?: string | null
           pairs_analyzed?: number | null
           phase1_completed_at?: string | null
           phase1_status?: string | null
@@ -1596,6 +1600,7 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          aurinko_next_page_token?: string | null
           conversations_found?: number | null
           conversations_with_replies?: number | null
           created_at?: string | null
@@ -1606,6 +1611,7 @@ export type Database = {
           estimated_completion_at?: string | null
           id?: string
           last_error?: string | null
+          last_import_batch_at?: string | null
           pairs_analyzed?: number | null
           phase1_completed_at?: string | null
           phase1_status?: string | null
