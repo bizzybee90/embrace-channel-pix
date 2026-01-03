@@ -238,22 +238,25 @@ serve(async (req) => {
           const fromEmail = extractEmail(msg.from);
           const toEmails = (msg.to || []).map((t: any) => extractEmail(t));
           
-          let direction = 'inbound';
-          if (folder === 'SENT' || fromEmail === connectedEmail) {
-            direction = 'outbound';
-          }
-          
+          // Determine direction for internal logic only (not stored on raw_emails)
+          // Raw email direction can be inferred later from folder/from address if needed.
+          const inferredDirection = (folder === 'SENT' || fromEmail === connectedEmail) ? 'outbound' : 'inbound';
+          void inferredDirection;
+
           // Safe extraction for stored fields
           const storedFromEmail = msg.from?.email || (typeof msg.from === 'string' ? msg.from : null);
           const storedFromName = msg.from?.name || null;
           const storedToEmail = msg.to?.[0]?.email || (typeof msg.to?.[0] === 'string' ? msg.to?.[0] : null);
           const storedToName = msg.to?.[0]?.name || null;
-          
+
+          // raw_emails.from_email is REQUIRED in schema
+          const requiredFromEmail = String(storedFromEmail || fromEmail || connectedEmail || 'unknown@unknown').toLowerCase();
+
           return {
             workspace_id: workspaceId,
             external_id: msg.id,
             thread_id: msg.threadId,
-            from_email: storedFromEmail,
+            from_email: requiredFromEmail,
             from_name: storedFromName,
             to_email: storedToEmail,
             to_name: storedToName,
@@ -261,7 +264,6 @@ serve(async (req) => {
             body_text: msg.body || msg.textBody || msg.snippet,
             body_html: msg.htmlBody,
             folder,
-            direction,
             received_at: msg.receivedAt || msg.date,
             has_attachments: (msg.attachments?.length || 0) > 0,
             status: 'pending'
