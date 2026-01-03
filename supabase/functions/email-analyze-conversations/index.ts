@@ -39,10 +39,11 @@ serve(async (req) => {
         messages (
           id,
           direction,
-          from_identifier,
+          actor_type,
+          actor_name,
           body,
-          received_at,
-          metadata
+          created_at,
+          raw_payload
         )
       `)
       .eq('workspace_id', workspaceId)
@@ -56,11 +57,11 @@ serve(async (req) => {
     for (const conv of conversations || []) {
       const inbound = (conv.messages || [])
         .filter((m: any) => m.direction === 'inbound')
-        .sort((a: any, b: any) => new Date(a.received_at).getTime() - new Date(b.received_at).getTime());
+        .sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
       
       const outbound = (conv.messages || [])
         .filter((m: any) => m.direction === 'outbound')
-        .sort((a: any, b: any) => new Date(a.received_at).getTime() - new Date(b.received_at).getTime());
+        .sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
       if (inbound.length > 0 && outbound.length > 0) {
         conversationsWithReplies++;
@@ -68,12 +69,12 @@ serve(async (req) => {
         // Match each inbound with its reply
         for (const inMsg of inbound) {
           const reply = outbound.find((o: any) => 
-            new Date(o.received_at) > new Date(inMsg.received_at)
+            new Date(o.created_at) > new Date(inMsg.created_at)
           );
 
           if (reply) {
-            const replyTimeHours = (new Date(reply.received_at).getTime() - 
-              new Date(inMsg.received_at).getTime()) / (1000 * 60 * 60);
+            const replyTimeHours = (new Date(reply.created_at).getTime() - 
+              new Date(inMsg.created_at).getTime()) / (1000 * 60 * 60);
 
             conversationPairs.push({
               workspace_id: workspaceId,
@@ -82,10 +83,10 @@ serve(async (req) => {
               outbound_message_id: reply.id,
               inbound_body: inMsg.body,
               outbound_body: reply.body,
-              inbound_type: inMsg.metadata?.classification?.email_type || 'unknown',
+              inbound_type: inMsg.raw_payload?.classification?.email_type || 'unknown',
               reply_time_hours: replyTimeHours,
               reply_length: (reply.body || '').length,
-              received_at: inMsg.received_at
+              received_at: inMsg.created_at
             });
           }
         }

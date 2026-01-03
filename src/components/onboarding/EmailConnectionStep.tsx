@@ -587,7 +587,21 @@ export function EmailConnectionStep({
     }
   };
 
-  // Subscribe to realtime updates for import progress
+  const handleRepairLearning = async () => {
+    try {
+      toast.message('Repairing learning…');
+      // Rebuild conversations/messages from already-classified emails
+      const { error } = await supabase.functions.invoke('email-queue-processor', {
+        body: { workspaceId, rebuild: true }
+      });
+      if (error) throw error;
+      toast.success('Repair started — learning will continue automatically.');
+    } catch (e: any) {
+      console.error(e);
+      toast.error('Could not start repair');
+    }
+  };
+
   useEffect(() => {
     if (!workspaceId) return;
 
@@ -831,6 +845,22 @@ export function EmailConnectionStep({
                 )}
                 <span className="font-medium text-sm">{statusMessage}</span>
               </div>
+
+              {/* Repair CTA (when classified emails exist but no conversations were built) */}
+              {(phase === 'analyzing' || phase === 'learning') &&
+                (importProgress.emails_classified || 0) > 0 &&
+                (importProgress.conversations_found || 0) === 0 && (
+                  <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-3 space-y-2">
+                    <p className="text-sm text-amber-800 dark:text-amber-200">
+                      We imported and classified your emails, but couldn’t build conversation threads needed for “Learn Your Style”.
+                    </p>
+                    <Button onClick={handleRepairLearning} size="sm" className="w-full gap-2" variant="outline">
+                      <RefreshCw className="h-4 w-4" />
+                      Repair Learning
+                    </Button>
+                  </div>
+                )}
+
 
               {/* Rate limit pause UI with countdown */}
               {paused && (
