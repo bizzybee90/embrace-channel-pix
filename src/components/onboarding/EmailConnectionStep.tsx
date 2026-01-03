@@ -3,10 +3,11 @@ import { Button } from '@/components/ui/button';
 import { CardTitle, CardDescription } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Mail, CheckCircle2, Loader2, RefreshCw, ArrowRight, AlertCircle, RotateCcw, StopCircle } from 'lucide-react';
+import { Mail, CheckCircle2, Loader2, RefreshCw, ArrowRight, AlertCircle, RotateCcw, StopCircle, Inbox, Send } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
+import { EmailImportPreview } from '@/components/email/EmailImportPreview';
 
 interface EmailConnectionStepProps {
   workspaceId: string;
@@ -32,6 +33,12 @@ interface ImportProgress {
   playbook_complete: boolean | null;
   last_error: string | null;
   started_at: string | null;
+  // New folder tracking fields
+  current_import_folder: string | null;
+  sent_import_complete: boolean | null;
+  inbox_import_complete: boolean | null;
+  sent_email_count: number | null;
+  inbox_email_count: number | null;
 }
 
 const emailProviders = [
@@ -106,18 +113,25 @@ const importModes = [
   },
 ];
 
-// Calculate progress based on 3-phase system
+// Calculate progress based on 3-phase system with folder awareness
 function calculateProgress(progress: ImportProgress): number {
   const phase = progress.current_phase;
   
   if (phase === 'complete') return 100;
   if (phase === 'error') return -1;
+  if (phase === 'ready') return 0;
   
   // Phase 1: Importing (0-40%)
   if (phase === 'importing') {
-    const received = progress.emails_received || 0;
-    // Estimate based on emails received (assume ~500 emails max for progress calculation)
-    return Math.min(40, Math.floor((received / 500) * 40));
+    const sentComplete = progress.sent_import_complete ?? false;
+    const inboxComplete = progress.inbox_import_complete ?? false;
+    
+    if (sentComplete && inboxComplete) return 40;
+    if (sentComplete) return 25; // SENT done, INBOX in progress
+    
+    // SENT in progress
+    const sentCount = progress.sent_email_count || 0;
+    return Math.min(20, Math.floor((sentCount / 500) * 20));
   }
   
   // Phase 2: Classifying (40-60%)
@@ -128,12 +142,18 @@ function calculateProgress(progress: ImportProgress): number {
     return 40 + Math.floor(classifyProgress * 20);
   }
   
-  // Phase 3: Analyzing (60-100%)
-  if (phase === 'analyzing') {
+  // Phase 3: Analyzing/Learning (60-100%)
+  if (phase === 'analyzing' || phase === 'learning') {
+    const voiceComplete = progress.voice_profile_complete ?? false;
+    const playbookComplete = progress.playbook_complete ?? false;
+    
+    if (voiceComplete && playbookComplete) return 100;
+    if (voiceComplete) return 85;
+    
     const pairs = progress.pairs_analyzed || 0;
     const totalPairs = progress.conversations_with_replies || 1;
     const analyzeProgress = pairs / totalPairs;
-    return 60 + Math.floor(analyzeProgress * 40);
+    return 60 + Math.floor(analyzeProgress * 25);
   }
   
   return 0;
@@ -146,16 +166,30 @@ function isImportStuck(progress: ImportProgress): boolean {
          progress.last_error.toLowerCase().includes('resume');
 }
 
-// Get human-readable status message
+// Get human-readable status message with folder awareness
 function getStatusMessage(progress: ImportProgress): string {
   const phase = progress.current_phase;
   
+  if (phase === 'ready') {
+    return 'Ready to import';
+  }
+  
   if (phase === 'importing') {
+    const currentFolder = progress.current_import_folder || 'SENT';
+    const sentComplete = progress.sent_import_complete ?? false;
+    const sentCount = progress.sent_email_count || 0;
+    const inboxCount = progress.inbox_email_count || 0;
     const received = progress.emails_received || 0;
+    
     if (isImportStuck(progress)) {
       return `Fetching paused at ${received.toLocaleString()} emails (rate limited)`;
     }
-    return `Fetching emails... ${received.toLocaleString()} received`;
+    
+    if (!sentComplete) {
+      return `Importing SENT folder... ${sentCount.toLocaleString()} emails (priority for voice learning)`;
+    }
+    
+    return `Importing INBOX... ${inboxCount.toLocaleString()} emails (SENT: ${sentCount.toLocaleString()} ✓)`;
   }
   
   if (phase === 'classifying') {
@@ -164,7 +198,7 @@ function getStatusMessage(progress: ImportProgress): string {
     return `Classifying emails... ${classified.toLocaleString()} of ${received.toLocaleString()}`;
   }
   
-  if (phase === 'analyzing') {
+  if (phase === 'analyzing' || phase === 'learning') {
     const pairs = progress.pairs_analyzed || 0;
     const total = progress.conversations_with_replies || 0;
     if (progress.voice_profile_complete) {
@@ -199,6 +233,7 @@ export function EmailConnectionStep({
   const [checkingConnection, setCheckingConnection] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [importStarted, setImportStarted] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   
   // New progress tracking
   const [importProgress, setImportProgress] = useState<ImportProgress | null>(null);
@@ -317,7 +352,7 @@ export function EmailConnectionStep({
         setImportProgress(progressResult.data as ImportProgress);
         // If import is already in progress, mark it as started
         const phase = progressResult.data.current_phase;
-        if (phase && phase !== 'idle' && phase !== 'connecting') {
+        if (phase && phase !== 'idle' && phase !== 'connecting' && phase !== 'ready') {
           setImportStarted(true);
         }
       }
@@ -336,12 +371,14 @@ export function EmailConnectionStep({
         popupPollRef.current = undefined;
         popupRef.current = null;
 
-        // Only start historical import if there's no existing progress
+        // Check if we should show preview or start import
         const hasExistingProgress = progressResult.data?.current_phase && 
-          progressResult.data.current_phase !== 'idle';
+          progressResult.data.current_phase !== 'idle' &&
+          progressResult.data.current_phase !== 'ready';
         
         if (!hasExistingProgress && !importStarted) {
-          await startHistoricalImport();
+          // Show preview first if newly connected
+          setShowPreview(true);
         }
 
         if (!connectedEmail && !isInitialLoad) {
@@ -369,10 +406,20 @@ export function EmailConnectionStep({
       setImportProgress(data as ImportProgress);
       // Mark as started if there's active progress
       const phase = data.current_phase;
-      if (phase && phase !== 'idle' && phase !== 'connecting') {
+      if (phase && phase !== 'idle' && phase !== 'connecting' && phase !== 'ready') {
         setImportStarted(true);
       }
     }
+  };
+
+  const handleStartImportFromPreview = async () => {
+    setShowPreview(false);
+    await startHistoricalImport();
+  };
+
+  const handleSkipPreview = () => {
+    setShowPreview(false);
+    onNext();
   };
 
   const handleStopSync = async () => {
@@ -560,7 +607,7 @@ export function EmailConnectionStep({
   }
 
   const phase = importProgress?.current_phase || 'idle';
-  const isImporting = ['importing', 'classifying', 'analyzing'].includes(phase);
+  const isImporting = ['importing', 'classifying', 'analyzing', 'learning'].includes(phase);
   const importComplete = phase === 'complete' && !importProgress?.last_error;
   const importError = phase === 'error' || (phase === 'complete' && importProgress?.last_error);
   const progress = importProgress ? calculateProgress(importProgress) : 0;
@@ -598,8 +645,17 @@ export function EmailConnectionStep({
             </div>
           </div>
 
+          {/* Show Preview before import */}
+          {showPreview && !importStarted && (
+            <EmailImportPreview 
+              workspaceId={workspaceId}
+              onStartImport={handleStartImportFromPreview}
+              onSkip={handleSkipPreview}
+            />
+          )}
+
           {/* Error State */}
-          {importError && importProgress && (
+          {importError && importProgress && !showPreview && (
             <div className="space-y-4 p-4 bg-destructive/10 rounded-lg border border-destructive/30">
               <div className="flex items-center gap-2 text-destructive">
                 <AlertCircle className="h-5 w-5" />
@@ -627,7 +683,7 @@ export function EmailConnectionStep({
           )}
 
           {/* Import Progress */}
-          {isImporting && importProgress && (
+          {isImporting && importProgress && !showPreview && (
             <div className="space-y-4 p-4 bg-muted/50 rounded-lg border">
               {/* Current phase indicator */}
               <div className="flex items-center gap-2">
@@ -657,9 +713,43 @@ export function EmailConnectionStep({
                 </div>
               )}
 
+              {/* Folder progress (during importing phase) */}
+              {phase === 'importing' && (
+                <div className="grid grid-cols-2 gap-2">
+                  <div className={`p-2 rounded border text-center text-xs ${
+                    importProgress.sent_import_complete 
+                      ? 'bg-success/10 border-success/30' 
+                      : importProgress.current_import_folder === 'SENT'
+                        ? 'bg-primary/10 border-primary/30'
+                        : 'bg-muted'
+                  }`}>
+                    <Send className="h-4 w-4 mx-auto mb-1 text-green-500" />
+                    <div className="font-semibold">SENT</div>
+                    <div className="text-muted-foreground">
+                      {(importProgress.sent_email_count || 0).toLocaleString()}
+                      {importProgress.sent_import_complete && ' ✓'}
+                    </div>
+                  </div>
+                  <div className={`p-2 rounded border text-center text-xs ${
+                    importProgress.inbox_import_complete 
+                      ? 'bg-success/10 border-success/30' 
+                      : importProgress.current_import_folder === 'INBOX'
+                        ? 'bg-primary/10 border-primary/30'
+                        : 'bg-muted'
+                  }`}>
+                    <Inbox className="h-4 w-4 mx-auto mb-1 text-blue-500" />
+                    <div className="font-semibold">INBOX</div>
+                    <div className="text-muted-foreground">
+                      {(importProgress.inbox_email_count || 0).toLocaleString()}
+                      {importProgress.inbox_import_complete && ' ✓'}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Phase indicators */}
               <div className="grid grid-cols-3 gap-2 text-xs">
-                <div className={`p-2 rounded text-center ${phase === 'importing' ? 'bg-primary/10 border border-primary/30' : phase === 'classifying' || phase === 'analyzing' ? 'bg-success/10' : 'bg-muted'}`}>
+                <div className={`p-2 rounded text-center ${phase === 'importing' ? 'bg-primary/10 border border-primary/30' : phase === 'classifying' || phase === 'analyzing' || phase === 'learning' ? 'bg-success/10' : 'bg-muted'}`}>
                   <div className="font-semibold">Phase 1</div>
                   <div className="text-muted-foreground">Import</div>
                   {importProgress.emails_received !== null && (
@@ -668,7 +758,7 @@ export function EmailConnectionStep({
                     </div>
                   )}
                 </div>
-                <div className={`p-2 rounded text-center ${phase === 'classifying' ? 'bg-primary/10 border border-primary/30' : phase === 'analyzing' ? 'bg-success/10' : 'bg-muted'}`}>
+                <div className={`p-2 rounded text-center ${phase === 'classifying' ? 'bg-primary/10 border border-primary/30' : phase === 'analyzing' || phase === 'learning' ? 'bg-success/10' : 'bg-muted'}`}>
                   <div className="font-semibold">Phase 2</div>
                   <div className="text-muted-foreground">Classify</div>
                   {importProgress.emails_classified !== null && (
@@ -677,7 +767,7 @@ export function EmailConnectionStep({
                     </div>
                   )}
                 </div>
-                <div className={`p-2 rounded text-center ${phase === 'analyzing' ? 'bg-primary/10 border border-primary/30' : 'bg-muted'}`}>
+                <div className={`p-2 rounded text-center ${phase === 'analyzing' || phase === 'learning' ? 'bg-primary/10 border border-primary/30' : 'bg-muted'}`}>
                   <div className="font-semibold">Phase 3</div>
                   <div className="text-muted-foreground">Learn</div>
                   {importProgress.pairs_analyzed !== null && (
@@ -741,17 +831,25 @@ export function EmailConnectionStep({
           )}
 
           {/* Import Complete */}
-          {importComplete && importProgress && (
+          {importComplete && importProgress && !showPreview && (
             <div className="space-y-2">
               <div className="flex items-center justify-center gap-2 p-3 bg-success/5 rounded-lg border border-success/20 text-success text-sm">
                 <CheckCircle2 className="h-4 w-4" />
                 <span>Import complete!</span>
               </div>
-              <div className="grid grid-cols-3 gap-2 text-center text-xs">
+              <div className="grid grid-cols-2 gap-2 text-center text-xs">
                 <div className="bg-muted/30 rounded p-2">
-                  <div className="font-semibold text-foreground">{(importProgress.emails_received || 0).toLocaleString()}</div>
-                  <div className="text-muted-foreground">Emails imported</div>
+                  <Send className="h-4 w-4 mx-auto mb-1 text-green-500" />
+                  <div className="font-semibold text-foreground">{(importProgress.sent_email_count || 0).toLocaleString()}</div>
+                  <div className="text-muted-foreground">Sent emails</div>
                 </div>
+                <div className="bg-muted/30 rounded p-2">
+                  <Inbox className="h-4 w-4 mx-auto mb-1 text-blue-500" />
+                  <div className="font-semibold text-foreground">{(importProgress.inbox_email_count || 0).toLocaleString()}</div>
+                  <div className="text-muted-foreground">Inbox emails</div>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-center text-xs">
                 <div className="bg-muted/30 rounded p-2">
                   <div className="font-semibold text-foreground">{(importProgress.conversations_found || 0).toLocaleString()}</div>
                   <div className="text-muted-foreground">Conversations</div>
@@ -769,15 +867,17 @@ export function EmailConnectionStep({
             </div>
           )}
 
-          <div className="flex gap-3">
-            <Button variant="outline" onClick={onBack} className="flex-1">
-              Back
-            </Button>
-            <Button onClick={onNext} className="flex-1 gap-2">
-              Continue
-              <ArrowRight className="h-4 w-4" />
-            </Button>
-          </div>
+          {!showPreview && (
+            <div className="flex gap-3">
+              <Button variant="outline" onClick={onBack} className="flex-1">
+                Back
+              </Button>
+              <Button onClick={onNext} className="flex-1 gap-2">
+                Continue
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
         </div>
       ) : (
         <div className="space-y-6">

@@ -197,3 +197,6 @@ verify_jwt = false
 
 [functions.start-historical-import]
 verify_jwt = false
+
+[functions.get-mailbox-stats]
+verify_jwt = false

@@ -1552,12 +1552,18 @@ export type Database = {
           conversations_found: number | null
           conversations_with_replies: number | null
           created_at: string | null
+          current_import_folder: string | null
           current_phase: string | null
           emails_classified: number | null
           emails_failed: number | null
           emails_received: number | null
           estimated_completion_at: string | null
+          estimated_minutes: number | null
+          estimated_total_emails: number | null
           id: string
+          inbox_email_count: number | null
+          inbox_import_complete: boolean | null
+          inbox_next_page_token: string | null
           last_error: string | null
           last_import_batch_at: string | null
           pairs_analyzed: number | null
@@ -1568,6 +1574,9 @@ export type Database = {
           phase3_completed_at: string | null
           phase3_status: string | null
           playbook_complete: boolean | null
+          sent_email_count: number | null
+          sent_import_complete: boolean | null
+          sent_next_page_token: string | null
           started_at: string | null
           updated_at: string | null
           voice_profile_complete: boolean | null
@@ -1578,12 +1587,18 @@ export type Database = {
           conversations_found?: number | null
           conversations_with_replies?: number | null
           created_at?: string | null
+          current_import_folder?: string | null
           current_phase?: string | null
           emails_classified?: number | null
           emails_failed?: number | null
           emails_received?: number | null
           estimated_completion_at?: string | null
+          estimated_minutes?: number | null
+          estimated_total_emails?: number | null
           id?: string
+          inbox_email_count?: number | null
+          inbox_import_complete?: boolean | null
+          inbox_next_page_token?: string | null
           last_error?: string | null
           last_import_batch_at?: string | null
           pairs_analyzed?: number | null
@@ -1594,6 +1609,9 @@ export type Database = {
           phase3_completed_at?: string | null
           phase3_status?: string | null
           playbook_complete?: boolean | null
+          sent_email_count?: number | null
+          sent_import_complete?: boolean | null
+          sent_next_page_token?: string | null
           started_at?: string | null
           updated_at?: string | null
           voice_profile_complete?: boolean | null
@@ -1604,12 +1622,18 @@ export type Database = {
           conversations_found?: number | null
           conversations_with_replies?: number | null
           created_at?: string | null
+          current_import_folder?: string | null
           current_phase?: string | null
           emails_classified?: number | null
           emails_failed?: number | null
           emails_received?: number | null
           estimated_completion_at?: string | null
+          estimated_minutes?: number | null
+          estimated_total_emails?: number | null
           id?: string
+          inbox_email_count?: number | null
+          inbox_import_complete?: boolean | null
+          inbox_next_page_token?: string | null
           last_error?: string | null
           last_import_batch_at?: string | null
           pairs_analyzed?: number | null
@@ -1620,6 +1644,9 @@ export type Database = {
           phase3_completed_at?: string | null
           phase3_status?: string | null
           playbook_complete?: boolean | null
+          sent_email_count?: number | null
+          sent_import_complete?: boolean | null
+          sent_next_page_token?: string | null
           started_at?: string | null
           updated_at?: string | null
           voice_profile_complete?: boolean | null
