@@ -10,8 +10,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const BATCH_SIZE = 50;
-const CLASSIFICATION_BATCH = 10;
+const BATCH_SIZE = 100; // Increased from 50
+const CLASSIFICATION_BATCH = 15; // Increased from 10
+const PARALLEL_WORKERS = 5; // Number of parallel workers to spawn
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -67,39 +68,56 @@ serve(async (req) => {
 
     let classifiedCount = 0;
 
-    // Process in batches of 10
+    // Process in batches of CLASSIFICATION_BATCH
     for (let i = 0; i < emails.length; i += CLASSIFICATION_BATCH) {
       const batch = emails.slice(i, i + CLASSIFICATION_BATCH);
       
       const classifications = await classifyBatch(openai, batch);
+
+      // Bulk update classified emails
+      const classifiedEmails: any[] = [];
+      const failedEmails: any[] = [];
 
       for (let j = 0; j < batch.length; j++) {
         const email = batch[j];
         const result = classifications[j];
 
         if (result?.email_type) {
-          await supabase.from('raw_emails').update({
-            status: 'classified',
-            classification: result,
-            email_type: result.email_type,
-            lane: result.lane,
-            confidence: result.confidence,
-            processing_completed_at: new Date().toISOString()
-          }).eq('id', email.id);
-
-          // Create conversation and message
-          await createConversationAndMessage(supabase, email, result);
+          classifiedEmails.push({ email, result });
           classifiedCount++;
         } else {
-          await supabase.from('raw_emails').update({
-            status: 'pending',
-            retry_count: (email.retry_count || 0) + 1
-          }).eq('id', email.id);
+          failedEmails.push(email);
         }
       }
 
-      // Small delay between batches to respect rate limits
-      await new Promise(r => setTimeout(r, 200));
+      // Process classified emails in parallel
+      await Promise.all(classifiedEmails.map(async ({ email, result }) => {
+        await supabase.from('raw_emails').update({
+          status: 'classified',
+          classification: result,
+          email_type: result.email_type,
+          lane: result.lane,
+          confidence: result.confidence,
+          processing_completed_at: new Date().toISOString()
+        }).eq('id', email.id);
+
+        await createConversationAndMessage(supabase, email, result);
+      }));
+
+      // Update failed emails
+      if (failedEmails.length > 0) {
+        await Promise.all(failedEmails.map(email =>
+          supabase.from('raw_emails').update({
+            status: 'pending',
+            retry_count: (email.retry_count || 0) + 1
+          }).eq('id', email.id)
+        ));
+      }
+      
+      // Minimal delay between classification batches (just for rate limiting)
+      if (i + CLASSIFICATION_BATCH < emails.length) {
+        await new Promise(r => setTimeout(r, 100));
+      }
     }
 
     // Update progress for all affected workspaces
@@ -110,7 +128,7 @@ serve(async (req) => {
 
     console.log(`[queue-processor] Classified ${classifiedCount}/${emails.length} emails`);
 
-    // Check if there are more pending emails - if so, continue processing
+    // Check if there are more pending emails - if so, spawn parallel workers
     const { count: remainingCount } = await supabase
       .from('raw_emails')
       .select('*', { count: 'exact', head: true })
@@ -118,14 +136,22 @@ serve(async (req) => {
       .lt('retry_count', 3);
 
     if (remainingCount && remainingCount > 0) {
-      console.log(`[queue-processor] ${remainingCount} emails remaining, scheduling continuation...`);
+      console.log(`[queue-processor] ${remainingCount} emails remaining, spawning ${PARALLEL_WORKERS} parallel workers...`);
       
-      // Continue processing in background
+      // Spawn multiple parallel workers immediately (no delay)
       EdgeRuntime.waitUntil((async () => {
-        await new Promise(r => setTimeout(r, 500)); // Brief pause
-        await supabase.functions.invoke('email-queue-processor', {
-          body: { workspaceId }
-        });
+        const workers = [];
+        const workersToSpawn = Math.min(PARALLEL_WORKERS, Math.ceil(remainingCount / BATCH_SIZE));
+        
+        for (let i = 0; i < workersToSpawn; i++) {
+          workers.push(
+            supabase.functions.invoke('email-queue-processor', {
+              body: { workspaceId }
+            })
+          );
+        }
+        
+        await Promise.all(workers);
       })());
     }
 
