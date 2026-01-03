@@ -194,3 +194,6 @@ verify_jwt = false
 
 [functions.email-deep-learning]
 verify_jwt = false
+
+[functions.start-historical-import]
+verify_jwt = false
