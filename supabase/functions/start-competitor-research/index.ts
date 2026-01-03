@@ -67,10 +67,10 @@ serve(async (req) => {
 
     console.log('[start-research] Created job:', job.id);
 
-    // Kick off discovery phase
+    // Kick off discovery phase with Apify
     supabase.functions.invoke('competitor-discover', {
       body: { jobId: job.id, workspaceId }
-    }).catch(err => console.error('Failed to start discovery:', err));
+    }).catch(err => console.error('[start-research] Failed to start discovery:', err));
 
     return new Response(JSON.stringify({
       success: true,

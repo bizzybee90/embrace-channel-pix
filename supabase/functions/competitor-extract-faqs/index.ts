@@ -1,21 +1,19 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import Anthropic from "https://esm.sh/@anthropic-ai/sdk@0.24.3";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const BATCH_SIZE = 5;
-const MAX_RUNTIME_MS = 25000;
+const BATCH_SIZE = 5; // Process 5 pages at a time
 
 declare const EdgeRuntime: { waitUntil: (p: Promise<unknown>) => void } | undefined;
 const waitUntil = (p: Promise<unknown>) => { try { EdgeRuntime?.waitUntil(p); } catch { /* ignore */ } };
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
-
-  const startTime = Date.now();
 
   try {
     const { jobId, workspaceId } = await req.json();
@@ -26,15 +24,20 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
+    // Use Claude (Anthropic) for FAQ extraction
+    const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
+    if (!ANTHROPIC_API_KEY) {
+      console.error('[extract-faqs] No ANTHROPIC_API_KEY configured');
       await supabase.from('competitor_research_jobs').update({
-        status: 'error', error_message: 'No Lovable API key'
+        status: 'error',
+        error_message: 'Anthropic API key not configured'
       }).eq('id', jobId);
-      return new Response(JSON.stringify({ error: 'No Lovable API key' }), {
+      return new Response(JSON.stringify({ error: 'No Anthropic API key' }), {
         status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
+
+    const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
 
     // Get job
     const { data: job } = await supabase
@@ -54,88 +57,123 @@ serve(async (req) => {
       heartbeat_at: new Date().toISOString(),
     }).eq('id', jobId);
 
-    // Get pages to extract from (join with sites to get business_name)
+    // Get pages that haven't been processed yet (with site info)
     const { data: pages } = await supabase
       .from('competitor_pages')
-      .select('*, site:competitor_sites!inner(business_name, url, job_id)')
+      .select('*, site:competitor_sites(business_name, url, job_id)')
       .eq('site.job_id', jobId)
       .eq('faqs_extracted', false)
       .gt('word_count', 100)
       .limit(BATCH_SIZE);
 
-    console.log(`[extract-faqs] Processing ${pages?.length || 0} pages`);
+    if (!pages || pages.length === 0) {
+      // No more pages - move to deduplication
+      console.log('[extract-faqs] No more pages, moving to deduplication');
+      await supabase.from('competitor_research_jobs').update({
+        status: 'deduplicating',
+      }).eq('id', jobId);
+      
+      waitUntil(
+        supabase.functions.invoke('competitor-dedupe-faqs', { body: { jobId, workspaceId } })
+      );
+      
+      return new Response(JSON.stringify({ success: true, complete: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
 
-    let faqsExtracted = 0;
+    console.log(`[extract-faqs] Processing ${pages.length} pages with Claude`);
 
-    for (const page of pages || []) {
-      if (Date.now() - startTime > MAX_RUNTIME_MS) break;
+    let totalFaqsExtracted = 0;
 
-      console.log(`[extract-faqs] Extracting from: ${page.url}`);
+    for (const page of pages) {
+      console.log(`[extract-faqs] Processing: ${page.url}`);
 
       try {
         const industry = job.industry || job.niche_query || 'business';
+        
+        // Call Claude to extract FAQs
         const prompt = `Extract FAQs from this ${industry} business website content.
 
 WEBSITE: ${page.site?.business_name || 'Unknown'}
 PAGE TYPE: ${page.page_type}
+URL: ${page.url}
+
 CONTENT:
 ${page.content?.substring(0, 8000) || ''}
 
-Extract 5-15 question-answer pairs that would help someone considering this service.
-Focus on: pricing, services, process, policies, coverage area, guarantees.
+Extract 5-15 question-answer pairs that would help someone considering this type of service.
+Focus on: pricing, services offered, process, policies, guarantees, coverage area, booking.
 
-Return ONLY valid JSON array:
+Return ONLY a valid JSON array with no other text:
 [
-  {
-    "question": "What services do you offer?",
-    "answer": "We offer...",
-    "category": "services"
-  }
+  {"question": "What services do you offer?", "answer": "We offer...", "category": "services"},
+  {"question": "How much does it cost?", "answer": "Prices start from...", "category": "pricing"}
 ]
 
 Categories: services, pricing, process, policies, coverage, trust, booking, faq
+Return ONLY the JSON array, no explanation, no markdown code blocks.`;
 
-Return ONLY the JSON array, no explanation.`;
-
-        const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'google/gemini-2.5-flash',
-            messages: [{ role: 'user', content: prompt }],
-          }),
+        const response = await anthropic.messages.create({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 4000,
+          messages: [{ role: 'user', content: prompt }],
         });
 
-        if (!response.ok) {
-          console.error('[extract-faqs] AI error:', response.status);
+        const content = response.content[0];
+        if (content.type !== 'text') {
+          console.log('[extract-faqs] Non-text response');
+          await supabase.from('competitor_pages').update({
+            faqs_extracted: true,
+            faq_count: 0,
+          }).eq('id', page.id);
           continue;
         }
 
-        const aiData = await response.json();
-        const content = aiData.choices?.[0]?.message?.content;
-        if (!content) continue;
-
-        // Parse JSON
+        // Parse JSON response
         let faqs;
         try {
-          const text = content.trim();
+          let text = content.text.trim();
+          // Remove markdown code blocks if present
+          text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+          
           const jsonMatch = text.match(/\[[\s\S]*\]/);
-          if (!jsonMatch) continue;
+          if (!jsonMatch) {
+            console.log('[extract-faqs] No JSON array found in response');
+            await supabase.from('competitor_pages').update({
+              faqs_extracted: true,
+              faq_count: 0,
+            }).eq('id', page.id);
+            continue;
+          }
           faqs = JSON.parse(jsonMatch[0]);
-        } catch {
-          console.error('[extract-faqs] JSON parse error');
+        } catch (parseError) {
+          console.error('[extract-faqs] JSON parse error:', parseError);
+          await supabase.from('competitor_pages').update({
+            faqs_extracted: true,
+            faq_count: 0,
+          }).eq('id', page.id);
           continue;
         }
 
-        // Insert FAQs
+        if (!Array.isArray(faqs)) {
+          console.log('[extract-faqs] Response is not an array');
+          await supabase.from('competitor_pages').update({
+            faqs_extracted: true,
+            faq_count: 0,
+          }).eq('id', page.id);
+          continue;
+        }
+
+        console.log(`[extract-faqs] Extracted ${faqs.length} FAQs from ${page.url}`);
+
+        // Store extracted FAQs
+        let pageFaqCount = 0;
         for (const faq of faqs) {
           if (!faq.question || !faq.answer) continue;
           if (faq.question.length < 10 || faq.answer.length < 20) continue;
 
-          await supabase.from('competitor_faqs_raw').insert({
+          const { error } = await supabase.from('competitor_faqs_raw').insert({
             workspace_id: workspaceId,
             job_id: jobId,
             site_id: page.site_id,
@@ -144,27 +182,37 @@ Return ONLY the JSON array, no explanation.`;
             answer: faq.answer.substring(0, 2000),
             category: faq.category || 'general',
             source_url: page.url,
-            source_business: page.site?.business_name,
+            source_business: page.site?.business_name || null,
+            is_duplicate: false,
+            is_refined: false,
           });
 
-          faqsExtracted++;
+          if (!error) {
+            pageFaqCount++;
+            totalFaqsExtracted++;
+          }
         }
 
         // Mark page as processed
         await supabase.from('competitor_pages').update({
           faqs_extracted: true,
-          faq_count: faqs.length,
+          faq_count: pageFaqCount,
         }).eq('id', page.id);
 
       } catch (err) {
-        console.error(`[extract-faqs] Error: ${page.url}`, err);
+        console.error(`[extract-faqs] Error processing ${page.url}:`, err);
+        // Mark as processed anyway to avoid infinite loop
+        await supabase.from('competitor_pages').update({
+          faqs_extracted: true,
+          faq_count: 0,
+        }).eq('id', page.id);
       }
 
-      // Rate limiting
+      // Rate limiting - wait between Claude calls
       await new Promise(r => setTimeout(r, 500));
     }
 
-    // Update job
+    // Update job progress
     const { data: currentJob } = await supabase
       .from('competitor_research_jobs')
       .select('faqs_extracted')
@@ -172,12 +220,12 @@ Return ONLY the JSON array, no explanation.`;
       .single();
 
     await supabase.from('competitor_research_jobs').update({
-      faqs_extracted: (currentJob?.faqs_extracted || 0) + faqsExtracted,
-      faqs_generated: (currentJob?.faqs_extracted || 0) + faqsExtracted,
+      faqs_extracted: (currentJob?.faqs_extracted || 0) + totalFaqsExtracted,
+      faqs_generated: (currentJob?.faqs_extracted || 0) + totalFaqsExtracted,
       heartbeat_at: new Date().toISOString(),
     }).eq('id', jobId);
 
-    // Check if more pages
+    // Check if more pages to process
     const { count: remainingCount } = await supabase
       .from('competitor_pages')
       .select('*, site:competitor_sites!inner(job_id)', { count: 'exact', head: true })
@@ -186,18 +234,25 @@ Return ONLY the JSON array, no explanation.`;
       .gt('word_count', 100);
 
     if (remainingCount && remainingCount > 0) {
-      waitUntil(supabase.functions.invoke('competitor-extract-faqs', { body: { jobId, workspaceId } }));
+      // Continue extraction
+      waitUntil(
+        supabase.functions.invoke('competitor-extract-faqs', { body: { jobId, workspaceId } })
+      );
     } else {
       // Move to deduplication
       await supabase.from('competitor_research_jobs').update({
-        status: 'deduplicating'
+        status: 'deduplicating',
       }).eq('id', jobId);
-      waitUntil(supabase.functions.invoke('competitor-dedupe-faqs', { body: { jobId, workspaceId } }));
+      
+      waitUntil(
+        supabase.functions.invoke('competitor-dedupe-faqs', { body: { jobId, workspaceId } })
+      );
     }
 
     return new Response(JSON.stringify({
       success: true,
-      faqsExtracted,
+      pagesProcessed: pages.length,
+      faqsExtracted: totalFaqsExtracted,
       remaining: remainingCount,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }

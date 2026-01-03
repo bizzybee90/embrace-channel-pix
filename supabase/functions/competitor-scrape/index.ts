@@ -6,17 +6,14 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const BATCH_SIZE = 5;
+const BATCH_SIZE = 10; // Scrape 10 sites at a time
 const MAX_PAGES_PER_SITE = 5;
-const MAX_RUNTIME_MS = 25000;
 
 declare const EdgeRuntime: { waitUntil: (p: Promise<unknown>) => void } | undefined;
 const waitUntil = (p: Promise<unknown>) => { try { EdgeRuntime?.waitUntil(p); } catch { /* ignore */ } };
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
-
-  const startTime = Date.now();
 
   try {
     const { jobId, workspaceId } = await req.json();
@@ -27,12 +24,13 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    const FIRECRAWL_API_KEY = Deno.env.get('FIRECRAWL_API_KEY');
-    if (!FIRECRAWL_API_KEY) {
+    const APIFY_API_KEY = Deno.env.get('APIFY_API_KEY');
+    if (!APIFY_API_KEY) {
       await supabase.from('competitor_research_jobs').update({
-        status: 'error', error_message: 'No Firecrawl API key'
+        status: 'error',
+        error_message: 'Apify API key not configured'
       }).eq('id', jobId);
-      return new Response(JSON.stringify({ error: 'No Firecrawl key' }), {
+      return new Response(JSON.stringify({ error: 'No Apify API key' }), {
         status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
@@ -63,131 +61,130 @@ serve(async (req) => {
       .eq('scrape_status', 'pending')
       .limit(BATCH_SIZE);
 
-    console.log(`[competitor-scrape] Scraping ${sites?.length || 0} sites`);
-
-    let sitesScraped = 0;
-    let pagesScraped = 0;
-
-    for (const site of sites || []) {
-      if (Date.now() - startTime > MAX_RUNTIME_MS) break;
-
-      console.log(`[competitor-scrape] Scraping: ${site.url}`);
-
-      // Update current scraping domain
+    if (!sites || sites.length === 0) {
+      // No more sites to scrape - move to extraction
+      console.log('[competitor-scrape] No more sites, moving to extraction');
       await supabase.from('competitor_research_jobs').update({
-        current_scraping_domain: site.domain || new URL(site.url).hostname,
+        status: 'extracting',
+        current_scraping_domain: null,
       }).eq('id', jobId);
+      
+      waitUntil(
+        supabase.functions.invoke('competitor-extract-faqs', { body: { jobId, workspaceId } })
+      );
+      
+      return new Response(JSON.stringify({ success: true, complete: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
 
-      await supabase.from('competitor_sites').update({
-        scrape_status: 'scraping'
-      }).eq('id', site.id);
+    console.log(`[competitor-scrape] Scraping ${sites.length} sites with Apify`);
 
-      try {
-        // Use Firecrawl map to discover pages
-        const mapResponse = await fetch('https://api.firecrawl.dev/v1/map', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            url: site.url,
-            limit: 20,
-          }),
-        });
+    // Mark sites as scraping
+    const siteIds = sites.map(s => s.id);
+    await supabase.from('competitor_sites')
+      .update({ scrape_status: 'scraping' })
+      .in('id', siteIds);
 
-        if (!mapResponse.ok) {
-          throw new Error(`Map failed: ${mapResponse.status}`);
+    // Update current scraping domain
+    await supabase.from('competitor_research_jobs').update({
+      current_scraping_domain: sites[0].domain || new URL(sites[0].url).hostname,
+    }).eq('id', jobId);
+
+    // Prepare URLs for Apify
+    const startUrls = sites.map(site => ({ url: site.url }));
+
+    // Call Apify Website Content Crawler
+    console.log('[competitor-scrape] Calling Apify Website Content Crawler...');
+    const apifyResponse = await fetch(
+      `https://api.apify.com/v2/acts/apify~website-content-crawler/run-sync-get-dataset-items?token=${APIFY_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          startUrls: startUrls,
+          maxCrawlPages: MAX_PAGES_PER_SITE * sites.length,
+          maxCrawlDepth: 2,
+          crawlerType: 'cheerio', // Fast, lightweight scraping
+          includeUrlGlobs: [],
+          excludeUrlGlobs: [
+            '**/privacy**', '**/terms**', '**/cookie**',
+            '**/login**', '**/register**', '**/cart**',
+            '**/checkout**', '**/*.pdf', '**/*.jpg', '**/*.png'
+          ],
+        }),
+      }
+    );
+
+    if (!apifyResponse.ok) {
+      const errorText = await apifyResponse.text();
+      console.error('[competitor-scrape] Apify error:', errorText);
+      
+      // Mark sites as failed
+      await supabase.from('competitor_sites')
+        .update({ scrape_status: 'failed', scrape_error: 'Apify API error' })
+        .in('id', siteIds);
+      
+      throw new Error(`Apify error: ${apifyResponse.status}`);
+    }
+
+    const scrapedPages = await apifyResponse.json();
+    console.log(`[competitor-scrape] Apify returned ${scrapedPages.length} pages`);
+
+    let pagesStored = 0;
+
+    // Store scraped content
+    for (const page of scrapedPages) {
+      const content = page.text || '';
+      if (content.length < 200) continue; // Skip tiny pages
+
+      const pageUrl = page.url || '';
+      
+      // Find which site this page belongs to
+      let matchingSite = null;
+      for (const site of sites) {
+        const siteUrlBase = site.url.replace(/\/$/, '').replace(/^https?:\/\//, '').replace(/^www\./, '');
+        const pageUrlBase = pageUrl.replace(/^https?:\/\//, '').replace(/^www\./, '');
+        if (pageUrlBase.startsWith(siteUrlBase.split('/')[0])) {
+          matchingSite = site;
+          break;
         }
+      }
 
-        const mapData = await mapResponse.json();
-        let pages = mapData.links || [site.url];
+      // Determine page type
+      const urlLower = pageUrl.toLowerCase();
+      let pageType = 'other';
+      if (urlLower.match(/\.(com|co\.uk|uk)\/?$/)) pageType = 'homepage';
+      else if (urlLower.includes('faq')) pageType = 'faq';
+      else if (urlLower.includes('service')) pageType = 'services';
+      else if (urlLower.includes('price') || urlLower.includes('pricing')) pageType = 'pricing';
+      else if (urlLower.includes('about')) pageType = 'about';
+      else if (urlLower.includes('contact')) pageType = 'contact';
 
-        // Prioritize important pages
-        const priorityPatterns = ['/faq', '/services', '/pricing', '/about', '/contact', '/price'];
-        pages = pages.sort((a: string, b: string) => {
-          const aScore = priorityPatterns.some(p => a.toLowerCase().includes(p)) ? 0 : 1;
-          const bScore = priorityPatterns.some(p => b.toLowerCase().includes(p)) ? 0 : 1;
-          return aScore - bScore;
-        }).slice(0, MAX_PAGES_PER_SITE);
+      const { error } = await supabase.from('competitor_pages').upsert({
+        workspace_id: workspaceId,
+        site_id: matchingSite?.id || null,
+        url: pageUrl,
+        page_type: pageType,
+        title: page.metadata?.title || '',
+        content: content.substring(0, 50000), // Limit size
+        word_count: content.split(/\s+/).length,
+        faqs_extracted: false,
+      }, { onConflict: 'workspace_id,url' });
 
-        // Scrape each page
-        for (const pageUrl of pages) {
-          if (Date.now() - startTime > MAX_RUNTIME_MS) break;
-
-          try {
-            const scrapeResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                url: pageUrl,
-                formats: ['markdown'],
-                onlyMainContent: true,
-              }),
-            });
-
-            if (!scrapeResponse.ok) continue;
-
-            const scrapeData = await scrapeResponse.json();
-            const content = scrapeData.data?.markdown || '';
-            const title = scrapeData.data?.metadata?.title || '';
-
-            if (content.length < 100) continue;
-
-            // Determine page type
-            const urlLower = pageUrl.toLowerCase();
-            let pageType = 'other';
-            if (urlLower === site.url || urlLower.endsWith('/')) pageType = 'homepage';
-            else if (urlLower.includes('faq')) pageType = 'faq';
-            else if (urlLower.includes('service')) pageType = 'services';
-            else if (urlLower.includes('price') || urlLower.includes('pricing')) pageType = 'pricing';
-            else if (urlLower.includes('about')) pageType = 'about';
-            else if (urlLower.includes('contact')) pageType = 'contact';
-
-            // Store page
-            await supabase.from('competitor_pages').upsert({
-              workspace_id: workspaceId,
-              site_id: site.id,
-              url: pageUrl,
-              page_type: pageType,
-              title,
-              content: content.substring(0, 50000),
-              word_count: content.split(/\s+/).length,
-            }, { onConflict: 'workspace_id,url' });
-
-            pagesScraped++;
-
-          } catch (err) {
-            console.error(`[competitor-scrape] Page error: ${pageUrl}`, err);
-          }
-
-          // Small delay between pages
-          await new Promise(r => setTimeout(r, 500));
-        }
-
-        // Update site status
-        await supabase.from('competitor_sites').update({
-          scrape_status: 'completed',
-          pages_scraped: pages.length,
-          pages_found: mapData.links?.length || 0,
-          scraped_at: new Date().toISOString(),
-          has_faq_page: pages.some((p: string) => p.toLowerCase().includes('faq')),
-          has_pricing_page: pages.some((p: string) => p.toLowerCase().includes('price')),
-        }).eq('id', site.id);
-
-        sitesScraped++;
-
-      } catch (err) {
-        console.error(`[competitor-scrape] Site error: ${site.url}`, err);
-        await supabase.from('competitor_sites').update({
-          scrape_status: 'failed',
-          scrape_error: String(err).substring(0, 200),
-        }).eq('id', site.id);
+      if (!error) {
+        pagesStored++;
+        console.log(`[competitor-scrape] Stored: ${pageUrl} (${pageType})`);
       }
     }
+
+    // Mark sites as completed
+    await supabase.from('competitor_sites')
+      .update({ 
+        scrape_status: 'completed',
+        scraped_at: new Date().toISOString(),
+      })
+      .in('id', siteIds);
 
     // Update job progress
     const { data: currentJob } = await supabase
@@ -197,8 +194,8 @@ serve(async (req) => {
       .single();
 
     await supabase.from('competitor_research_jobs').update({
-      sites_scraped: (currentJob?.sites_scraped || 0) + sitesScraped,
-      pages_scraped: (currentJob?.pages_scraped || 0) + pagesScraped,
+      sites_scraped: (currentJob?.sites_scraped || 0) + sites.length,
+      pages_scraped: (currentJob?.pages_scraped || 0) + pagesStored,
       heartbeat_at: new Date().toISOString(),
     }).eq('id', jobId);
 
@@ -211,20 +208,25 @@ serve(async (req) => {
 
     if (remainingCount && remainingCount > 0) {
       // Continue scraping
-      waitUntil(supabase.functions.invoke('competitor-scrape', { body: { jobId, workspaceId } }));
+      waitUntil(
+        supabase.functions.invoke('competitor-scrape', { body: { jobId, workspaceId } })
+      );
     } else {
-      // Move to extraction phase
+      // Move to extraction
       await supabase.from('competitor_research_jobs').update({
         status: 'extracting',
         current_scraping_domain: null,
       }).eq('id', jobId);
-      waitUntil(supabase.functions.invoke('competitor-extract-faqs', { body: { jobId, workspaceId } }));
+      
+      waitUntil(
+        supabase.functions.invoke('competitor-extract-faqs', { body: { jobId, workspaceId } })
+      );
     }
 
     return new Response(JSON.stringify({
       success: true,
-      sitesScraped,
-      pagesScraped,
+      sitesBatch: sites.length,
+      pagesStored,
       remaining: remainingCount,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
