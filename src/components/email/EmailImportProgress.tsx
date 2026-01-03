@@ -23,6 +23,7 @@ interface ImportProgress {
   phase1_completed_at: string | null;
   phase2_completed_at: string | null;
   phase3_completed_at: string | null;
+  estimated_total_emails: number | null;
 }
 
 interface EmailImportProgressProps {
@@ -95,29 +96,61 @@ export function EmailImportProgress({ workspaceId, onComplete }: EmailImportProg
     }
   };
 
-  // Calculate time remaining estimate
+  // Calculate time remaining estimate using: totalEmails / 500 + 15 min for classification/learning
   const getTimeRemaining = () => {
     if (progress.current_phase === 'complete') return null;
     
-    const emailsRemaining = progress.emails_received - progress.emails_classified;
-    const emailsPerMinute = 100; // Approximate processing speed
-    const minutesRemaining = Math.ceil(emailsRemaining / emailsPerMinute);
+    const totalEmails = progress.estimated_total_emails || progress.emails_received;
+    if (totalEmails === 0) return 'Calculating...';
     
-    if (progress.current_phase === 'classifying' && minutesRemaining > 0) {
-      return `~${minutesRemaining} min remaining`;
+    // 500 emails/min import + 15 min for classification/learning
+    const totalEstimatedMinutes = Math.ceil(totalEmails / 500) + 15;
+    
+    // Calculate how far along we are
+    let completedMinutes = 0;
+    if (progress.emails_received > 0) {
+      completedMinutes = Math.ceil(progress.emails_received / 500);
+    }
+    if (progress.current_phase === 'classifying') {
+      completedMinutes += Math.ceil((progress.emails_classified / Math.max(progress.emails_received, 1)) * 5);
+    }
+    if (progress.current_phase === 'analyzing') {
+      completedMinutes = totalEstimatedMinutes - 10;
+    }
+    if (progress.current_phase === 'learning') {
+      completedMinutes = totalEstimatedMinutes - 5;
     }
     
-    if (progress.current_phase === 'analyzing') return '~2 min remaining';
-    if (progress.current_phase === 'learning') return '~5 min remaining';
+    const minutesRemaining = Math.max(1, totalEstimatedMinutes - completedMinutes);
     
-    return null;
+    if (minutesRemaining >= 60) {
+      const hours = Math.floor(minutesRemaining / 60);
+      const mins = minutesRemaining % 60;
+      return `~${hours}h ${mins}m remaining`;
+    }
+    
+    return `~${minutesRemaining} min remaining`;
+  };
+  
+  // Get import count display
+  const getImportCountDisplay = () => {
+    const totalEmails = progress.estimated_total_emails || 0;
+    const received = progress.emails_received || 0;
+    
+    if (totalEmails > 0 && received > 0) {
+      return `${received.toLocaleString()} of ~${totalEmails.toLocaleString()} emails`;
+    }
+    if (received > 0) {
+      return `${received.toLocaleString()} emails received`;
+    }
+    return 'Starting import...';
   };
 
   const phases = [
     {
       id: 'import',
       label: 'Import Emails',
-      description: `${progress.emails_received.toLocaleString()} emails received`,
+      description: getImportCountDisplay(),
       status: progress.emails_received > 0 ? 'complete' : 
               progress.current_phase === 'importing' ? 'active' : 'pending',
       icon: Mail

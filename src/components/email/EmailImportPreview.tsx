@@ -8,24 +8,7 @@ interface EmailImportPreviewProps {
   onSkip: () => void;
 }
 
-function getEstimateFromMode(mode?: string): { emails: string; time: string } {
-  switch (mode) {
-    case 'last_30000':
-      return { emails: 'Up to 30,000', time: '~1-2 hours' };
-    case 'last_10000':
-      return { emails: 'Up to 10,000', time: '~30-45 minutes' };
-    case 'last_1000':
-      return { emails: 'Up to 1,000', time: '~10-15 minutes' };
-    case 'all_history':
-      return { emails: 'All available', time: 'Varies by inbox size' };
-    default:
-      return { emails: 'Your emails', time: '~15-30 minutes' };
-  }
-}
-
 export function EmailImportPreview({ importMode, onStartImport, onSkip }: EmailImportPreviewProps) {
-  const estimate = getEstimateFromMode(importMode);
-
   return (
     <div className="space-y-6">
       {/* What happens next */}
@@ -35,25 +18,29 @@ export function EmailImportPreview({ importMode, onStartImport, onSkip }: EmailI
           <span>What happens next</span>
         </div>
         <ul className="text-sm text-muted-foreground space-y-2 ml-7">
-          <li>• We'll import your <span className="font-medium text-foreground">{estimate.emails}</span> emails</li>
-          <li>• BizzyBee learns your writing style from sent emails</li>
+          <li>• We'll import your emails and learn your writing style</li>
+          <li>• BizzyBee prioritizes your SENT folder for voice learning</li>
           <li>• You can continue using the app while we work</li>
         </ul>
       </div>
 
-      {/* Time estimate */}
-      <div className="flex items-center justify-center gap-3 p-4 bg-muted/50 rounded-lg border">
-        <Clock className="h-5 w-5 text-muted-foreground" />
-        <div className="text-center">
-          <p className="font-medium text-foreground">Estimated time: {estimate.time}</p>
-          <p className="text-xs text-muted-foreground">We prioritize SENT folder for voice learning</p>
+      {/* Time estimate - honest range */}
+      <div className="p-4 bg-muted/50 rounded-lg border space-y-3">
+        <div className="flex items-center gap-2">
+          <Clock className="h-5 w-5 text-muted-foreground" />
+          <p className="font-medium text-foreground">Import time varies by mailbox size</p>
         </div>
+        <ul className="text-sm text-muted-foreground space-y-1 ml-7">
+          <li>• <span className="text-foreground">Small</span> (under 5k emails): ~15 minutes</li>
+          <li>• <span className="text-foreground">Medium</span> (5k-20k): ~30-60 minutes</li>
+          <li>• <span className="text-foreground">Large</span> (20k+): 1-2 hours</li>
+        </ul>
       </div>
 
       {/* Import note */}
       <div className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg text-xs text-muted-foreground">
         <Mail className="h-4 w-4 shrink-0" />
-        <p>Import happens in the background — you'll see progress updates as we go.</p>
+        <p>Import happens in the background — you'll see real-time progress updates.</p>
       </div>
 
       {/* Actions */}
