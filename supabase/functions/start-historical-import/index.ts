@@ -1,21 +1,18 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// Declare EdgeRuntime for Supabase Edge Functions
-declare const EdgeRuntime: { waitUntil: (promise: Promise<unknown>) => void };
-
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// SMART IMPORT STRATEGY - NO CAPS, IMPORT ALL WITHIN 6 MONTHS
-const MAX_AGE_DAYS = 180; // Only import last 6 months
-const BATCH_SIZE = 200;
-const DELAY_MS = 500;
-const MAX_BATCHES_PER_INVOCATION = 40;
+// SEQUENTIAL IMPORT STRATEGY: SENT first, then INBOX to avoid rate limiting
+const MAX_AGE_DAYS = 180;
+const BATCH_SIZE = 100; // Reduced from 200
+const DELAY_MS = 800; // Increased from 500
+const MAX_BATCHES_PER_INVOCATION = 30; // Reduced from 40
 const EARLY_CLASSIFICATION_THRESHOLD = 1000;
-const PARALLEL_CLASSIFICATION_WORKERS = 5;
+const PARALLEL_CLASSIFICATION_WORKERS = 3; // Reduced from 5
 
 // Helper to safely extract email string from various formats
 function extractEmail(emailObj: any): string {
@@ -31,20 +28,24 @@ serve(async (req) => {
   }
 
   try {
-    const { workspaceId, folder } = await req.json();
+    const { workspaceId, folder, runId } = await req.json();
     
-    // If no folder specified, kick off BOTH folders in parallel
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    );
+
+    // If no folder specified, start SEQUENTIAL import (SENT first)
     if (!folder) {
-      console.log('[historical-import] Starting PARALLEL import for workspace:', workspaceId);
+      console.log('[historical-import] Starting SEQUENTIAL import for workspace:', workspaceId);
       
-      const supabase = createClient(
-        Deno.env.get('SUPABASE_URL')!,
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-      );
+      // Generate a new run_id for this import session
+      const newRunId = crypto.randomUUID();
       
-      // Initialize progress
+      // Initialize progress with the new run_id
       await supabase.from('email_import_progress').upsert({
         workspace_id: workspaceId,
+        run_id: newRunId,
         current_phase: 'importing',
         phase1_status: 'running',
         started_at: new Date().toISOString(),
@@ -55,28 +56,26 @@ serve(async (req) => {
         inbox_import_complete: false,
         emails_classified: 0,
         last_error: null,
+        resume_after: null,
+        paused_reason: null,
+        current_import_folder: 'SENT',
         last_import_batch_at: new Date().toISOString()
       }, { onConflict: 'workspace_id' });
       
-      // Start BOTH imports in parallel using background tasks
-      EdgeRuntime.waitUntil((async () => {
-        console.log('[historical-import] Starting SENT folder import...');
-        await supabase.functions.invoke('start-historical-import', {
-          body: { workspaceId, folder: 'SENT' }
-        });
-      })());
+      // Start with SENT folder only (INBOX will be started after SENT completes)
+      const { error } = await supabase.functions.invoke('start-historical-import', {
+        body: { workspaceId, folder: 'SENT', runId: newRunId }
+      });
       
-      EdgeRuntime.waitUntil((async () => {
-        console.log('[historical-import] Starting INBOX folder import...');
-        await supabase.functions.invoke('start-historical-import', {
-          body: { workspaceId, folder: 'INBOX' }
-        });
-      })());
+      if (error) {
+        console.error('[historical-import] Failed to start SENT import:', error);
+      }
       
       return new Response(JSON.stringify({
         success: true,
-        message: 'Parallel import started for SENT and INBOX folders',
-        parallel: true
+        message: 'Sequential import started (SENT first, then INBOX)',
+        runId: newRunId,
+        sequential: true
       }), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -84,12 +83,27 @@ serve(async (req) => {
     }
     
     // Single folder import
-    console.log('[historical-import] Starting folder import:', folder, 'for workspace:', workspaceId);
+    console.log('[historical-import] Starting folder import:', folder, 'for workspace:', workspaceId, 'runId:', runId);
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    );
+    // Check if this is still the active run
+    const { data: currentProgress } = await supabase
+      .from('email_import_progress')
+      .select('run_id, resume_after')
+      .eq('workspace_id', workspaceId)
+      .maybeSingle();
+    
+    // If runId doesn't match current run_id, this is a stale task - exit silently
+    if (runId && currentProgress?.run_id && currentProgress.run_id !== runId) {
+      console.log('[historical-import] Stale run detected, exiting. Expected:', currentProgress.run_id, 'Got:', runId);
+      return new Response(JSON.stringify({
+        success: false,
+        message: 'Stale run - ignoring',
+        stale: true
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
 
     // Get Aurinko credentials and email address
     const { data: config } = await supabase
@@ -114,6 +128,8 @@ serve(async (req) => {
       .select('*')
       .eq('workspace_id', workspaceId)
       .maybeSingle();
+    
+    const activeRunId = runId || existingProgress?.run_id;
 
     // Get page token and count for this specific folder
     let pageToken: string | null = folder === 'SENT' 
@@ -125,11 +141,25 @@ serve(async (req) => {
     let folderCount = folder === 'SENT'
       ? (existingProgress?.sent_email_count || 0)
       : (existingProgress?.inbox_email_count || 0);
-    let totalFetched = existingProgress?.emails_received || 0;
 
-    // If this folder is already complete, nothing to do
+    // If this folder is already complete, check if we need to start INBOX
     if (folderComplete) {
       console.log(`[historical-import] ${folder} folder already complete with ${folderCount} emails`);
+      
+      // If SENT is complete but INBOX isn't, start INBOX
+      if (folder === 'SENT' && !existingProgress?.inbox_import_complete) {
+        console.log('[historical-import] SENT complete, starting INBOX...');
+        
+        await supabase.from('email_import_progress').update({
+          current_import_folder: 'INBOX',
+          updated_at: new Date().toISOString()
+        }).eq('workspace_id', workspaceId);
+        
+        await supabase.functions.invoke('start-historical-import', {
+          body: { workspaceId, folder: 'INBOX', runId: activeRunId }
+        });
+      }
+      
       return new Response(JSON.stringify({
         success: true,
         folder,
@@ -141,6 +171,12 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
+
+    // Update current folder being imported
+    await supabase.from('email_import_progress').update({
+      current_import_folder: folder,
+      updated_at: new Date().toISOString()
+    }).eq('workspace_id', workspaceId);
 
     console.log(`[historical-import] ${folder} - Starting from count: ${folderCount}, pageToken: ${!!pageToken}`);
 
@@ -173,11 +209,15 @@ serve(async (req) => {
         console.error(`[historical-import] ${folder} - Aurinko error:`, response.status, errorText);
         
         if (response.status === 429) {
-          console.log(`[historical-import] ${folder} - Rate limited, saving state for resume...`);
+          console.log(`[historical-import] ${folder} - Rate limited, setting resume_after...`);
           
-          // Save current state for this folder
+          // Set resume_after to 90 seconds from now (let frontend handle resume)
+          const resumeAfter = new Date(Date.now() + 90000).toISOString();
+          
           const updateData: any = {
-            last_error: `${folder} rate limited - will auto-resume in 60s`,
+            resume_after: resumeAfter,
+            paused_reason: 'rate_limit',
+            last_error: `Rate limited on ${folder} - auto-resume scheduled`,
             updated_at: new Date().toISOString()
           };
           if (folder === 'SENT') {
@@ -190,20 +230,14 @@ serve(async (req) => {
           
           await supabase.from('email_import_progress').update(updateData).eq('workspace_id', workspaceId);
           
-          // Schedule retry for this folder
-          EdgeRuntime.waitUntil((async () => {
-            await new Promise(r => setTimeout(r, 60000));
-            await supabase.functions.invoke('start-historical-import', {
-              body: { workspaceId, folder }
-            });
-          })());
-          
+          // DO NOT schedule backend retry - let frontend handle it
           return new Response(JSON.stringify({
             success: true,
             folder,
-            message: `${folder} rate limited, will resume in 60 seconds`,
+            message: `${folder} rate limited - frontend will resume`,
             emailsFetched: folderCount,
-            rateLimited: true
+            rateLimited: true,
+            resumeAfter
           }), {
             status: 200,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -234,22 +268,12 @@ serve(async (req) => {
       // BULK INSERT with safe email extraction
       if (filteredMessages.length > 0) {
         const emailsToInsert = filteredMessages.map((msg: any) => {
-          // Safely extract email addresses
           const fromEmail = extractEmail(msg.from);
-          const toEmails = (msg.to || []).map((t: any) => extractEmail(t));
-          
-          // Determine direction for internal logic only (not stored on raw_emails)
-          // Raw email direction can be inferred later from folder/from address if needed.
-          const inferredDirection = (folder === 'SENT' || fromEmail === connectedEmail) ? 'outbound' : 'inbound';
-          void inferredDirection;
-
-          // Safe extraction for stored fields
           const storedFromEmail = msg.from?.email || (typeof msg.from === 'string' ? msg.from : null);
           const storedFromName = msg.from?.name || null;
           const storedToEmail = msg.to?.[0]?.email || (typeof msg.to?.[0] === 'string' ? msg.to?.[0] : null);
           const storedToName = msg.to?.[0]?.name || null;
 
-          // raw_emails.from_email is REQUIRED in schema
           const requiredFromEmail = String(storedFromEmail || fromEmail || connectedEmail || 'unknown@unknown').toLowerCase();
 
           return {
@@ -286,19 +310,35 @@ serve(async (req) => {
       batchCount++;
 
       // Update progress for this folder atomically
-      const { data: currentProgress } = await supabase
+      const { data: latestProgress } = await supabase
         .from('email_import_progress')
-        .select('sent_email_count, inbox_email_count, emails_received')
+        .select('sent_email_count, inbox_email_count, emails_received, run_id')
         .eq('workspace_id', workspaceId)
         .single();
+      
+      // Check run_id again to ensure we're still the active run
+      if (activeRunId && latestProgress?.run_id && latestProgress.run_id !== activeRunId) {
+        console.log('[historical-import] Run superseded, exiting gracefully');
+        return new Response(JSON.stringify({
+          success: false,
+          message: 'Run superseded by new import',
+          stale: true
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
 
       const newTotalFetched = folder === 'SENT'
-        ? folderCount + (currentProgress?.inbox_email_count || 0)
-        : (currentProgress?.sent_email_count || 0) + folderCount;
+        ? folderCount + (latestProgress?.inbox_email_count || 0)
+        : (latestProgress?.sent_email_count || 0) + folderCount;
 
       const updateData: any = {
         emails_received: newTotalFetched,
         last_import_batch_at: new Date().toISOString(),
+        last_error: null,
+        resume_after: null,
+        paused_reason: null,
         updated_at: new Date().toISOString()
       };
       if (folder === 'SENT') {
@@ -316,7 +356,10 @@ serve(async (req) => {
         console.log(`[historical-import] ${folder} folder complete with ${folderCount} emails`);
         
         const completeUpdate: any = {
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
+          last_error: null,
+          resume_after: null,
+          paused_reason: null
         };
         if (folder === 'SENT') {
           completeUpdate.sent_import_complete = true;
@@ -328,24 +371,40 @@ serve(async (req) => {
         
         await supabase.from('email_import_progress').update(completeUpdate).eq('workspace_id', workspaceId);
         
-        // Check if BOTH folders are now complete
-        const { data: latestProgress } = await supabase
-          .from('email_import_progress')
-          .select('sent_import_complete, inbox_import_complete, sent_email_count, inbox_email_count')
-          .eq('workspace_id', workspaceId)
-          .single();
-        
-        if (latestProgress?.sent_import_complete && latestProgress?.inbox_import_complete) {
-          console.log('[historical-import] BOTH folders complete, triggering classification...');
-          const totalEmails = (latestProgress.sent_email_count || 0) + (latestProgress.inbox_email_count || 0);
-          await triggerClassification(supabase, workspaceId, totalEmails);
+        // SEQUENTIAL: If SENT is complete, start INBOX
+        if (folder === 'SENT') {
+          console.log('[historical-import] SENT complete, starting INBOX...');
+          
+          await supabase.from('email_import_progress').update({
+            current_import_folder: 'INBOX'
+          }).eq('workspace_id', workspaceId);
+          
+          // Start INBOX import
+          await supabase.functions.invoke('start-historical-import', {
+            body: { workspaceId, folder: 'INBOX', runId: activeRunId }
+          });
+          
+          return new Response(JSON.stringify({
+            success: true,
+            folder: 'SENT',
+            emailsFetched: folderCount,
+            message: 'SENT folder complete, INBOX starting...',
+            hasMore: false
+          }), {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
         }
+        
+        // INBOX complete - trigger classification
+        console.log('[historical-import] INBOX complete, triggering classification...');
+        await triggerClassification(supabase, workspaceId, newTotalFetched);
         
         return new Response(JSON.stringify({
           success: true,
           folder,
           emailsFetched: folderCount,
-          message: `${folder} folder import complete`,
+          message: 'All folders imported, classification started',
           hasMore: false
         }), {
           status: 200,
@@ -358,11 +417,10 @@ serve(async (req) => {
         console.log(`[historical-import] Hit ${EARLY_CLASSIFICATION_THRESHOLD} emails, triggering early classification...`);
         classificationTriggered = true;
         
-        EdgeRuntime.waitUntil((async () => {
-          await supabase.functions.invoke('email-queue-processor', {
-            body: { workspaceId }
-          });
-        })());
+        // Just invoke once, not in background
+        await supabase.functions.invoke('email-queue-processor', {
+          body: { workspaceId }
+        });
       }
 
       // Delay between batches
@@ -374,18 +432,16 @@ serve(async (req) => {
     // Reached batch limit, schedule continuation for this folder
     console.log(`[historical-import] ${folder} - Reached batch limit at ${folderCount} emails, scheduling continuation...`);
     
-    EdgeRuntime.waitUntil((async () => {
-      await new Promise(r => setTimeout(r, 500));
-      await supabase.functions.invoke('start-historical-import', {
-        body: { workspaceId, folder }
-      });
-    })());
+    // Continue with same folder
+    await supabase.functions.invoke('start-historical-import', {
+      body: { workspaceId, folder, runId: activeRunId }
+    });
     
     return new Response(JSON.stringify({
       success: true,
       folder,
       emailsFetched: folderCount,
-      message: `${folder} import continuing in background...`,
+      message: `${folder} import continuing...`,
       hasMore: true
     }), {
       status: 200,
@@ -409,26 +465,17 @@ async function triggerClassification(supabase: any, workspaceId: string, totalFe
     sent_next_page_token: null,
     inbox_next_page_token: null,
     last_error: null,
+    resume_after: null,
+    paused_reason: null,
     updated_at: new Date().toISOString()
   }).eq('workspace_id', workspaceId);
 
-  // Spawn PARALLEL_CLASSIFICATION_WORKERS workers
-  EdgeRuntime.waitUntil((async () => {
-    console.log(`[historical-import] Invoking ${PARALLEL_CLASSIFICATION_WORKERS} parallel classification workers...`);
-    
-    const workers = [];
-    for (let i = 0; i < PARALLEL_CLASSIFICATION_WORKERS; i++) {
-      workers.push(
-        supabase.functions.invoke('email-queue-processor', {
-          body: { workspaceId }
-        })
-      );
-    }
-    
-    const results = await Promise.allSettled(workers);
-    const errors = results.filter(r => r.status === 'rejected');
-    if (errors.length > 0) {
-      console.error('[historical-import] Some workers failed:', errors);
-    }
-  })());
+  // Spawn workers
+  console.log(`[historical-import] Invoking ${PARALLEL_CLASSIFICATION_WORKERS} classification workers...`);
+  
+  for (let i = 0; i < PARALLEL_CLASSIFICATION_WORKERS; i++) {
+    await supabase.functions.invoke('email-queue-processor', {
+      body: { workspaceId }
+    });
+  }
 }

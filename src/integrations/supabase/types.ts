@@ -1567,6 +1567,7 @@ export type Database = {
           last_error: string | null
           last_import_batch_at: string | null
           pairs_analyzed: number | null
+          paused_reason: string | null
           phase1_completed_at: string | null
           phase1_status: string | null
           phase2_completed_at: string | null
@@ -1574,6 +1575,8 @@ export type Database = {
           phase3_completed_at: string | null
           phase3_status: string | null
           playbook_complete: boolean | null
+          resume_after: string | null
+          run_id: string | null
           sent_email_count: number | null
           sent_import_complete: boolean | null
           sent_next_page_token: string | null
@@ -1602,6 +1605,7 @@ export type Database = {
           last_error?: string | null
           last_import_batch_at?: string | null
           pairs_analyzed?: number | null
+          paused_reason?: string | null
           phase1_completed_at?: string | null
           phase1_status?: string | null
           phase2_completed_at?: string | null
@@ -1609,6 +1613,8 @@ export type Database = {
           phase3_completed_at?: string | null
           phase3_status?: string | null
           playbook_complete?: boolean | null
+          resume_after?: string | null
+          run_id?: string | null
           sent_email_count?: number | null
           sent_import_complete?: boolean | null
           sent_next_page_token?: string | null
@@ -1637,6 +1643,7 @@ export type Database = {
           last_error?: string | null
           last_import_batch_at?: string | null
           pairs_analyzed?: number | null
+          paused_reason?: string | null
           phase1_completed_at?: string | null
           phase1_status?: string | null
           phase2_completed_at?: string | null
@@ -1644,6 +1651,8 @@ export type Database = {
           phase3_completed_at?: string | null
           phase3_status?: string | null
           playbook_complete?: boolean | null
+          resume_after?: string | null
+          run_id?: string | null
           sent_email_count?: number | null
           sent_import_complete?: boolean | null
           sent_next_page_token?: string | null

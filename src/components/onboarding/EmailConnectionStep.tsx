@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { CardTitle, CardDescription } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Mail, CheckCircle2, Loader2, RefreshCw, ArrowRight, AlertCircle, RotateCcw, StopCircle, Inbox, Send } from 'lucide-react';
+import { Mail, CheckCircle2, Loader2, RefreshCw, ArrowRight, AlertCircle, RotateCcw, StopCircle, Inbox, Send, Clock } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
@@ -41,12 +41,14 @@ interface ImportProgress {
   playbook_complete: boolean | null;
   last_error: string | null;
   started_at: string | null;
-  // New folder tracking fields
   current_import_folder: string | null;
   sent_import_complete: boolean | null;
   inbox_import_complete: boolean | null;
   sent_email_count: number | null;
   inbox_email_count: number | null;
+  run_id: string | null;
+  resume_after: string | null;
+  paused_reason: string | null;
 }
 
 const emailProviders = [
@@ -80,8 +82,6 @@ const emailProviders = [
   },
 ];
 
-// Time estimates based on ~500 emails per 1.3 minutes (appears faster than expected)
-// Formula: (emails / 385) + 8 mins learning, then show slightly less to beat expectations
 const importModes = [
   { 
     value: 'all_history' as ImportMode, 
@@ -94,20 +94,20 @@ const importModes = [
     value: 'last_30000' as ImportMode, 
     label: 'Last 30,000 emails', 
     description: 'Comprehensive learning with great coverage',
-    timeEstimate: '~65 mins',  // 30000/385 + 8 = 86 mins, show 65
+    timeEstimate: '~65 mins',
     recommended: true
   },
   { 
     value: 'last_10000' as ImportMode, 
     label: 'Last 10,000 emails', 
     description: 'Strong learning data with faster import',
-    timeEstimate: '~25 mins'   // 10000/385 + 8 = 34 mins, show 25
+    timeEstimate: '~25 mins'
   },
   { 
     value: 'last_1000' as ImportMode, 
     label: 'Last 1,000 emails', 
     description: 'Quick start with decent learning data',
-    timeEstimate: '~10 mins'   // 1000/385 + 8 = 10.6 mins
+    timeEstimate: '~10 mins'
   },
   { 
     value: 'all_historical_90_days' as ImportMode, 
@@ -135,89 +135,111 @@ const importModes = [
   },
 ];
 
-// Calculate progress based on 3-phase system with folder awareness
-function calculateProgress(progress: ImportProgress): number {
+// Calculate progress - make it monotonic (never go backwards)
+function calculateProgress(progress: ImportProgress, maxProgressRef: React.MutableRefObject<number>): number {
   const phase = progress.current_phase;
   
   if (phase === 'complete') return 100;
-  if (phase === 'error') return -1;
+  if (phase === 'error') return maxProgressRef.current; // Keep current on error
   if (phase === 'ready') return 0;
+  
+  let calculatedProgress = 0;
   
   // Phase 1: Importing (0-40%)
   if (phase === 'importing') {
     const sentComplete = progress.sent_import_complete ?? false;
     const inboxComplete = progress.inbox_import_complete ?? false;
     
-    if (sentComplete && inboxComplete) return 40;
-    if (sentComplete) return 25; // SENT done, INBOX in progress
-    
-    // SENT in progress
-    const sentCount = progress.sent_email_count || 0;
-    return Math.min(20, Math.floor((sentCount / 500) * 20));
+    if (sentComplete && inboxComplete) {
+      calculatedProgress = 40;
+    } else if (sentComplete) {
+      const inboxCount = progress.inbox_email_count || 0;
+      calculatedProgress = 20 + Math.min(20, Math.floor((inboxCount / 5000) * 20));
+    } else {
+      const sentCount = progress.sent_email_count || 0;
+      calculatedProgress = Math.min(20, Math.floor((sentCount / 5000) * 20));
+    }
   }
   
   // Phase 2: Classifying (40-60%)
-  if (phase === 'classifying') {
+  else if (phase === 'classifying') {
     const received = progress.emails_received || 1;
     const classified = progress.emails_classified || 0;
     const classifyProgress = classified / received;
-    return 40 + Math.floor(classifyProgress * 20);
+    calculatedProgress = 40 + Math.floor(classifyProgress * 20);
   }
   
   // Phase 3: Analyzing/Learning (60-100%)
-  if (phase === 'analyzing' || phase === 'learning') {
+  else if (phase === 'analyzing' || phase === 'learning') {
     const voiceComplete = progress.voice_profile_complete ?? false;
     const playbookComplete = progress.playbook_complete ?? false;
     
-    if (voiceComplete && playbookComplete) return 100;
-    if (voiceComplete) return 85;
-    
-    const pairs = progress.pairs_analyzed || 0;
-    const totalPairs = progress.conversations_with_replies || 1;
-    const analyzeProgress = pairs / totalPairs;
-    return 60 + Math.floor(analyzeProgress * 25);
+    if (voiceComplete && playbookComplete) {
+      calculatedProgress = 100;
+    } else if (voiceComplete) {
+      calculatedProgress = 85;
+    } else {
+      const pairs = progress.pairs_analyzed || 0;
+      const totalPairs = progress.conversations_with_replies || 1;
+      const analyzeProgress = pairs / totalPairs;
+      calculatedProgress = 60 + Math.floor(analyzeProgress * 25);
+    }
   }
   
-  return 0;
+  // Make monotonic - never decrease
+  const result = Math.max(calculatedProgress, maxProgressRef.current);
+  maxProgressRef.current = result;
+  return result;
 }
 
-// Check if import is stuck (rate limited or stalled)
-function isImportStuck(progress: ImportProgress): boolean {
-  if (!progress.last_error) return false;
-  return progress.last_error.toLowerCase().includes('rate limit') || 
-         progress.last_error.toLowerCase().includes('resume');
+// Check if import is paused for rate limiting
+function isPaused(progress: ImportProgress): boolean {
+  if (progress.paused_reason === 'rate_limit') return true;
+  if (progress.resume_after) {
+    const resumeTime = new Date(progress.resume_after).getTime();
+    return resumeTime > Date.now();
+  }
+  return false;
 }
 
-// Get human-readable status message with folder awareness
+// Get seconds until resume
+function getSecondsUntilResume(progress: ImportProgress): number {
+  if (!progress.resume_after) return 0;
+  const resumeTime = new Date(progress.resume_after).getTime();
+  return Math.max(0, Math.ceil((resumeTime - Date.now()) / 1000));
+}
+
+// Get human-readable status message
 function getStatusMessage(progress: ImportProgress): string {
   const phase = progress.current_phase;
   
-  if (phase === 'ready') {
-    return 'Ready to import';
-  }
+  if (phase === 'ready') return 'Ready to import';
   
   if (phase === 'importing') {
     const currentFolder = progress.current_import_folder || 'SENT';
     const sentComplete = progress.sent_import_complete ?? false;
     const sentCount = progress.sent_email_count || 0;
     const inboxCount = progress.inbox_email_count || 0;
-    const received = progress.emails_received || 0;
     
-    if (isImportStuck(progress)) {
-      return `Fetching paused at ${received.toLocaleString()} emails (rate limited)`;
+    if (isPaused(progress)) {
+      const seconds = getSecondsUntilResume(progress);
+      if (seconds > 0) {
+        return `Paused (rate limit) - resuming in ${seconds}s`;
+      }
+      return 'Paused - click Resume to continue';
     }
     
     if (!sentComplete) {
-      return `Importing SENT folder... ${sentCount.toLocaleString()} emails (priority for voice learning)`;
+      return `Importing SENT... ${sentCount.toLocaleString()} emails`;
     }
     
-    return `Importing INBOX... ${inboxCount.toLocaleString()} emails (SENT: ${sentCount.toLocaleString()} ✓)`;
+    return `Importing INBOX... ${inboxCount.toLocaleString()} emails`;
   }
   
   if (phase === 'classifying') {
     const classified = progress.emails_classified || 0;
     const received = progress.emails_received || 0;
-    return `Classifying emails... ${classified.toLocaleString()} of ${received.toLocaleString()}`;
+    return `Classifying... ${classified.toLocaleString()} of ${received.toLocaleString()}`;
   }
   
   if (phase === 'analyzing' || phase === 'learning') {
@@ -256,18 +278,57 @@ export function EmailConnectionStep({
   const [initialLoading, setInitialLoading] = useState(true);
   const [importStarted, setImportStarted] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
-  
-  // New progress tracking
   const [importProgress, setImportProgress] = useState<ImportProgress | null>(null);
+  const [resumeCountdown, setResumeCountdown] = useState(0);
 
+  // Refs for deduplication and monotonic progress
   const connectedEmailRef = useRef<string | null>(null);
+  const toastedEmailRef = useRef<string | null>(null);
+  const maxProgressRef = useRef<number>(0);
   const connectTimeoutRef = useRef<number | undefined>(undefined);
   const popupRef = useRef<Window | null>(null);
   const popupPollRef = useRef<number | undefined>(undefined);
+  const autoResumeTimerRef = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     connectedEmailRef.current = connectedEmail;
   }, [connectedEmail]);
+
+  // Auto-resume countdown and trigger
+  useEffect(() => {
+    if (!importProgress) return;
+    
+    const seconds = getSecondsUntilResume(importProgress);
+    if (seconds > 0) {
+      setResumeCountdown(seconds);
+      
+      // Clear existing timer
+      if (autoResumeTimerRef.current) {
+        window.clearInterval(autoResumeTimerRef.current);
+      }
+      
+      // Countdown timer
+      autoResumeTimerRef.current = window.setInterval(() => {
+        setResumeCountdown(prev => {
+          if (prev <= 1) {
+            window.clearInterval(autoResumeTimerRef.current);
+            // Auto-resume when countdown hits 0
+            handleResumeImport();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      
+      return () => {
+        if (autoResumeTimerRef.current) {
+          window.clearInterval(autoResumeTimerRef.current);
+        }
+      };
+    } else {
+      setResumeCountdown(0);
+    }
+  }, [importProgress?.resume_after]);
 
   const handleConnect = async (provider: Provider) => {
     setIsConnecting(true);
@@ -280,9 +341,7 @@ export function EmailConnectionStep({
     popupRef.current = null;
 
     try {
-      const authEndpoint = 'aurinko-auth-start';
-      
-      const { data, error } = await supabase.functions.invoke(authEndpoint, {
+      const { data, error } = await supabase.functions.invoke('aurinko-auth-start', {
         body: {
           workspaceId,
           provider,
@@ -325,12 +384,12 @@ export function EmailConnectionStep({
     }
   };
 
-  // Start historical import after email is connected
   const startHistoricalImport = async () => {
     if (!workspaceId || importStarted) return;
     
     console.log('[EmailConnection] Starting historical import...');
     setImportStarted(true);
+    maxProgressRef.current = 0; // Reset progress tracking
     
     try {
       const { data, error } = await supabase.functions.invoke('start-historical-import', {
@@ -353,7 +412,6 @@ export function EmailConnectionStep({
   const checkEmailConnection = async (isInitialLoad = false) => {
     setCheckingConnection(true);
     try {
-      // Fetch both email config and import progress in parallel
       const [configResult, progressResult] = await Promise.all([
         supabase
           .from('email_provider_configs')
@@ -369,10 +427,8 @@ export function EmailConnectionStep({
           .maybeSingle()
       ]);
 
-      // Set import progress immediately if it exists
       if (!progressResult.error && progressResult.data) {
         setImportProgress(progressResult.data as ImportProgress);
-        // If import is already in progress, mark it as started
         const phase = progressResult.data.current_phase;
         if (phase && phase !== 'idle' && phase !== 'connecting' && phase !== 'ready') {
           setImportStarted(true);
@@ -383,9 +439,10 @@ export function EmailConnectionStep({
       const data = configResult.data;
 
       if (data?.email_address) {
-        setConnectedEmail(data.email_address);
+        const newEmail = data.email_address;
+        setConnectedEmail(newEmail);
         setConnectedConfigId(data.id);
-        onEmailConnected(data.email_address);
+        onEmailConnected(newEmail);
 
         if (connectTimeoutRef.current) window.clearTimeout(connectTimeoutRef.current);
         if (popupPollRef.current) window.clearInterval(popupPollRef.current);
@@ -393,18 +450,18 @@ export function EmailConnectionStep({
         popupPollRef.current = undefined;
         popupRef.current = null;
 
-        // Check if we should show preview or start import
         const hasExistingProgress = progressResult.data?.current_phase && 
           progressResult.data.current_phase !== 'idle' &&
           progressResult.data.current_phase !== 'ready';
         
         if (!hasExistingProgress && !importStarted) {
-          // Show preview first if newly connected
           setShowPreview(true);
         }
 
-        if (!connectedEmail && !isInitialLoad) {
-          toast.success(`Connected to ${data.email_address}`);
+        // Only toast once per email address
+        if (toastedEmailRef.current !== newEmail && !isInitialLoad) {
+          toastedEmailRef.current = newEmail;
+          toast.success(`Connected to ${newEmail}`);
         }
         localStorage.removeItem('onboarding_email_pending');
         localStorage.removeItem('onboarding_workspace_id');
@@ -426,7 +483,6 @@ export function EmailConnectionStep({
 
     if (!error && data) {
       setImportProgress(data as ImportProgress);
-      // Mark as started if there's active progress
       const phase = data.current_phase;
       if (phase && phase !== 'idle' && phase !== 'connecting' && phase !== 'ready') {
         setImportStarted(true);
@@ -452,7 +508,9 @@ export function EmailConnectionStep({
         .from('email_import_progress')
         .update({ 
           current_phase: 'complete',
-          last_error: 'Stopped by user'
+          last_error: 'Stopped by user',
+          resume_after: null,
+          paused_reason: null
         })
         .eq('workspace_id', workspaceId);
       
@@ -468,10 +526,17 @@ export function EmailConnectionStep({
     try {
       toast.message('Restarting import…');
       setImportStarted(false);
+      maxProgressRef.current = 0; // Reset monotonic progress
       
-      // Reset progress and start again
+      // Delete old progress (new run_id will be generated)
       await supabase
         .from('email_import_progress')
+        .delete()
+        .eq('workspace_id', workspaceId);
+      
+      // Delete raw emails to start fresh
+      await supabase
+        .from('raw_emails')
         .delete()
         .eq('workspace_id', workspaceId);
       
@@ -484,27 +549,36 @@ export function EmailConnectionStep({
     }
   };
 
-  // Resume a stuck/rate-limited import
   const handleResumeImport = async () => {
+    if (!importProgress) return;
+    
     try {
       toast.message('Resuming import…');
       
-      // Clear the error and trigger resume
+      // Clear pause state and trigger import with current run_id
       await supabase
         .from('email_import_progress')
         .update({ 
           last_error: null,
+          resume_after: null,
+          paused_reason: null,
           updated_at: new Date().toISOString()
         })
         .eq('workspace_id', workspaceId);
       
+      // Resume from current folder
+      const currentFolder = importProgress.current_import_folder || 
+        (importProgress.sent_import_complete ? 'INBOX' : 'SENT');
+      
       const { error } = await supabase.functions.invoke('start-historical-import', {
-        body: { workspaceId }
+        body: { 
+          workspaceId, 
+          folder: currentFolder,
+          runId: importProgress.run_id 
+        }
       });
       
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
       
       toast.success('Import resumed!');
     } catch (e: any) {
@@ -543,7 +617,7 @@ export function EmailConnectionStep({
 
   // Initial check and polling for connection
   useEffect(() => {
-    checkEmailConnection(true); // Pass true for initial load
+    checkEmailConnection(true);
 
     const pending = localStorage.getItem('onboarding_email_pending') === 'true';
 
@@ -632,8 +706,9 @@ export function EmailConnectionStep({
   const isImporting = ['importing', 'classifying', 'analyzing', 'learning'].includes(phase);
   const importComplete = phase === 'complete' && !importProgress?.last_error;
   const importError = phase === 'error' || (phase === 'complete' && importProgress?.last_error);
-  const progress = importProgress ? calculateProgress(importProgress) : 0;
+  const progress = importProgress ? calculateProgress(importProgress, maxProgressRef) : 0;
   const statusMessage = importProgress ? getStatusMessage(importProgress) : '';
+  const paused = importProgress ? isPaused(importProgress) : false;
 
   return (
     <div className="space-y-6">
@@ -689,6 +764,8 @@ export function EmailConnectionStep({
                   setImportProgress(null);
                   setImportStarted(false);
                   setShowPreview(false);
+                  toastedEmailRef.current = null;
+                  maxProgressRef.current = 0;
                   toast.success('Email disconnected');
                 } catch (error) {
                   toast.error('Failed to disconnect');
@@ -747,28 +824,40 @@ export function EmailConnectionStep({
             <div className="space-y-4 p-4 bg-muted/50 rounded-lg border">
               {/* Current phase indicator */}
               <div className="flex items-center gap-2">
-                {isImportStuck(importProgress) ? (
-                  <AlertCircle className="h-4 w-4 text-amber-500" />
+                {paused ? (
+                  <Clock className="h-4 w-4 text-amber-500" />
                 ) : (
                   <Loader2 className="h-4 w-4 animate-spin text-primary" />
                 )}
                 <span className="font-medium text-sm">{statusMessage}</span>
               </div>
 
-              {/* Rate limit warning and resume button */}
-              {isImportStuck(importProgress) && (
+              {/* Rate limit pause UI with countdown */}
+              {paused && (
                 <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-3 space-y-3">
-                  <p className="text-sm text-amber-800 dark:text-amber-200">
-                    The email provider paused the import due to rate limits. 
-                    It should auto-resume in ~60 seconds, or you can manually resume now.
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-amber-800 dark:text-amber-200">
+                      Paused due to provider rate limits
+                    </p>
+                    {resumeCountdown > 0 && (
+                      <span className="text-sm font-mono bg-amber-100 dark:bg-amber-900 px-2 py-1 rounded">
+                        {resumeCountdown}s
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-amber-700 dark:text-amber-300">
+                    {resumeCountdown > 0 
+                      ? `Auto-resuming in ${resumeCountdown} seconds...`
+                      : 'Ready to resume'}
                   </p>
                   <Button 
                     onClick={handleResumeImport} 
                     size="sm"
                     className="w-full gap-2"
+                    variant={resumeCountdown > 0 ? "outline" : "default"}
                   >
                     <RefreshCw className="h-4 w-4" />
-                    Resume Import Now
+                    Resume Now
                   </Button>
                 </div>
               )}
@@ -857,8 +946,8 @@ export function EmailConnectionStep({
                 </div>
               )}
 
-              {/* Live indicator - only show when not stuck */}
-              {!isImportStuck(importProgress) && (
+              {/* Live indicator - only show when not paused */}
+              {!paused && (
                 <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
                   <span className="relative flex h-2 w-2">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
@@ -915,26 +1004,21 @@ export function EmailConnectionStep({
                   <div className="text-muted-foreground">Conversations</div>
                 </div>
                 <div className="bg-muted/30 rounded p-2">
-                  <div className="font-semibold text-foreground">{(importProgress.pairs_analyzed || 0).toLocaleString()}</div>
-                  <div className="text-muted-foreground">Patterns learned</div>
+                  <div className="font-semibold text-foreground">{(importProgress.conversations_with_replies || 0).toLocaleString()}</div>
+                  <div className="text-muted-foreground">With replies</div>
                 </div>
               </div>
-              {importProgress.voice_profile_complete && (
-                <div className="text-xs text-center text-success">
-                  ✓ Voice profile built • ✓ Response playbook ready
-                </div>
-              )}
             </div>
           )}
 
-          {!showPreview && (
+          {/* Continue buttons */}
+          {!showPreview && (isImporting || importComplete || importError) && (
             <div className="flex gap-3">
               <Button variant="outline" onClick={onBack} className="flex-1">
                 Back
               </Button>
               <Button onClick={onNext} className="flex-1 gap-2">
-                Continue
-                <ArrowRight className="h-4 w-4" />
+                Continue <ArrowRight className="h-4 w-4" />
               </Button>
             </div>
           )}
@@ -943,42 +1027,32 @@ export function EmailConnectionStep({
         <div className="space-y-6">
           {/* Import Mode Selection */}
           <div className="space-y-3">
-            <Label className="text-sm font-medium">How many emails should we import?</Label>
-            <RadioGroup
-              value={importMode}
-              onValueChange={(value) => setImportMode(value as ImportMode)}
-              className="space-y-2"
-            >
+            <Label className="text-sm font-medium">How much email history should we learn from?</Label>
+            <RadioGroup value={importMode} onValueChange={(v) => setImportMode(v as ImportMode)} className="space-y-2">
               {importModes.map((mode) => (
                 <div 
                   key={mode.value}
                   className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
                     importMode === mode.value 
-                      ? 'border-primary/50 bg-primary/5' 
-                      : 'hover:bg-accent/50'
-                  } ${mode.recommended ? 'ring-1 ring-primary/30' : ''}`}
+                      ? 'border-primary bg-primary/5' 
+                      : 'border-border hover:border-muted-foreground/50'
+                  }`}
                   onClick={() => setImportMode(mode.value)}
                 >
-                  <RadioGroupItem value={mode.value} id={mode.value} className="mt-1" />
+                  <RadioGroupItem value={mode.value} id={mode.value} className="mt-0.5" />
                   <div className="flex-1">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <Label htmlFor={mode.value} className="font-medium cursor-pointer">
-                          {mode.label}
-                        </Label>
-                        {mode.recommended && (
-                          <span className="text-[10px] font-medium text-primary bg-primary/10 px-1.5 py-0.5 rounded">
-                            Recommended
-                          </span>
-                        )}
-                      </div>
-                      {'timeEstimate' in mode && mode.timeEstimate && (
-                        <span className="text-[10px] text-muted-foreground bg-muted px-2 py-0.5 rounded whitespace-nowrap">
-                          {mode.timeEstimate}
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor={mode.value} className="font-medium cursor-pointer">
+                        {mode.label}
+                      </Label>
+                      {mode.recommended && (
+                        <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                          Recommended
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-muted-foreground">{mode.description}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{mode.description}</p>
+                    <p className="text-xs text-muted-foreground/70 mt-1">{mode.timeEstimate}</p>
                   </div>
                 </div>
               ))}
@@ -986,56 +1060,38 @@ export function EmailConnectionStep({
           </div>
 
           {/* Provider Selection */}
-          <div className="grid grid-cols-2 gap-3">
-            {emailProviders.map((provider) => (
-              <Button
-                key={provider.id}
-                variant="outline"
-                size="lg"
-                className={`h-auto py-5 flex-col gap-2 relative ${
-                  provider.comingSoon ? 'opacity-60 cursor-not-allowed' : ''
-                }`}
-                disabled={isConnecting || provider.comingSoon}
-                onClick={() => provider.available && handleConnect(provider.id)}
-              >
-                {provider.comingSoon && (
-                  <span className="absolute top-2 right-2 text-[10px] font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-                    Soon
-                  </span>
-                )}
-                {isConnecting && selectedProvider === provider.id ? (
-                  <Loader2 className="h-7 w-7 animate-spin" />
-                ) : provider.icon ? (
-                  <img src={provider.icon} alt={provider.name} className="h-7 w-7" />
-                ) : (
-                  <Mail className={`h-7 w-7 ${provider.iconColor || 'text-muted-foreground'}`} />
-                )}
-                <span className="font-medium text-sm">{provider.name}</span>
-              </Button>
-            ))}
-          </div>
-
-          {checkingConnection && (
-            <div className="flex items-center justify-center gap-2 text-muted-foreground">
-              <RefreshCw className="h-4 w-4 animate-spin" />
-              <span className="text-sm">Checking connection...</span>
+          <div className="space-y-3">
+            <Label className="text-sm font-medium">Select your email provider</Label>
+            <div className="grid grid-cols-2 gap-3">
+              {emailProviders.map((provider) => (
+                <Button
+                  key={provider.id}
+                  variant="outline"
+                  className="h-auto py-4 flex flex-col items-center gap-2 relative"
+                  onClick={() => handleConnect(provider.id)}
+                  disabled={!provider.available || isConnecting}
+                >
+                  {provider.comingSoon && (
+                    <span className="absolute top-1 right-1 text-[10px] bg-muted px-1.5 py-0.5 rounded">
+                      Soon
+                    </span>
+                  )}
+                  {isConnecting && selectedProvider === provider.id ? (
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                  ) : provider.icon ? (
+                    <img src={provider.icon} alt={provider.name} className="h-6 w-6 object-contain" />
+                  ) : (
+                    <Mail className={`h-6 w-6 ${provider.iconColor || ''}`} />
+                  )}
+                  <span className="text-sm font-medium">{provider.name}</span>
+                </Button>
+              ))}
             </div>
-          )}
-
-          <p className="text-xs text-center text-muted-foreground">
-            We use secure OAuth - we never see your password.
-            <br />
-            You can disconnect anytime in Settings.
-          </p>
-
-          <div className="flex gap-3">
-            <Button variant="outline" onClick={onBack} className="flex-1">
-              Back
-            </Button>
-            <Button variant="ghost" onClick={onNext} className="flex-1">
-              Skip for now
-            </Button>
           </div>
+
+          <Button variant="outline" onClick={onBack} className="w-full">
+            Back
+          </Button>
         </div>
       )}
     </div>
