@@ -139,12 +139,22 @@ function calculateProgress(progress: ImportProgress): number {
   return 0;
 }
 
+// Check if import is stuck (rate limited or stalled)
+function isImportStuck(progress: ImportProgress): boolean {
+  if (!progress.last_error) return false;
+  return progress.last_error.toLowerCase().includes('rate limit') || 
+         progress.last_error.toLowerCase().includes('resume');
+}
+
 // Get human-readable status message
 function getStatusMessage(progress: ImportProgress): string {
   const phase = progress.current_phase;
   
   if (phase === 'importing') {
     const received = progress.emails_received || 0;
+    if (isImportStuck(progress)) {
+      return `Fetching paused at ${received.toLocaleString()} emails (rate limited)`;
+    }
     return `Fetching emails... ${received.toLocaleString()} received`;
   }
   
@@ -405,6 +415,35 @@ export function EmailConnectionStep({
     }
   };
 
+  // Resume a stuck/rate-limited import
+  const handleResumeImport = async () => {
+    try {
+      toast.message('Resuming import…');
+      
+      // Clear the error and trigger resume
+      await supabase
+        .from('email_import_progress')
+        .update({ 
+          last_error: null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('workspace_id', workspaceId);
+      
+      const { error } = await supabase.functions.invoke('start-historical-import', {
+        body: { workspaceId }
+      });
+      
+      if (error) {
+        throw error;
+      }
+      
+      toast.success('Import resumed!');
+    } catch (e: any) {
+      console.error(e);
+      toast.error('Could not resume import');
+    }
+  };
+
   // Subscribe to realtime updates for import progress
   useEffect(() => {
     if (!workspaceId) return;
@@ -592,9 +631,31 @@ export function EmailConnectionStep({
             <div className="space-y-4 p-4 bg-muted/50 rounded-lg border">
               {/* Current phase indicator */}
               <div className="flex items-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                {isImportStuck(importProgress) ? (
+                  <AlertCircle className="h-4 w-4 text-amber-500" />
+                ) : (
+                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                )}
                 <span className="font-medium text-sm">{statusMessage}</span>
               </div>
+
+              {/* Rate limit warning and resume button */}
+              {isImportStuck(importProgress) && (
+                <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-3 space-y-3">
+                  <p className="text-sm text-amber-800 dark:text-amber-200">
+                    The email provider paused the import due to rate limits. 
+                    It should auto-resume in ~60 seconds, or you can manually resume now.
+                  </p>
+                  <Button 
+                    onClick={handleResumeImport} 
+                    size="sm"
+                    className="w-full gap-2"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                    Resume Import Now
+                  </Button>
+                </div>
+              )}
 
               {/* Phase indicators */}
               <div className="grid grid-cols-3 gap-2 text-xs">
@@ -646,14 +707,16 @@ export function EmailConnectionStep({
                 </div>
               )}
 
-              {/* Live indicator */}
-              <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                </span>
-                <span>Actively importing</span>
-              </div>
+              {/* Live indicator - only show when not stuck */}
+              {!isImportStuck(importProgress) && (
+                <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                  </span>
+                  <span>Actively importing</span>
+                </div>
+              )}
 
               {/* Stop button */}
               <Button 
