@@ -38,42 +38,68 @@ export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, on
     }
 
     setStatus('scraping');
-    setProgress(20);
+    setProgress(15);
 
     try {
       console.log('Scraping website:', businessContext.websiteUrl);
-      
-      // Simulate progress while scraping
-      const progressInterval = setInterval(() => {
-        setProgress(prev => Math.min(prev + 5, 90));
-      }, 3000);
 
+      // Kick off backend job (returns immediately now)
       const scrapeResult = await supabase.functions.invoke('scrape-customer-website', {
-        body: { 
-          workspaceId, 
+        body: {
+          workspaceId,
           websiteUrl: businessContext.websiteUrl,
           businessName: businessContext.companyName,
-          businessType: businessContext.businessType
-        }
+          businessType: businessContext.businessType,
+        },
       });
-
-      clearInterval(progressInterval);
 
       if (scrapeResult.error) {
         console.error('Error scraping website:', scrapeResult.error);
         throw new Error(scrapeResult.error.message || 'Failed to scrape website');
       }
 
-      const websiteGenerated = scrapeResult.data?.faqsGenerated || 0;
-      const pages = scrapeResult.data?.pagesScraped || 0;
-      
-      console.log(`Scraping complete: ${pages} pages, ${websiteGenerated} FAQs`);
-      
-      setWebsiteFaqsGenerated(websiteGenerated);
-      setPagesScraped(pages);
-      setProgress(100);
-      setStatus('complete');
+      // Poll DB for completion
+      setProgress(25);
+      const startedAt = Date.now();
 
+      const poll = async () => {
+        const { data, error } = await supabase
+          .from('business_context')
+          .select('knowledge_base_status, website_faqs_generated')
+          .eq('workspace_id', workspaceId)
+          .maybeSingle();
+
+        if (error) {
+          throw error;
+        }
+
+        const kbStatus = (data?.knowledge_base_status || 'scraping') as Status;
+        const faqs = data?.website_faqs_generated || 0;
+
+        if (kbStatus === 'complete') {
+          setWebsiteFaqsGenerated(faqs);
+          setPagesScraped(faqs > 0 ? 1 : 0); // backend no longer returns pages; keep UI sane
+          setProgress(100);
+          setStatus('complete');
+          return;
+        }
+
+        if (kbStatus === 'error') {
+          throw new Error('Website scraping failed');
+        }
+
+        // Keep progress moving while scraping
+        setProgress((prev) => Math.min(prev + 4, 95));
+
+        // Timeout after 4 minutes
+        if (Date.now() - startedAt > 4 * 60 * 1000) {
+          throw new Error('Website scraping is taking too long');
+        }
+
+        setTimeout(poll, 5000);
+      };
+
+      poll();
     } catch (err: any) {
       console.error('Knowledge base generation error:', err);
       setError(err.message || 'Something went wrong');
