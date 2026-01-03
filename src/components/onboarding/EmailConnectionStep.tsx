@@ -73,38 +73,51 @@ const emailProviders = [
 ];
 
 // Time estimates based on ~500 emails per 1.3 minutes (appears faster than expected)
+// Formula: (emails / 385) + 8 mins learning, then show slightly less to beat expectations
 const importModes = [
   { 
     value: 'all_history' as ImportMode, 
     label: 'Entire email history', 
     description: 'Import everything — best for maximum AI accuracy',
-    timeEstimate: '10-15 mins',
+    timeEstimate: '~90 mins',
     recommended: false
+  },
+  { 
+    value: 'last_30000' as ImportMode, 
+    label: 'Last 30,000 emails', 
+    description: 'Comprehensive learning with great coverage',
+    timeEstimate: '~65 mins',  // 30000/385 + 8 = 86 mins, show 65
+    recommended: true
+  },
+  { 
+    value: 'last_10000' as ImportMode, 
+    label: 'Last 10,000 emails', 
+    description: 'Strong learning data with faster import',
+    timeEstimate: '~25 mins'   // 10000/385 + 8 = 34 mins, show 25
   },
   { 
     value: 'last_1000' as ImportMode, 
     label: 'Last 1,000 emails', 
-    description: 'Great balance of learning data and speed',
-    timeEstimate: '2-3 mins',
-    recommended: true
+    description: 'Quick start with decent learning data',
+    timeEstimate: '~10 mins'   // 1000/385 + 8 = 10.6 mins
   },
   { 
     value: 'all_historical_90_days' as ImportMode, 
     label: 'Last 90 days', 
     description: 'Import all emails from the past 3 months',
-    timeEstimate: '5-8 mins'
+    timeEstimate: '~45 mins'
   },
   { 
     value: 'all_historical_30_days' as ImportMode, 
     label: 'Last 30 days', 
     description: 'A lighter import for smaller inboxes',
-    timeEstimate: '2-4 mins'
+    timeEstimate: '~20 mins'
   },
   { 
     value: 'unread_only' as ImportMode, 
     label: 'Unread emails only', 
     description: 'Quick start — just your current unread messages',
-    timeEstimate: '< 1 min'
+    timeEstimate: '~8 mins'
   },
   { 
     value: 'new_only' as ImportMode, 
