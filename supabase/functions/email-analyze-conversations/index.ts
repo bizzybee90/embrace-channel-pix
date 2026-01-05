@@ -30,7 +30,7 @@ serve(async (req) => {
     // =========================================================
     // STEP 1: Find all conversations with both inbound & outbound
     // =========================================================
-    const { data: conversations } = await supabase
+    const { data: conversations, error: convError } = await supabase
       .from('conversations')
       .select(`
         id,
@@ -49,6 +49,22 @@ serve(async (req) => {
       .eq('workspace_id', workspaceId)
       .order('updated_at', { ascending: false });
 
+    if (convError) {
+      console.error('[analyze-conversations] Error fetching conversations:', convError);
+      throw convError;
+    }
+
+    // Get message direction counts for debugging
+    const { data: directionCounts } = await supabase
+      .from('messages')
+      .select('direction')
+      .in('conversation_id', (conversations || []).map(c => c.id));
+
+    const inboundMsgs = (directionCounts || []).filter((m: any) => m.direction === 'inbound').length;
+    const outboundMsgs = (directionCounts || []).filter((m: any) => m.direction === 'outbound').length;
+    
+    console.log(`[analyze-conversations] Message direction stats: ${inboundMsgs} inbound, ${outboundMsgs} outbound`);
+
     let conversationsWithReplies = 0;
     const conversationPairs: any[] = [];
 
@@ -65,6 +81,7 @@ serve(async (req) => {
 
       if (inbound.length > 0 && outbound.length > 0) {
         conversationsWithReplies++;
+        console.log(`[analyze-conversations] Conv ${conv.id}: ${inbound.length} inbound, ${outbound.length} outbound - HAS PAIRS`);
 
         // Match each inbound with its reply
         for (const inMsg of inbound) {
@@ -90,10 +107,13 @@ serve(async (req) => {
             });
           }
         }
+      } else if (inbound.length > 0 || outbound.length > 0) {
+        // Log conversations that only have one direction
+        console.log(`[analyze-conversations] Conv ${conv.id}: ${inbound.length} inbound, ${outbound.length} outbound - NO PAIRS`);
       }
     }
 
-    console.log(`[analyze-conversations] Found ${conversationPairs.length} matched pairs`);
+    console.log(`[analyze-conversations] Found ${conversationPairs.length} matched pairs from ${conversationsWithReplies} conversations with replies`);
 
     // =========================================================
     // STEP 2: Store conversation pairs for Phase 3
@@ -104,6 +124,7 @@ serve(async (req) => {
         { onConflict: 'workspace_id,inbound_message_id' }
       );
       if (error) console.error('[analyze-conversations] Upsert error:', error);
+      else console.log(`[analyze-conversations] Stored ${conversationPairs.length} pairs`);
     }
 
     // =========================================================
@@ -136,7 +157,7 @@ serve(async (req) => {
     }).eq('workspace_id', workspaceId);
 
     // Trigger Phase 3
-    console.log('[analyze-conversations] Triggering Phase 3');
+    console.log('[analyze-conversations] Triggering Phase 3 (deep-learning)');
     await supabase.functions.invoke('email-deep-learning', {
       body: { workspaceId }
     });
@@ -145,7 +166,8 @@ serve(async (req) => {
       success: true,
       conversations: conversations?.length || 0,
       withReplies: conversationsWithReplies,
-      pairs: conversationPairs.length
+      pairs: conversationPairs.length,
+      messageStats: { inbound: inboundMsgs, outbound: outboundMsgs }
     }), {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
