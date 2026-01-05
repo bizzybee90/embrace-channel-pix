@@ -589,12 +589,19 @@ export function EmailConnectionStep({
 
   const handleRepairLearning = async () => {
     try {
-      toast.message('Repairing learning…');
-      // Rebuild conversations/messages from already-classified emails
+      toast.message('Resetting stuck emails and repairing learning…');
+      
+      // Step 1: Reset any stuck processing emails
+      await supabase.functions.invoke('email-queue-processor', {
+        body: { workspaceId, resetStuck: true }
+      });
+      
+      // Step 2: Rebuild conversations/messages from already-classified emails
       const { error } = await supabase.functions.invoke('email-queue-processor', {
         body: { workspaceId, rebuild: true }
       });
       if (error) throw error;
+      
       toast.success('Repair started — learning will continue automatically.');
     } catch (e: any) {
       console.error(e);

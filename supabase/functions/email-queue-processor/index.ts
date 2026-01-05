@@ -13,6 +13,7 @@ const corsHeaders = {
 const BATCH_SIZE = 100;
 const CLASSIFICATION_BATCH = 15;
 const PARALLEL_WORKERS = 5;
+const STUCK_TIMEOUT_MINUTES = 5;
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -23,11 +24,41 @@ serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const workspaceId: string | undefined = body.workspaceId;
     const rebuild: boolean = body.rebuild === true;
+    const resetStuck: boolean = body.resetStuck === true;
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
+
+    // Reset stuck emails first (processing for > 5 minutes)
+    const stuckCutoff = new Date(Date.now() - STUCK_TIMEOUT_MINUTES * 60 * 1000).toISOString();
+    const { data: stuckData } = await supabase
+      .from('raw_emails')
+      .update({ status: 'pending', processing_started_at: null })
+      .eq('status', 'processing')
+      .lt('processing_started_at', stuckCutoff)
+      .eq(workspaceId ? 'workspace_id' : 'id', workspaceId || 'dummy')
+      .select('id');
+    
+    if (stuckData && stuckData.length > 0) {
+      console.log(`[queue-processor] Reset ${stuckData.length} stuck emails`);
+    }
+
+    // If resetStuck only, just reset and return
+    if (resetStuck && !rebuild) {
+      let resetQuery = supabase
+        .from('raw_emails')
+        .update({ status: 'pending', processing_started_at: null })
+        .eq('status', 'processing');
+      if (workspaceId) resetQuery = resetQuery.eq('workspace_id', workspaceId);
+      await resetQuery;
+      
+      return new Response(JSON.stringify({ resetStuck: true }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
 
     // Get connected email for direction detection
     let connectedEmail: string | null = null;
@@ -38,6 +69,7 @@ serve(async (req) => {
         .eq('workspace_id', workspaceId)
         .single();
       connectedEmail = config?.email_address?.toLowerCase() || null;
+      console.log(`[queue-processor] Connected email: ${connectedEmail}`);
     }
 
     const targetStatus = rebuild ? 'classified' : 'pending';
@@ -78,6 +110,8 @@ serve(async (req) => {
     const openai = rebuild ? null : new OpenAI({ apiKey: Deno.env.get('OPENAI_API_KEY')! });
 
     let processed = 0;
+    let outboundCount = 0;
+    let inboundCount = 0;
 
     // Process in batches
     for (let i = 0; i < emails.length; i += CLASSIFICATION_BATCH) {
@@ -109,7 +143,9 @@ serve(async (req) => {
           }).eq('id', email.id);
         }
 
-        await createConversationAndMessage(supabase, email, result, connectedEmail);
+        const direction = await createConversationAndMessage(supabase, email, result, connectedEmail);
+        if (direction === 'outbound') outboundCount++;
+        else if (direction === 'inbound') inboundCount++;
 
         // In rebuild mode, restore back to classified when done
         if (rebuild) {
@@ -135,6 +171,8 @@ serve(async (req) => {
         await new Promise(r => setTimeout(r, 100));
       }
     }
+
+    console.log(`[queue-processor] Processed ${processed} emails: ${inboundCount} inbound, ${outboundCount} outbound`);
 
     // Update progress for affected workspaces
     const workspaceIds = [...new Set(emails.map((e: any) => e.workspace_id))];
@@ -179,6 +217,8 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({
       processed,
+      inbound: inboundCount,
+      outbound: outboundCount,
       remaining: remainingCount || 0,
       mode: rebuild ? 'rebuild' : 'classify'
     }), {
@@ -240,19 +280,45 @@ async function createConversationAndMessage(
   email: any,
   classification: any,
   connectedEmail: string | null
-) {
-  const fromEmail = (email.from_email || '').toLowerCase();
+): Promise<'inbound' | 'outbound' | 'skipped'> {
+  const fromEmail = (email.from_email || '').toLowerCase().trim();
+  const toEmail = (email.to_email || '').toLowerCase().trim();
   const folder = (email.folder || '').toUpperCase();
 
+  // Improved direction detection - case insensitive folder matching
   let direction: 'inbound' | 'outbound' = 'inbound';
-  if (folder === 'SENT' || folder === 'SENT MAIL' || folder === 'SENT ITEMS') direction = 'outbound';
-  else if (connectedEmail && fromEmail === connectedEmail) direction = 'outbound';
+  
+  // Check folder first - any folder containing "SENT" is outbound
+  if (folder.includes('SENT')) {
+    direction = 'outbound';
+    console.log(`[queue-processor] Email ${email.id}: OUTBOUND (folder=${folder})`);
+  }
+  // Check if from email matches connected email (case insensitive)
+  else if (connectedEmail && fromEmail === connectedEmail.toLowerCase().trim()) {
+    direction = 'outbound';
+    console.log(`[queue-processor] Email ${email.id}: OUTBOUND (from=${fromEmail} matches ${connectedEmail})`);
+  }
+  // Check common connected email variations
+  else if (connectedEmail) {
+    const connectedBase = connectedEmail.split('@')[0]?.toLowerCase() || '';
+    const fromBase = fromEmail.split('@')[0]?.toLowerCase() || '';
+    if (connectedBase && fromBase && connectedBase === fromBase) {
+      direction = 'outbound';
+      console.log(`[queue-processor] Email ${email.id}: OUTBOUND (base match: ${fromBase})`);
+    }
+  }
+
+  if (direction === 'inbound') {
+    console.log(`[queue-processor] Email ${email.id}: INBOUND (folder=${folder}, from=${fromEmail})`);
+  }
 
   // Only skip inbound non-customer emails
-  if (direction === 'inbound' && classification.email_type !== 'customer') return;
+  if (direction === 'inbound' && classification.email_type !== 'customer') {
+    return 'skipped';
+  }
 
   const customerEmail = direction === 'inbound' ? email.from_email : email.to_email;
-  if (!customerEmail) return;
+  if (!customerEmail) return 'skipped';
 
   // Customer
   let { data: customer } = await supabase
@@ -274,12 +340,12 @@ async function createConversationAndMessage(
       .single();
     if (custErr) {
       console.error('[queue-processor] customer insert error:', custErr);
-      return;
+      return 'skipped';
     }
     customer = newCustomer;
   }
 
-  if (!customer) return;
+  if (!customer) return 'skipped';
 
   // Conversation (thread_id)
   let { data: conversation } = await supabase
@@ -307,13 +373,13 @@ async function createConversationAndMessage(
 
     if (convErr) {
       console.error('[queue-processor] conversation insert error:', convErr);
-      return;
+      return 'skipped';
     }
 
     conversation = newConv;
   }
 
-  if (!conversation) return;
+  if (!conversation) return 'skipped';
 
   // Dedup message within conversation by raw_payload.external_id
   const externalId = String(email.external_id || '');
@@ -354,7 +420,11 @@ async function createConversationAndMessage(
       }
     });
 
-    if (msgErr) console.error('[queue-processor] message insert error:', msgErr);
+    if (msgErr) {
+      console.error('[queue-processor] message insert error:', msgErr);
+    } else {
+      console.log(`[queue-processor] Created ${direction} message for conv ${conversation.id}`);
+    }
   }
 
   // Update conversation timestamp
@@ -362,6 +432,8 @@ async function createConversationAndMessage(
     .from('conversations')
     .update({ updated_at: email.received_at })
     .eq('id', conversation.id);
+
+  return direction;
 }
 
 async function updateProgress(supabase: any, workspaceId: string) {
