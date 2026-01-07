@@ -4,7 +4,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/hooks/useWorkspace';
-import { Trash2, AlertTriangle, RefreshCw, Loader2, Building2, ArrowRight } from 'lucide-react';
+import { Trash2, AlertTriangle, RefreshCw, Loader2, Building2, ArrowRight, Zap, CheckCircle2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import {
   AlertDialog,
@@ -19,6 +19,21 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { Progress } from '@/components/ui/progress';
+
+interface CleanupStep {
+  id: number;
+  name: string;
+  description: string;
+}
+
+const CLEANUP_STEPS: CleanupStep[] = [
+  { id: 1, name: 'Clean Orphaned Messages', description: 'Remove messages without conversations' },
+  { id: 2, name: 'Dedupe Conversations', description: 'Remove duplicate email threads' },
+  { id: 3, name: 'Dedupe Customers', description: 'Remove duplicate customer records' },
+  { id: 4, name: 'Clear Import Queue', description: 'Clear pending email imports' },
+  { id: 5, name: 'Reset Progress', description: 'Reset import progress for fresh start' },
+];
 
 export const TestDataCleanupPanel = () => {
   const { workspace } = useWorkspace();
@@ -29,6 +44,9 @@ export const TestDataCleanupPanel = () => {
   const [deleteCustomers, setDeleteCustomers] = useState(false);
   const [companyName, setCompanyName] = useState('');
   const [savingContext, setSavingContext] = useState(false);
+  const [cleanupRunning, setCleanupRunning] = useState(false);
+  const [currentStep, setCurrentStep] = useState<number | null>(null);
+  const [stepResults, setStepResults] = useState<Record<number, { deleted: number; remaining: number; message: string }>>({});
 
   // Fetch existing business context
   const fetchBusinessContext = async () => {
@@ -91,6 +109,54 @@ export const TestDataCleanupPanel = () => {
     } finally {
       setSavingContext(false);
     }
+  };
+
+  const runCleanupStep = async (step: number) => {
+    if (!workspace?.id) return;
+    
+    setCleanupRunning(true);
+    setCurrentStep(step);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('cleanup-duplicates', {
+        body: { step, workspaceId: workspace.id }
+      });
+
+      if (error) throw error;
+
+      setStepResults(prev => ({ ...prev, [step]: data }));
+      
+      toast({
+        title: `Step ${step} Complete`,
+        description: data.message,
+      });
+
+      // Refresh counts after cleanup
+      fetchCounts();
+    } catch (error: any) {
+      console.error('Cleanup error:', error);
+      toast({
+        title: 'Cleanup failed',
+        description: error?.message || 'Something went wrong',
+        variant: 'destructive',
+      });
+    } finally {
+      setCleanupRunning(false);
+      setCurrentStep(null);
+    }
+  };
+
+  const runAllSteps = async () => {
+    for (const step of CLEANUP_STEPS) {
+      await runCleanupStep(step.id);
+      // Small delay between steps
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+    
+    toast({
+      title: 'All cleanup steps complete',
+      description: 'Your database has been cleaned up.',
+    });
   };
 
   const fetchCounts = async () => {
@@ -335,6 +401,86 @@ export const TestDataCleanupPanel = () => {
                   Set your company name above first
                 </p>
               )}
+            </div>
+          </div>
+        </div>
+
+        {/* Nuclear Cleanup Section */}
+        <div className="p-4 bg-orange-500/10 border border-orange-500/30 rounded-lg">
+          <div className="flex items-start gap-3">
+            <Zap className="h-5 w-5 text-orange-600 shrink-0 mt-0.5" />
+            <div className="space-y-4 flex-1">
+              <div>
+                <h3 className="text-lg font-semibold">Database Cleanup (Large Datasets)</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Clean up duplicate records in batches. Use this if you have millions of duplicate records
+                  from import issues. Run each step multiple times if needed.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                {CLEANUP_STEPS.map((step) => (
+                  <div 
+                    key={step.id}
+                    className="flex items-center justify-between p-3 bg-background/50 rounded-lg border"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
+                        stepResults[step.id] ? 'bg-green-500 text-white' : 'bg-muted text-muted-foreground'
+                      }`}>
+                        {stepResults[step.id] ? <CheckCircle2 className="h-4 w-4" /> : step.id}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">{step.name}</p>
+                        <p className="text-xs text-muted-foreground">{step.description}</p>
+                        {stepResults[step.id] && (
+                          <p className="text-xs text-green-600 mt-1">
+                            {stepResults[step.id].message}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => runCleanupStep(step.id)}
+                      disabled={cleanupRunning}
+                    >
+                      {currentStep === step.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        'Run'
+                      )}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex gap-2">
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="outline" className="gap-2" disabled={cleanupRunning}>
+                      <Zap className="h-4 w-4" />
+                      Run All Steps
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Run all cleanup steps?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This will run all 5 cleanup steps in sequence. This may take a few minutes
+                        for large datasets. You can also run steps individually.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={runAllSteps}>
+                        Run All
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
             </div>
           </div>
         </div>

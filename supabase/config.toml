@@ -203,3 +203,6 @@ verify_jwt = false
 
 [functions.aurinko-exchange-token]
 verify_jwt = false
+
+[functions.cleanup-duplicates]
+verify_jwt = false
