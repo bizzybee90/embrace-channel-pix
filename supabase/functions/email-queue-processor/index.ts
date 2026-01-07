@@ -320,34 +320,52 @@ async function createConversationAndMessage(
   const customerEmail = direction === 'inbound' ? email.from_email : email.to_email;
   if (!customerEmail) return 'skipped';
 
-  // Customer
+  // Customer - UPSERT to prevent duplicates (race condition safe)
+  const customerData = {
+    workspace_id: email.workspace_id,
+    email: customerEmail.toLowerCase(),
+    name: direction === 'inbound' ? email.from_name : email.to_name,
+  };
+  
+  // First try to find existing customer
   let { data: customer } = await supabase
     .from('customers')
     .select('id')
     .eq('workspace_id', email.workspace_id)
-    .eq('email', customerEmail)
+    .ilike('email', customerEmail)
     .maybeSingle();
 
   if (!customer) {
+    // Use insert with ON CONFLICT handling via error catch
     const { data: newCustomer, error: custErr } = await supabase
       .from('customers')
-      .insert({
-        workspace_id: email.workspace_id,
-        email: customerEmail,
-        name: direction === 'inbound' ? email.from_name : email.to_name,
-      })
+      .insert(customerData)
       .select('id')
       .single();
+    
     if (custErr) {
-      console.error('[queue-processor] customer insert error:', custErr);
-      return 'skipped';
+      // If duplicate key error, fetch existing record
+      if (custErr.code === '23505') {
+        console.log('[queue-processor] Customer already exists (race condition), fetching...');
+        const { data: existingCust } = await supabase
+          .from('customers')
+          .select('id')
+          .eq('workspace_id', email.workspace_id)
+          .ilike('email', customerEmail)
+          .single();
+        customer = existingCust;
+      } else {
+        console.error('[queue-processor] customer insert error:', custErr);
+        return 'skipped';
+      }
+    } else {
+      customer = newCustomer;
     }
-    customer = newCustomer;
   }
 
   if (!customer) return 'skipped';
 
-  // Conversation (thread_id)
+  // Conversation - UPSERT to prevent duplicates (race condition safe)
   let { data: conversation } = await supabase
     .from('conversations')
     .select('id')
@@ -356,27 +374,41 @@ async function createConversationAndMessage(
     .maybeSingle();
 
   if (!conversation) {
+    const convData = {
+      workspace_id: email.workspace_id,
+      customer_id: customer.id,
+      external_conversation_id: email.thread_id,
+      title: email.subject,
+      channel: 'email',
+      lane: classification.lane,
+      status: 'open',
+      updated_at: email.received_at,
+    };
+    
     const { data: newConv, error: convErr } = await supabase
       .from('conversations')
-      .insert({
-        workspace_id: email.workspace_id,
-        customer_id: customer.id,
-        external_conversation_id: email.thread_id,
-        title: email.subject,
-        channel: 'email',
-        lane: classification.lane,
-        status: 'open',
-        updated_at: email.received_at,
-      })
+      .insert(convData)
       .select('id')
       .single();
 
     if (convErr) {
-      console.error('[queue-processor] conversation insert error:', convErr);
-      return 'skipped';
+      // If duplicate key error, fetch existing record
+      if (convErr.code === '23505') {
+        console.log('[queue-processor] Conversation already exists (race condition), fetching...');
+        const { data: existingConv } = await supabase
+          .from('conversations')
+          .select('id')
+          .eq('workspace_id', email.workspace_id)
+          .eq('external_conversation_id', email.thread_id)
+          .single();
+        conversation = existingConv;
+      } else {
+        console.error('[queue-processor] conversation insert error:', convErr);
+        return 'skipped';
+      }
+    } else {
+      conversation = newConv;
     }
-
-    conversation = newConv;
   }
 
   if (!conversation) return 'skipped';
