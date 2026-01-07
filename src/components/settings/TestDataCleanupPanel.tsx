@@ -4,7 +4,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/hooks/useWorkspace';
-import { Trash2, AlertTriangle, RefreshCw, Loader2, Building2, ArrowRight, Zap, CheckCircle2 } from 'lucide-react';
+import { Trash2, AlertTriangle, RefreshCw, Loader2, Building2, ArrowRight, Zap, CheckCircle2, Bomb } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import {
   AlertDialog,
@@ -47,6 +47,10 @@ export const TestDataCleanupPanel = () => {
   const [cleanupRunning, setCleanupRunning] = useState(false);
   const [currentStep, setCurrentStep] = useState<number | null>(null);
   const [stepResults, setStepResults] = useState<Record<number, { deleted: number; remaining: number; message: string }>>({});
+  const [nuclearResetOpen, setNuclearResetOpen] = useState(false);
+  const [nuclearConfirmText, setNuclearConfirmText] = useState('');
+  const [nuclearRunning, setNuclearRunning] = useState(false);
+  const [nuclearResult, setNuclearResult] = useState<{ success: boolean; result?: any } | null>(null);
 
   // Fetch existing business context
   const fetchBusinessContext = async () => {
@@ -157,6 +161,45 @@ export const TestDataCleanupPanel = () => {
       title: 'All cleanup steps complete',
       description: 'Your database has been cleaned up.',
     });
+  };
+
+  const handleNuclearReset = async () => {
+    if (!workspace?.id || nuclearConfirmText !== 'CONFIRM') return;
+    
+    setNuclearRunning(true);
+    setNuclearResult(null);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('nuclear-reset', {
+        body: { 
+          workspaceId: workspace.id, 
+          confirm: 'CONFIRM_NUCLEAR_RESET' 
+        }
+      });
+
+      if (error) throw error;
+
+      setNuclearResult({ success: true, result: data.result });
+      
+      toast({
+        title: '☢️ Nuclear Reset Complete',
+        description: `Cleared ${data.result?.messages_cleared?.toLocaleString() || 0} messages, ${data.result?.conversations_cleared?.toLocaleString() || 0} conversations, ${data.result?.customers_cleared?.toLocaleString() || 0} customers`,
+      });
+
+      // Refresh counts
+      fetchCounts();
+      setNuclearConfirmText('');
+      setNuclearResetOpen(false);
+    } catch (error: any) {
+      console.error('Nuclear reset error:', error);
+      toast({
+        title: 'Nuclear reset failed',
+        description: error?.message || 'Something went wrong',
+        variant: 'destructive',
+      });
+    } finally {
+      setNuclearRunning(false);
+    }
   };
 
   const fetchCounts = async () => {
@@ -481,6 +524,101 @@ export const TestDataCleanupPanel = () => {
                   </AlertDialogContent>
                 </AlertDialog>
               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Nuclear Reset Section - For extreme cases */}
+        <div className="p-4 bg-red-500/10 border border-red-500/40 rounded-lg">
+          <div className="flex items-start gap-3">
+            <Bomb className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
+            <div className="space-y-3 flex-1">
+              <div>
+                <h3 className="text-lg font-semibold text-red-700">☢️ Nuclear Reset</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  <strong>For 8M+ records that won't delete.</strong> Uses TRUNCATE to instantly 
+                  clear ALL messages, conversations, customers, and import data. This bypasses 
+                  timeout issues with DELETE statements.
+                </p>
+              </div>
+
+              {nuclearResult?.success && (
+                <div className="p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
+                  <p className="text-sm text-green-700 font-medium">✅ Nuclear reset complete!</p>
+                  <p className="text-xs text-green-600 mt-1">
+                    Cleared {nuclearResult.result?.messages_cleared?.toLocaleString()} messages, 
+                    {nuclearResult.result?.conversations_cleared?.toLocaleString()} conversations, 
+                    {nuclearResult.result?.customers_cleared?.toLocaleString()} customers
+                  </p>
+                </div>
+              )}
+
+              <AlertDialog open={nuclearResetOpen} onOpenChange={setNuclearResetOpen}>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" className="gap-2 bg-red-600 hover:bg-red-700">
+                    <Bomb className="h-4 w-4" />
+                    Nuclear Reset (TRUNCATE ALL)
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="text-red-600 flex items-center gap-2">
+                      <Bomb className="h-5 w-5" />
+                      ☢️ Nuclear Reset - Point of No Return
+                    </AlertDialogTitle>
+                    <AlertDialogDescription className="space-y-3">
+                      <p className="font-medium text-foreground">
+                        This will PERMANENTLY and INSTANTLY delete:
+                      </p>
+                      <ul className="list-disc list-inside text-sm space-y-1">
+                        <li>ALL messages (even millions)</li>
+                        <li>ALL conversations</li>
+                        <li>ALL customers</li>
+                        <li>ALL email import data</li>
+                        <li>ALL conversation pairs</li>
+                      </ul>
+                      <p className="text-sm text-muted-foreground">
+                        This uses TRUNCATE which is instant regardless of table size. 
+                        Use this when DELETE statements time out on large datasets.
+                      </p>
+                      <div className="pt-3 border-t">
+                        <p className="text-sm font-medium mb-2">
+                          Type <span className="font-mono bg-muted px-1 rounded">CONFIRM</span> to proceed:
+                        </p>
+                        <Input
+                          value={nuclearConfirmText}
+                          onChange={(e) => setNuclearConfirmText(e.target.value)}
+                          placeholder="Type CONFIRM"
+                          className="font-mono"
+                        />
+                      </div>
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel onClick={() => setNuclearConfirmText('')}>
+                      Cancel
+                    </AlertDialogCancel>
+                    <Button
+                      variant="destructive"
+                      onClick={handleNuclearReset}
+                      disabled={nuclearConfirmText !== 'CONFIRM' || nuclearRunning}
+                      className="bg-red-600 hover:bg-red-700"
+                    >
+                      {nuclearRunning ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Resetting...
+                        </>
+                      ) : (
+                        <>
+                          <Bomb className="h-4 w-4 mr-2" />
+                          Execute Nuclear Reset
+                        </>
+                      )}
+                    </Button>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
           </div>
         </div>

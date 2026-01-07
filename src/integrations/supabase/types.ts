@@ -4307,6 +4307,10 @@ export type Database = {
           similarity: number
         }[]
       }
+      nuclear_reset: {
+        Args: { p_confirm: string; p_workspace_id: string }
+        Returns: Json
+      }
       search_faqs_with_priority: {
         Args: {
           p_embedding: string
