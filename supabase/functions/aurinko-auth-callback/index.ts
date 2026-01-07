@@ -1,4 +1,4 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/+esm';
 
 // Redirect helper that uses origin from state
 
@@ -245,9 +245,9 @@ Deno.serve(async (req) => {
         });
 
         // Don't await - let it run in background
-        syncPromise.then(result => {
+        syncPromise.then((result: any) => {
           console.log('Email sync started in background:', result.data || result.error);
-        }).catch(err => {
+        }).catch((err: any) => {
           console.error('Background sync failed to start:', err);
         });
 

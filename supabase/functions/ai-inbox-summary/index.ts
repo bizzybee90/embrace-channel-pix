@@ -1,12 +1,11 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.47.10';
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/+esm';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -51,7 +50,7 @@ serve(async (req) => {
     }
 
     // Prepare conversation data for AI
-    const conversationSummaries = conversations.map(c => {
+    const conversationSummaries = conversations.map((c: any) => {
       const customer = Array.isArray(c.customer) ? c.customer[0] : c.customer;
       return {
         title: c.title || 'Untitled',
