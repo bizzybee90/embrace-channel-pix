@@ -200,3 +200,6 @@ verify_jwt = false
 
 [functions.get-mailbox-stats]
 verify_jwt = false
+
+[functions.aurinko-exchange-token]
+verify_jwt = false

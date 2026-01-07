@@ -2673,6 +2673,53 @@ export type Database = {
           },
         ]
       }
+      make_progress: {
+        Row: {
+          completed_at: string | null
+          emails_classified: number | null
+          emails_imported: number | null
+          emails_total: number | null
+          error_message: string | null
+          started_at: string | null
+          status: string | null
+          updated_at: string | null
+          voice_profile_complete: boolean | null
+          workspace_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          emails_classified?: number | null
+          emails_imported?: number | null
+          emails_total?: number | null
+          error_message?: string | null
+          started_at?: string | null
+          status?: string | null
+          updated_at?: string | null
+          voice_profile_complete?: boolean | null
+          workspace_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          emails_classified?: number | null
+          emails_imported?: number | null
+          emails_total?: number | null
+          error_message?: string | null
+          started_at?: string | null
+          status?: string | null
+          updated_at?: string | null
+          voice_profile_complete?: boolean | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "make_progress_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       message_responses: {
         Row: {
           agent_id: string | null
@@ -3129,6 +3176,70 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "raw_emails_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      response_feedback: {
+        Row: {
+          ai_confidence: number | null
+          ai_draft: string | null
+          conversation_id: string | null
+          created_at: string | null
+          edit_distance: number | null
+          final_response: string | null
+          id: string
+          message_id: string | null
+          scenario_type: string | null
+          was_edited: boolean | null
+          workspace_id: string | null
+        }
+        Insert: {
+          ai_confidence?: number | null
+          ai_draft?: string | null
+          conversation_id?: string | null
+          created_at?: string | null
+          edit_distance?: number | null
+          final_response?: string | null
+          id?: string
+          message_id?: string | null
+          scenario_type?: string | null
+          was_edited?: boolean | null
+          workspace_id?: string | null
+        }
+        Update: {
+          ai_confidence?: number | null
+          ai_draft?: string | null
+          conversation_id?: string | null
+          created_at?: string | null
+          edit_distance?: number | null
+          final_response?: string | null
+          id?: string
+          message_id?: string | null
+          scenario_type?: string | null
+          was_edited?: boolean | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "response_feedback_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "response_feedback_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "response_feedback_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
