@@ -25,6 +25,7 @@ import Diagnostics from "./pages/Diagnostics";
 import LearningPage from "./pages/LearningPage";
 import GDPRPortal from "./pages/GDPRPortal";
 import EmailAuthSuccess from "./pages/EmailAuthSuccess";
+import EmailOAuthCallback from "./pages/EmailOAuthCallback";
 
 
 const queryClient = new QueryClient();
@@ -35,6 +36,7 @@ const RouterContent = () => {
       <Route path="/auth" element={<Auth />} />
       <Route path="/onboarding" element={<Onboarding />} />
       <Route path="/email-auth-success" element={<EmailAuthSuccess />} />
+      <Route path="/auth/email/callback" element={<EmailOAuthCallback />} />
       
       {/* Home - Calm reassurance screen */}
       <Route 
