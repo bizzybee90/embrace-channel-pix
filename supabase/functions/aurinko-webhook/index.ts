@@ -263,12 +263,12 @@ async function processEmailFromData(supabase: any, emailConfig: any, message: an
     return;
   }
 
-  // Find or create customer
+  // Find or create customer - UPSERT pattern to prevent duplicates
   let { data: customer } = await supabase
     .from('customers')
     .select('*')
     .eq('workspace_id', emailConfig.workspace_id)
-    .eq('email', senderEmail)
+    .ilike('email', senderEmail)
     .single();
 
   if (!customer) {
@@ -276,7 +276,7 @@ async function processEmailFromData(supabase: any, emailConfig: any, message: an
       .from('customers')
       .insert({
         workspace_id: emailConfig.workspace_id,
-        email: senderEmail,
+        email: senderEmail.toLowerCase(),
         name: senderName,
         preferred_channel: 'email',
       })
@@ -284,20 +284,40 @@ async function processEmailFromData(supabase: any, emailConfig: any, message: an
       .single();
 
     if (createError) {
-      console.error('Error creating customer:', createError);
-      return;
+      // Handle duplicate key error (race condition)
+      if (createError.code === '23505') {
+        console.log('Customer already exists (race condition), fetching...');
+        const { data: existingCust } = await supabase
+          .from('customers')
+          .select('*')
+          .eq('workspace_id', emailConfig.workspace_id)
+          .ilike('email', senderEmail)
+          .single();
+        customer = existingCust;
+      } else {
+        console.error('Error creating customer:', createError);
+        return;
+      }
+    } else {
+      customer = newCustomer;
+      console.log('Created new customer:', customer.id);
     }
-    customer = newCustomer;
-    console.log('Created new customer:', customer.id);
   }
 
-  // Check for existing conversation with this email thread
+  if (!customer) {
+    console.error('Could not find or create customer');
+    return;
+  }
+
+  // Check for existing conversation with this email thread - UPSERT pattern
   const threadId = message.threadId || message.id;
+  const externalConvId = `aurinko_${threadId}`;
+  
   let { data: existingConversation } = await supabase
     .from('conversations')
     .select('*')
     .eq('workspace_id', emailConfig.workspace_id)
-    .eq('external_conversation_id', `aurinko_${threadId}`)
+    .eq('external_conversation_id', externalConvId)
     .single();
 
   let conversationId;
@@ -323,7 +343,7 @@ async function processEmailFromData(supabase: any, emailConfig: any, message: an
         channel: 'email',
         title: subject,
         status: 'new',
-        external_conversation_id: `aurinko_${threadId}`,
+        external_conversation_id: externalConvId,
         metadata: { 
           aurinko_account_id: emailConfig.account_id,
           aurinko_message_id: aurinkoMessageId,
@@ -334,11 +354,29 @@ async function processEmailFromData(supabase: any, emailConfig: any, message: an
       .single();
 
     if (convError) {
-      console.error('Error creating conversation:', convError);
-      return;
+      // Handle duplicate key error (race condition)
+      if (convError.code === '23505') {
+        console.log('Conversation already exists (race condition), fetching...');
+        const { data: existingConv } = await supabase
+          .from('conversations')
+          .select('*')
+          .eq('workspace_id', emailConfig.workspace_id)
+          .eq('external_conversation_id', externalConvId)
+          .single();
+        if (existingConv) {
+          conversationId = existingConv.id;
+        } else {
+          console.error('Could not find conversation after race condition');
+          return;
+        }
+      } else {
+        console.error('Error creating conversation:', convError);
+        return;
+      }
+    } else {
+      conversationId = newConversation.id;
+      console.log('Created new conversation:', conversationId);
     }
-    conversationId = newConversation.id;
-    console.log('Created new conversation:', conversationId);
   }
 
   // Add message
