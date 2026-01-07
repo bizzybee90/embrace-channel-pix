@@ -206,3 +206,6 @@ verify_jwt = false
 
 [functions.cleanup-duplicates]
 verify_jwt = false
+
+[functions.nuclear-reset]
+verify_jwt = false
