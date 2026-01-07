@@ -166,6 +166,29 @@ export function OnboardingWizard({ workspaceId, onComplete }: OnboardingWizardPr
     <div className="min-h-screen bg-muted/30 flex items-center justify-center p-6">
       <Card className={`w-full max-w-2xl shadow-lg shadow-black/5 border-border/50 ${currentStep === 'welcome' ? 'p-10' : ''}`}>
         <CardHeader className="text-center pb-2">
+          {/* Skip button */}
+          <div className="flex justify-end mb-2">
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={async () => {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (user) {
+                  await supabase
+                    .from('users')
+                    .update({ 
+                      onboarding_completed: true,
+                      onboarding_step: 'skipped'
+                    })
+                    .eq('id', user.id);
+                }
+                window.location.href = '/settings';
+              }}
+              className="text-muted-foreground hover:text-foreground text-xs"
+            >
+              Skip setup →
+            </Button>
+          </div>
           {/* Logo - Bold, prominent brand presence */}
           <div className={`flex justify-center ${currentStep === 'welcome' ? 'pt-4 mb-14' : 'mb-8'}`}>
             <img 
