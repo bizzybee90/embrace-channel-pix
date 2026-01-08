@@ -1,5 +1,11 @@
 project_id = "ikioetqbrybnofqkdcib"
 
+[functions.email-import]
+verify_jwt = true
+
+[functions.email-classify]
+verify_jwt = true
+
 [functions.log-conversation]
 verify_jwt = false
 
