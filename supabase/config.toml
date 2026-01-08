@@ -6,6 +6,18 @@ verify_jwt = true
 [functions.email-classify]
 verify_jwt = true
 
+[functions.voice-learn]
+verify_jwt = true
+
+[functions.ai-draft]
+verify_jwt = true
+
+[functions.email-send]
+verify_jwt = true
+
+[functions.email-webhook]
+verify_jwt = false
+
 [functions.log-conversation]
 verify_jwt = false
 

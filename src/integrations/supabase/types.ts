@@ -3870,6 +3870,7 @@ export type Database = {
       voice_profiles: {
         Row: {
           analysis_status: string | null
+          average_length: number | null
           avg_response_length: number | null
           avg_response_time_minutes: number | null
           avg_sentences: number | null
@@ -3882,9 +3883,11 @@ export type Database = {
           emails_analyzed: number | null
           emoji_frequency: string | null
           example_responses: Json | null
+          examples: Json | null
           exclamation_frequency: number | null
           formality_score: number | null
           greeting_patterns: Json | null
+          greeting_style: string | null
           id: string
           ignore_patterns: Json | null
           last_analyzed_at: string | null
@@ -3897,7 +3900,9 @@ export type Database = {
           response_rate_percent: number | null
           sample_responses: Json | null
           signoff_patterns: Json | null
+          signoff_style: string | null
           style_confidence: number | null
+          tone: string | null
           tone_descriptors: string[] | null
           total_pairs_analyzed: number | null
           updated_at: string | null
@@ -3908,6 +3913,7 @@ export type Database = {
         }
         Insert: {
           analysis_status?: string | null
+          average_length?: number | null
           avg_response_length?: number | null
           avg_response_time_minutes?: number | null
           avg_sentences?: number | null
@@ -3920,9 +3926,11 @@ export type Database = {
           emails_analyzed?: number | null
           emoji_frequency?: string | null
           example_responses?: Json | null
+          examples?: Json | null
           exclamation_frequency?: number | null
           formality_score?: number | null
           greeting_patterns?: Json | null
+          greeting_style?: string | null
           id?: string
           ignore_patterns?: Json | null
           last_analyzed_at?: string | null
@@ -3935,7 +3943,9 @@ export type Database = {
           response_rate_percent?: number | null
           sample_responses?: Json | null
           signoff_patterns?: Json | null
+          signoff_style?: string | null
           style_confidence?: number | null
+          tone?: string | null
           tone_descriptors?: string[] | null
           total_pairs_analyzed?: number | null
           updated_at?: string | null
@@ -3946,6 +3956,7 @@ export type Database = {
         }
         Update: {
           analysis_status?: string | null
+          average_length?: number | null
           avg_response_length?: number | null
           avg_response_time_minutes?: number | null
           avg_sentences?: number | null
@@ -3958,9 +3969,11 @@ export type Database = {
           emails_analyzed?: number | null
           emoji_frequency?: string | null
           example_responses?: Json | null
+          examples?: Json | null
           exclamation_frequency?: number | null
           formality_score?: number | null
           greeting_patterns?: Json | null
+          greeting_style?: string | null
           id?: string
           ignore_patterns?: Json | null
           last_analyzed_at?: string | null
@@ -3973,7 +3986,9 @@ export type Database = {
           response_rate_percent?: number | null
           sample_responses?: Json | null
           signoff_patterns?: Json | null
+          signoff_style?: string | null
           style_confidence?: number | null
+          tone?: string | null
           tone_descriptors?: string[] | null
           total_pairs_analyzed?: number | null
           updated_at?: string | null
