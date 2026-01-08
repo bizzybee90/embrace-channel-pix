@@ -116,9 +116,10 @@ export interface Message {
     path: string;
     type: string;
     size: number;
-  }>;
+  }> | null;
   raw_payload: Record<string, any> | null;
   created_at: string;
+  external_id?: string | null;
 }
 
 export interface Template {
