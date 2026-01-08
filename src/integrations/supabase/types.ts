@@ -2525,6 +2525,56 @@ export type Database = {
           },
         ]
       }
+      import_progress: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          current_step: string | null
+          error: string | null
+          id: string
+          processed_emails: number | null
+          started_at: string | null
+          status: string
+          total_emails: number | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          current_step?: string | null
+          error?: string | null
+          id?: string
+          processed_emails?: number | null
+          started_at?: string | null
+          status?: string
+          total_emails?: number | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          current_step?: string | null
+          error?: string | null
+          id?: string
+          processed_emails?: number | null
+          started_at?: string | null
+          status?: string
+          total_emails?: number | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_progress_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inbox_insights: {
         Row: {
           analyzed_at: string | null
