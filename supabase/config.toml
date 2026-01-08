@@ -15,12 +15,6 @@ verify_jwt = false
 [functions.generate-embedding]
 verify_jwt = false
 
-[functions.receive-message]
-verify_jwt = false
-
-[functions.send-response]
-verify_jwt = false
-
 [functions.send-scheduled-summary]
 verify_jwt = false
 
@@ -48,12 +42,6 @@ verify_jwt = false
 [functions.cleanup-old-data]
 verify_jwt = false
 
-[functions.merge-duplicate-customers]
-verify_jwt = false
-
-[functions.merge-duplicate-conversations]
-verify_jwt = false
-
 [functions.test-integration]
 verify_jwt = false
 
@@ -66,19 +54,7 @@ verify_jwt = false
 [functions.aurinko-webhook]
 verify_jwt = false
 
-[functions.email-triage-agent]
-verify_jwt = false
-
-[functions.backfill-decision-buckets]
-verify_jwt = false
-
-[functions.backfill-customers]
-verify_jwt = false
-
 [functions.pre-triage-rules]
-verify_jwt = false
-
-[functions.email-draft-agent]
 verify_jwt = false
 
 [functions.populate-sender-rules]
@@ -141,30 +117,6 @@ verify_jwt = false
 [functions.competitor-faq-per-site]
 verify_jwt = false
 
-[functions.match-email-threads]
-verify_jwt = false
-
-[functions.categorize-email-pairs]
-verify_jwt = false
-
-[functions.build-few-shot-library]
-verify_jwt = false
-
-[functions.gmail-sync-worker]
-verify_jwt = false
-
-[functions.start-email-import]
-verify_jwt = false
-
-[functions.email-analyze]
-verify_jwt = false
-
-[functions.email-fetch-bodies]
-verify_jwt = false
-
-[functions.import-watchdog]
-verify_jwt = false
-
 [functions.start-competitor-research]
 verify_jwt = false
 
@@ -183,28 +135,10 @@ verify_jwt = false
 [functions.competitor-research-watchdog]
 verify_jwt = false
 
-[functions.email-webhook-receiver]
-verify_jwt = false
-
-[functions.email-queue-processor]
-verify_jwt = false
-
-[functions.email-analyze-conversations]
-verify_jwt = false
-
-[functions.email-deep-learning]
-verify_jwt = false
-
-[functions.start-historical-import]
-verify_jwt = false
-
 [functions.get-mailbox-stats]
 verify_jwt = false
 
 [functions.aurinko-exchange-token]
-verify_jwt = false
-
-[functions.cleanup-duplicates]
 verify_jwt = false
 
 [functions.nuclear-reset]
