@@ -118,7 +118,7 @@ export const EmailAccountCard = ({ config, onDisconnect, onUpdate }: EmailAccoun
   const handleSync = async () => {
     setSyncing(true);
     try {
-      const { data, error } = await supabase.functions.invoke('email-sync', {
+      const { data, error } = await supabase.functions.invoke('email-import', {
         body: { configId: config.id, mode: config.import_mode },
       });
 

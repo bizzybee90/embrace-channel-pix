@@ -124,7 +124,7 @@ export function DraftPreviewSheet({
     setSending(true);
     try {
       // Send via edge function
-      const { error: sendError } = await supabase.functions.invoke('send-response', {
+      const { error: sendError } = await supabase.functions.invoke('email-send', {
         body: {
           conversationId: conversation.id,
           response: draftText,

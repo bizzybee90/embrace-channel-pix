@@ -44,7 +44,7 @@ export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, on
       console.log('Scraping website:', businessContext.websiteUrl);
 
       // Kick off backend job (returns immediately now)
-      const scrapeResult = await supabase.functions.invoke('scrape-customer-website', {
+      const scrapeResult = await supabase.functions.invoke('website-scrape', {
         body: {
           workspaceId,
           websiteUrl: businessContext.websiteUrl,
