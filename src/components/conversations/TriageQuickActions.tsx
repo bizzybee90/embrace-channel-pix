@@ -40,8 +40,8 @@ export function TriageQuickActions({ conversation, onUpdate }: TriageQuickAction
     setRetriageResult(null);
     
     try {
-      const { data, error } = await supabase.functions.invoke('retriage-conversation', {
-        body: { conversationId: conversation.id }
+      const { data, error } = await supabase.functions.invoke('bulk-retriage', {
+        body: { conversationId: conversation.id, limit: 1 }
       });
 
       if (error) throw error;

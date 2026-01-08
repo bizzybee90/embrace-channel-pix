@@ -122,7 +122,7 @@ export const AIAgentPanel = () => {
       }> = [];
 
       while (hasMore) {
-        const { data, error } = await supabase.functions.invoke('bulk-retriage-conversations', {
+        const { data, error } = await supabase.functions.invoke('bulk-retriage', {
           body: {
             workspaceId: workspace.id,
             limit: batchSize,

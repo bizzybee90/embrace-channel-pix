@@ -48,7 +48,7 @@ export function DraftReplyEditor({
   const sendMutation = useMutation({
     mutationFn: async () => {
       // Call edge function to send response
-      const { error: sendError } = await supabase.functions.invoke('send-response', {
+      const { error: sendError } = await supabase.functions.invoke('email-send', {
         body: {
           conversationId,
           response: draft,

@@ -264,14 +264,7 @@ const RouterContent = () => {
           </AuthGuard>
         } 
       />
-      <Route 
-        path="/ai-test" 
-        element={
-          <AuthGuard>
-            {React.createElement(React.lazy(() => import('@/pages/AIComparisonTest')))}
-          </AuthGuard>
-        } 
-      />
+      {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
       <Route path="*" element={<NotFound />} />
     </Routes>

@@ -146,7 +146,7 @@ export function DraftMessages({ onNavigate, maxItems = 5 }: DraftMessagesProps) 
         if (!conv?.ai_draft_response) continue;
 
         // Send via edge function
-        const { error } = await supabase.functions.invoke('send-response', {
+        const { error } = await supabase.functions.invoke('email-send', {
           body: {
             conversationId: id,
             response: conv.ai_draft_response,

@@ -29,59 +29,13 @@ export function CustomerMergePanel() {
   const [conversationResults, setConversationResults] = useState<any | null>(null);
 
   const handleMergeCustomers = async () => {
-    try {
-      setIsLoadingCustomers(true);
-      setCustomerResults(null);
-
-      const { data, error } = await supabase.functions.invoke('merge-duplicate-customers', {
-        method: 'POST',
-      });
-
-      if (error) throw error;
-
-      setCustomerResults(data);
-      
-      if (data.totalDuplicatesMerged > 0) {
-        toast.success(
-          `Successfully merged ${data.totalDuplicatesMerged} duplicate customers and moved ${data.totalConversationsMoved} conversations`
-        );
-      } else {
-        toast.info('No duplicate customers found');
-      }
-    } catch (error) {
-      console.error('Error merging customers:', error);
-      toast.error('Failed to merge customers');
-    } finally {
-      setIsLoadingCustomers(false);
-    }
+    // Function removed - duplicate prevention now handled by DB constraints
+    toast.info('Duplicate prevention is now automatic via database constraints');
   };
 
   const handleMergeConversations = async () => {
-    try {
-      setIsLoadingConversations(true);
-      setConversationResults(null);
-
-      const { data, error } = await supabase.functions.invoke('merge-duplicate-conversations', {
-        method: 'POST',
-      });
-
-      if (error) throw error;
-
-      setConversationResults(data);
-      
-      if (data.totalConversationsMerged > 0) {
-        toast.success(
-          `Successfully merged ${data.totalConversationsMerged} duplicate conversations and moved ${data.totalMessagesMoved} messages`
-        );
-      } else {
-        toast.info('No duplicate conversations found');
-      }
-    } catch (error) {
-      console.error('Error merging conversations:', error);
-      toast.error('Failed to merge conversations');
-    } finally {
-      setIsLoadingConversations(false);
-    }
+    // Function removed - duplicate prevention now handled by DB constraints
+    toast.info('Duplicate prevention is now automatic via database constraints');
   };
 
   return (

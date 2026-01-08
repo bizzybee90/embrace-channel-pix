@@ -164,7 +164,7 @@ export const ConversationThread = ({ conversation, onUpdate, onBack }: Conversat
             toast({ title: "Step 4", description: `Calling send-response for ${recipient}...` });
             console.log('📤 Step 4: Sending message via edge function:', { channel: conversation.channel, recipient });
             
-            const { data: sendResult, error: sendError } = await supabase.functions.invoke('send-response', {
+            const { data: sendResult, error: sendError } = await supabase.functions.invoke('email-send', {
               body: {
                 conversationId: conversation.id,
                 channel: conversation.channel,

@@ -109,10 +109,11 @@ export function LowConfidenceWizard() {
 
   const processConversation = useCallback(async (conv: LowConfidenceConversation): Promise<ProcessedResult> => {
     try {
-      const { data, error } = await supabase.functions.invoke('retriage-conversation', {
+      const { data, error } = await supabase.functions.invoke('bulk-retriage', {
         body: { 
           conversationId: conv.id,
-          workspaceId
+          workspaceId,
+          limit: 1
         }
       });
 

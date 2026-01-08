@@ -6,26 +6,14 @@ verify_jwt = true
 [functions.email-classify]
 verify_jwt = true
 
-[functions.voice-learn]
-verify_jwt = true
-
 [functions.ai-draft]
 verify_jwt = true
 
 [functions.email-send]
 verify_jwt = true
 
-[functions.email-webhook]
-verify_jwt = false
-
 [functions.log-conversation]
 verify_jwt = false
-
-[functions.generate-ai-summary]
-verify_jwt = true
-
-[functions.ai-comparison-test]
-verify_jwt = true
 
 [functions.claude-ai-agent-tools]
 verify_jwt = false
@@ -37,9 +25,6 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.receive-apify-data]
-verify_jwt = false
-
-[functions.sync-external-data]
 verify_jwt = false
 
 [functions.send-csat-request]
@@ -60,9 +45,6 @@ verify_jwt = false
 [functions.cleanup-old-data]
 verify_jwt = false
 
-[functions.test-integration]
-verify_jwt = false
-
 [functions.aurinko-auth-start]
 verify_jwt = false
 
@@ -75,13 +57,7 @@ verify_jwt = false
 [functions.pre-triage-rules]
 verify_jwt = false
 
-[functions.populate-sender-rules]
-verify_jwt = false
-
 [functions.compute-sender-stats]
-verify_jwt = false
-
-[functions.bulk-retriage-conversations]
 verify_jwt = false
 
 [functions.bootstrap-sender-rules]
@@ -91,9 +67,6 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.send-summary-notifications]
-verify_jwt = false
-
-[functions.retriage-conversation]
 verify_jwt = false
 
 [functions.gdpr-portal-request]
@@ -112,9 +85,6 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.copy-industry-faqs]
-verify_jwt = false
-
-[functions.scrape-customer-website]
 verify_jwt = false
 
 [functions.google-places-autocomplete]
