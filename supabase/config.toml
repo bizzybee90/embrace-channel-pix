@@ -108,24 +108,6 @@ verify_jwt = false
 [functions.google-places-autocomplete]
 verify_jwt = false
 
-[functions.voice-learn]
-verify_jwt = true
-
-[functions.ai-draft]
-verify_jwt = true
-
-[functions.email-send]
-verify_jwt = true
-
-[functions.email-webhook]
-verify_jwt = false
-
-[functions.scrape-customer-website]
-verify_jwt = false
-
-[functions.google-places-autocomplete]
-verify_jwt = false
-
 [functions.competitor-discover]
 verify_jwt = false
 
