@@ -885,6 +885,7 @@ export type Database = {
           sla_status: string | null
           sla_target_minutes: number | null
           snoozed_until: string | null
+          source_id: string | null
           status: string | null
           suggested_actions: string[] | null
           summary_for_human: string | null
@@ -950,6 +951,7 @@ export type Database = {
           sla_status?: string | null
           sla_target_minutes?: number | null
           snoozed_until?: string | null
+          source_id?: string | null
           status?: string | null
           suggested_actions?: string[] | null
           summary_for_human?: string | null
@@ -1015,6 +1017,7 @@ export type Database = {
           sla_status?: string | null
           sla_target_minutes?: number | null
           snoozed_until?: string | null
+          source_id?: string | null
           status?: string | null
           suggested_actions?: string[] | null
           summary_for_human?: string | null
@@ -2766,6 +2769,7 @@ export type Database = {
           conversation_id: string | null
           created_at: string | null
           direction: string
+          external_id: string | null
           id: string
           is_internal: boolean | null
           raw_payload: Json | null
@@ -2780,6 +2784,7 @@ export type Database = {
           conversation_id?: string | null
           created_at?: string | null
           direction: string
+          external_id?: string | null
           id?: string
           is_internal?: boolean | null
           raw_payload?: Json | null
@@ -2794,6 +2799,7 @@ export type Database = {
           conversation_id?: string | null
           created_at?: string | null
           direction?: string
+          external_id?: string | null
           id?: string
           is_internal?: boolean | null
           raw_payload?: Json | null
@@ -3110,6 +3116,7 @@ export type Database = {
           has_attachments: boolean | null
           id: string
           lane: string | null
+          processed: boolean | null
           processing_completed_at: string | null
           processing_started_at: string | null
           received_at: string | null
@@ -3136,6 +3143,7 @@ export type Database = {
           has_attachments?: boolean | null
           id?: string
           lane?: string | null
+          processed?: boolean | null
           processing_completed_at?: string | null
           processing_started_at?: string | null
           received_at?: string | null
@@ -3162,6 +3170,7 @@ export type Database = {
           has_attachments?: boolean | null
           id?: string
           lane?: string | null
+          processed?: boolean | null
           processing_completed_at?: string | null
           processing_started_at?: string | null
           received_at?: string | null
