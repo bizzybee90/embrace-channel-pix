@@ -161,3 +161,15 @@ verify_jwt = false
 
 [functions.nuclear-reset]
 verify_jwt = false
+
+[functions.website-scrape]
+verify_jwt = true
+
+[functions.test-conversation]
+verify_jwt = true
+
+[functions.learn-correction]
+verify_jwt = true
+
+[functions.bulk-retriage]
+verify_jwt = false

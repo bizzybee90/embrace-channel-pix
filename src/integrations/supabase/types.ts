@@ -1062,6 +1062,54 @@ export type Database = {
           },
         ]
       }
+      correction_examples: {
+        Row: {
+          analysis: string | null
+          conversation_id: string | null
+          created_at: string | null
+          edited_draft: string
+          id: string
+          learnings: Json | null
+          original_draft: string
+          workspace_id: string
+        }
+        Insert: {
+          analysis?: string | null
+          conversation_id?: string | null
+          created_at?: string | null
+          edited_draft: string
+          id?: string
+          learnings?: Json | null
+          original_draft: string
+          workspace_id: string
+        }
+        Update: {
+          analysis?: string | null
+          conversation_id?: string | null
+          created_at?: string | null
+          edited_draft?: string
+          id?: string
+          learnings?: Json | null
+          original_draft?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "correction_examples_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "correction_examples_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customer_consents: {
         Row: {
           channel: string
@@ -2351,6 +2399,50 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "faq_database_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      faqs: {
+        Row: {
+          answer: string
+          category: string | null
+          created_at: string | null
+          embedding: string | null
+          id: string
+          question: string
+          source: string | null
+          updated_at: string | null
+          workspace_id: string
+        }
+        Insert: {
+          answer: string
+          category?: string | null
+          created_at?: string | null
+          embedding?: string | null
+          id?: string
+          question: string
+          source?: string | null
+          updated_at?: string | null
+          workspace_id: string
+        }
+        Update: {
+          answer?: string
+          category?: string | null
+          created_at?: string | null
+          embedding?: string | null
+          id?: string
+          question?: string
+          source?: string | null
+          updated_at?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "faqs_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -3884,6 +3976,7 @@ export type Database = {
           emoji_frequency: string | null
           example_responses: Json | null
           examples: Json | null
+          examples_count: number | null
           exclamation_frequency: number | null
           formality_score: number | null
           greeting_patterns: Json | null
@@ -3891,6 +3984,7 @@ export type Database = {
           id: string
           ignore_patterns: Json | null
           last_analyzed_at: string | null
+          learnings: string[] | null
           objection_handling_style: string | null
           outbound_emails_found: number | null
           personality_traits: Json | null
@@ -3927,6 +4021,7 @@ export type Database = {
           emoji_frequency?: string | null
           example_responses?: Json | null
           examples?: Json | null
+          examples_count?: number | null
           exclamation_frequency?: number | null
           formality_score?: number | null
           greeting_patterns?: Json | null
@@ -3934,6 +4029,7 @@ export type Database = {
           id?: string
           ignore_patterns?: Json | null
           last_analyzed_at?: string | null
+          learnings?: string[] | null
           objection_handling_style?: string | null
           outbound_emails_found?: number | null
           personality_traits?: Json | null
@@ -3970,6 +4066,7 @@ export type Database = {
           emoji_frequency?: string | null
           example_responses?: Json | null
           examples?: Json | null
+          examples_count?: number | null
           exclamation_frequency?: number | null
           formality_score?: number | null
           greeting_patterns?: Json | null
@@ -3977,6 +4074,7 @@ export type Database = {
           id?: string
           ignore_patterns?: Json | null
           last_analyzed_at?: string | null
+          learnings?: string[] | null
           objection_handling_style?: string | null
           outbound_emails_found?: number | null
           personality_traits?: Json | null
