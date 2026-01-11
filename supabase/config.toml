@@ -155,3 +155,18 @@ verify_jwt = true
 
 [functions.industry-keywords]
 verify_jwt = true
+
+[functions.customer-intelligence]
+verify_jwt = true
+
+[functions.document-process]
+verify_jwt = true
+
+[functions.pattern-detect]
+verify_jwt = true
+
+[functions.image-analyze]
+verify_jwt = true
+
+[functions.audio-process]
+verify_jwt = true
