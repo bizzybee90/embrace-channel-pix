@@ -143,3 +143,6 @@ verify_jwt = true
 
 [functions.bulk-retriage]
 verify_jwt = false
+
+[functions.voice-learn]
+verify_jwt = true
