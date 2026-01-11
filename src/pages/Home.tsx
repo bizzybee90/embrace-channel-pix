@@ -26,6 +26,7 @@ import { DraftMessages } from '@/components/dashboard/DraftMessages';
 import { HumanAIActivityLog } from '@/components/dashboard/HumanAIActivityLog';
 import { AIBriefingWidget } from '@/components/dashboard/AIBriefingWidget';
 import { LearningInsightsWidget } from '@/components/dashboard/LearningInsightsWidget';
+import { InsightsWidget } from '@/components/dashboard/InsightsWidget';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface HomeStats {
@@ -385,8 +386,11 @@ export const Home = () => {
                 </Button>
               </Card>
 
-              {/* Right Column: Learning + Activity Log */}
+              {/* Right Column: Insights + Learning + Activity Log */}
               <div className="space-y-4">
+                {/* AI Insights - New Stage 3 Widget */}
+                {workspace?.id && <InsightsWidget workspaceId={workspace.id} />}
+
                 {/* Enhanced Learning Insights */}
                 <LearningInsightsWidget />
 

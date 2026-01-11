@@ -1,13 +1,14 @@
 import { Conversation } from '@/lib/types';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { AlertCircle, FileText, Sparkles, ChevronDown } from 'lucide-react';
+import { AlertCircle, FileText, Sparkles, ChevronDown, User } from 'lucide-react';
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
+import { CustomerIntelligence } from '@/components/customers/CustomerIntelligence';
 
 interface AIContextPanelProps {
   conversation: Conversation;
@@ -211,7 +212,32 @@ const PANEL_HEADER_CLASSES = "flex items-center justify-between w-full px-4 gap-
         );
       })()}
 
-      {/* AI metadata removed - these internal metrics don't help users act */}
+      {/* Customer Intelligence - Stage 3 */}
+      {conversation.customer_id && conversation.workspace_id && (
+        <Collapsible>
+          <Card className="card-elevation overflow-hidden">
+            <CollapsibleTrigger className={PANEL_HEADER_CLASSES}>
+              <div className="flex items-center gap-3">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-500/10 text-blue-500">
+                  <User className="h-4 w-4" />
+                </div>
+                <span className="text-sm font-medium text-foreground">
+                  Customer Profile
+                </span>
+              </div>
+              <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform ui-open:rotate-180" />
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="px-4 pb-4">
+                <CustomerIntelligence 
+                  workspaceId={conversation.workspace_id} 
+                  customerId={conversation.customer_id} 
+                />
+              </div>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
+      )}
     </div>
   );
 };

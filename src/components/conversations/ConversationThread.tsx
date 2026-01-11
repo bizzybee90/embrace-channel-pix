@@ -282,7 +282,11 @@ export const ConversationThread = ({ conversation, onUpdate, onBack }: Conversat
           onUpdate={onUpdate}
           onUseDraft={setDraftText}
         />
-        <MessageTimeline messages={messages} />
+        <MessageTimeline 
+          messages={messages} 
+          workspaceId={conversation.workspace_id}
+          onDraftTextChange={setDraftText}
+        />
       </div>
 
       {!isCompleted && (
