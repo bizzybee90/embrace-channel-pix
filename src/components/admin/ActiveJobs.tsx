@@ -35,7 +35,7 @@ export function ActiveJobs() {
       const [emailJobs, classificationJobs] = await Promise.all([
         supabase
           .from('email_import_jobs')
-          .select('id, status, workspace_id, headers_fetched, bodies_fetched, created_at, updated_at, error_message')
+          .select('id, status, workspace_id, bodies_fetched, total_target, created_at, updated_at, error_message')
           .in('status', ['in_progress', 'paused', 'pending'])
           .order('created_at', { ascending: false })
           .limit(10),
@@ -54,9 +54,9 @@ export function ActiveJobs() {
           status: job.status,
           workspace_id: job.workspace_id,
           progress: job.bodies_fetched || 0,
-          total: job.headers_fetched || 0,
-          created_at: job.created_at,
-          updated_at: job.updated_at,
+          total: job.total_target || 0,
+          created_at: job.created_at ?? new Date().toISOString(),
+          updated_at: job.updated_at ?? new Date().toISOString(),
           error_message: job.error_message ?? undefined,
         })),
         ...(classificationJobs.data || []).map(job => ({
