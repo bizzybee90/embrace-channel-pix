@@ -28,6 +28,7 @@ import EmailAuthSuccess from "./pages/EmailAuthSuccess";
 import EmailOAuthCallback from "./pages/EmailOAuthCallback";
 import KnowledgeBase from "./pages/KnowledgeBase";
 import TestDashboard from "./pages/TestDashboard";
+import DevOpsDashboard from "./pages/admin/DevOpsDashboard";
 
 
 const queryClient = new QueryClient();
@@ -283,6 +284,16 @@ const RouterContent = () => {
           element={
             <AuthGuard>
               <TestDashboard />
+            </AuthGuard>
+          }
+        />
+
+        {/* DevOps Dashboard - Admin only */}
+        <Route
+          path="/admin/devops"
+          element={
+            <AuthGuard>
+              <DevOpsDashboard />
             </AuthGuard>
           }
         />
