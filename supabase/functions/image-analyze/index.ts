@@ -9,9 +9,10 @@ const corsHeaders = {
 interface AnalyzeRequest {
   workspace_id: string;
   image_url: string;
-  analysis_type: 'quote' | 'damage' | 'property' | 'general';
+  analysis_type: 'quote' | 'damage' | 'receipt' | 'property' | 'general';
   message_id?: string;
   customer_message?: string;
+  context?: string;
 }
 
 serve(async (req) => {
@@ -110,6 +111,33 @@ Return JSON:
   "recommended_actions": ["action1", "action2"],
   "urgency": "immediate|soon|routine",
   "suggested_response": "A professional response to send the customer",
+  "confidence": 0.0-1.0
+}`;
+        break;
+
+      case 'receipt':
+        analysisPrompt = `Extract information from this receipt/invoice image.
+
+Customer's message: ${body.customer_message || 'No message provided'}
+
+Extract:
+1. Vendor/business name
+2. Date
+3. Items/services listed
+4. Amounts
+5. Total
+
+Return JSON:
+{
+  "vendor": "business name on receipt",
+  "date": "date if visible",
+  "items": [{"description": "item name", "quantity": 1, "amount": 0.00}],
+  "subtotal": 0.00,
+  "tax": 0.00,
+  "total": 0.00,
+  "payment_method": "cash|card|other if visible",
+  "relevant_notes": ["any important notes or terms"],
+  "suggested_response": "A professional response acknowledging the receipt",
   "confidence": 0.0-1.0
 }`;
         break;
