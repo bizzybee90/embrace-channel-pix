@@ -26,6 +26,8 @@ import LearningPage from "./pages/LearningPage";
 import GDPRPortal from "./pages/GDPRPortal";
 import EmailAuthSuccess from "./pages/EmailAuthSuccess";
 import EmailOAuthCallback from "./pages/EmailOAuthCallback";
+import KnowledgeBase from "./pages/KnowledgeBase";
+import TestDashboard from "./pages/TestDashboard";
 
 
 const queryClient = new QueryClient();
@@ -256,17 +258,38 @@ const RouterContent = () => {
       <Route path="/gdpr-portal" element={<GDPRPortal />} />
       <Route path="/gdpr-portal/:workspaceSlug" element={<GDPRPortal />} />
       
-      <Route
-        path="/diagnostics" 
-        element={
-          <AuthGuard>
-            <Diagnostics />
-          </AuthGuard>
-        } 
-      />
-      {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-      {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-      <Route path="*" element={<NotFound />} />
+        <Route
+          path="/diagnostics" 
+          element={
+            <AuthGuard>
+              <Diagnostics />
+            </AuthGuard>
+          } 
+        />
+
+        {/* Knowledge Base */}
+        <Route
+          path="/knowledge-base"
+          element={
+            <AuthGuard>
+              <KnowledgeBase />
+            </AuthGuard>
+          }
+        />
+
+        {/* Admin Test Dashboard - Development only */}
+        <Route
+          path="/admin/test"
+          element={
+            <AuthGuard>
+              <TestDashboard />
+            </AuthGuard>
+          }
+        />
+
+        {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+        {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+        <Route path="*" element={<NotFound />} />
     </Routes>
   );
 };
