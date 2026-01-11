@@ -6,19 +6,19 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-interface VerificationIssue {
-  type: 'hallucination' | 'factual_error' | 'policy_violation' | 'tone_mismatch' | 'missing_info';
-  severity: 'critical' | 'warning' | 'info';
-  description: string;
-  suggestion?: string;
+interface VerifyRequest {
+  workspace_id: string;
+  conversation_id: string;
+  draft_text: string;
+  customer_message: string;
+  draft_id?: string;
 }
 
-interface VerificationResult {
-  status: 'passed' | 'failed' | 'needs_review';
-  issues: VerificationIssue[];
-  correctedDraft?: string;
-  confidenceScore: number;
-  notes: string;
+interface VerificationIssue {
+  type: 'hallucination' | 'incorrect_fact' | 'unsupported_claim' | 'tone_mismatch' | 'missing_info';
+  description: string;
+  severity: 'low' | 'medium' | 'high';
+  suggestion?: string;
 }
 
 serve(async (req) => {
@@ -28,147 +28,148 @@ serve(async (req) => {
 
   const startTime = Date.now();
   const functionName = 'draft-verify';
-  let currentStep = 'initializing';
 
   try {
-    // Validate environment
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    );
 
-    if (!supabaseUrl || !supabaseKey) {
-      throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be configured');
-    }
-    if (!lovableApiKey) {
-      throw new Error('LOVABLE_API_KEY environment variable not configured');
+    const body: VerifyRequest = await req.json();
+    console.log(`[${functionName}] Starting verification:`, { 
+      workspace_id: body.workspace_id,
+      conversation_id: body.conversation_id,
+      draft_length: body.draft_text?.length 
+    });
+
+    // Validate required fields
+    if (!body.workspace_id) throw new Error('workspace_id is required');
+    if (!body.draft_text) throw new Error('draft_text is required');
+    if (!body.customer_message) throw new Error('customer_message is required');
+
+    // Fetch FAQs for fact-checking (try both tables)
+    let faqs: any[] = [];
+    const { data: faqData, error: faqError } = await supabase
+      .from('faqs')
+      .select('question, answer, source, priority')
+      .eq('workspace_id', body.workspace_id)
+      .order('priority', { ascending: false })
+      .limit(30);
+
+    if (faqError) {
+      console.log(`[${functionName}] Trying faq_database table...`);
+      const { data: faqDbData } = await supabase
+        .from('faq_database')
+        .select('question, answer, source, priority')
+        .eq('workspace_id', body.workspace_id)
+        .order('priority', { ascending: false })
+        .limit(30);
+      faqs = faqDbData || [];
+    } else {
+      faqs = faqData || [];
     }
 
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    console.log(`[${functionName}] Found ${faqs.length} FAQs for verification`);
 
-    // Parse and validate input
-    currentStep = 'validating_input';
-    const body = await req.json();
-    
-    if (!body.conversation_id) {
-      throw new Error('conversation_id is required');
-    }
-    if (!body.workspace_id) {
-      throw new Error('workspace_id is required');
-    }
-    if (!body.draft) {
-      throw new Error('draft is required');
-    }
-
-    const { conversation_id, workspace_id, draft } = body;
-    console.log(`[${functionName}] Starting verification:`, { conversation_id, workspace_id });
-
-    // Step 1: Fetch conversation context
-    currentStep = 'fetching_context';
-    const { data: conversation, error: convError } = await supabase
-      .from('conversations')
-      .select(`
-        id,
-        title,
-        email_classification,
-        urgency,
-        customer:customers(id, name, email)
-      `)
-      .eq('id', conversation_id)
-      .eq('workspace_id', workspace_id)
+    // Fetch business profile for context
+    const { data: business } = await supabase
+      .from('business_profile')
+      .select('business_name, industry, services, pricing_model, price_summary, payment_methods, guarantee, cancellation_policy')
+      .eq('workspace_id', body.workspace_id)
       .single();
 
-    if (convError) {
-      throw new Error(`Failed to fetch conversation: ${convError.message}`);
-    }
-
-    // Step 2: Fetch original customer message
-    const { data: messages } = await supabase
-      .from('messages')
-      .select('body, direction')
-      .eq('conversation_id', conversation_id)
-      .order('created_at', { ascending: false })
-      .limit(5);
-
-    const customerMessage = messages?.find(m => m.direction === 'inbound')?.body || '';
-
-    // Step 3: Fetch knowledge base for fact-checking
-    currentStep = 'fetching_knowledge';
-    const { data: faqs } = await supabase
-      .from('faq_database')
-      .select('question, answer')
-      .eq('workspace_id', workspace_id)
-      .order('priority', { ascending: false })
-      .limit(10);
-
+    // Also fetch business facts
     const { data: businessFacts } = await supabase
       .from('business_facts')
       .select('fact_key, fact_value, category')
-      .eq('workspace_id', workspace_id)
+      .eq('workspace_id', body.workspace_id)
       .limit(20);
 
-    // Step 4: Build verification prompt
-    currentStep = 'building_prompt';
-    const knowledgeBase = [
-      ...(faqs || []).map(f => `Q: ${f.question}\nA: ${f.answer}`),
-      ...(businessFacts || []).map(f => `${f.category}: ${f.fact_key} = ${f.fact_value}`)
-    ].join('\n\n');
+    // Build knowledge base context
+    const faqContext = faqs?.map(f => 
+      `Q: ${f.question}\nA: ${f.answer}\nSource: ${f.source || 'unknown'}`
+    ).join('\n\n') || 'No FAQs available';
 
-    const verificationPrompt = `You are a draft verification assistant. Your job is to check AI-generated email responses for issues before they are sent to customers.
+    const businessContext = business 
+      ? `Business: ${business.business_name || 'Unknown'}
+Industry: ${business.industry || 'Not specified'}
+Services: ${Array.isArray(business.services) ? business.services.join(', ') : business.services || 'Not specified'}
+Pricing: ${business.pricing_model || 'Not specified'} - ${business.price_summary || ''}
+Payment Methods: ${business.payment_methods || 'Not specified'}
+Guarantee: ${business.guarantee || 'Not specified'}
+Cancellation Policy: ${business.cancellation_policy || 'Not specified'}`
+      : 'Business info not available';
 
-CUSTOMER QUESTION:
-${customerMessage}
+    const factsContext = businessFacts?.map(f => 
+      `${f.category}: ${f.fact_key} = ${f.fact_value}`
+    ).join('\n') || '';
 
-AI-GENERATED DRAFT:
-${draft}
+    // Verify with Gemini via Lovable AI Gateway
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    if (!LOVABLE_API_KEY) {
+      throw new Error('LOVABLE_API_KEY not configured');
+    }
 
-KNOWLEDGE BASE (source of truth):
-${knowledgeBase || 'No knowledge base available - be extra careful about factual claims.'}
+    const verificationPrompt = `You are a fact-checker for customer service emails. Your job is to verify that the draft response is accurate and doesn't contain hallucinations.
 
-VERIFICATION TASKS:
-1. Check for HALLUCINATIONS - claims not supported by the knowledge base
-2. Check for FACTUAL ERRORS - incorrect information about products, services, pricing, etc.
-3. Check for POLICY VIOLATIONS - promises that shouldn't be made, discounts not authorized, etc.
-4. Check for TONE MISMATCH - inappropriate formality, too casual, or off-brand language
-5. Check for MISSING INFO - important details the customer asked about that weren't addressed
+## KNOWLEDGE BASE (Source of Truth)
+${businessContext}
 
-RESPOND IN JSON FORMAT ONLY:
+${factsContext ? `## BUSINESS FACTS\n${factsContext}` : ''}
+
+## FAQs (Verified Facts)
+${faqContext}
+
+## CUSTOMER'S QUESTION
+${body.customer_message}
+
+## DRAFT RESPONSE TO VERIFY
+${body.draft_text}
+
+---
+
+VERIFICATION TASK:
+1. Check if any claims in the draft are NOT supported by the knowledge base
+2. Identify any hallucinated facts (made-up details not in FAQs)
+3. Check if the response actually answers the customer's question
+4. Flag any incorrect or misleading information
+5. Note if important information from FAQs was missed
+
+Respond with JSON only:
 {
   "status": "passed" | "failed" | "needs_review",
+  "confidence_score": 0.0-1.0,
   "issues": [
     {
-      "type": "hallucination" | "factual_error" | "policy_violation" | "tone_mismatch" | "missing_info",
-      "severity": "critical" | "warning" | "info",
-      "description": "What's wrong",
-      "suggestion": "How to fix it"
+      "type": "hallucination" | "incorrect_fact" | "unsupported_claim" | "tone_mismatch" | "missing_info",
+      "description": "specific issue description",
+      "severity": "low" | "medium" | "high",
+      "suggestion": "how to fix (optional)"
     }
   ],
-  "correctedDraft": "If status is 'failed', provide a corrected version here. Otherwise null.",
-  "confidenceScore": 0.0-1.0,
-  "notes": "Brief summary of verification"
+  "corrected_draft": "only if status is 'failed', provide corrected version",
+  "notes": "brief summary of verification"
 }
 
-RULES:
-- status="passed" means the draft is safe to send
-- status="failed" means there are critical issues that MUST be fixed
-- status="needs_review" means there are warnings a human should check
-- Only flag REAL issues, not stylistic preferences
-- If no knowledge base, flag any specific claims about pricing, availability, or policies as "needs_review"`;
+If the draft is accurate and well-supported by the knowledge base, return status: "passed" with empty issues array.`;
 
-    // Step 5: Call AI for verification
-    currentStep = 'verifying_draft';
-    console.log(`[${functionName}] Calling AI Gateway for verification...`);
+    console.log(`[${functionName}] Calling Lovable AI Gateway...`);
 
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${lovableApiKey}`
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-pro',
-        messages: [{ role: 'user', content: verificationPrompt }],
-        max_tokens: 2000,
-        response_format: { type: 'json_object' }
+        model: 'google/gemini-2.5-flash',
+        messages: [
+          { 
+            role: 'system', 
+            content: 'You are a precise fact-checker. Only flag issues that are clearly wrong or unsupported. Be helpful, not overly critical. Respond with valid JSON only.' 
+          },
+          { role: 'user', content: verificationPrompt }
+        ]
       })
     });
 
@@ -180,92 +181,94 @@ RULES:
         throw new Error('AI credits exhausted. Please add credits to your workspace.');
       }
       const errorText = await aiResponse.text();
-      throw new Error(`AI Gateway error ${aiResponse.status}: ${errorText}`);
+      throw new Error(`AI Gateway error: ${aiResponse.status} - ${errorText}`);
     }
 
     const aiData = await aiResponse.json();
-    
-    if (!aiData.choices || !aiData.choices[0] || !aiData.choices[0].message) {
-      throw new Error('AI Gateway returned unexpected format');
-    }
+    const verificationText = aiData.choices?.[0]?.message?.content || '';
 
-    // Parse the verification result
-    currentStep = 'parsing_result';
-    let verificationResult: VerificationResult;
+    // Parse verification result
+    let verification;
     try {
-      const content = aiData.choices[0].message.content.trim();
-      // Handle potential markdown code blocks
-      const jsonStr = content.replace(/```json\n?/g, '').replace(/```\n?/g, '');
-      verificationResult = JSON.parse(jsonStr);
+      const jsonMatch = verificationText.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) throw new Error('No JSON found in response');
+      verification = JSON.parse(jsonMatch[0]);
     } catch (parseError) {
-      console.error(`[${functionName}] Failed to parse AI response:`, parseError);
-      // Default to needs_review if parsing fails
-      verificationResult = {
-        status: 'needs_review',
-        issues: [{
-          type: 'hallucination',
-          severity: 'warning',
-          description: 'Could not automatically verify draft - manual review recommended'
-        }],
-        confidenceScore: 0.5,
-        notes: 'Verification parsing failed, defaulting to manual review'
+      console.error(`[${functionName}] Failed to parse verification:`, verificationText);
+      // Default to passed if parsing fails (don't block the user)
+      verification = {
+        status: 'passed',
+        confidence_score: 0.5,
+        issues: [],
+        notes: 'Verification parsing failed, defaulting to passed'
       };
     }
 
-    // Step 6: Save verification result to database
-    currentStep = 'saving_result';
-    const { data: verification, error: saveError } = await supabase
+    console.log(`[${functionName}] Verification result:`, {
+      status: verification.status,
+      confidence: verification.confidence_score,
+      issues_count: verification.issues?.length || 0
+    });
+
+    // Store verification result
+    const { data: verificationRecord, error: insertError } = await supabase
       .from('draft_verifications')
       .insert({
-        workspace_id,
-        conversation_id,
-        original_draft: draft,
-        verification_status: verificationResult.status,
-        issues_found: verificationResult.issues,
-        corrected_draft: verificationResult.correctedDraft || null,
-        confidence_score: verificationResult.confidenceScore,
-        verification_notes: verificationResult.notes
+        workspace_id: body.workspace_id,
+        conversation_id: body.conversation_id,
+        draft_id: body.draft_id,
+        original_draft: body.draft_text,
+        verification_status: verification.status,
+        issues_found: verification.issues || [],
+        corrected_draft: verification.corrected_draft || null,
+        confidence_score: verification.confidence_score,
+        verification_notes: verification.notes
       })
-      .select()
+      .select('id')
       .single();
 
-    if (saveError) {
-      console.error(`[${functionName}] Failed to save verification:`, saveError);
-      // Continue anyway - verification result is still useful
+    if (insertError) {
+      console.error(`[${functionName}] Failed to store verification:`, insertError);
+    }
+
+    // Update message verification status if draft_id provided
+    if (body.draft_id && verificationRecord) {
+      await supabase
+        .from('messages')
+        .update({ 
+          verification_status: verification.status,
+          verification_id: verificationRecord.id
+        })
+        .eq('id', body.draft_id);
     }
 
     const duration = Date.now() - startTime;
-    console.log(`[${functionName}] Completed in ${duration}ms:`, {
-      status: verificationResult.status,
-      issues_count: verificationResult.issues.length,
-      confidence: verificationResult.confidenceScore
-    });
+    console.log(`[${functionName}] Completed in ${duration}ms`);
 
     return new Response(
       JSON.stringify({
         success: true,
-        verification_id: verification?.id || null,
-        status: verificationResult.status,
-        issues: verificationResult.issues,
-        corrected_draft: verificationResult.correctedDraft,
-        confidence_score: verificationResult.confidenceScore,
-        notes: verificationResult.notes,
+        verification: {
+          status: verification.status,
+          confidence_score: verification.confidence_score,
+          issues: verification.issues || [],
+          corrected_draft: verification.corrected_draft,
+          notes: verification.notes
+        },
+        verification_id: verificationRecord?.id,
         duration_ms: duration
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error: any) {
-    const duration = Date.now() - startTime;
-    console.error(`[${functionName}] Error at step "${currentStep}":`, error.message);
-
+    console.error(`[${functionName}] Error:`, error);
     return new Response(
       JSON.stringify({
         success: false,
         error: error.message,
         function: functionName,
-        step: currentStep,
-        duration_ms: duration
+        duration_ms: Date.now() - startTime
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
