@@ -9,7 +9,32 @@ const corsHeaders = {
 interface ProcessRequest {
   workspace_id: string;
   document_id?: string;
-  action: 'process' | 'list' | 'delete';
+  action: 'process' | 'extract_faqs' | 'delete' | 'list';
+}
+
+// Helper function to chunk text
+function chunkText(text: string, chunkSize: number, overlap: number): { text: string; page: number }[] {
+  const chunks: { text: string; page: number }[] = [];
+  let start = 0;
+  let page = 1;
+
+  while (start < text.length) {
+    const end = Math.min(start + chunkSize, text.length);
+    const chunkText = text.slice(start, end);
+    
+    if (chunkText.trim().length > 50) { // Only add meaningful chunks
+      chunks.push({
+        text: chunkText,
+        page
+      });
+    }
+    
+    start = end - overlap;
+    if (start >= text.length - overlap) break;
+    page++;
+  }
+
+  return chunks;
 }
 
 serve(async (req) => {
@@ -27,219 +52,207 @@ serve(async (req) => {
     );
 
     const body: ProcessRequest = await req.json();
-    console.log(`[${functionName}] Request:`, body);
+    console.log(`[${functionName}] Starting:`, body);
 
     if (!body.workspace_id) throw new Error('workspace_id is required');
+    if (!body.action) throw new Error('action is required');
 
-    const action = body.action || 'process';
+    let result: any;
 
-    // List documents
-    if (action === 'list') {
-      const { data: documents, error } = await supabase
-        .from('documents')
-        .select('id, name, file_type, file_size, status, page_count, processed_at, created_at')
-        .eq('workspace_id', body.workspace_id)
-        .order('created_at', { ascending: false });
+    switch (body.action) {
+      case 'list': {
+        const { data: documents, error } = await supabase
+          .from('documents')
+          .select('id, name, file_type, file_size, status, page_count, processed_at, created_at')
+          .eq('workspace_id', body.workspace_id)
+          .order('created_at', { ascending: false });
 
-      return new Response(
-        JSON.stringify({ success: true, documents: documents || [] }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Delete document
-    if (action === 'delete' && body.document_id) {
-      // Delete chunks first
-      await supabase
-        .from('document_chunks')
-        .delete()
-        .eq('document_id', body.document_id);
-
-      // Delete document record
-      const { error: deleteError } = await supabase
-        .from('documents')
-        .delete()
-        .eq('id', body.document_id)
-        .eq('workspace_id', body.workspace_id);
-
-      if (deleteError) throw deleteError;
-
-      return new Response(
-        JSON.stringify({ success: true, message: 'Document deleted' }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Process document
-    if (!body.document_id) throw new Error('document_id is required for processing');
-
-    // Get document details
-    const { data: document, error: docError } = await supabase
-      .from('documents')
-      .select('*')
-      .eq('id', body.document_id)
-      .eq('workspace_id', body.workspace_id)
-      .single();
-
-    if (docError || !document) {
-      throw new Error('Document not found');
-    }
-
-    // Update status to processing
-    await supabase
-      .from('documents')
-      .update({ status: 'processing' })
-      .eq('id', body.document_id);
-
-    // Download file from storage
-    const { data: fileData, error: downloadError } = await supabase
-      .storage
-      .from('documents')
-      .download(document.file_path);
-
-    if (downloadError || !fileData) {
-      await supabase
-        .from('documents')
-        .update({ status: 'error', error_message: 'Failed to download file' })
-        .eq('id', body.document_id);
-      throw new Error('Failed to download file from storage');
-    }
-
-    // Convert to text (basic text extraction)
-    let extractedText = '';
-    const fileType = document.file_type.toLowerCase();
-
-    if (fileType.includes('text') || fileType.includes('txt')) {
-      extractedText = await fileData.text();
-    } else if (fileType.includes('json')) {
-      const json = await fileData.text();
-      extractedText = JSON.stringify(JSON.parse(json), null, 2);
-    } else {
-      // For PDFs and other formats, we'd need specialized processing
-      // For now, try to extract any text content
-      try {
-        extractedText = await fileData.text();
-      } catch {
-        extractedText = 'Unable to extract text from this file format';
+        if (error) throw error;
+        result = { documents: documents || [] };
+        break;
       }
-    }
 
-    console.log(`[${functionName}] Extracted ${extractedText.length} characters from ${document.name}`);
+      case 'process': {
+        if (!body.document_id) throw new Error('document_id is required');
 
-    // Chunk the text (max ~1000 tokens per chunk for good embedding quality)
-    const CHUNK_SIZE = 1500;
-    const CHUNK_OVERLAP = 200;
-    const chunks: string[] = [];
-    
-    if (extractedText.length > 0) {
-      let position = 0;
-      while (position < extractedText.length) {
-        const chunk = extractedText.slice(position, position + CHUNK_SIZE);
-        if (chunk.trim().length > 50) { // Only add meaningful chunks
-          chunks.push(chunk);
+        // Fetch document
+        const { data: document, error: docError } = await supabase
+          .from('documents')
+          .select('*')
+          .eq('id', body.document_id)
+          .eq('workspace_id', body.workspace_id)
+          .single();
+
+        if (docError || !document) throw new Error('Document not found');
+
+        // Update status
+        await supabase
+          .from('documents')
+          .update({ status: 'processing' })
+          .eq('id', body.document_id);
+
+        // Download file from storage
+        const { data: fileData, error: downloadError } = await supabase
+          .storage
+          .from('documents')
+          .download(document.file_path);
+
+        if (downloadError) {
+          await supabase.from('documents').update({ 
+            status: 'failed', 
+            error_message: `Download failed: ${downloadError.message}` 
+          }).eq('id', body.document_id);
+          throw new Error(`Download failed: ${downloadError.message}`);
         }
-        position += CHUNK_SIZE - CHUNK_OVERLAP;
-      }
-    }
 
-    console.log(`[${functionName}] Created ${chunks.length} chunks`);
-
-    // Generate embeddings for chunks using OpenAI
-    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
-    const chunksWithEmbeddings: any[] = [];
-
-    if (OPENAI_API_KEY && chunks.length > 0) {
-      for (let i = 0; i < chunks.length; i++) {
-        try {
-          const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${OPENAI_API_KEY}`
-            },
-            body: JSON.stringify({
-              model: 'text-embedding-3-small',
-              input: chunks[i]
-            })
-          });
-
-          if (embeddingResponse.ok) {
-            const embeddingData = await embeddingResponse.json();
-            chunksWithEmbeddings.push({
-              document_id: body.document_id,
-              workspace_id: body.workspace_id,
-              chunk_index: i,
-              content: chunks[i],
-              page_number: Math.floor(i / 3) + 1, // Estimate page number
-              embedding: JSON.stringify(embeddingData.data[0].embedding)
-            });
+        // Extract text based on file type
+        let extractedText = '';
+        const fileType = document.file_type?.toLowerCase() || '';
+        
+        if (['txt', 'md', 'text', 'markdown'].includes(fileType)) {
+          extractedText = await fileData.text();
+        } else if (fileType === 'json') {
+          const json = await fileData.text();
+          extractedText = JSON.stringify(JSON.parse(json), null, 2);
+        } else if (fileType === 'csv') {
+          extractedText = await fileData.text();
+        } else {
+          // For PDF and other formats, try basic text extraction
+          try {
+            extractedText = await fileData.text();
+          } catch {
+            extractedText = 'Unable to extract text from this file format';
           }
-        } catch (e) {
-          console.error(`[${functionName}] Embedding error for chunk ${i}:`, e);
-          // Still store chunk without embedding
-          chunksWithEmbeddings.push({
+        }
+
+        console.log(`[${functionName}] Extracted ${extractedText.length} characters from ${document.name}`);
+
+        // Chunk the text (roughly 500 tokens per chunk with overlap)
+        const chunks = chunkText(extractedText, 2000, 200);
+        console.log(`[${functionName}] Created ${chunks.length} chunks`);
+
+        // Delete existing chunks for this document
+        await supabase
+          .from('document_chunks')
+          .delete()
+          .eq('document_id', body.document_id);
+
+        // Generate embeddings and store chunks
+        const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+        let chunksWithEmbeddings = 0;
+
+        for (let i = 0; i < chunks.length; i++) {
+          const chunk = chunks[i];
+          let embedding = null;
+
+          // Generate embedding if OpenAI key is available
+          if (OPENAI_API_KEY) {
+            try {
+              const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${OPENAI_API_KEY}`,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  model: 'text-embedding-3-small',
+                  input: chunk.text
+                })
+              });
+
+              if (embeddingResponse.ok) {
+                const embeddingData = await embeddingResponse.json();
+                embedding = embeddingData.data?.[0]?.embedding;
+                if (embedding) chunksWithEmbeddings++;
+              }
+            } catch (e) {
+              console.error(`[${functionName}] Embedding failed for chunk ${i}:`, e);
+            }
+          }
+
+          // Store chunk (with or without embedding)
+          const { error: insertError } = await supabase.from('document_chunks').insert({
             document_id: body.document_id,
             workspace_id: body.workspace_id,
             chunk_index: i,
-            content: chunks[i],
-            page_number: Math.floor(i / 3) + 1
+            content: chunk.text,
+            page_number: chunk.page,
+            embedding: embedding ? JSON.stringify(embedding) : null
           });
+
+          if (insertError) {
+            console.error(`[${functionName}] Failed to insert chunk ${i}:`, insertError);
+          }
         }
+
+        // Update document status
+        await supabase
+          .from('documents')
+          .update({
+            status: 'processed',
+            extracted_text: extractedText.slice(0, 50000), // Store truncated
+            page_count: chunks.length,
+            processed_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', body.document_id);
+
+        result = { 
+          chunks_created: chunks.length,
+          chunks_with_embeddings: chunksWithEmbeddings,
+          text_length: extractedText.length
+        };
+        break;
       }
-    } else {
-      // Store chunks without embeddings
-      chunks.forEach((chunk, i) => {
-        chunksWithEmbeddings.push({
-          document_id: body.document_id,
-          workspace_id: body.workspace_id,
-          chunk_index: i,
-          content: chunk,
-          page_number: Math.floor(i / 3) + 1
-        });
-      });
-    }
 
-    // Store chunks
-    if (chunksWithEmbeddings.length > 0) {
-      // Delete existing chunks first
-      await supabase
-        .from('document_chunks')
-        .delete()
-        .eq('document_id', body.document_id);
+      case 'extract_faqs': {
+        if (!body.document_id) throw new Error('document_id is required');
 
-      const { error: insertError } = await supabase
-        .from('document_chunks')
-        .insert(chunksWithEmbeddings);
+        // Fetch document
+        const { data: document, error: docError } = await supabase
+          .from('documents')
+          .select('id, name, workspace_id')
+          .eq('id', body.document_id)
+          .eq('workspace_id', body.workspace_id)
+          .single();
 
-      if (insertError) {
-        console.error(`[${functionName}] Failed to store chunks:`, insertError);
-      }
-    }
+        if (docError || !document) throw new Error('Document not found');
 
-    // Generate FAQs from document content using AI
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    let generatedFaqs: any[] = [];
+        // Get document chunks
+        const { data: chunks } = await supabase
+          .from('document_chunks')
+          .select('content')
+          .eq('document_id', body.document_id)
+          .order('chunk_index')
+          .limit(20);
 
-    if (LOVABLE_API_KEY && extractedText.length > 100) {
-      const faqPrompt = `Extract FAQ-style question and answer pairs from this document content. Focus on useful information that could answer customer questions.
+        if (!chunks?.length) throw new Error('No chunks found - process document first');
 
-DOCUMENT: ${document.name}
-CONTENT:
-${extractedText.slice(0, 8000)}
+        const documentContent = chunks.map(c => c.content).join('\n\n');
 
----
+        // Extract FAQs with Gemini
+        const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+        if (!LOVABLE_API_KEY) throw new Error('LOVABLE_API_KEY not configured');
 
-Extract up to 10 FAQs. Return JSON array:
+        const extractPrompt = `Extract FAQs from this document content. Create Q&A pairs for any information a customer might ask about.
+
+Document: ${document.name}
+
+Content:
+${documentContent.slice(0, 15000)}
+
+Generate JSON array of FAQs:
 [
   {
-    "question": "Clear question that a customer might ask",
-    "answer": "Comprehensive answer from the document",
-    "category": "Pricing|Services|Policies|Hours|General"
+    "question": "Natural question a customer might ask",
+    "answer": "Complete answer from the document",
+    "category": "Pricing|Services|Policies|General"
   }
-]`;
+]
 
-      try {
-        const faqResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+Extract 10-20 meaningful FAQs. Only use information actually in the document.`;
+
+        const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -248,92 +261,103 @@ Extract up to 10 FAQs. Return JSON array:
           body: JSON.stringify({
             model: 'google/gemini-2.5-flash',
             messages: [
-              { role: 'system', content: 'Extract FAQs from documents. Return valid JSON array only.' },
-              { role: 'user', content: faqPrompt }
+              { role: 'system', content: 'Extract FAQs from documents. Respond with valid JSON array only.' },
+              { role: 'user', content: extractPrompt }
             ],
             temperature: 0.3
           })
         });
 
-        if (faqResponse.ok) {
-          const faqData = await faqResponse.json();
-          const faqText = faqData.choices?.[0]?.message?.content || '';
-          
-          try {
-            const jsonMatch = faqText.match(/\[[\s\S]*\]/);
-            if (jsonMatch) {
-              generatedFaqs = JSON.parse(jsonMatch[0]);
-              console.log(`[${functionName}] Generated ${generatedFaqs.length} FAQs from document`);
-              
-              // Store FAQs in faq_database
-              if (generatedFaqs.length > 0) {
-                const faqsToInsert = generatedFaqs.map(faq => ({
-                  workspace_id: body.workspace_id,
-                  question: faq.question,
-                  answer: faq.answer,
-                  category: faq.category || 'General',
-                  source_url: `document://${document.name}`,
-                  generation_source: 'document',
-                  is_own_content: true
-                }));
+        if (!aiResponse.ok) throw new Error('FAQ extraction failed');
 
-                await supabase
-                  .from('faq_database')
-                  .insert(faqsToInsert);
-              }
-            }
-          } catch (parseError) {
-            console.error(`[${functionName}] FAQ parsing error:`, parseError);
+        const aiData = await aiResponse.json();
+        const faqsText = aiData.choices?.[0]?.message?.content || '[]';
+        
+        let faqs;
+        try {
+          const jsonMatch = faqsText.match(/\[[\s\S]*\]/);
+          faqs = JSON.parse(jsonMatch?.[0] || '[]');
+        } catch {
+          faqs = [];
+        }
+
+        console.log(`[${functionName}] Extracted ${faqs.length} FAQs from document`);
+
+        // Insert FAQs into faq_database
+        const faqRecords = faqs.map((faq: any) => ({
+          workspace_id: body.workspace_id,
+          question: faq.question,
+          answer: faq.answer,
+          category: faq.category || 'General',
+          source_url: `document://${document.name}`,
+          generation_source: 'document',
+          is_own_content: true,
+          priority: 7 // Lower than website (9-10) but decent
+        }));
+
+        if (faqRecords.length > 0) {
+          const { error: faqError } = await supabase.from('faq_database').insert(faqRecords);
+          if (faqError) {
+            console.error(`[${functionName}] FAQ insert error:`, faqError);
           }
         }
-      } catch (faqError) {
-        console.error(`[${functionName}] FAQ generation error:`, faqError);
+
+        result = { faqs_extracted: faqRecords.length };
+        break;
       }
-    }
 
-    // Update document as processed
-    const { error: updateError } = await supabase
-      .from('documents')
-      .update({
-        status: 'processed',
-        extracted_text: extractedText.slice(0, 50000), // Store first 50k chars
-        page_count: Math.ceil(chunks.length / 3),
-        processed_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', body.document_id);
+      case 'delete': {
+        if (!body.document_id) throw new Error('document_id is required');
 
-    if (updateError) {
-      console.error(`[${functionName}] Failed to update document:`, updateError);
+        // Fetch document
+        const { data: document, error: docError } = await supabase
+          .from('documents')
+          .select('file_path')
+          .eq('id', body.document_id)
+          .eq('workspace_id', body.workspace_id)
+          .single();
+
+        if (docError || !document) throw new Error('Document not found');
+
+        // Delete chunks first
+        await supabase
+          .from('document_chunks')
+          .delete()
+          .eq('document_id', body.document_id);
+
+        // Delete document record
+        await supabase
+          .from('documents')
+          .delete()
+          .eq('id', body.document_id);
+
+        // Delete from storage
+        if (document.file_path) {
+          await supabase.storage
+            .from('documents')
+            .remove([document.file_path]);
+        }
+
+        result = { deleted: true };
+        break;
+      }
+
+      default:
+        throw new Error(`Unknown action: ${body.action}`);
     }
 
     const duration = Date.now() - startTime;
     console.log(`[${functionName}] Completed in ${duration}ms`);
 
     return new Response(
-      JSON.stringify({
-        success: true,
-        document: {
-          id: body.document_id,
-          name: document.name,
-          chunks_created: chunksWithEmbeddings.length,
-          faqs_generated: generatedFaqs.length,
-          text_length: extractedText.length
-        },
-        duration_ms: duration
-      }),
+      JSON.stringify({ success: true, ...result, duration_ms: duration }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error: any) {
     console.error(`[${functionName}] Error:`, error);
     return new Response(
-      JSON.stringify({
-        success: false,
-        error: error.message,
-        function: functionName,
-        duration_ms: Date.now() - startTime
-      }),
+      JSON.stringify({ success: false, error: error.message, function: functionName }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
