@@ -1,13 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// Declare EdgeRuntime for TypeScript
-declare const EdgeRuntime: {
-  waitUntil: (promise: Promise<unknown>) => void;
-};
-
 // =============================================================================
-// ROBUST EMAIL CLASSIFICATION WITH RATE LIMITING & AUTO-CONTINUATION
+// ROBUST EMAIL CLASSIFICATION WITH RATE LIMITING & FRONTEND-DRIVEN CONTINUATION
 // Handles 30,000+ emails with Gemini rate limit management
 // =============================================================================
 
@@ -110,12 +105,12 @@ serve(async (req) => {
       }
       job = data as ClassifyJob;
     } else {
-      // Count unclassified emails
+      // Count unclassified emails in queue
       const { count } = await supabase
-        .from('raw_emails')
+        .from('email_import_queue')
         .select('id', { count: 'exact', head: true })
         .eq('workspace_id', workspace_id)
-        .is('classification_category', null);
+        .eq('status', 'pending');
 
       const { data, error } = await supabase
         .from('classification_jobs')
@@ -148,14 +143,15 @@ serve(async (req) => {
     let batchesProcessed = 0;
     let classifiedThisRun = 0;
     let consecutiveFailures = 0;
+    let rateLimitDelay = 0;
 
     while (shouldContinueProcessing(startTime) && consecutiveFailures < MAX_RETRIES) {
-      // Fetch next batch of unclassified emails
+      // Fetch next batch of unclassified emails from queue
       let query = supabase
-        .from('raw_emails')
-        .select('id, from_email, from_name, subject, body_text, folder, email_type')
+        .from('email_import_queue')
+        .select('id, from_email, from_name, subject, body, direction')
         .eq('workspace_id', workspace_id)
-        .is('classification_category', null)
+        .eq('status', 'pending')
         .order('received_at', { ascending: false })
         .limit(BATCH_SIZE);
 
@@ -178,7 +174,7 @@ serve(async (req) => {
 
       // Build Gemini prompt
       const emailSummaries = emails.map((e: any, i: number) =>
-        `[${i}] From: ${e.from_email} | Subject: ${e.subject || '(no subject)'} | Type: ${e.email_type || 'unknown'}\nBody: ${(e.body_text || '').substring(0, 150)}...`
+        `[${i}] From: ${e.from_email} | Subject: ${e.subject || '(no subject)'} | Direction: ${e.direction || 'unknown'}\nBody: ${(e.body || '').substring(0, 150)}...`
       ).join('\n\n---\n\n');
 
       const prompt = `Classify each email. Categories: inquiry, booking, quote, complaint, follow_up, spam, notification, personal.
@@ -206,29 +202,27 @@ ${emailSummaries}`;
 
           if (response.status === 429) {
             const errorText = await response.text();
-            const retryDelay = parseRetryDelay(errorText) || getBackoffDelay(retryCount);
+            rateLimitDelay = parseRetryDelay(errorText) || getBackoffDelay(retryCount);
             
-            console.log(`[${FUNCTION_NAME}] Rate limited, waiting ${retryDelay}ms`);
+            console.log(`[${FUNCTION_NAME}] Rate limited, delay needed: ${rateLimitDelay}ms`);
             
             // Check if we have time to wait
             if (!shouldContinueProcessing(startTime)) {
               console.log(`[${FUNCTION_NAME}] No time for retry, saving checkpoint`);
               await saveCheckpoint(supabase, job);
               
-              // Schedule continuation
-              scheduleNextBatch(supabaseUrl, supabaseServiceKey, workspace_id, job.id);
-              
               return createResponse({
                 success: true,
                 status: 'rate_limited',
                 job_id: job.id,
                 classified_this_run: classifiedThisRun,
-                message: 'Rate limited, will continue automatically',
+                message: 'Rate limited, please continue after delay',
                 should_continue: true,
+                continue_after_ms: rateLimitDelay,
               });
             }
             
-            await sleep(retryDelay);
+            await sleep(rateLimitDelay);
             retryCount++;
             continue;
           }
@@ -273,12 +267,8 @@ ${emailSummaries}`;
         if (!email) continue;
 
         const { error: updateError } = await supabase
-          .from('raw_emails')
+          .from('email_import_queue')
           .update({
-            classification_category: c.category,
-            classification_confidence: c.confidence,
-            classification_reasoning: c.reasoning,
-            requires_reply: c.requires_reply,
             status: 'classified',
           })
           .eq('id', email.id);
@@ -301,10 +291,10 @@ ${emailSummaries}`;
     // Check if Complete or Need Continuation
     // -------------------------------------------------------------------------
     const { count: remaining } = await supabase
-      .from('raw_emails')
+      .from('email_import_queue')
       .select('id', { count: 'exact', head: true })
       .eq('workspace_id', workspace_id)
-      .is('classification_category', null);
+      .eq('status', 'pending');
 
     const isComplete = !remaining || remaining === 0;
 
@@ -327,8 +317,8 @@ ${emailSummaries}`;
       });
     }
 
-    // Schedule next batch
-    scheduleNextBatch(supabaseUrl, supabaseServiceKey, workspace_id, job.id);
+    // More work to do - frontend should call again
+    await saveCheckpoint(supabase, job);
 
     return createResponse({
       success: true,
@@ -338,7 +328,7 @@ ${emailSummaries}`;
       classified_this_run: classifiedThisRun,
       remaining,
       should_continue: true,
-      message: 'Processing continues in background',
+      continue_after_ms: rateLimitDelay || 2000, // Frontend should wait before next call
     });
 
   } catch (error: any) {
@@ -371,31 +361,9 @@ async function saveCheckpoint(supabase: SupabaseClient, job: ClassifyJob): Promi
     .eq('id', job.id);
 }
 
-function scheduleNextBatch(
-  supabaseUrl: string,
-  serviceKey: string,
-  workspaceId: string,
-  jobId: string
-): void {
-  // Use waitUntil for background scheduling
-  EdgeRuntime.waitUntil(
-    sleep(2000).then(() =>
-      fetch(`${supabaseUrl}/functions/v1/${FUNCTION_NAME}`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${serviceKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ workspace_id: workspaceId, job_id: jobId }),
-      }).catch(err => console.error(`[${FUNCTION_NAME}] Chain error:`, err))
-    )
-  );
-}
-
 function createResponse(data: Record<string, unknown>): Response {
   return new Response(
     JSON.stringify(data),
     { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
   );
 }
-

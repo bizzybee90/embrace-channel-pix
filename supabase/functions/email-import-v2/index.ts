@@ -1,13 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// Declare EdgeRuntime for TypeScript
-declare const EdgeRuntime: {
-  waitUntil: (promise: Promise<unknown>) => void;
-};
-
 // =============================================================================
-// ROBUST EMAIL IMPORT WITH CHECKPOINTING & BACKGROUND PROCESSING
+// ROBUST EMAIL IMPORT WITH CHECKPOINTING & FRONTEND-DRIVEN CONTINUATION
 // Handles 30,000+ emails with automatic resumption and rate limiting
 // =============================================================================
 
@@ -26,6 +21,7 @@ const BASE_DELAY_MS = 1000;
 interface ImportJob {
   id: string;
   workspace_id: string;
+  config_id: string;
   status: 'pending' | 'in_progress' | 'paused' | 'completed' | 'failed';
   import_mode: string;
   total_target: number;
@@ -83,6 +79,19 @@ serve(async (req) => {
     console.log(`[${FUNCTION_NAME}] Starting:`, { workspace_id, job_id, import_mode });
 
     // -------------------------------------------------------------------------
+    // Get Email Provider Config
+    // -------------------------------------------------------------------------
+    const { data: emailConfig, error: configError } = await supabase
+      .from('email_provider_configs')
+      .select('id, access_token, email_address')
+      .eq('workspace_id', workspace_id)
+      .single();
+
+    if (configError || !emailConfig?.access_token) {
+      throw new Error('Email not connected. Please connect your email account first.');
+    }
+
+    // -------------------------------------------------------------------------
     // Get or Create Import Job
     // -------------------------------------------------------------------------
     let job: ImportJob;
@@ -108,6 +117,7 @@ serve(async (req) => {
         .from('email_import_jobs')
         .insert({
           workspace_id,
+          config_id: emailConfig.id,
           status: 'in_progress',
           import_mode,
           total_target: totalTarget,
@@ -131,19 +141,6 @@ serve(async (req) => {
       .from('email_import_jobs')
       .update({ status: 'in_progress', last_batch_at: new Date().toISOString() })
       .eq('id', job.id);
-
-    // -------------------------------------------------------------------------
-    // Get Email Provider Config
-    // -------------------------------------------------------------------------
-    const { data: emailConfig, error: configError } = await supabase
-      .from('email_provider_configs')
-      .select('access_token, email_address')
-      .eq('workspace_id', workspace_id)
-      .single();
-
-    if (configError || !emailConfig?.access_token) {
-      throw new Error('Email not connected. Please connect your email account first.');
-    }
 
     // -------------------------------------------------------------------------
     // Process Emails in Batches
@@ -177,7 +174,7 @@ serve(async (req) => {
       // Fetch batch from Aurinko
       const batchLimit = Math.min(BATCH_SIZE, targetPerFolder - imported);
       
-      let response: Response;
+      let response: Response | undefined;
       let retryCount = 0;
 
       while (retryCount < MAX_RETRIES) {
@@ -203,16 +200,17 @@ serve(async (req) => {
           const delay = retryAfter ? parseInt(retryAfter) * 1000 : getBackoffDelay(retryCount);
           console.log(`[${FUNCTION_NAME}] Rate limited, waiting ${delay}ms`);
           
-          // If delay would exceed timeout, save checkpoint and exit
+          // If delay would exceed timeout, save checkpoint and return for frontend to continue
           if (!shouldContinueProcessing(startTime)) {
             await saveCheckpoint(supabase, job, 'paused');
             return createResponse({
               success: true,
               status: 'paused',
               job_id: job.id,
-              message: 'Rate limited, will continue automatically',
+              message: 'Rate limited, please continue',
               progress: getProgress(job),
               should_continue: true,
+              continue_after_ms: delay,
             });
           }
           
@@ -228,8 +226,12 @@ serve(async (req) => {
         throw new Error(`Aurinko API error: ${response.status}`);
       }
 
+      if (!response) {
+        throw new Error('Failed to fetch emails after retries');
+      }
+
       // Parse response
-      const data = await response!.json();
+      const data = await response.json();
       const messages = data.records || [];
 
       if (messages.length === 0) {
@@ -244,24 +246,26 @@ serve(async (req) => {
         continue;
       }
 
-      // Transform and save emails
+      // Transform and save emails to queue
       const emailsToSave = messages.map((msg: any) => ({
         workspace_id,
+        config_id: emailConfig.id,
         external_id: msg.id,
         thread_id: msg.threadId,
         from_email: msg.from?.address || '',
         from_name: msg.from?.name || null,
-        to_email: msg.to?.[0]?.address || '',
+        to_emails: msg.to?.map((t: any) => t.address) || [],
         subject: msg.subject || '',
-        body_text: msg.textBody || msg.bodySnippet || '',
+        body: msg.textBody || msg.bodySnippet || '',
+        body_html: msg.htmlBody || null,
         received_at: msg.receivedAt || msg.createdAt,
-        folder,
-        email_type: folder === 'SENT' ? 'sent' : 'received',
-        status: 'imported',
+        direction: folder === 'SENT' ? 'outbound' : 'inbound',
+        status: 'pending',
+        has_body: !!(msg.textBody || msg.bodySnippet),
       }));
 
       const { error: insertError, data: insertedData } = await supabase
-        .from('raw_emails')
+        .from('email_import_queue')
         .upsert(emailsToSave, {
           onConflict: 'workspace_id,external_id',
           ignoreDuplicates: true,
@@ -328,25 +332,8 @@ serve(async (req) => {
       });
     }
 
-    // Need to continue - trigger next batch
+    // More work to do - frontend should call again
     await saveCheckpoint(supabase, job, 'in_progress');
-
-    // Use EdgeRuntime.waitUntil for background continuation
-    const continuePayload = { workspace_id, job_id: job.id };
-    
-    // Schedule next batch (fire and forget)
-    EdgeRuntime.waitUntil(
-      sleep(1000).then(() => 
-        fetch(`${supabaseUrl}/functions/v1/${FUNCTION_NAME}`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${supabaseServiceKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(continuePayload),
-        }).catch(err => console.error('[${FUNCTION_NAME}] Chain error:', err))
-      )
-    );
 
     return createResponse({
       success: true,
@@ -356,7 +343,7 @@ serve(async (req) => {
       imported_this_run: totalImportedThisRun,
       progress: getProgress(job),
       should_continue: true,
-      message: 'Processing continues in background',
+      continue_after_ms: 1000, // Frontend should wait 1s before next call
     });
 
   } catch (error: any) {
@@ -414,8 +401,3 @@ function createResponse(data: Record<string, unknown>): Response {
     { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
   );
 }
-
-// Handle graceful shutdown
-addEventListener('beforeunload', (ev: any) => {
-  console.log(`[${FUNCTION_NAME}] Shutdown:`, ev.detail?.reason);
-});
