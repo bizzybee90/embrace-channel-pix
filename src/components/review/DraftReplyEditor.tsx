@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import {
@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Send, Loader2, Sparkles } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { DraftVerificationBadge } from './DraftVerificationBadge';
 
 interface DraftReplyEditorProps {
   open: boolean;
@@ -21,6 +22,7 @@ interface DraftReplyEditorProps {
   conversationTitle: string;
   customerEmail: string;
   aiDraft: string;
+  workspaceId?: string;
   onSent?: () => void;
 }
 
@@ -31,9 +33,11 @@ export function DraftReplyEditor({
   conversationTitle,
   customerEmail,
   aiDraft,
+  workspaceId,
   onSent,
 }: DraftReplyEditorProps) {
   const [draft, setDraft] = useState(aiDraft);
+  const [verificationStatus, setVerificationStatus] = useState<'pending' | 'passed' | 'failed' | 'needs_review' | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -41,6 +45,7 @@ export function DraftReplyEditor({
   const handleOpenChange = (isOpen: boolean) => {
     if (isOpen) {
       setDraft(aiDraft);
+      setVerificationStatus(null);
     }
     onOpenChange(isOpen);
   };
@@ -98,6 +103,18 @@ export function DraftReplyEditor({
           <SheetTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-purple-500" />
             Edit & Send Reply
+            {workspaceId && (
+              <DraftVerificationBadge
+                conversationId={conversationId}
+                workspaceId={workspaceId}
+                draft={draft}
+                verificationStatus={verificationStatus}
+                onUseCorrectedDraft={(corrected) => setDraft(corrected)}
+                onVerificationComplete={(result) => {
+                  setVerificationStatus(result.status as any);
+                }}
+              />
+            )}
           </SheetTitle>
           <SheetDescription>
             <span className="font-medium">To:</span> {customerEmail}
@@ -109,7 +126,11 @@ export function DraftReplyEditor({
         <div className="flex-1 mt-4">
           <Textarea
             value={draft}
-            onChange={(e) => setDraft(e.target.value)}
+            onChange={(e) => {
+              setDraft(e.target.value);
+              // Reset verification when draft changes
+              if (verificationStatus) setVerificationStatus(null);
+            }}
             placeholder="Write your reply..."
             className="min-h-[300px] resize-none"
           />

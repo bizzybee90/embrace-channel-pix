@@ -9,6 +9,9 @@ verify_jwt = true
 [functions.ai-draft]
 verify_jwt = true
 
+[functions.draft-verify]
+verify_jwt = true
+
 [functions.email-send]
 verify_jwt = true
 
@@ -91,13 +94,10 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.competitor-discover]
-verify_jwt = false
+verify_jwt = true
 
 [functions.competitor-discover-smart]
 verify_jwt = false
-
-[functions.competitor-discover]
-verify_jwt = true
 
 [functions.competitor-scrape-worker]
 verify_jwt = false
