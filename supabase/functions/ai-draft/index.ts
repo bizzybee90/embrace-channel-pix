@@ -75,7 +75,6 @@ serve(async (req) => {
       .select(`
         id,
         title,
-        intent,
         category,
         customer:customers(id, name, email)
       `)
@@ -385,7 +384,6 @@ CUSTOMER INFORMATION:
 - Name: ${customerName}
 - Email: ${customerEmail}
 - Topic: ${conversation.title || conversation.category || 'General inquiry'}
-- Detected intent: ${conversation.intent || 'general inquiry'}
 ${voiceSection}
 
 CONVERSATION HISTORY:
