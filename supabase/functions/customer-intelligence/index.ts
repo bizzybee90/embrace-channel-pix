@@ -8,8 +8,8 @@ const corsHeaders = {
 
 interface IntelligenceRequest {
   workspace_id: string;
-  customer_id: string;
-  action: 'analyze' | 'refresh' | 'get';
+  customer_id?: string;
+  action: 'analyze' | 'refresh_all' | 'get_insights';
 }
 
 serve(async (req) => {
@@ -27,253 +27,230 @@ serve(async (req) => {
     );
 
     const body: IntelligenceRequest = await req.json();
-    console.log(`[${functionName}] Request:`, body);
+    console.log(`[${functionName}] Starting:`, body);
 
     if (!body.workspace_id) throw new Error('workspace_id is required');
-    if (!body.customer_id) throw new Error('customer_id is required');
+    if (!body.action) throw new Error('action is required');
 
-    const action = body.action || 'analyze';
-
-    // Get customer data
-    const { data: customer, error: customerError } = await supabase
-      .from('customers')
-      .select('*')
-      .eq('id', body.customer_id)
-      .eq('workspace_id', body.workspace_id)
-      .single();
-
-    if (customerError || !customer) {
-      throw new Error('Customer not found');
-    }
-
-    // If just getting existing intelligence, return early
-    if (action === 'get') {
-      const { data: insights } = await supabase
-        .from('customer_insights')
-        .select('*')
-        .eq('customer_id', body.customer_id)
-        .order('created_at', { ascending: false })
-        .limit(10);
-
-      return new Response(
-        JSON.stringify({
-          success: true,
-          customer: {
-            id: customer.id,
-            name: customer.name,
-            email: customer.email,
-            intelligence: customer.intelligence,
-            lifetime_value: customer.lifetime_value,
-            sentiment_trend: customer.sentiment_trend,
-            topics_discussed: customer.topics_discussed,
-            vip_status: customer.vip_status,
-            last_analyzed_at: customer.last_analyzed_at
-          },
-          insights: insights || []
-        }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Get customer's conversation history
-    const { data: conversations } = await supabase
-      .from('conversations')
-      .select('id, title, summary_for_human, category, priority, ai_sentiment, created_at, status, urgency')
-      .eq('customer_id', body.customer_id)
-      .order('created_at', { ascending: false })
-      .limit(50);
-
-    // Get messages from those conversations
-    const conversationIds = conversations?.map(c => c.id) || [];
-    let messages: any[] = [];
-    if (conversationIds.length > 0) {
-      const { data: msgData } = await supabase
-        .from('messages')
-        .select('id, conversation_id, body, direction, actor_type, created_at')
-        .in('conversation_id', conversationIds)
-        .order('created_at', { ascending: false })
-        .limit(200);
-      messages = msgData || [];
-    }
-
-    // Prepare context for AI analysis
-    const conversationSummaries = conversations?.slice(0, 20).map(c => ({
-      category: c.category,
-      sentiment: c.ai_sentiment,
-      priority: c.priority,
-      summary: c.summary_for_human,
-      date: c.created_at
-    })) || [];
-
-    const customerMessages = messages
-      .filter(m => m.direction === 'inbound')
-      .slice(0, 50)
-      .map(m => m.body)
-      .join('\n---\n');
-
-    // Analyze with AI
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY not configured');
-    }
+    if (!LOVABLE_API_KEY) throw new Error('LOVABLE_API_KEY not configured');
 
-    const analysisPrompt = `Analyze this customer's communication history and create a detailed profile.
+    let result: any;
 
-## CUSTOMER INFO
-Name: ${customer.name || 'Unknown'}
-Email: ${customer.email || 'Unknown'}
-Phone: ${customer.phone || 'Unknown'}
-Total Conversations: ${conversations?.length || 0}
+    switch (body.action) {
+      case 'analyze': {
+        if (!body.customer_id) throw new Error('customer_id required for analyze');
+        
+        // Fetch customer's conversation history
+        const { data: conversations, error: convError } = await supabase
+          .from('conversations')
+          .select(`
+            id,
+            title,
+            status,
+            priority,
+            ai_sentiment,
+            category,
+            created_at
+          `)
+          .eq('customer_id', body.customer_id)
+          .order('created_at', { ascending: false })
+          .limit(50);
 
-## CONVERSATION HISTORY (most recent first)
-${JSON.stringify(conversationSummaries, null, 2)}
+        if (convError) throw new Error(`Failed to fetch conversations: ${convError.message}`);
+        if (!conversations || conversations.length === 0) {
+          return new Response(
+            JSON.stringify({ success: true, message: 'No conversations to analyze' }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
 
-## SAMPLE CUSTOMER MESSAGES
-${customerMessages.slice(0, 3000)}
+        // Get messages for these conversations
+        const conversationIds = conversations.map(c => c.id);
+        const { data: messages } = await supabase
+          .from('messages')
+          .select('conversation_id, body, direction, created_at')
+          .in('conversation_id', conversationIds)
+          .order('created_at', { ascending: false })
+          .limit(200);
 
----
+        // Group messages by conversation
+        const messagesByConv: Record<string, any[]> = {};
+        (messages || []).forEach(m => {
+          if (!messagesByConv[m.conversation_id]) {
+            messagesByConv[m.conversation_id] = [];
+          }
+          messagesByConv[m.conversation_id].push(m);
+        });
 
-Create a comprehensive customer intelligence profile. Return JSON:
+        // Prepare conversation summary for AI
+        const conversationSummary = conversations.slice(0, 20).map(conv => {
+          const convMessages = messagesByConv[conv.id]?.slice(0, 5) || [];
+          return `Subject: ${conv.title || 'No subject'}
+Status: ${conv.status}
+Priority: ${conv.priority}
+Category: ${conv.category || 'uncategorized'}
+Sentiment: ${conv.ai_sentiment || 'unknown'}
+Messages: ${convMessages.map(m => `[${m.direction}] ${m.body?.slice(0, 200)}`).join('\n')}`;
+        }).join('\n---\n');
+
+        // Analyze with Gemini
+        const analysisPrompt = `Analyze this customer's email history and extract insights:
+
+${conversationSummary}
+
+Provide a JSON response with:
 {
-  "personality_traits": ["trait1", "trait2"],
-  "communication_style": "brief|detailed|formal|casual|urgent",
-  "preferred_response_style": "description of how to best respond to this customer",
-  "key_topics": ["topic1", "topic2"],
-  "sentiment_trend": "positive|neutral|negative|improving|declining",
-  "engagement_level": "high|medium|low",
-  "vip_indicators": ["reason1", "reason2"],
-  "is_vip": true|false,
-  "potential_concerns": ["concern1"],
-  "opportunities": ["opportunity1"],
+  "lifetime_value_estimate": "low/medium/high/vip based on engagement",
+  "sentiment_trend": "positive/neutral/negative/declining",
+  "response_preference": "formal/casual/brief/detailed based on their messages",
+  "topics_discussed": ["array", "of", "main", "topics"],
+  "communication_patterns": {
+    "typical_response_time": "immediate/same-day/slow",
+    "message_length": "brief/moderate/detailed",
+    "tone": "professional/friendly/demanding/appreciative"
+  },
   "insights": [
     {
-      "type": "behavior|preference|need|risk|opportunity",
-      "text": "specific insight about the customer",
+      "type": "behavior/preference/risk/opportunity",
+      "text": "specific insight",
       "confidence": 0.0-1.0
     }
   ],
-  "recommended_approach": "summary of best way to handle this customer"
+  "summary": "2-3 sentence summary of this customer"
 }`;
 
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          { 
-            role: 'system', 
-            content: 'You are a customer intelligence analyst. Analyze communication patterns and create actionable customer profiles. Return valid JSON only.' 
+        const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${LOVABLE_API_KEY}`
           },
-          { role: 'user', content: analysisPrompt }
-        ],
-        temperature: 0.3
-      })
-    });
+          body: JSON.stringify({
+            model: 'google/gemini-2.5-flash',
+            messages: [
+              { role: 'system', content: 'You are a customer intelligence analyst. Analyze email patterns to understand customers. Respond with valid JSON only.' },
+              { role: 'user', content: analysisPrompt }
+            ],
+            temperature: 0.3
+          })
+        });
 
-    if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      throw new Error(`AI Gateway error: ${aiResponse.status} - ${errorText}`);
-    }
+        if (!aiResponse.ok) throw new Error(`AI error: ${await aiResponse.text()}`);
 
-    const aiData = await aiResponse.json();
-    const analysisText = aiData.choices?.[0]?.message?.content || '';
+        const aiData = await aiResponse.json();
+        const analysisText = aiData.choices?.[0]?.message?.content || '';
+        
+        let analysis;
+        try {
+          const jsonMatch = analysisText.match(/\{[\s\S]*\}/);
+          analysis = JSON.parse(jsonMatch?.[0] || '{}');
+        } catch {
+          throw new Error('Failed to parse AI analysis');
+        }
 
-    // Parse AI response
-    let analysis;
-    try {
-      const jsonMatch = analysisText.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) throw new Error('No JSON found');
-      analysis = JSON.parse(jsonMatch[0]);
-    } catch (parseError) {
-      console.error(`[${functionName}] Failed to parse analysis:`, analysisText);
-      analysis = {
-        sentiment_trend: 'neutral',
-        communication_style: 'unknown',
-        is_vip: false,
-        insights: []
-      };
-    }
+        // Update customer record
+        const { error: updateError } = await supabase
+          .from('customers')
+          .update({
+            intelligence: analysis,
+            lifetime_value: analysis.lifetime_value_estimate === 'vip' ? 10000 : 
+                           analysis.lifetime_value_estimate === 'high' ? 5000 :
+                           analysis.lifetime_value_estimate === 'medium' ? 1000 : 100,
+            sentiment_trend: analysis.sentiment_trend,
+            response_preference: analysis.response_preference,
+            topics_discussed: analysis.topics_discussed,
+            vip_status: analysis.lifetime_value_estimate === 'vip',
+            last_analyzed_at: new Date().toISOString()
+          })
+          .eq('id', body.customer_id);
 
-    console.log(`[${functionName}] Analysis complete:`, {
-      sentiment: analysis.sentiment_trend,
-      is_vip: analysis.is_vip,
-      insights_count: analysis.insights?.length || 0
-    });
+        if (updateError) throw new Error(`Failed to update customer: ${updateError.message}`);
 
-    // Update customer record
-    const { error: updateError } = await supabase
-      .from('customers')
-      .update({
-        intelligence: {
-          personality_traits: analysis.personality_traits,
-          communication_style: analysis.communication_style,
-          preferred_response_style: analysis.preferred_response_style,
-          engagement_level: analysis.engagement_level,
-          recommended_approach: analysis.recommended_approach,
-          potential_concerns: analysis.potential_concerns,
-          opportunities: analysis.opportunities
-        },
-        sentiment_trend: analysis.sentiment_trend,
-        topics_discussed: analysis.key_topics || [],
-        vip_status: analysis.is_vip || false,
-        last_analyzed_at: new Date().toISOString()
-      })
-      .eq('id', body.customer_id);
+        // Store insights
+        if (analysis.insights?.length > 0) {
+          const insights = analysis.insights.map((i: any) => ({
+            customer_id: body.customer_id,
+            workspace_id: body.workspace_id,
+            insight_type: i.type,
+            insight_text: i.text,
+            confidence: i.confidence,
+            source_conversations: conversations.slice(0, 10).map(c => c.id)
+          }));
 
-    if (updateError) {
-      console.error(`[${functionName}] Failed to update customer:`, updateError);
-    }
+          await supabase.from('customer_insights').insert(insights);
+        }
 
-    // Store individual insights
-    if (analysis.insights && analysis.insights.length > 0) {
-      const insightsToStore = analysis.insights.map((insight: any) => ({
-        customer_id: body.customer_id,
-        workspace_id: body.workspace_id,
-        insight_type: insight.type,
-        insight_text: insight.text,
-        confidence: insight.confidence,
-        source_conversations: conversationIds.slice(0, 10),
-        expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days
-      }));
-
-      const { error: insightError } = await supabase
-        .from('customer_insights')
-        .insert(insightsToStore);
-
-      if (insightError) {
-        console.error(`[${functionName}] Failed to store insights:`, insightError);
+        result = { 
+          customer_id: body.customer_id,
+          analysis,
+          conversations_analyzed: conversations.length
+        };
+        break;
       }
+
+      case 'refresh_all': {
+        // Get customers who haven't been analyzed recently
+        const { data: customers } = await supabase
+          .from('customers')
+          .select('id')
+          .eq('workspace_id', body.workspace_id)
+          .or('last_analyzed_at.is.null,last_analyzed_at.lt.' + 
+              new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
+          .limit(20);
+
+        const analyzed = [];
+        for (const customer of customers || []) {
+          try {
+            // Recursive call to analyze each
+            const { data } = await supabase.functions.invoke('customer-intelligence', {
+              body: { workspace_id: body.workspace_id, customer_id: customer.id, action: 'analyze' }
+            });
+            analyzed.push(customer.id);
+          } catch (e) {
+            console.error(`Failed to analyze ${customer.id}:`, e);
+          }
+        }
+
+        result = { refreshed: analyzed.length, customers: analyzed };
+        break;
+      }
+
+      case 'get_insights': {
+        const query = supabase
+          .from('customer_insights')
+          .select('*, customer:customers(name, email)')
+          .eq('workspace_id', body.workspace_id)
+          .order('created_at', { ascending: false })
+          .limit(50);
+
+        if (body.customer_id) {
+          query.eq('customer_id', body.customer_id);
+        }
+
+        const { data: insights, error } = await query;
+        if (error) throw error;
+
+        result = { insights };
+        break;
+      }
+
+      default:
+        throw new Error(`Unknown action: ${body.action}`);
     }
 
     const duration = Date.now() - startTime;
     console.log(`[${functionName}] Completed in ${duration}ms`);
 
     return new Response(
-      JSON.stringify({
-        success: true,
-        analysis: {
-          ...analysis,
-          conversations_analyzed: conversations?.length || 0,
-          messages_analyzed: messages.length
-        },
-        duration_ms: duration
-      }),
+      JSON.stringify({ success: true, ...result, duration_ms: duration }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error: any) {
     console.error(`[${functionName}] Error:`, error);
     return new Response(
-      JSON.stringify({
-        success: false,
-        error: error.message,
-        function: functionName,
-        duration_ms: Date.now() - startTime
-      }),
+      JSON.stringify({ success: false, error: error.message, function: functionName }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
