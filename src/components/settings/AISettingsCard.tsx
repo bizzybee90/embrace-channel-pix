@@ -58,7 +58,7 @@ export const AISettingsCard = ({ workspaceId }: AISettingsCardProps) => {
         workspace_id: workspaceId, 
         ...newSettings,
         updated_at: new Date().toISOString()
-      });
+      }, { onConflict: 'workspace_id' });
     
     setSaving(false);
     if (error) {
