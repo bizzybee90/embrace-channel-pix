@@ -1,4 +1,4 @@
-import { Home, Mail, CheckCircle2, Clock, ChevronDown, ChevronRight, ChevronLeft, Send, Inbox, BarChart3, MessageSquare, Settings, ClipboardCheck } from 'lucide-react';
+import { Home, Mail, CheckCircle2, Clock, ChevronDown, ChevronRight, ChevronLeft, Send, Inbox, BarChart3, MessageSquare, Settings, ClipboardCheck, BookOpen } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
@@ -318,6 +318,15 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
                 >
                   <BarChart3 className="h-4 w-4" />
                   <span>Analytics</span>
+                </NavLink>
+                <NavLink
+                  to="/knowledge-base"
+                  onClick={onNavigate}
+                  className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-all"
+                  activeClassName="bg-accent text-accent-foreground font-medium"
+                >
+                  <BookOpen className="h-4 w-4" />
+                  <span>Knowledge Base</span>
                 </NavLink>
                 <NavLink
                   to="/settings"
