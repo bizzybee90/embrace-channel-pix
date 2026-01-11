@@ -149,3 +149,6 @@ verify_jwt = true
 
 [functions.business-location]
 verify_jwt = true
+
+[functions.industry-keywords]
+verify_jwt = true
