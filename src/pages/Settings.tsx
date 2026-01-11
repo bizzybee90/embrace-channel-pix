@@ -33,7 +33,7 @@ import { SettingsSection } from '@/components/settings/SettingsSection';
 import { MobilePageLayout } from '@/components/layout/MobilePageLayout';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useWorkspace } from '@/hooks/useWorkspace';
-import { Bot, Plug, Shield, Layout, Code, ChevronRight, ExternalLink } from 'lucide-react';
+import { Bot, Plug, Shield, Layout, Code, ChevronRight, ExternalLink, Wrench, TestTube2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface SettingsCategory {
@@ -182,8 +182,42 @@ export default function Settings() {
       description: 'Testing, cleanup, and diagnostics',
       content: (
         <div className="space-y-3">
+          {/* Admin Dashboards */}
+          <SettingsSection title="Admin Dashboards" description="DevOps monitoring and testing tools" defaultOpen>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Card className="bg-muted/30 hover:bg-muted/50 transition-colors">
+                <CardContent className="p-4">
+                  <Link to="/admin/devops" className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-primary/10">
+                      <Wrench className="h-5 w-5 text-primary" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium text-sm">DevOps Dashboard</p>
+                      <p className="text-xs text-muted-foreground">System health, jobs, logs & triggers</p>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </Link>
+                </CardContent>
+              </Card>
+              <Card className="bg-muted/30 hover:bg-muted/50 transition-colors">
+                <CardContent className="p-4">
+                  <Link to="/admin/test" className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-orange-500/10">
+                      <TestTube2 className="h-5 w-5 text-orange-500" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium text-sm">Test Dashboard</p>
+                      <p className="text-xs text-muted-foreground">Edge function testing</p>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </Link>
+                </CardContent>
+              </Card>
+            </div>
+          </SettingsSection>
+
           {workspace?.id && (
-            <SettingsSection title="Data Reset" description="Reset data and re-onboard" defaultOpen>
+            <SettingsSection title="Data Reset" description="Reset data and re-onboard">
               <DataResetPanel workspaceId={workspace.id} />
             </SettingsSection>
           )}
