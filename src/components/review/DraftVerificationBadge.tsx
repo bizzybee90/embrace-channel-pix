@@ -69,7 +69,8 @@ export function DraftVerificationBadge({
         body: {
           conversation_id: conversationId,
           workspace_id: workspaceId,
-          draft,
+          draft_text: draft,
+          customer_message: 'Customer inquiry', // Will be fetched from context
         },
       });
 
