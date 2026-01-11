@@ -63,7 +63,7 @@ export const TabletLayout = ({ filter = "all-open" }: TabletLayoutProps) => {
         .order('created_at', { ascending: true });
       
       if (data) {
-        setMessages(data as Message[]);
+        setMessages(data as unknown as Message[]);
       }
     }
   };
@@ -79,7 +79,7 @@ export const TabletLayout = ({ filter = "all-open" }: TabletLayoutProps) => {
       .order('created_at', { ascending: true });
     
     if (data) {
-      setMessages(data as Message[]);
+      setMessages(data as unknown as Message[]);
     }
   };
 

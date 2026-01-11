@@ -120,6 +120,8 @@ export interface Message {
   raw_payload: Record<string, any> | null;
   created_at: string;
   external_id?: string | null;
+  verification_status?: string | null;
+  verification_id?: string | null;
 }
 
 export interface Template {

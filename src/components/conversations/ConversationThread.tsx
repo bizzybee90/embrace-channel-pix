@@ -36,7 +36,7 @@ export const ConversationThread = ({ conversation, onUpdate, onBack }: Conversat
         .order('created_at', { ascending: true });
 
       if (data) {
-        setMessages(data as Message[]);
+        setMessages(data as unknown as Message[]);
       }
       setLoading(false);
 

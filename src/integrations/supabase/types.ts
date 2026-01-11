@@ -1518,6 +1518,63 @@ export type Database = {
           },
         ]
       }
+      draft_verifications: {
+        Row: {
+          confidence_score: number | null
+          conversation_id: string | null
+          corrected_draft: string | null
+          created_at: string | null
+          draft_id: string | null
+          id: string
+          issues_found: Json | null
+          original_draft: string
+          verification_notes: string | null
+          verification_status: string
+          workspace_id: string
+        }
+        Insert: {
+          confidence_score?: number | null
+          conversation_id?: string | null
+          corrected_draft?: string | null
+          created_at?: string | null
+          draft_id?: string | null
+          id?: string
+          issues_found?: Json | null
+          original_draft: string
+          verification_notes?: string | null
+          verification_status?: string
+          workspace_id: string
+        }
+        Update: {
+          confidence_score?: number | null
+          conversation_id?: string | null
+          corrected_draft?: string | null
+          created_at?: string | null
+          draft_id?: string | null
+          id?: string
+          issues_found?: Json | null
+          original_draft?: string
+          verification_notes?: string | null
+          verification_status?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "draft_verifications_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "draft_verifications_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_fetch_retries: {
         Row: {
           attempt_count: number | null
@@ -2980,6 +3037,8 @@ export type Database = {
           id: string
           is_internal: boolean | null
           raw_payload: Json | null
+          verification_id: string | null
+          verification_status: string | null
         }
         Insert: {
           actor_id?: string | null
@@ -2995,6 +3054,8 @@ export type Database = {
           id?: string
           is_internal?: boolean | null
           raw_payload?: Json | null
+          verification_id?: string | null
+          verification_status?: string | null
         }
         Update: {
           actor_id?: string | null
@@ -3010,6 +3071,8 @@ export type Database = {
           id?: string
           is_internal?: boolean | null
           raw_payload?: Json | null
+          verification_id?: string | null
+          verification_status?: string | null
         }
         Relationships: [
           {
@@ -3024,6 +3087,13 @@ export type Database = {
             columns: ["conversation_id"]
             isOneToOne: false
             referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_verification_id_fkey"
+            columns: ["verification_id"]
+            isOneToOne: false
+            referencedRelation: "draft_verifications"
             referencedColumns: ["id"]
           },
         ]
