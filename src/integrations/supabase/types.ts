@@ -4609,6 +4609,22 @@ export type Database = {
           text: string
         }[]
       }
+      match_faq_database: {
+        Args: {
+          match_count?: number
+          match_threshold?: number
+          match_workspace_id: string
+          query_embedding: string
+        }
+        Returns: {
+          answer: string
+          id: string
+          priority: number
+          question: string
+          similarity: number
+          source: string
+        }[]
+      }
       match_faqs: {
         Args: {
           match_count?: number
