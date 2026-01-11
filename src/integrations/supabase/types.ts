@@ -236,6 +236,7 @@ export type Database = {
           place_id: string | null
           price_summary: string | null
           pricing_model: string | null
+          search_keywords: string[] | null
           service_area: string | null
           service_radius_miles: number | null
           services: Json | null
@@ -265,6 +266,7 @@ export type Database = {
           place_id?: string | null
           price_summary?: string | null
           pricing_model?: string | null
+          search_keywords?: string[] | null
           service_area?: string | null
           service_radius_miles?: number | null
           services?: Json | null
@@ -294,6 +296,7 @@ export type Database = {
           place_id?: string | null
           price_summary?: string | null
           pricing_model?: string | null
+          search_keywords?: string[] | null
           service_area?: string | null
           service_radius_miles?: number | null
           services?: Json | null
