@@ -6,25 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-interface VoiceProfile {
-  tone: string;
-  greeting_style: string;
-  signoff_style: string;
-  common_phrases: string[];
-  average_length: number;
-}
-
-interface FAQ {
-  question: string;
-  answer: string;
-  category: string;
-}
-
-interface SampleEmail {
-  from: string;
-  subject: string;
-  body: string;
-}
+const ANTHROPIC_API = 'https://api.anthropic.com/v1/messages';
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -33,270 +15,164 @@ serve(async (req) => {
 
   const startTime = Date.now();
   const functionName = 'test-conversation';
-  let currentStep = 'initializing';
 
   try {
-    // Validate environment
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    );
 
-    if (!supabaseUrl) throw new Error('SUPABASE_URL environment variable not configured');
-    if (!supabaseKey) throw new Error('SUPABASE_SERVICE_ROLE_KEY environment variable not configured');
-    if (!lovableApiKey) throw new Error('LOVABLE_API_KEY environment variable not configured');
+    const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
+    if (!ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY not configured');
 
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
-    // Parse and validate input
-    currentStep = 'validating_input';
     const body = await req.json();
-    
-    if (!body.workspace_id) {
-      throw new Error('workspace_id is required');
-    }
+    console.log(`[${functionName}] Starting:`, { workspace_id: body.workspace_id });
 
-    const { workspace_id } = body;
-    console.log(`[${functionName}] Starting:`, { workspace_id });
-
-    // Get workspace details
-    currentStep = 'fetching_workspace';
-    const { data: workspace, error: workspaceError } = await supabase
-      .from('workspaces')
-      .select('name')
-      .eq('id', workspace_id)
-      .single();
-
-    if (workspaceError) {
-      throw new Error(`Failed to fetch workspace: ${workspaceError.message}`);
-    }
-
-    const businessName = workspace?.name || 'Your Business';
-    console.log(`[${functionName}] Workspace: ${businessName}`);
+    if (!body.workspace_id) throw new Error('workspace_id is required');
 
     // Get voice profile
-    currentStep = 'fetching_voice_profile';
-    const { data: voiceProfile, error: voiceError } = await supabase
+    const { data: voiceProfile } = await supabase
       .from('voice_profiles')
-      .select('tone, greeting_style, signoff_style, common_phrases, average_length')
-      .eq('workspace_id', workspace_id)
+      .select('*')
+      .eq('workspace_id', body.workspace_id)
       .single();
 
-    if (voiceError && voiceError.code !== 'PGRST116') {
-      throw new Error(`Failed to fetch voice profile: ${voiceError.message}`);
+    if (!voiceProfile?.psychological_profile) {
+      throw new Error('Voice profile not found. Please complete voice learning first.');
     }
 
-    // Use defaults if no voice profile exists
-    const voice: VoiceProfile = voiceProfile || {
-      tone: 'friendly and professional',
-      greeting_style: 'Hi there,',
-      signoff_style: 'Best regards',
-      common_phrases: [],
-      average_length: 100
-    };
+    // Get business profile
+    const { data: businessProfile } = await supabase
+      .from('business_profile')
+      .select('*')
+      .eq('workspace_id', body.workspace_id)
+      .single();
 
-    console.log(`[${functionName}] Voice profile loaded:`, { 
-      tone: voice.tone, 
-      hasProfile: !!voiceProfile 
-    });
-
-    // Get sample FAQs for context
-    currentStep = 'fetching_faqs';
-    const { data: faqs, error: faqError } = await supabase
+    // Get some FAQs for context
+    const { data: faqs } = await supabase
       .from('faqs')
-      .select('question, answer, category')
-      .eq('workspace_id', workspace_id)
-      .limit(5);
+      .select('question, answer')
+      .eq('workspace_id', body.workspace_id)
+      .order('priority', { ascending: false })
+      .limit(15);
 
-    if (faqError && faqError.code !== 'PGRST116') {
-      throw new Error(`Failed to fetch FAQs: ${faqError.message}`);
-    }
+    // Sample customer inquiry
+    const testInquiry = body.test_message || 
+      "Hi, I'm looking for someone to clean the windows on my 3-bedroom house. How much would that cost and when could you fit me in?";
 
-    const faqList: FAQ[] = faqs || [];
-    console.log(`[${functionName}] FAQs loaded: ${faqList.length}`);
+    const profile = voiceProfile.psychological_profile;
 
-    // Build context for AI
-    const faqContext = faqList.length > 0
-      ? faqList.map(f => `Q: ${f.question}\nA: ${f.answer}`).join('\n\n')
-      : 'No FAQs available yet.';
+    const systemPrompt = `You are writing an email response AS ${businessProfile?.business_name || 'this business owner'}.
 
-    // Generate sample incoming email with AI
-    currentStep = 'generating_sample_email';
-    const sampleEmailPrompt = `You are generating a realistic customer inquiry email for a UK service business called "${businessName}".
+CRITICAL: You must write EXACTLY like this person. Here is their communication style:
 
-Generate a typical customer email asking about services, pricing, or availability. Make it:
-- Realistic and natural (like a real customer would write)
-- Appropriate length (3-5 sentences)
-- Include a specific question or request
-- Use British English spelling
+${profile.summary || 'Professional and friendly communication style.'}
 
-${faqList.length > 0 ? `The business has these FAQs that might guide what customers ask about:\n${faqContext}` : ''}
+TONE:
+- Overall: ${profile.tone?.overall || 'professional'}
+- Warmth: ${profile.tone?.warmth || 5}/10
+- Directness: ${profile.tone?.directness || 5}/10  
+- Formality: ${profile.tone?.formality || 5}/10
 
-Respond ONLY with valid JSON in this exact format:
-{
-  "from": "Customer Name",
-  "subject": "Email subject line",
-  "body": "The email body text"
-}`;
+GREETING: Always start with "${profile.greetings?.primary || 'Hi,'}"
+SIGN-OFF: Always end with "${profile.signoffs?.primary || 'Thanks,'}" then "${profile.signoffs?.name_format || 'The Team'}"
 
-    const sampleEmailResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+COMMON PHRASES TO USE: ${(profile.vocabulary?.common_phrases || []).join(', ') || 'None specified'}
+
+SENTENCE STRUCTURE:
+- Length: ${profile.structure?.avg_sentence_length || 'medium'}
+- Paragraphs: ${profile.structure?.avg_paragraph_length || '2-3 sentences'}
+- Bullet points: ${profile.structure?.uses_bullet_points ? 'Yes' : 'No'}
+
+VOCABULARY:
+- Spelling: ${profile.vocabulary?.spelling || 'British'}
+- Contractions: ${profile.vocabulary?.contractions ? 'Yes' : 'No'}
+- Emojis: ${profile.vocabulary?.emoji_usage || 'never'}
+- Exclamation marks: ${profile.vocabulary?.exclamation_frequency || 'occasional'}
+
+RESPONSE PATTERNS:
+- Pricing: ${profile.patterns?.pricing_style || 'Provide general guidance'}
+- Complaints: ${profile.patterns?.complaint_handling || 'Be helpful and apologetic'}
+- Bookings: ${profile.patterns?.booking_confirmation || 'Confirm details'}
+
+THINGS TO NEVER DO:
+${(profile.never_do || []).map((n: string) => `- ${n}`).join('\n') || '- Be overly formal or robotic'}
+
+BUSINESS INFO:
+${businessProfile ? `
+- Business: ${businessProfile.business_name}
+- Services: ${JSON.stringify(businessProfile.services || [])}
+- Area: ${businessProfile.service_area || businessProfile.formatted_address || 'Not specified'}
+- Phone: ${businessProfile.phone || 'Not provided'}
+` : 'Use general helpful responses'}
+
+FAQS FOR REFERENCE (use to inform your answer):
+${(faqs || []).map(f => `Q: ${f.question}\nA: ${f.answer}`).join('\n\n') || 'No FAQs available yet.'}
+
+INSTRUCTIONS:
+1. Write a response to the customer inquiry below
+2. Match the voice profile EXACTLY - this is the most important thing
+3. Use information from FAQs if relevant
+4. Keep it concise and natural
+5. Do not be overly formal or robotic
+6. Sound like a real person, not an AI`;
+
+    console.log(`[${functionName}] Calling Claude API...`);
+
+    const claudeResponse = await fetch(ANTHROPIC_API, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${lovableApiKey}`
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [{ role: 'user', content: sampleEmailPrompt }]
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1024,
+        system: systemPrompt,
+        messages: [
+          { role: 'user', content: `Customer inquiry:\n\n${testInquiry}` }
+        ]
       })
     });
 
-    if (!sampleEmailResponse.ok) {
-      const errorText = await sampleEmailResponse.text();
-      throw new Error(`AI Gateway error generating sample email (${sampleEmailResponse.status}): ${errorText}`);
+    if (!claudeResponse.ok) {
+      const errorText = await claudeResponse.text();
+      console.error(`[${functionName}] Claude API error:`, errorText);
+      throw new Error(`Claude API error: ${claudeResponse.status}`);
     }
 
-    const sampleEmailData = await sampleEmailResponse.json();
-    const sampleEmailContent = sampleEmailData.choices?.[0]?.message?.content;
+    const claudeData = await claudeResponse.json();
+    const draft = claudeData.content?.[0]?.text || '';
 
-    if (!sampleEmailContent) {
-      throw new Error('AI Gateway returned empty response for sample email');
+    if (!draft) {
+      throw new Error('Claude returned empty response');
     }
-
-    let sampleEmail: SampleEmail;
-    try {
-      // Clean potential markdown code blocks
-      const cleanedContent = sampleEmailContent
-        .replace(/```json\n?/g, '')
-        .replace(/```\n?/g, '')
-        .trim();
-      sampleEmail = JSON.parse(cleanedContent);
-    } catch (parseError) {
-      console.error(`[${functionName}] Failed to parse sample email:`, sampleEmailContent);
-      throw new Error('Failed to parse AI-generated sample email');
-    }
-
-    if (!sampleEmail.from || !sampleEmail.subject || !sampleEmail.body) {
-      throw new Error('AI-generated sample email missing required fields');
-    }
-
-    console.log(`[${functionName}] Sample email generated:`, { subject: sampleEmail.subject });
-
-    // Generate AI reply using voice profile
-    currentStep = 'generating_ai_reply';
-    const replyPrompt = `You are writing an email reply for "${businessName}", a UK service business.
-
-VOICE PROFILE:
-- Tone: ${voice.tone}
-- Greeting style: ${voice.greeting_style}
-- Sign-off style: ${voice.signoff_style}
-- Common phrases they use: ${voice.common_phrases?.length > 0 ? voice.common_phrases.join(', ') : 'None specified'}
-- Typical response length: approximately ${voice.average_length} words
-
-CUSTOMER EMAIL:
-From: ${sampleEmail.from}
-Subject: ${sampleEmail.subject}
-
-${sampleEmail.body}
-
-${faqList.length > 0 ? `RELEVANT KNOWLEDGE BASE:\n${faqContext}` : ''}
-
-Write a reply that:
-1. Matches the voice profile EXACTLY (tone, greeting, sign-off)
-2. Addresses the customer's question helpfully
-3. Uses British English spelling
-4. Is approximately ${voice.average_length} words
-5. Sounds natural and human, not robotic
-
-Respond with ONLY the email body text (no subject line, no JSON, just the reply text).`;
-
-    const replyResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${lovableApiKey}`
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [{ role: 'user', content: replyPrompt }]
-      })
-    });
-
-    if (!replyResponse.ok) {
-      const errorText = await replyResponse.text();
-      throw new Error(`AI Gateway error generating reply (${replyResponse.status}): ${errorText}`);
-    }
-
-    const replyData = await replyResponse.json();
-    const aiReply = replyData.choices?.[0]?.message?.content?.trim();
-
-    if (!aiReply) {
-      throw new Error('AI Gateway returned empty response for reply');
-    }
-
-    console.log(`[${functionName}] AI reply generated:`, { 
-      length: aiReply.length,
-      wordCount: aiReply.split(/\s+/).length
-    });
-
-    // Calculate confidence score based on available data
-    currentStep = 'calculating_confidence';
-    let confidence = 0.5; // Base confidence
-
-    // Boost confidence based on available context
-    if (voiceProfile) confidence += 0.2; // Has learned voice
-    if (faqList.length > 0) confidence += 0.1; // Has knowledge base
-    if (faqList.length >= 3) confidence += 0.1; // Has substantial knowledge base
-    if (voice.common_phrases?.length > 0) confidence += 0.1; // Has learned phrases
-
-    // Cap at 0.95 (never claim 100% confidence)
-    confidence = Math.min(confidence, 0.95);
 
     const duration = Date.now() - startTime;
-    console.log(`[${functionName}] Completed in ${duration}ms:`, {
-      hasVoiceProfile: !!voiceProfile,
-      faqCount: faqList.length,
-      confidence: confidence.toFixed(2)
-    });
+    console.log(`[${functionName}] Completed in ${duration}ms, draft length: ${draft.length}`);
 
     return new Response(
-      JSON.stringify({
+      JSON.stringify({ 
         success: true,
-        sample_email: {
-          from: sampleEmail.from,
-          subject: sampleEmail.subject,
-          body: sampleEmail.body
-        },
-        ai_reply: aiReply,
-        confidence: parseFloat(confidence.toFixed(2)),
-        context: {
-          has_voice_profile: !!voiceProfile,
-          faq_count: faqList.length,
-          business_name: businessName
-        },
+        inquiry: testInquiry,
+        draft,
+        voice_summary: profile.summary || 'Voice profile loaded',
         duration_ms: duration
       }),
-      { 
-        status: 200, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error: any) {
-    const duration = Date.now() - startTime;
-    console.error(`[${functionName}] Error at step '${currentStep}':`, error);
-
+    console.error(`[${functionName}] Error:`, error);
     return new Response(
-      JSON.stringify({
-        success: false,
+      JSON.stringify({ 
+        success: false, 
         error: error.message,
         function: functionName,
-        step: currentStep,
-        duration_ms: duration
+        duration_ms: Date.now() - startTime
       }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
