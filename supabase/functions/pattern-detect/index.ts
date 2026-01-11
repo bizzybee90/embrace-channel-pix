@@ -212,7 +212,6 @@ serve(async (req) => {
 
     // Weekend volume check
     const weekendVolume = (byDayOfWeek[0] || 0) + (byDayOfWeek[6] || 0);
-    const weekdayVolume = totalConversations - weekendVolume;
     const weekendPercentage = Math.round(weekendVolume / totalConversations * 100);
     if (weekendPercentage > 30) {
       insights.push({
@@ -224,6 +223,90 @@ serve(async (req) => {
         metrics: { weekend_volume: weekendVolume, percentage: weekendPercentage }
       });
     }
+
+    // Add AI-generated deeper insights
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    if (LOVABLE_API_KEY && totalConversations >= 5) {
+      try {
+        const metricsContext = {
+          period_days: periodDays,
+          total_conversations: totalConversations,
+          by_category: byCategory,
+          by_priority: byPriority,
+          by_sentiment: bySentiment,
+          auto_handling_rate: autoRate,
+          urgent_percentage: urgentPercentage,
+          needs_reply: needsReply
+        };
+
+        const analysisPrompt = `Analyze these inbox metrics for a small business and generate 1-2 additional actionable insights:
+
+${JSON.stringify(metricsContext, null, 2)}
+
+Generate insights in JSON format:
+[
+  {
+    "insight_type": "opportunity|issue|trend",
+    "title": "Brief title",
+    "description": "Detailed insight with specific recommendations",
+    "severity": "info|warning",
+    "is_actionable": true
+  }
+]
+
+Focus on patterns not already covered and actionable recommendations.`;
+
+        const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${LOVABLE_API_KEY}`
+          },
+          body: JSON.stringify({
+            model: 'google/gemini-2.5-flash',
+            messages: [
+              { role: 'system', content: 'You are a business analytics expert. Generate actionable insights from email metrics. Respond with valid JSON array only.' },
+              { role: 'user', content: analysisPrompt }
+            ],
+            temperature: 0.3
+          })
+        });
+
+        if (aiResponse.ok) {
+          const aiData = await aiResponse.json();
+          const insightsText = aiData.choices?.[0]?.message?.content || '[]';
+          
+          try {
+            const jsonMatch = insightsText.match(/\[[\s\S]*\]/);
+            const aiInsights = JSON.parse(jsonMatch?.[0] || '[]');
+            aiInsights.forEach((ai: any) => {
+              insights.push({
+                insight_type: ai.insight_type || 'opportunity',
+                title: ai.title,
+                description: ai.description,
+                severity: ai.severity || 'info',
+                is_actionable: ai.is_actionable ?? true,
+                metrics: metricsContext
+              });
+            });
+          } catch {
+            console.log(`[${functionName}] Could not parse AI insights`);
+          }
+        }
+      } catch (aiError) {
+        console.log(`[${functionName}] AI analysis skipped:`, aiError);
+      }
+    }
+
+    // Always add a summary insight at the start
+    insights.unshift({
+      insight_type: 'summary',
+      title: `Week in Review: ${totalConversations} Conversations`,
+      description: `You handled ${totalConversations} conversations this week. ${autoHandled} were auto-handled (${autoRate}%). ${urgent} were urgent.${negativeSentiment > 0 ? ` Watch: ${negativeSentiment} had negative sentiment.` : ''}`,
+      severity: 'info',
+      is_actionable: false,
+      metrics: { total: totalConversations, auto_handled: autoHandled, urgent }
+    });
 
     // Store insights
     if (insights.length > 0) {
