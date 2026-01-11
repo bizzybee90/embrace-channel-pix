@@ -6,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const GEMINI_API = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent';
+const LOVABLE_AI_GATEWAY = 'https://ai.gateway.lovable.dev/v1/chat/completions';
 const FIRECRAWL_API = 'https://api.firecrawl.dev/v1';
 
 serve(async (req) => {
@@ -23,10 +23,10 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    const GOOGLE_API_KEY = Deno.env.get('GOOGLE_API_KEY');
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     const FIRECRAWL_API_KEY = Deno.env.get('FIRECRAWL_API_KEY');
 
-    if (!GOOGLE_API_KEY) throw new Error('GOOGLE_API_KEY not configured');
+    if (!LOVABLE_API_KEY) throw new Error('LOVABLE_API_KEY not configured');
     if (!FIRECRAWL_API_KEY) throw new Error('FIRECRAWL_API_KEY not configured');
 
     const body = await req.json();
@@ -119,7 +119,7 @@ serve(async (req) => {
       );
     }
 
-    // Send ALL content to Gemini for FAQ extraction
+    // Send ALL content to Lovable AI Gateway for FAQ extraction
     const competitorText = scrapedContent.map(c => 
       `=== ${c.name} (${c.url}) ===\n${c.content}`
     ).join('\n\n---\n\n');
@@ -160,24 +160,32 @@ Generate 50-100 high-quality FAQs. Prioritize unique, useful information.
 Skip generic content that doesn't add value.
 DO NOT include competitor names, addresses, or specific prices in answers.`;
 
-    const geminiResponse = await fetch(`${GEMINI_API}?key=${GOOGLE_API_KEY}`, {
+    console.log(`[${functionName}] Calling Lovable AI Gateway...`);
+
+    const aiResponse = await fetch(LOVABLE_AI_GATEWAY, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`
+      },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.3,
-          maxOutputTokens: 16384
-        }
+        model: 'google/gemini-2.5-pro',
+        messages: [{ role: 'user', content: prompt }]
       })
     });
 
-    if (!geminiResponse.ok) {
-      throw new Error(`Gemini API error: ${await geminiResponse.text()}`);
+    if (!aiResponse.ok) {
+      if (aiResponse.status === 429) {
+        throw new Error('Rate limit exceeded. Please try again later.');
+      }
+      if (aiResponse.status === 402) {
+        throw new Error('AI credits exhausted. Please add credits to your workspace.');
+      }
+      throw new Error(`AI Gateway error: ${aiResponse.status}`);
     }
 
-    const geminiData = await geminiResponse.json();
-    const responseText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const aiData = await aiResponse.json();
+    const responseText = aiData.choices?.[0]?.message?.content || '';
 
     // Parse FAQs
     let faqs: any[];
@@ -190,7 +198,7 @@ DO NOT include competitor names, addresses, or specific prices in answers.`;
       faqs = [];
     }
 
-    console.log(`[${functionName}] Extracted ${faqs.length} FAQs from Gemini`);
+    console.log(`[${functionName}] Extracted ${faqs.length} FAQs`);
 
     // Insert FAQs with priority 5-8 (below user's own content)
     const faqsToInsert = faqs.map(faq => ({

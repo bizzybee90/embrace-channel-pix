@@ -6,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const GEMINI_API = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent';
+const LOVABLE_AI_GATEWAY = 'https://ai.gateway.lovable.dev/v1/chat/completions';
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -22,8 +22,8 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    const GOOGLE_API_KEY = Deno.env.get('GOOGLE_API_KEY');
-    if (!GOOGLE_API_KEY) throw new Error('GOOGLE_API_KEY not configured');
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    if (!LOVABLE_API_KEY) throw new Error('LOVABLE_API_KEY not configured');
 
     const body = await req.json();
     console.log(`[${functionName}] Starting:`, { workspace_id: body.workspace_id, action: body.action });
@@ -89,24 +89,32 @@ Generate 5-10 keywords that:
 Respond with ONLY a JSON array of strings:
 ["window cleaning", "residential window cleaners", "commercial window cleaning", "gutter cleaning", "pressure washing"]`;
 
-    const geminiResponse = await fetch(`${GEMINI_API}?key=${GOOGLE_API_KEY}`, {
+    console.log(`[${functionName}] Calling Lovable AI Gateway...`);
+
+    const aiResponse = await fetch(LOVABLE_AI_GATEWAY, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`
+      },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.3,
-          maxOutputTokens: 1024
-        }
+        model: 'google/gemini-2.5-pro',
+        messages: [{ role: 'user', content: prompt }]
       })
     });
 
-    if (!geminiResponse.ok) {
-      throw new Error(`Gemini API error: ${await geminiResponse.text()}`);
+    if (!aiResponse.ok) {
+      if (aiResponse.status === 429) {
+        throw new Error('Rate limit exceeded. Please try again later.');
+      }
+      if (aiResponse.status === 402) {
+        throw new Error('AI credits exhausted. Please add credits to your workspace.');
+      }
+      throw new Error(`AI Gateway error: ${aiResponse.status}`);
     }
 
-    const geminiData = await geminiResponse.json();
-    const responseText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const aiData = await aiResponse.json();
+    const responseText = aiData.choices?.[0]?.message?.content || '';
 
     // Parse keywords
     let keywords: string[];
