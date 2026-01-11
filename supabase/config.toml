@@ -146,3 +146,6 @@ verify_jwt = false
 
 [functions.voice-learn]
 verify_jwt = true
+
+[functions.business-location]
+verify_jwt = true
