@@ -3021,51 +3021,81 @@ export type Database = {
       }
       inbox_insights: {
         Row: {
+          action_taken: boolean | null
           analyzed_at: string | null
           avg_response_time_hours: number | null
           common_inquiry_types: Json | null
           created_at: string | null
+          description: string | null
           emails_by_category: Json | null
           emails_by_sender_domain: Json | null
           id: string
+          insight_type: string | null
+          is_actionable: boolean | null
+          is_read: boolean | null
           learning_phases_completed: Json | null
+          metrics: Json | null
           patterns_learned: number | null
           peak_email_hours: Json | null
+          period_end: string | null
+          period_start: string | null
           response_rate_percent: number | null
+          severity: string | null
+          title: string | null
           total_emails_analyzed: number | null
           total_outbound_analyzed: number | null
           updated_at: string | null
           workspace_id: string
         }
         Insert: {
+          action_taken?: boolean | null
           analyzed_at?: string | null
           avg_response_time_hours?: number | null
           common_inquiry_types?: Json | null
           created_at?: string | null
+          description?: string | null
           emails_by_category?: Json | null
           emails_by_sender_domain?: Json | null
           id?: string
+          insight_type?: string | null
+          is_actionable?: boolean | null
+          is_read?: boolean | null
           learning_phases_completed?: Json | null
+          metrics?: Json | null
           patterns_learned?: number | null
           peak_email_hours?: Json | null
+          period_end?: string | null
+          period_start?: string | null
           response_rate_percent?: number | null
+          severity?: string | null
+          title?: string | null
           total_emails_analyzed?: number | null
           total_outbound_analyzed?: number | null
           updated_at?: string | null
           workspace_id: string
         }
         Update: {
+          action_taken?: boolean | null
           analyzed_at?: string | null
           avg_response_time_hours?: number | null
           common_inquiry_types?: Json | null
           created_at?: string | null
+          description?: string | null
           emails_by_category?: Json | null
           emails_by_sender_domain?: Json | null
           id?: string
+          insight_type?: string | null
+          is_actionable?: boolean | null
+          is_read?: boolean | null
           learning_phases_completed?: Json | null
+          metrics?: Json | null
           patterns_learned?: number | null
           peak_email_hours?: Json | null
+          period_end?: string | null
+          period_start?: string | null
           response_rate_percent?: number | null
+          severity?: string | null
+          title?: string | null
           total_emails_analyzed?: number | null
           total_outbound_analyzed?: number | null
           updated_at?: string | null
