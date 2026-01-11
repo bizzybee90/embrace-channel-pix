@@ -167,41 +167,81 @@ serve(async (req) => {
 
       // Try semantic search first if we have an embedding
       if (questionEmbedding) {
+        // Try match_faqs first (faqs table)
         try {
           const { data: matchedFaqs, error: matchError } = await supabase
             .rpc('match_faqs', {
               query_embedding: questionEmbedding,
               match_workspace_id: workspace_id,
-              match_threshold: 0.5,
-              match_count: 5
+              match_threshold: 0.4,  // Lower threshold for more results
+              match_count: 7
             });
 
           if (!matchError && matchedFaqs?.length > 0) {
             relevantFaqs = matchedFaqs;
             usedSemanticSearch = true;
-            console.log(`[${functionName}] Found ${matchedFaqs.length} semantically relevant FAQs`);
+            const avgSimilarity = (matchedFaqs.reduce((sum: number, f: any) => sum + (f.similarity || 0), 0) / matchedFaqs.length * 100).toFixed(1);
+            console.log(`[${functionName}] Found ${matchedFaqs.length} semantically relevant FAQs from faqs table (avg similarity: ${avgSimilarity}%)`);
           } else if (matchError) {
-            console.log(`[${functionName}] Semantic search error: ${matchError.message}`);
+            console.log(`[${functionName}] match_faqs error: ${matchError.message}`);
           }
         } catch (e) {
-          console.log(`[${functionName}] Semantic search failed: ${e}`);
+          console.log(`[${functionName}] match_faqs failed: ${e}`);
+        }
+
+        // If no results from faqs, try faq_database table
+        if (relevantFaqs.length === 0) {
+          try {
+            const { data: matchedFaqDb, error: matchDbError } = await supabase
+              .rpc('match_faq_database', {
+                query_embedding: questionEmbedding,
+                match_workspace_id: workspace_id,
+                match_threshold: 0.4,
+                match_count: 7
+              });
+
+            if (!matchDbError && matchedFaqDb?.length > 0) {
+              relevantFaqs = matchedFaqDb;
+              usedSemanticSearch = true;
+              const avgSimilarity = (matchedFaqDb.reduce((sum: number, f: any) => sum + (f.similarity || 0), 0) / matchedFaqDb.length * 100).toFixed(1);
+              console.log(`[${functionName}] Found ${matchedFaqDb.length} semantically relevant FAQs from faq_database (avg similarity: ${avgSimilarity}%)`);
+            } else if (matchDbError) {
+              console.log(`[${functionName}] match_faq_database error: ${matchDbError.message}`);
+            }
+          } catch (e) {
+            console.log(`[${functionName}] match_faq_database failed: ${e}`);
+          }
         }
       }
 
-      // Fallback: if no semantic matches, get highest priority FAQs
+      // Fallback: if no semantic matches, get highest priority FAQs from either table
       if (relevantFaqs.length === 0) {
+        // Try faqs table first
         const { data: fallbackFaqs, error: faqError } = await supabase
-          .from('faq_database')
+          .from('faqs')
           .select('question, answer, source, priority')
           .eq('workspace_id', workspace_id)
           .order('priority', { ascending: false })
-          .limit(5);
+          .limit(7);
 
-        if (faqError) {
-          console.log(`[${functionName}] FAQ fetch warning: ${faqError.message}`);
-        } else if (fallbackFaqs && fallbackFaqs.length > 0) {
+        if (!faqError && fallbackFaqs && fallbackFaqs.length > 0) {
           relevantFaqs = fallbackFaqs;
-          console.log(`[${functionName}] Using ${fallbackFaqs.length} fallback FAQs (no semantic matches)`);
+          console.log(`[${functionName}] Using ${fallbackFaqs.length} priority-based FAQs from faqs table`);
+        } else {
+          // Try faq_database table
+          const { data: fallbackFaqDb } = await supabase
+            .from('faq_database')
+            .select('question, answer, source, priority')
+            .eq('workspace_id', workspace_id)
+            .order('priority', { ascending: false })
+            .limit(7);
+
+          if (fallbackFaqDb && fallbackFaqDb.length > 0) {
+            relevantFaqs = fallbackFaqDb;
+            console.log(`[${functionName}] Using ${fallbackFaqDb.length} priority-based FAQs from faq_database`);
+          } else {
+            console.log(`[${functionName}] No FAQs found in any table`);
+          }
         }
       }
     }
