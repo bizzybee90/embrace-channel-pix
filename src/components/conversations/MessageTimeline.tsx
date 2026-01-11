@@ -11,6 +11,8 @@ import { Button } from '@/components/ui/button';
 import { cleanEmailContent, hasSignificantCleaning } from '@/utils/emailParser';
 import { EmailThread } from './EmailThread';
 import { HtmlEmailViewer } from './HtmlEmailViewer';
+import { ImageAnalysis } from './ImageAnalysis';
+import { VoicemailPlayer } from './VoicemailPlayer';
 
 const getInitials = (name: string | null) => {
   if (!name) return '?';
@@ -20,11 +22,18 @@ const getInitials = (name: string | null) => {
 interface MessageTimelineProps {
   messages: Message[];
   defaultCollapsed?: boolean;
+  workspaceId?: string;
+  onDraftTextChange?: (text: string) => void;
 }
 
 const COLLAPSED_MESSAGE_COUNT = 3;
 
-export const MessageTimeline = ({ messages, defaultCollapsed = true }: MessageTimelineProps) => {
+export const MessageTimeline = ({ 
+  messages, 
+  defaultCollapsed = true,
+  workspaceId,
+  onDraftTextChange
+}: MessageTimelineProps) => {
   const [downloadingFile, setDownloadingFile] = useState<string | null>(null);
   const [isExpanded, setIsExpanded] = useState(!defaultCollapsed);
   const [showOriginalIds, setShowOriginalIds] = useState<Set<string>>(new Set());
@@ -220,23 +229,63 @@ export const MessageTimeline = ({ messages, defaultCollapsed = true }: MessageTi
           )}
           
           {message.attachments && Array.isArray(message.attachments) && message.attachments.length > 0 && (
-            <div className="mt-2 space-y-1">
-              {message.attachments.map((attachment: any, idx: number) => (
-                <button
-                  key={idx}
-                  onClick={() => handleDownloadAttachment(attachment.path, attachment.name)}
-                  disabled={downloadingFile === attachment.path}
-                  className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
-                >
-                  {downloadingFile === attachment.path ? (
-                    <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
-                  ) : (
-                    <Paperclip className="h-4 w-4" />
-                  )}
-                  <span className="truncate">{attachment.name}</span>
-                  <span className="text-xs">({Math.round((attachment.size || 0) / 1024)}KB)</span>
-                </button>
-              ))}
+            <div className="mt-2 space-y-2">
+              {message.attachments.map((attachment: any, idx: number) => {
+                const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(attachment.name || '');
+                const isAudio = /\.(mp3|wav|m4a|ogg|webm)$/i.test(attachment.name || '');
+                
+                // Get full URL for the attachment
+                const { data: urlData } = supabase.storage
+                  .from('message-attachments')
+                  .getPublicUrl(attachment.path);
+                const attachmentUrl = urlData?.publicUrl || '';
+
+                // Render ImageAnalysis for images
+                if (isImage && workspaceId && attachmentUrl) {
+                  return (
+                    <ImageAnalysis
+                      key={idx}
+                      workspaceId={workspaceId}
+                      messageId={message.id}
+                      imageUrl={attachmentUrl}
+                      customerMessage={message.body}
+                      onSuggestedResponse={onDraftTextChange}
+                    />
+                  );
+                }
+
+                // Render VoicemailPlayer for audio
+                if (isAudio && workspaceId && attachmentUrl) {
+                  return (
+                    <VoicemailPlayer
+                      key={idx}
+                      workspaceId={workspaceId}
+                      messageId={message.id}
+                      audioUrl={attachmentUrl}
+                      customerName={message.actor_name || undefined}
+                      onSuggestedResponse={onDraftTextChange}
+                    />
+                  );
+                }
+
+                // Default file download button
+                return (
+                  <button
+                    key={idx}
+                    onClick={() => handleDownloadAttachment(attachment.path, attachment.name)}
+                    disabled={downloadingFile === attachment.path}
+                    className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+                  >
+                    {downloadingFile === attachment.path ? (
+                      <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
+                    ) : (
+                      <Paperclip className="h-4 w-4" />
+                    )}
+                    <span className="truncate">{attachment.name}</span>
+                    <span className="text-xs">({Math.round((attachment.size || 0) / 1024)}KB)</span>
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
