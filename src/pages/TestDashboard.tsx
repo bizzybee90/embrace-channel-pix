@@ -42,7 +42,7 @@ const TEST_CATEGORIES: TestCategory[] = [
       {
         name: 'Email Import',
         function: 'email-import',
-        payload: { workspace_id: TEST_WORKSPACE_ID, limit: 5 },
+        payload: { workspace_id: TEST_WORKSPACE_ID, import_mode: 'last_100', limit: 5 },
         description: 'Import emails from connected account'
       },
       {
@@ -55,7 +55,7 @@ const TEST_CATEGORIES: TestCategory[] = [
         name: 'Voice Learn',
         function: 'voice-learn',
         payload: { workspace_id: TEST_WORKSPACE_ID },
-        description: 'Analyze voice/tone from sent emails'
+        description: 'Analyze voice/tone from sent emails (needs 10+ sent emails)'
       },
       {
         name: 'Industry Keywords',
@@ -66,7 +66,7 @@ const TEST_CATEGORIES: TestCategory[] = [
       {
         name: 'Website Scrape',
         function: 'website-scrape',
-        payload: { workspace_id: TEST_WORKSPACE_ID, url: 'https://example.com' },
+        payload: { workspace_id: TEST_WORKSPACE_ID, website_url: 'https://example.com' },
         description: 'Scrape website for FAQs'
       },
       {
@@ -76,7 +76,7 @@ const TEST_CATEGORIES: TestCategory[] = [
           workspace_id: TEST_WORKSPACE_ID, 
           test_message: 'How much do you charge for a basic service?' 
         },
-        description: 'Test AI draft generation'
+        description: 'Test AI draft generation (needs voice profile)'
       }
     ]
   },
@@ -89,17 +89,17 @@ const TEST_CATEGORIES: TestCategory[] = [
         function: 'ai-draft',
         payload: { 
           workspace_id: TEST_WORKSPACE_ID,
-          conversation_id: 'test-conv-1',
+          conversation_id: null, // Requires real conversation_id from database
           customer_message: 'What are your prices?'
         },
-        description: 'Generate AI draft response'
+        description: 'Generate AI draft response (needs real conversation_id)'
       },
       {
         name: 'Draft Verify',
         function: 'draft-verify',
         payload: { 
           workspace_id: TEST_WORKSPACE_ID,
-          draft: 'Thanks for your inquiry. Our prices start at $50.',
+          draft_text: 'Thanks for your inquiry. Our prices start at $50.',
           customer_message: 'What are your prices?'
         },
         description: 'Verify draft quality and facts'
@@ -111,9 +111,9 @@ const TEST_CATEGORIES: TestCategory[] = [
           workspace_id: TEST_WORKSPACE_ID,
           original_draft: 'Thanks for asking!',
           edited_draft: 'Hi there! Thanks so much for reaching out.',
-          conversation_id: 'test-conv-1'
+          conversation_id: null // Requires real conversation_id
         },
-        description: 'Learn from user corrections'
+        description: 'Learn from user corrections (needs real workspace)'
       },
       {
         name: 'Pattern Detect',
@@ -132,7 +132,8 @@ const TEST_CATEGORIES: TestCategory[] = [
         function: 'customer-intelligence',
         payload: { 
           workspace_id: TEST_WORKSPACE_ID,
-          customer_id: 'test-customer-1'
+          customer_id: 'test-customer-1',
+          action: 'analyze'
         },
         description: 'Generate customer insights'
       },
@@ -141,7 +142,8 @@ const TEST_CATEGORIES: TestCategory[] = [
         function: 'document-process',
         payload: { 
           workspace_id: TEST_WORKSPACE_ID,
-          document_id: 'test-doc-1'
+          document_id: 'test-doc-1',
+          action: 'process'
         },
         description: 'Process uploaded document'
       },
@@ -150,7 +152,7 @@ const TEST_CATEGORIES: TestCategory[] = [
         function: 'image-analyze',
         payload: { 
           workspace_id: TEST_WORKSPACE_ID,
-          image_url: 'https://example.com/test.jpg',
+          image_url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/47/PNG_transparency_demonstration_1.png/300px-PNG_transparency_demonstration_1.png',
           customer_message: 'Can you give me a quote for this?'
         },
         description: 'Analyze image attachment'
@@ -160,7 +162,7 @@ const TEST_CATEGORIES: TestCategory[] = [
         function: 'audio-process',
         payload: { 
           workspace_id: TEST_WORKSPACE_ID,
-          audio_url: 'https://example.com/voicemail.mp3'
+          audio_url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3'
         },
         description: 'Transcribe voicemail'
       },
@@ -184,7 +186,7 @@ const TEST_CATEGORIES: TestCategory[] = [
           industry: 'cleaning services',
           location: 'London'
         },
-        description: 'Discover competitor websites'
+        description: 'Discover competitor websites (needs business profile)'
       },
       {
         name: 'Competitor Scrape',
