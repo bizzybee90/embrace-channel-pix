@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { User, Session } from "@supabase/supabase-js";
@@ -9,7 +9,8 @@ export const AuthGuard = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [checkingOnboarding, setCheckingOnboarding] = useState(false);
+  const checkingOnboardingRef = useRef(false);
+  const hasCheckedOnboarding = useRef(false);
 
   useEffect(() => {
     // Set up auth state listener first
@@ -35,15 +36,15 @@ export const AuthGuard = ({ children }: { children: React.ReactNode }) => {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
-  // Check onboarding status after user is loaded
+  // Check onboarding status ONCE after user is loaded
   useEffect(() => {
     const checkOnboarding = async () => {
-      if (!user || checkingOnboarding) return;
+      if (!user || checkingOnboardingRef.current || hasCheckedOnboarding.current) return;
       
       // Skip onboarding check if already on onboarding page
       if (location.pathname === '/onboarding') return;
 
-      setCheckingOnboarding(true);
+      checkingOnboardingRef.current = true;
       try {
         const { data: userData, error } = await supabase
           .from('users')
@@ -56,6 +57,8 @@ export const AuthGuard = ({ children }: { children: React.ReactNode }) => {
           return;
         }
 
+        hasCheckedOnboarding.current = true;
+
         // Redirect to onboarding if not completed
         if (userData && userData.onboarding_completed === false) {
           navigate('/onboarding');
@@ -63,12 +66,12 @@ export const AuthGuard = ({ children }: { children: React.ReactNode }) => {
       } catch (error) {
         console.error('Error in onboarding check:', error);
       } finally {
-        setCheckingOnboarding(false);
+        checkingOnboardingRef.current = false;
       }
     };
 
     checkOnboarding();
-  }, [user, navigate, location.pathname, checkingOnboarding]);
+  }, [user, navigate, location.pathname]);
 
   if (loading) {
     return (
@@ -82,7 +85,15 @@ export const AuthGuard = ({ children }: { children: React.ReactNode }) => {
   }
 
   if (!user || !session) {
-    return null;
+    // Show loading state instead of null to prevent flash
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto mb-4" />
+          <p className="text-muted-foreground">Redirecting...</p>
+        </div>
+      </div>
+    );
   }
 
   return <>{children}</>;
