@@ -1228,6 +1228,57 @@ export type Database = {
           },
         ]
       }
+      customer_insights: {
+        Row: {
+          confidence: number | null
+          created_at: string | null
+          customer_id: string
+          expires_at: string | null
+          id: string
+          insight_text: string
+          insight_type: string
+          source_conversations: string[] | null
+          workspace_id: string
+        }
+        Insert: {
+          confidence?: number | null
+          created_at?: string | null
+          customer_id: string
+          expires_at?: string | null
+          id?: string
+          insight_text: string
+          insight_type: string
+          source_conversations?: string[] | null
+          workspace_id: string
+        }
+        Update: {
+          confidence?: number | null
+          created_at?: string | null
+          customer_id?: string
+          expires_at?: string | null
+          id?: string
+          insight_text?: string
+          insight_type?: string
+          source_conversations?: string[] | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_insights_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_insights_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customers: {
         Row: {
           address: string | null
@@ -1239,7 +1290,10 @@ export type Database = {
           embedding: string | null
           frequency: string | null
           id: string
+          intelligence: Json | null
+          last_analyzed_at: string | null
           last_updated: string | null
+          lifetime_value: number | null
           name: string | null
           next_appointment: string | null
           notes: string | null
@@ -1247,10 +1301,14 @@ export type Database = {
           phone: string | null
           preferred_channel: string | null
           price: number | null
+          response_preference: string | null
           schedule_code: string | null
+          sentiment_trend: string | null
           status: string | null
           tier: string | null
+          topics_discussed: string[] | null
           updated_at: string | null
+          vip_status: boolean | null
           workspace_id: string | null
         }
         Insert: {
@@ -1263,7 +1321,10 @@ export type Database = {
           embedding?: string | null
           frequency?: string | null
           id?: string
+          intelligence?: Json | null
+          last_analyzed_at?: string | null
           last_updated?: string | null
+          lifetime_value?: number | null
           name?: string | null
           next_appointment?: string | null
           notes?: string | null
@@ -1271,10 +1332,14 @@ export type Database = {
           phone?: string | null
           preferred_channel?: string | null
           price?: number | null
+          response_preference?: string | null
           schedule_code?: string | null
+          sentiment_trend?: string | null
           status?: string | null
           tier?: string | null
+          topics_discussed?: string[] | null
           updated_at?: string | null
+          vip_status?: boolean | null
           workspace_id?: string | null
         }
         Update: {
@@ -1287,7 +1352,10 @@ export type Database = {
           embedding?: string | null
           frequency?: string | null
           id?: string
+          intelligence?: Json | null
+          last_analyzed_at?: string | null
           last_updated?: string | null
+          lifetime_value?: number | null
           name?: string | null
           next_appointment?: string | null
           notes?: string | null
@@ -1295,10 +1363,14 @@ export type Database = {
           phone?: string | null
           preferred_channel?: string | null
           price?: number | null
+          response_preference?: string | null
           schedule_code?: string | null
+          sentiment_trend?: string | null
           status?: string | null
           tier?: string | null
+          topics_discussed?: string[] | null
           updated_at?: string | null
+          vip_status?: boolean | null
           workspace_id?: string | null
         }
         Relationships: [
@@ -1465,6 +1537,110 @@ export type Database = {
             foreignKeyName: "data_retention_policies_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      document_chunks: {
+        Row: {
+          chunk_index: number
+          content: string
+          created_at: string | null
+          document_id: string
+          embedding: string | null
+          id: string
+          page_number: number | null
+          workspace_id: string
+        }
+        Insert: {
+          chunk_index: number
+          content: string
+          created_at?: string | null
+          document_id: string
+          embedding?: string | null
+          id?: string
+          page_number?: number | null
+          workspace_id: string
+        }
+        Update: {
+          chunk_index?: number
+          content?: string
+          created_at?: string | null
+          document_id?: string
+          embedding?: string | null
+          id?: string
+          page_number?: number | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_chunks_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_chunks_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      documents: {
+        Row: {
+          created_at: string | null
+          error_message: string | null
+          extracted_text: string | null
+          file_path: string
+          file_size: number | null
+          file_type: string
+          id: string
+          name: string
+          page_count: number | null
+          processed_at: string | null
+          status: string | null
+          updated_at: string | null
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          error_message?: string | null
+          extracted_text?: string | null
+          file_path: string
+          file_size?: number | null
+          file_type: string
+          id?: string
+          name: string
+          page_count?: number | null
+          processed_at?: string | null
+          status?: string | null
+          updated_at?: string | null
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string | null
+          error_message?: string | null
+          extracted_text?: string | null
+          file_path?: string
+          file_size?: number | null
+          file_type?: string
+          id?: string
+          name?: string
+          page_count?: number | null
+          processed_at?: string | null
+          status?: string | null
+          updated_at?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "documents_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
             referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
@@ -2739,6 +2915,60 @@ export type Database = {
           },
         ]
       }
+      image_analyses: {
+        Row: {
+          analysis_type: string
+          confidence: number | null
+          description: string | null
+          extracted_data: Json | null
+          id: string
+          image_url: string
+          message_id: string | null
+          processed_at: string | null
+          suggested_response: string | null
+          workspace_id: string
+        }
+        Insert: {
+          analysis_type: string
+          confidence?: number | null
+          description?: string | null
+          extracted_data?: Json | null
+          id?: string
+          image_url: string
+          message_id?: string | null
+          processed_at?: string | null
+          suggested_response?: string | null
+          workspace_id: string
+        }
+        Update: {
+          analysis_type?: string
+          confidence?: number | null
+          description?: string | null
+          extracted_data?: Json | null
+          id?: string
+          image_url?: string
+          message_id?: string | null
+          processed_at?: string | null
+          suggested_response?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "image_analyses_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "image_analyses_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       import_progress: {
         Row: {
           completed_at: string | null
@@ -3027,15 +3257,19 @@ export type Database = {
           actor_id: string | null
           actor_name: string | null
           actor_type: string
+          attachment_urls: string[] | null
           attachments: Json | null
+          audio_url: string | null
           body: string
           channel: string
           conversation_id: string | null
           created_at: string | null
           direction: string
           external_id: string | null
+          has_attachments: boolean | null
           id: string
           is_internal: boolean | null
+          is_voicemail: boolean | null
           raw_payload: Json | null
           verification_id: string | null
           verification_status: string | null
@@ -3044,15 +3278,19 @@ export type Database = {
           actor_id?: string | null
           actor_name?: string | null
           actor_type: string
+          attachment_urls?: string[] | null
           attachments?: Json | null
+          audio_url?: string | null
           body: string
           channel: string
           conversation_id?: string | null
           created_at?: string | null
           direction: string
           external_id?: string | null
+          has_attachments?: boolean | null
           id?: string
           is_internal?: boolean | null
+          is_voicemail?: boolean | null
           raw_payload?: Json | null
           verification_id?: string | null
           verification_status?: string | null
@@ -3061,15 +3299,19 @@ export type Database = {
           actor_id?: string | null
           actor_name?: string | null
           actor_type?: string
+          attachment_urls?: string[] | null
           attachments?: Json | null
+          audio_url?: string | null
           body?: string
           channel?: string
           conversation_id?: string | null
           created_at?: string | null
           direction?: string
           external_id?: string | null
+          has_attachments?: boolean | null
           id?: string
           is_internal?: boolean | null
+          is_voicemail?: boolean | null
           raw_payload?: Json | null
           verification_id?: string | null
           verification_status?: string | null
@@ -4252,6 +4494,63 @@ export type Database = {
           },
         ]
       }
+      voicemail_transcripts: {
+        Row: {
+          audio_url: string
+          caller_sentiment: string | null
+          duration_seconds: number | null
+          extracted_info: Json | null
+          id: string
+          message_id: string | null
+          processed_at: string | null
+          suggested_response: string | null
+          summary: string | null
+          transcript: string | null
+          workspace_id: string
+        }
+        Insert: {
+          audio_url: string
+          caller_sentiment?: string | null
+          duration_seconds?: number | null
+          extracted_info?: Json | null
+          id?: string
+          message_id?: string | null
+          processed_at?: string | null
+          suggested_response?: string | null
+          summary?: string | null
+          transcript?: string | null
+          workspace_id: string
+        }
+        Update: {
+          audio_url?: string
+          caller_sentiment?: string | null
+          duration_seconds?: number | null
+          extracted_info?: Json | null
+          id?: string
+          message_id?: string | null
+          processed_at?: string | null
+          suggested_response?: string | null
+          summary?: string | null
+          transcript?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "voicemail_transcripts_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "voicemail_transcripts_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       webhook_logs: {
         Row: {
           conversation_id: string | null
@@ -4607,6 +4906,21 @@ export type Database = {
           mode: string
           similarity: number
           text: string
+        }[]
+      }
+      match_document_chunks: {
+        Args: {
+          match_count?: number
+          match_threshold?: number
+          match_workspace_id: string
+          query_embedding: string
+        }
+        Returns: {
+          content: string
+          document_id: string
+          id: string
+          page_number: number
+          similarity: number
         }[]
       }
       match_faq_database: {
