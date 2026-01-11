@@ -170,3 +170,9 @@ verify_jwt = true
 
 [functions.audio-process]
 verify_jwt = true
+
+[functions.email-import-v2]
+verify_jwt = false
+
+[functions.email-classify-v2]
+verify_jwt = false

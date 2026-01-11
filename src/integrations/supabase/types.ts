@@ -318,6 +318,62 @@ export type Database = {
           },
         ]
       }
+      classification_jobs: {
+        Row: {
+          classified_count: number | null
+          completed_at: string | null
+          created_at: string
+          error_message: string | null
+          failed_count: number | null
+          id: string
+          last_processed_id: string | null
+          retry_count: number | null
+          started_at: string | null
+          status: string
+          total_to_classify: number | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          classified_count?: number | null
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          failed_count?: number | null
+          id?: string
+          last_processed_id?: string | null
+          retry_count?: number | null
+          started_at?: string | null
+          status?: string
+          total_to_classify?: number | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          classified_count?: number | null
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          failed_count?: number | null
+          id?: string
+          last_processed_id?: string | null
+          retry_count?: number | null
+          started_at?: string | null
+          status?: string
+          total_to_classify?: number | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "classification_jobs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       competitor_faq_candidates: {
         Row: {
           answer: string
@@ -1817,17 +1873,24 @@ export type Database = {
           config_id: string
           conversation_threads: number | null
           created_at: string | null
+          current_folder: string | null
           error_details: Json | null
           error_message: string | null
           heartbeat_at: string | null
           id: string
           import_mode: string | null
           inbox_emails_scanned: number | null
+          inbox_imported: number | null
+          inbox_page_token: string | null
+          last_batch_at: string | null
           messages_created: number | null
           retry_count: number | null
           sent_emails_scanned: number | null
+          sent_imported: number | null
+          sent_page_token: string | null
           started_at: string | null
           status: string
+          total_target: number | null
           total_threads_found: number | null
           updated_at: string | null
           workspace_id: string
@@ -1840,17 +1903,24 @@ export type Database = {
           config_id: string
           conversation_threads?: number | null
           created_at?: string | null
+          current_folder?: string | null
           error_details?: Json | null
           error_message?: string | null
           heartbeat_at?: string | null
           id?: string
           import_mode?: string | null
           inbox_emails_scanned?: number | null
+          inbox_imported?: number | null
+          inbox_page_token?: string | null
+          last_batch_at?: string | null
           messages_created?: number | null
           retry_count?: number | null
           sent_emails_scanned?: number | null
+          sent_imported?: number | null
+          sent_page_token?: string | null
           started_at?: string | null
           status?: string
+          total_target?: number | null
           total_threads_found?: number | null
           updated_at?: string | null
           workspace_id: string
@@ -1863,17 +1933,24 @@ export type Database = {
           config_id?: string
           conversation_threads?: number | null
           created_at?: string | null
+          current_folder?: string | null
           error_details?: Json | null
           error_message?: string | null
           heartbeat_at?: string | null
           id?: string
           import_mode?: string | null
           inbox_emails_scanned?: number | null
+          inbox_imported?: number | null
+          inbox_page_token?: string | null
+          last_batch_at?: string | null
           messages_created?: number | null
           retry_count?: number | null
           sent_emails_scanned?: number | null
+          sent_imported?: number | null
+          sent_page_token?: string | null
           started_at?: string | null
           status?: string
+          total_target?: number | null
           total_threads_found?: number | null
           updated_at?: string | null
           workspace_id?: string
