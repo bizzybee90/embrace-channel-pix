@@ -74,8 +74,9 @@ serve(async (req) => {
       .from('conversations')
       .select(`
         id,
-        subject,
+        title,
         intent,
+        category,
         customer:customers(id, name, email)
       `)
       .eq('id', conversation_id)
@@ -92,7 +93,7 @@ serve(async (req) => {
     const customer = Array.isArray(conversation.customer) ? conversation.customer[0] : conversation.customer;
 
     console.log(`[${functionName}] Fetched conversation:`, { 
-      subject: conversation.subject,
+      title: conversation.title,
       customer_email: customer?.email
     });
 
@@ -383,7 +384,7 @@ Use this information if relevant to the customer's question.`;
 CUSTOMER INFORMATION:
 - Name: ${customerName}
 - Email: ${customerEmail}
-- Subject: ${conversation.subject || 'No subject'}
+- Topic: ${conversation.title || conversation.category || 'General inquiry'}
 - Detected intent: ${conversation.intent || 'general inquiry'}
 ${voiceSection}
 

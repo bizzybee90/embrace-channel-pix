@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 const FUNCTION_NAME = 'website-scrape';
-const GEMINI_API = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent';
+const GEMINI_API = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent';
 const FIRECRAWL_API = 'https://api.firecrawl.dev/v1';
 
 interface ExtractedData {

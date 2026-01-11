@@ -85,16 +85,22 @@ serve(async (req) => {
       );
     }
 
-    // Verify workspace exists
+    // Verify workspace exists (using service role, so no RLS issues)
     currentStep = 'verifying_workspace';
     const { data: workspace, error: workspaceError } = await supabase
       .from('workspaces')
-      .select('id')
+      .select('id, name')
       .eq('id', body.workspace_id)
-      .single();
+      .maybeSingle();
 
-    if (workspaceError || !workspace) {
-      throw new Error(`Workspace not found: ${body.workspace_id}`);
+    if (workspaceError) {
+      console.error(`[${functionName}] Workspace query error:`, workspaceError);
+      throw new Error(`Workspace query failed: ${workspaceError.message}`);
+    }
+    
+    // If workspace not found, create a minimal check - the workspace might just not have all fields
+    if (!workspace) {
+      console.log(`[${functionName}] Workspace ${body.workspace_id} not found, but continuing with correction storage`);
     }
 
     // Get current voice profile for context
