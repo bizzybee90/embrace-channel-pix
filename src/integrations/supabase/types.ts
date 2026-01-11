@@ -222,13 +222,18 @@ export type Database = {
           address: string | null
           business_name: string
           cancellation_policy: string | null
+          county: string | null
           created_at: string | null
           email: string | null
+          formatted_address: string | null
           guarantee: string | null
           id: string
           industry: string | null
+          latitude: number | null
+          longitude: number | null
           payment_methods: string | null
           phone: string | null
+          place_id: string | null
           price_summary: string | null
           pricing_model: string | null
           service_area: string | null
@@ -246,13 +251,18 @@ export type Database = {
           address?: string | null
           business_name: string
           cancellation_policy?: string | null
+          county?: string | null
           created_at?: string | null
           email?: string | null
+          formatted_address?: string | null
           guarantee?: string | null
           id?: string
           industry?: string | null
+          latitude?: number | null
+          longitude?: number | null
           payment_methods?: string | null
           phone?: string | null
+          place_id?: string | null
           price_summary?: string | null
           pricing_model?: string | null
           service_area?: string | null
@@ -270,13 +280,18 @@ export type Database = {
           address?: string | null
           business_name?: string
           cancellation_policy?: string | null
+          county?: string | null
           created_at?: string | null
           email?: string | null
+          formatted_address?: string | null
           guarantee?: string | null
           id?: string
           industry?: string | null
+          latitude?: number | null
+          longitude?: number | null
           payment_methods?: string | null
           phone?: string | null
+          place_id?: string | null
           price_summary?: string | null
           pricing_model?: string | null
           service_area?: string | null
