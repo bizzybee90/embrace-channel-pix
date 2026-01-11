@@ -112,7 +112,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.competitor-scrape]
-verify_jwt = false
+verify_jwt = true
 
 [functions.competitor-extract-faqs]
 verify_jwt = false
