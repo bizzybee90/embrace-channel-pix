@@ -6,241 +6,242 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Domains to skip (directories, social media, not actual businesses)
-const SKIP_DOMAINS = [
-  // Social media
-  'facebook.com', 'instagram.com', 'twitter.com', 'linkedin.com',
-  'youtube.com', 'tiktok.com', 'pinterest.com', 'x.com',
-  // UK directories
-  'yell.com', 'checkatrade.com', 'trustatrader.com', 'mybuilder.com',
-  'bark.com', 'ratedpeople.com', 'mylocalservices.co.uk',
-  'freeindex.co.uk', 'cylex-uk.co.uk', 'hotfrog.co.uk', 'misterwhat.co.uk',
-  'brownbook.net', 'uksmallbusinessdirectory.co.uk', 'thomsonlocal.com',
-  'scoot.co.uk', '192.com', 'thebestof.co.uk', 'touchlocal.com',
-  // US directories
-  'yelp.com', 'yellowpages.com', 'bbb.org', 'angieslist.com',
-  'homeadvisor.com', 'thumbtack.com',
-  // Review sites
-  'tripadvisor.com', 'trustpilot.com', 'reviews.co.uk', 'reviews.io',
-  // Job sites
-  'indeed.com', 'glassdoor.com', 'reed.co.uk', 'totaljobs.com',
-  // General
-  'google.com', 'bing.com', 'yahoo.com', 'wikipedia.org',
-  'amazon.co.uk', 'amazon.com', 'ebay.co.uk', 'ebay.com',
-  'gumtree.com', 'craigslist.org', 'nextdoor.com', 'nextdoor.co.uk',
-  // Government
-  'gov.uk', 'nhs.uk',
-];
-
-declare const EdgeRuntime: { waitUntil: (p: Promise<unknown>) => void } | undefined;
-const waitUntil = (p: Promise<unknown>) => { try { EdgeRuntime?.waitUntil(p); } catch { /* ignore */ } };
+const GEMINI_API = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent';
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  const startTime = Date.now();
+  const functionName = 'competitor-discover';
 
   try {
-    const { jobId, workspaceId } = await req.json();
-    console.log('[competitor-discover] Starting with Apify:', { jobId, workspaceId });
-
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    const APIFY_API_KEY = Deno.env.get('APIFY_API_KEY');
-    if (!APIFY_API_KEY) {
-      console.error('[competitor-discover] No APIFY_API_KEY configured');
-      await supabase.from('competitor_research_jobs').update({
-        status: 'error',
-        error_message: 'Apify API key not configured. Please add APIFY_API_KEY to secrets.'
-      }).eq('id', jobId);
-      return new Response(JSON.stringify({ error: 'No Apify API key' }), {
-        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
+    const GOOGLE_API_KEY = Deno.env.get('GOOGLE_API_KEY');
+    if (!GOOGLE_API_KEY) throw new Error('GOOGLE_API_KEY not configured');
 
-    // Get job details
-    const { data: job } = await supabase
-      .from('competitor_research_jobs')
+    const body = await req.json();
+    console.log(`[${functionName}] Starting:`, { workspace_id: body.workspace_id });
+
+    if (!body.workspace_id) throw new Error('workspace_id is required');
+
+    // Get business profile
+    const { data: profile } = await supabase
+      .from('business_profile')
       .select('*')
-      .eq('id', jobId)
+      .eq('workspace_id', body.workspace_id)
       .single();
 
-    if (!job) {
-      return new Response(JSON.stringify({ error: 'Job not found' }), {
-        status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+    if (!profile) {
+      throw new Error('Business profile not found. Please set your location first.');
     }
 
-    // Update status
-    await supabase.from('competitor_research_jobs').update({
-      status: 'discovering',
-      started_at: job.started_at || new Date().toISOString(),
-      heartbeat_at: new Date().toISOString(),
-    }).eq('id', jobId);
+    const location = profile.formatted_address || profile.county || profile.service_area || 'UK';
+    const keywords = profile.search_keywords || [profile.industry || 'local business'];
+    const radius = profile.service_radius_miles || 25;
 
-    const industry = job.industry || job.niche_query;
-    const location = job.location || job.service_area;
+    console.log(`[${functionName}] Searching for:`, { location, keywords, radius });
 
-    // Generate UK-focused search queries
-    const searchQueries = [
-      `${industry} ${location}`,
-      `${industry} services ${location}`,
-      `${industry} company ${location}`,
-      `best ${industry} ${location}`,
-      `${industry} near ${location}`,
-      `local ${industry} ${location}`,
-      `professional ${industry} ${location}`,
-    ].join('\n');
+    // Create a research job
+    const { data: job, error: jobError } = await supabase
+      .from('competitor_research_jobs')
+      .insert({
+        workspace_id: body.workspace_id,
+        niche_query: keywords.join(', '),
+        location: location,
+        radius_miles: radius,
+        status: 'discovering',
+        started_at: new Date().toISOString(),
+        heartbeat_at: new Date().toISOString()
+      })
+      .select()
+      .single();
 
-    console.log('[competitor-discover] Search queries:', searchQueries);
+    if (jobError) throw jobError;
 
-    // Call Apify Google Search Scraper
-    console.log('[competitor-discover] Calling Apify Google Search Scraper...');
-    const apifyResponse = await fetch(
-      `https://api.apify.com/v2/acts/apify~google-search-scraper/run-sync-get-dataset-items?token=${APIFY_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          queries: searchQueries,
-          maxPagesPerQuery: 2,        // First 2 pages of Google results
-          resultsPerPage: 20,         // 20 results per page
-          countryCode: 'gb',          // UK Google
-          languageCode: 'en',
-          mobileResults: false,
-          includeUnfilteredResults: false,
-        }),
-      }
-    );
+    // Use Gemini with Google Search to find competitors
+    const prompt = `Find 15-20 ${keywords.join(' / ')} businesses within ${radius} miles of ${location}.
 
-    if (!apifyResponse.ok) {
-      const errorText = await apifyResponse.text();
-      console.error('[competitor-discover] Apify error:', errorText);
-      await supabase.from('competitor_research_jobs').update({
-        status: 'error',
-        error_message: `Apify API error: ${apifyResponse.status}`
-      }).eq('id', jobId);
-      throw new Error(`Apify API error: ${apifyResponse.status}`);
-    }
+Use Google Search to find real, currently operating businesses. 
 
-    const apifyResults = await apifyResponse.json();
-    console.log('[competitor-discover] Apify returned', apifyResults.length, 'result sets');
+EXCLUDE these domains: yell.com, checkatrade.com, bark.com, trustpilot.com, facebook.com, instagram.com, linkedin.com, yelp.com, gumtree.com, freeindex.co.uk, thomsonlocal.com, twitter.com, youtube.com, pinterest.com, x.com, trustatrader.com, mybuilder.com, ratedpeople.com, google.com, bing.com, yahoo.com, wikipedia.org, amazon.co.uk, ebay.co.uk, gov.uk, nhs.uk
 
-    // Extract unique competitor URLs
-    const discoveredUrls = new Map<string, Record<string, unknown>>();
+For each business found, provide:
+- Business name
+- Website URL (their actual website, not a directory listing)
+- City/town
+- Approximate distance from ${location}
+- Google rating if available
 
-    for (const resultSet of apifyResults) {
-      const searchQuery = resultSet.searchQuery?.term || '';
+Respond with ONLY a JSON array:
+[
+  {
+    "name": "ABC Window Cleaning",
+    "website": "https://abcwindowcleaning.co.uk",
+    "city": "Dunstable",
+    "distance_miles": 5,
+    "rating": 4.8,
+    "review_count": 45
+  }
+]
+
+Only include businesses with actual websites. Skip any without a website.`;
+
+    const geminiResponse = await fetch(`${GEMINI_API}?key=${GOOGLE_API_KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        tools: [{
+          google_search: {}  // Enable Google grounding
+        }],
+        generationConfig: {
+          temperature: 0.2,
+          maxOutputTokens: 4096
+        }
+      })
+    });
+
+    if (!geminiResponse.ok) {
+      const errorText = await geminiResponse.text();
+      console.error(`[${functionName}] Gemini API error:`, errorText);
       
-      for (const result of resultSet.organicResults || []) {
-        const url = result.url;
-        if (!url) continue;
-
-        // Extract and normalize domain
-        let domain: string;
-        try {
-          const urlObj = new URL(url);
-          domain = urlObj.hostname.replace('www.', '').toLowerCase();
-        } catch {
-          continue;
-        }
-
-        // Skip directory sites and social media
-        if (SKIP_DOMAINS.some(skip => domain.includes(skip))) {
-          console.log(`[competitor-discover] Skipping directory/social: ${domain}`);
-          continue;
-        }
-
-        // Skip if already found
-        if (discoveredUrls.has(domain)) {
-          continue;
-        }
-
-        // Check if UK domain
-        const isUkDomain = domain.endsWith('.co.uk') || domain.endsWith('.uk');
-
-        console.log(`[competitor-discover] Found: ${domain} ${isUkDomain ? '(UK)' : ''}`);
-
-        discoveredUrls.set(domain, {
-          workspace_id: workspaceId,
-          job_id: jobId,
-          url: url,
-          domain: domain,
-          business_name: result.title || null,
-          description: result.description || null,
-          discovery_source: 'apify_google_search',
-          discovery_query: searchQuery,
-          is_valid: true,
-          status: 'approved',
-          scrape_status: 'pending',
-        });
-      }
+      // Update job with error
+      await supabase
+        .from('competitor_research_jobs')
+        .update({
+          status: 'error',
+          error_message: `Gemini API error: ${geminiResponse.status}`,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', job.id);
+        
+      throw new Error(`Gemini API error: ${geminiResponse.status}`);
     }
 
-    console.log(`[competitor-discover] Total unique competitors: ${discoveredUrls.size}`);
+    const geminiData = await geminiResponse.json();
+    const responseText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
-    // Insert discovered sites one by one to handle any conflicts
-    let insertedCount = 0;
-    if (discoveredUrls.size > 0) {
-      const sites = Array.from(discoveredUrls.values());
+    console.log(`[${functionName}] Gemini response length:`, responseText.length);
+
+    // Parse competitors
+    let competitors: any[];
+    try {
+      const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+      if (!jsonMatch) throw new Error('No JSON array found');
+      competitors = JSON.parse(jsonMatch[0]);
+    } catch (parseError) {
+      console.error(`[${functionName}] Parse error:`, responseText.substring(0, 500));
       
-      for (const site of sites) {
-        // Check if site already exists for this job
-        const { data: existing } = await supabase
-          .from('competitor_sites')
-          .select('id')
-          .eq('job_id', jobId)
-          .eq('domain', site.domain)
-          .maybeSingle();
+      // Update job with error
+      await supabase
+        .from('competitor_research_jobs')
+        .update({
+          status: 'error',
+          error_message: 'Failed to parse competitor list from AI response',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', job.id);
         
-        if (existing) {
-          console.log(`[competitor-discover] Skipping duplicate: ${site.domain}`);
-          continue;
-        }
-        
-        const { error: insertError } = await supabase
-          .from('competitor_sites')
-          .insert(site);
+      throw new Error('Failed to parse competitor list');
+    }
 
-        if (insertError) {
-          console.error(`[competitor-discover] Insert error for ${site.domain}:`, insertError);
-        } else {
-          insertedCount++;
-          console.log(`[competitor-discover] Inserted: ${site.domain}`);
-        }
+    // Filter and dedupe
+    const seenUrls = new Set<string>();
+    const validCompetitors = competitors.filter(c => {
+      if (!c.website || !c.name) return false;
+      
+      try {
+        const hostname = new URL(c.website).hostname.toLowerCase();
+        if (seenUrls.has(hostname)) return false;
+        seenUrls.add(hostname);
+        return true;
+      } catch {
+        return false;
+      }
+    });
+
+    console.log(`[${functionName}] Valid competitors after filtering:`, validCompetitors.length);
+
+    // Insert competitors
+    const competitorsToInsert = validCompetitors.map(c => {
+      let domain: string;
+      try {
+        domain = new URL(c.website).hostname.replace('www.', '').toLowerCase();
+      } catch {
+        domain = c.website;
+      }
+      
+      return {
+        job_id: job.id,
+        workspace_id: body.workspace_id,
+        domain: domain,
+        url: c.website,
+        business_name: c.name,
+        city: c.city || null,
+        distance_miles: c.distance_miles || null,
+        rating: c.rating || null,
+        review_count: c.review_count || null,
+        status: 'discovered',
+        is_valid: true,
+        scrape_status: 'pending',
+        discovery_source: 'gemini_grounded',
+        discovered_at: new Date().toISOString()
+      };
+    });
+
+    if (competitorsToInsert.length > 0) {
+      const { error: insertError } = await supabase
+        .from('competitor_sites')
+        .insert(competitorsToInsert);
+        
+      if (insertError) {
+        console.error(`[${functionName}] Insert error:`, insertError);
       }
     }
-    
-    console.log(`[competitor-discover] Inserted ${insertedCount} sites`)
 
     // Update job
-    await supabase.from('competitor_research_jobs').update({
-      sites_discovered: discoveredUrls.size,
-      sites_approved: discoveredUrls.size,
-      status: discoveredUrls.size > 0 ? 'scraping' : 'error',
-      error_message: discoveredUrls.size === 0 ? 'No competitor sites found' : null,
-      heartbeat_at: new Date().toISOString(),
-    }).eq('id', jobId);
+    await supabase
+      .from('competitor_research_jobs')
+      .update({
+        sites_discovered: validCompetitors.length,
+        sites_approved: validCompetitors.length,
+        status: validCompetitors.length > 0 ? 'discovered' : 'error',
+        error_message: validCompetitors.length === 0 ? 'No competitor sites found' : null,
+        updated_at: new Date().toISOString(),
+        heartbeat_at: new Date().toISOString()
+      })
+      .eq('id', job.id);
 
-    // Trigger scraping phase
-    if (discoveredUrls.size > 0) {
-      waitUntil(
-        supabase.functions.invoke('competitor-scrape', { body: { jobId, workspaceId } })
-      );
-    }
+    const duration = Date.now() - startTime;
+    console.log(`[${functionName}] Completed in ${duration}ms: ${validCompetitors.length} competitors`);
 
-    return new Response(JSON.stringify({
-      success: true,
-      sitesDiscovered: discoveredUrls.size,
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+    return new Response(
+      JSON.stringify({ 
+        success: true,
+        job_id: job.id,
+        competitors_found: validCompetitors.length,
+        competitors: validCompetitors,
+        duration_ms: duration
+      }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
 
-  } catch (error) {
-    console.error('[competitor-discover] Error:', error);
-    return new Response(JSON.stringify({ error: String(error) }), {
-      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+  } catch (error: any) {
+    console.error(`[${functionName}] Error:`, error);
+    return new Response(
+      JSON.stringify({ 
+        success: false, 
+        error: error.message,
+        function: functionName,
+        duration_ms: Date.now() - startTime
+      }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
   }
 });
