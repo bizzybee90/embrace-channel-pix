@@ -12,10 +12,9 @@ import { GDPRDashboard } from '@/components/settings/GDPRDashboard';
 import { WorkspaceGDPRSettingsPanel } from '@/components/settings/WorkspaceGDPRSettingsPanel';
 import { CustomerMergePanel } from '@/components/settings/CustomerMergePanel';
 import { ChannelManagementPanel } from '@/components/settings/ChannelManagementPanel';
-import { AIAgentPanel } from '@/components/settings/AIAgentPanel';
+import { AISettingsCard } from '@/components/settings/AISettingsCard';
 import { ConversationOrderingPanel } from '@/components/settings/ConversationOrderingPanel';
 import { KnowledgeBasePanel } from '@/components/settings/KnowledgeBasePanel';
-import { DataSyncPanel } from '@/components/settings/DataSyncPanel';
 import { IntegrationsPanel } from '@/components/settings/IntegrationsPanel';
 import { EmailSettingsPanel } from '@/components/settings/EmailSettingsPanel';
 import { BusinessContextPanel } from '@/components/settings/BusinessContextPanel';
@@ -59,9 +58,11 @@ export default function Settings() {
       description: 'Agent configuration, knowledge base, and learning',
       content: (
         <div className="space-y-3">
-          <SettingsSection title="AI Agent" description="Configure prompts and models" defaultOpen>
-            <AIAgentPanel />
-          </SettingsSection>
+          {workspace?.id && (
+            <SettingsSection title="AI Behavior" description="Configure automation and confidence thresholds" defaultOpen>
+              <AISettingsCard workspaceId={workspace.id} />
+            </SettingsSection>
+          )}
           <SettingsSection title="Knowledge Base" description="FAQs, pricing, and business facts">
             <KnowledgeBasePanel />
           </SettingsSection>
@@ -107,9 +108,6 @@ export default function Settings() {
           </SettingsSection>
           <SettingsSection title="Integrations" description="Third-party connections">
             <IntegrationsPanel />
-          </SettingsSection>
-          <SettingsSection title="Data Sync" description="External data sources">
-            <DataSyncPanel />
           </SettingsSection>
         </div>
       )

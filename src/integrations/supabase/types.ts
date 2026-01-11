@@ -49,6 +49,53 @@ export type Database = {
           },
         ]
       }
+      automation_settings: {
+        Row: {
+          always_verify: boolean | null
+          auto_send_enabled: boolean | null
+          auto_send_threshold: number | null
+          created_at: string | null
+          default_to_drafts: boolean | null
+          id: string
+          low_confidence_threshold: number | null
+          notify_on_low_confidence: boolean | null
+          updated_at: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          always_verify?: boolean | null
+          auto_send_enabled?: boolean | null
+          auto_send_threshold?: number | null
+          created_at?: string | null
+          default_to_drafts?: boolean | null
+          id?: string
+          low_confidence_threshold?: number | null
+          notify_on_low_confidence?: boolean | null
+          updated_at?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          always_verify?: boolean | null
+          auto_send_enabled?: boolean | null
+          auto_send_threshold?: number | null
+          created_at?: string | null
+          default_to_drafts?: boolean | null
+          id?: string
+          low_confidence_threshold?: number | null
+          notify_on_low_confidence?: boolean | null
+          updated_at?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automation_settings_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       business_context: {
         Row: {
           active_insurance_claim: boolean | null
