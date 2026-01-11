@@ -49,6 +49,47 @@ export type Database = {
           },
         ]
       }
+      api_usage: {
+        Row: {
+          cost_estimate: number | null
+          created_at: string | null
+          function_name: string | null
+          id: string
+          provider: string
+          requests: number | null
+          tokens_used: number | null
+          workspace_id: string | null
+        }
+        Insert: {
+          cost_estimate?: number | null
+          created_at?: string | null
+          function_name?: string | null
+          id?: string
+          provider: string
+          requests?: number | null
+          tokens_used?: number | null
+          workspace_id?: string | null
+        }
+        Update: {
+          cost_estimate?: number | null
+          created_at?: string | null
+          function_name?: string | null
+          id?: string
+          provider?: string
+          requests?: number | null
+          tokens_used?: number | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "api_usage_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       automation_settings: {
         Row: {
           always_verify: boolean | null
@@ -4229,6 +4270,47 @@ export type Database = {
           },
         ]
       }
+      system_logs: {
+        Row: {
+          created_at: string | null
+          details: Json | null
+          function_name: string | null
+          id: string
+          level: string
+          message: string
+          stack_trace: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          details?: Json | null
+          function_name?: string | null
+          id?: string
+          level?: string
+          message: string
+          stack_trace?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          details?: Json | null
+          function_name?: string | null
+          id?: string
+          level?: string
+          message?: string
+          stack_trace?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "system_logs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       system_prompts: {
         Row: {
           agent_type: string
@@ -4919,7 +5001,16 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      api_usage_summary: {
+        Row: {
+          hour: string | null
+          provider: string | null
+          total_cost: number | null
+          total_requests: number | null
+          total_tokens: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       analyze_email_threads: {
