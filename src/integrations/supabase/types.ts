@@ -3294,6 +3294,9 @@ export type Database = {
           body_html: string | null
           body_text: string | null
           classification: Json | null
+          classification_category: string | null
+          classification_confidence: number | null
+          classification_reasoning: string | null
           confidence: number | null
           created_at: string | null
           email_type: string | null
@@ -3309,6 +3312,7 @@ export type Database = {
           processing_completed_at: string | null
           processing_started_at: string | null
           received_at: string | null
+          requires_reply: boolean | null
           retry_count: number | null
           status: string | null
           subject: string | null
@@ -3321,6 +3325,9 @@ export type Database = {
           body_html?: string | null
           body_text?: string | null
           classification?: Json | null
+          classification_category?: string | null
+          classification_confidence?: number | null
+          classification_reasoning?: string | null
           confidence?: number | null
           created_at?: string | null
           email_type?: string | null
@@ -3336,6 +3343,7 @@ export type Database = {
           processing_completed_at?: string | null
           processing_started_at?: string | null
           received_at?: string | null
+          requires_reply?: boolean | null
           retry_count?: number | null
           status?: string | null
           subject?: string | null
@@ -3348,6 +3356,9 @@ export type Database = {
           body_html?: string | null
           body_text?: string | null
           classification?: Json | null
+          classification_category?: string | null
+          classification_confidence?: number | null
+          classification_reasoning?: string | null
           confidence?: number | null
           created_at?: string | null
           email_type?: string | null
@@ -3363,6 +3374,7 @@ export type Database = {
           processing_completed_at?: string | null
           processing_started_at?: string | null
           received_at?: string | null
+          requires_reply?: boolean | null
           retry_count?: number | null
           status?: string | null
           subject?: string | null
