@@ -25,6 +25,9 @@ interface VoiceProfile {
 interface FAQ {
   question: string;
   answer: string;
+  similarity?: number;
+  source?: string;
+  priority?: number;
 }
 
 serve(async (req) => {
@@ -125,25 +128,81 @@ serve(async (req) => {
     const hasVoiceProfile = !!voiceProfile;
     console.log(`[${functionName}] Voice profile:`, hasVoiceProfile ? 'found' : 'not found, using defaults');
 
-    // Step 4: Get relevant FAQs
+    // Step 4: Get relevant FAQs using semantic search
     currentStep = 'fetching_faqs';
     const lastInboundMessage = messages
       .filter((m: Message) => m.direction === 'inbound')
       .pop();
 
     let relevantFaqs: FAQ[] = [];
+    let usedSemanticSearch = false;
+    
     if (lastInboundMessage) {
-      const { data: faqs, error: faqError } = await supabase
-        .from('faq_database')
-        .select('question, answer')
-        .eq('workspace_id', workspace_id)
-        .limit(5);
+      // Generate embedding for the customer's message for semantic search
+      let questionEmbedding = null;
+      try {
+        console.log(`[${functionName}] Generating embedding for semantic FAQ search...`);
+        const embeddingResponse = await fetch(
+          `${supabaseUrl}/functions/v1/generate-embedding`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${supabaseKey}`
+            },
+            body: JSON.stringify({ text: lastInboundMessage.body })
+          }
+        );
 
-      if (faqError) {
-        console.log(`[${functionName}] FAQ fetch warning: ${faqError.message}`);
-      } else if (faqs && faqs.length > 0) {
-        relevantFaqs = faqs;
-        console.log(`[${functionName}] Found ${faqs.length} FAQs for context`);
+        if (embeddingResponse.ok) {
+          const embeddingData = await embeddingResponse.json();
+          questionEmbedding = embeddingData.embedding;
+          console.log(`[${functionName}] Embedding generated successfully`);
+        } else {
+          console.log(`[${functionName}] Embedding response not OK: ${embeddingResponse.status}`);
+        }
+      } catch (e) {
+        console.log(`[${functionName}] Embedding generation failed, falling back to standard FAQs: ${e}`);
+      }
+
+      // Try semantic search first if we have an embedding
+      if (questionEmbedding) {
+        try {
+          const { data: matchedFaqs, error: matchError } = await supabase
+            .rpc('match_faqs', {
+              query_embedding: questionEmbedding,
+              match_workspace_id: workspace_id,
+              match_threshold: 0.5,
+              match_count: 5
+            });
+
+          if (!matchError && matchedFaqs?.length > 0) {
+            relevantFaqs = matchedFaqs;
+            usedSemanticSearch = true;
+            console.log(`[${functionName}] Found ${matchedFaqs.length} semantically relevant FAQs`);
+          } else if (matchError) {
+            console.log(`[${functionName}] Semantic search error: ${matchError.message}`);
+          }
+        } catch (e) {
+          console.log(`[${functionName}] Semantic search failed: ${e}`);
+        }
+      }
+
+      // Fallback: if no semantic matches, get highest priority FAQs
+      if (relevantFaqs.length === 0) {
+        const { data: fallbackFaqs, error: faqError } = await supabase
+          .from('faq_database')
+          .select('question, answer, source, priority')
+          .eq('workspace_id', workspace_id)
+          .order('priority', { ascending: false })
+          .limit(5);
+
+        if (faqError) {
+          console.log(`[${functionName}] FAQ fetch warning: ${faqError.message}`);
+        } else if (fallbackFaqs && fallbackFaqs.length > 0) {
+          relevantFaqs = fallbackFaqs;
+          console.log(`[${functionName}] Using ${fallbackFaqs.length} fallback FAQs (no semantic matches)`);
+        }
       }
     }
 
@@ -187,14 +246,15 @@ serve(async (req) => {
     const draft = aiData.choices[0].message.content.trim();
     console.log(`[${functionName}] Generated draft (${draft.length} chars)`);
 
-    // Calculate confidence based on available context
-    const confidence = calculateConfidence(hasVoiceProfile, relevantFaqs.length, messages.length);
+    // Calculate confidence based on available context (semantic search boosts confidence)
+    const confidence = calculateConfidence(hasVoiceProfile, relevantFaqs.length, messages.length, usedSemanticSearch);
 
     const duration = Date.now() - startTime;
     console.log(`[${functionName}] Completed in ${duration}ms:`, {
       draft_length: draft.length,
       confidence,
       faqs_used: relevantFaqs.length,
+      semantic_search: usedSemanticSearch,
       messages_in_thread: messages.length
     });
 
@@ -255,13 +315,20 @@ No specific voice profile learned yet. Use a professional, friendly, and helpful
 Keep the response concise but complete.`;
   }
 
-  // Format FAQ section
+  // Format FAQ section with relevance scores if available
   let faqSection = '';
   if (faqs.length > 0) {
+    const faqContext = faqs.map(faq => {
+      const relevance = faq.similarity 
+        ? ` (${Math.round(faq.similarity * 100)}% relevant)` 
+        : '';
+      return `Q: ${faq.question}${relevance}\nA: ${faq.answer}`;
+    }).join('\n\n');
+    
     faqSection = `
 
 RELEVANT KNOWLEDGE BASE:
-${faqs.map(f => `Q: ${f.question}\nA: ${f.answer}`).join('\n\n')}
+${faqContext}
 
 Use this information if relevant to the customer's question.`;
   }
@@ -299,15 +366,21 @@ Write the reply now:`;
 function calculateConfidence(
   hasVoiceProfile: boolean,
   faqCount: number,
-  messageCount: number
+  messageCount: number,
+  usedSemanticSearch: boolean = false
 ): number {
   let confidence = 0.5; // Base confidence
 
   // Voice profile adds significant confidence
   if (hasVoiceProfile) confidence += 0.2;
 
-  // FAQs add confidence
-  if (faqCount > 0) confidence += Math.min(faqCount * 0.05, 0.15);
+  // FAQs add confidence - semantic search FAQs are more valuable
+  if (faqCount > 0) {
+    const faqBoost = usedSemanticSearch 
+      ? Math.min(faqCount * 0.07, 0.20)  // Semantic matches are more relevant
+      : Math.min(faqCount * 0.05, 0.15);
+    confidence += faqBoost;
+  }
 
   // More context from messages helps
   if (messageCount > 1) confidence += 0.05;
