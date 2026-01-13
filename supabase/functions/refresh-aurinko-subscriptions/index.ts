@@ -34,7 +34,7 @@ serve(async (req) => {
     // Fetch all active email configs (or specific one)
     let query = supabase
       .from('email_provider_configs')
-      .select('*')
+      .select('id, email_address, account_id, subscription_id')
       .not('access_token', 'is', null);
 
     if (specificConfigId) {
@@ -71,13 +71,28 @@ serve(async (req) => {
       try {
         console.log(`🔧 Refreshing subscription for: ${config.email_address}`);
 
+        // Get decrypted access token securely
+        const { data: accessToken, error: tokenError } = await supabase
+          .rpc('get_decrypted_access_token', { config_id: config.id });
+
+        if (tokenError || !accessToken) {
+          console.error(`❌ Failed to get access token for ${config.email_address}:`, tokenError);
+          results.push({ 
+            configId: config.id, 
+            email: config.email_address, 
+            success: false, 
+            error: 'Failed to retrieve access token' 
+          });
+          continue;
+        }
+
         // First, delete any existing subscriptions to avoid duplicates
         const deleteResponse = await fetch(
           `https://api.aurinko.io/v1/subscriptions`,
           {
             method: 'GET',
             headers: {
-              'Authorization': `Bearer ${config.access_token}`,
+              'Authorization': `Bearer ${accessToken}`,
             },
           }
         );
@@ -91,7 +106,7 @@ serve(async (req) => {
             await fetch(`https://api.aurinko.io/v1/subscriptions/${sub.id}`, {
               method: 'DELETE',
               headers: {
-                'Authorization': `Bearer ${config.access_token}`,
+                'Authorization': `Bearer ${accessToken}`,
               },
             });
             console.log(`🗑️ Deleted old subscription: ${sub.id}`);
@@ -104,7 +119,7 @@ serve(async (req) => {
           {
             method: 'POST',
             headers: {
-              'Authorization': `Bearer ${config.access_token}`,
+              'Authorization': `Bearer ${accessToken}`,
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({

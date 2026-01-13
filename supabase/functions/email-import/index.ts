@@ -146,7 +146,7 @@ serve(async (req) => {
 
     const { data: emailConfig, error: configError } = await supabase
       .from('email_provider_configs')
-      .select('access_token, email_address, provider')
+      .select('id, email_address, provider')
       .eq('workspace_id', workspaceId)
       .single();
 
@@ -161,7 +161,11 @@ serve(async (req) => {
       throw new Error('Email not connected. Please connect your email account first.');
     }
 
-    if (!emailConfig.access_token) {
+    // Get decrypted access token securely
+    const { data: accessToken, error: tokenError } = await supabase
+      .rpc('get_decrypted_access_token', { config_id: emailConfig.id });
+
+    if (tokenError || !accessToken) {
       throw new Error('Email access token is missing. Please reconnect your email account.');
     }
 
@@ -202,7 +206,7 @@ serve(async (req) => {
 
     const sentResult = await importEmailsFromFolder({
       supabase,
-      accessToken: emailConfig.access_token,
+      accessToken: accessToken,
       workspaceId,
       folder: 'SENT',
       limit: sentLimit,
@@ -224,7 +228,7 @@ serve(async (req) => {
 
     const inboxResult = await importEmailsFromFolder({
       supabase,
-      accessToken: emailConfig.access_token,
+      accessToken: accessToken,
       workspaceId,
       folder: 'INBOX',
       limit: inboxLimit,

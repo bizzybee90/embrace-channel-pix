@@ -124,7 +124,7 @@ serve(async (req) => {
     
     const { data: emailConfig, error: configError } = await supabase
       .from('email_provider_configs')
-      .select('account_id, access_token, email_address')
+      .select('id, account_id, email_address')
       .eq('workspace_id', body.workspace_id)
       .single();
 
@@ -134,11 +134,16 @@ serve(async (req) => {
     if (!emailConfig) {
       throw new Error('No email provider configured for this workspace. Please connect your email first.');
     }
-    if (!emailConfig.access_token) {
-      throw new Error('Email access token is missing. Please reconnect your email.');
-    }
     if (!emailConfig.account_id) {
       throw new Error('Email account ID is missing. Please reconnect your email.');
+    }
+
+    // Get decrypted access token securely
+    const { data: accessToken, error: tokenError } = await supabase
+      .rpc('get_decrypted_access_token', { config_id: emailConfig.id });
+
+    if (tokenError || !accessToken) {
+      throw new Error('Email access token is missing. Please reconnect your email.');
     }
 
     const senderEmail = emailConfig.email_address;
@@ -167,7 +172,7 @@ serve(async (req) => {
       {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${emailConfig.access_token}`,
+          'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(emailPayload),
