@@ -120,7 +120,7 @@ serve(async (req) => {
     // Find the email config for this account
     const { data: emailConfig, error: configError } = await supabase
       .from('email_provider_configs')
-      .select('*')
+      .select('id, workspace_id, email_address, account_id, aliases')
       .eq('account_id', accountId.toString())
       .single();
 
@@ -132,16 +132,31 @@ serve(async (req) => {
       });
     }
 
+    // Get decrypted access token securely
+    const { data: accessToken, error: tokenError } = await supabase
+      .rpc('get_decrypted_access_token', { config_id: emailConfig.id });
+
+    if (tokenError || !accessToken) {
+      console.error('Failed to get access token for account:', accountId, tokenError);
+      return new Response(JSON.stringify({ error: 'Failed to retrieve access token' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Add accessToken to emailConfig object for use in helper functions
+    const emailConfigWithToken = { ...emailConfig, accessToken };
+
     console.log('Found email config for workspace:', emailConfig.workspace_id, 'processing', notifications.length, 'notifications');
 
     // Process each notification
     for (const notif of notifications) {
       if (notif.type === 'message.created' && notif.resource) {
         // New email arrived - process it
-        await processNewEmail(supabase, emailConfig, notif.resource);
+        await processNewEmail(supabase, emailConfigWithToken, notif.resource);
       } else if (notif.type === 'message.updated' && notif.resource) {
         // Email was updated (e.g., marked as read/unread externally)
-        await processEmailUpdate(supabase, emailConfig, notif.resource);
+        await processEmailUpdate(supabase, emailConfigWithToken, notif.resource);
       }
     }
 
@@ -175,7 +190,7 @@ async function processNewEmail(supabase: any, emailConfig: any, emailData: any) 
   
   const messageResponse = await fetch(messageUrl, {
     headers: {
-      'Authorization': `Bearer ${emailConfig.access_token}`,
+      'Authorization': `Bearer ${emailConfig.accessToken}`,
     },
   });
 
@@ -418,7 +433,7 @@ async function processEmailUpdate(supabase: any, emailConfig: any, emailData: an
   const messageUrl = `https://api.aurinko.io/v1/email/messages/${messageId}`;
   const messageResponse = await fetch(messageUrl, {
     headers: {
-      'Authorization': `Bearer ${emailConfig.access_token}`,
+      'Authorization': `Bearer ${emailConfig.accessToken}`,
     },
   });
 

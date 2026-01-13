@@ -5038,6 +5038,10 @@ export type Database = {
           total_tokens: number
         }[]
       }
+      get_decrypted_access_token: {
+        Args: { config_id: string }
+        Returns: string
+      }
       get_my_workspace_id: { Args: never; Returns: string }
       get_research_job_stats: {
         Args: { p_job_id: string }

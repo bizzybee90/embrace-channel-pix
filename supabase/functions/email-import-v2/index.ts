@@ -83,12 +83,20 @@ serve(async (req) => {
     // -------------------------------------------------------------------------
     const { data: emailConfig, error: configError } = await supabase
       .from('email_provider_configs')
-      .select('id, access_token, email_address')
+      .select('id, email_address')
       .eq('workspace_id', workspace_id)
       .single();
 
-    if (configError || !emailConfig?.access_token) {
+    if (configError || !emailConfig) {
       throw new Error('Email not connected. Please connect your email account first.');
+    }
+
+    // Get decrypted access token securely
+    const { data: accessToken, error: tokenError } = await supabase
+      .rpc('get_decrypted_access_token', { config_id: emailConfig.id });
+
+    if (tokenError || !accessToken) {
+      throw new Error('Email access token is missing. Please reconnect your email account.');
     }
 
     // -------------------------------------------------------------------------
@@ -188,7 +196,7 @@ serve(async (req) => {
         response = await fetch(url.toString(), {
           method: 'GET',
           headers: {
-            'Authorization': `Bearer ${emailConfig.access_token}`,
+            'Authorization': `Bearer ${accessToken}`,
             'Content-Type': 'application/json',
           },
         });
