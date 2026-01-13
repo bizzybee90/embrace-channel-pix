@@ -5001,16 +5001,7 @@ export type Database = {
       }
     }
     Views: {
-      api_usage_summary: {
-        Row: {
-          hour: string | null
-          provider: string | null
-          total_cost: number | null
-          total_requests: number | null
-          total_tokens: number | null
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Functions: {
       analyze_email_threads: {
@@ -5036,6 +5027,16 @@ export type Database = {
           p_workspace_id: string
         }
         Returns: number
+      }
+      get_api_usage_summary: {
+        Args: never
+        Returns: {
+          hour: string
+          provider: string
+          total_cost: number
+          total_requests: number
+          total_tokens: number
+        }[]
       }
       get_my_workspace_id: { Args: never; Returns: string }
       get_research_job_stats: {
