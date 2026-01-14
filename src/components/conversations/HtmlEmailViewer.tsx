@@ -1,7 +1,7 @@
-import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { ExternalLink, X } from 'lucide-react';
+import { ExternalLink } from 'lucide-react';
+import DOMPurify from 'dompurify';
 
 interface HtmlEmailViewerProps {
   htmlContent: string;
@@ -9,13 +9,16 @@ interface HtmlEmailViewerProps {
   onOpenChange: (open: boolean) => void;
 }
 
-// Sanitize HTML by removing script tags and event handlers
+// Sanitize HTML using DOMPurify for comprehensive XSS protection
 const sanitizeHtml = (html: string): string => {
-  // Remove script tags
-  let sanitized = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
-  // Remove event handlers
-  sanitized = sanitized.replace(/\s*on\w+\s*=\s*["'][^"']*["']/gi, '');
-  return sanitized;
+  return DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: ['html', 'head', 'body', 'meta', 'style', 'table', 'tr', 'td', 'th', 'tbody', 'thead', 'tfoot', 'caption', 'colgroup', 'col', 'div', 'span', 'img', 'a', 'b', 'i', 'strong', 'em', 'br', 'p', 'hr', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'blockquote', 'pre', 'code', 'font', 'center', 'u', 's', 'strike', 'sub', 'sup', 'small', 'big'],
+    ALLOWED_ATTR: ['style', 'class', 'id', 'href', 'src', 'alt', 'title', 'width', 'height', 'cellpadding', 'cellspacing', 'border', 'align', 'valign', 'bgcolor', 'color', 'face', 'size', 'target', 'rel', 'colspan', 'rowspan', 'charset', 'name', 'content', 'http-equiv'],
+    ALLOW_DATA_ATTR: false,
+    ADD_ATTR: ['target'], // Allow target for links
+    FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'input', 'button', 'select', 'textarea'],
+    FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'onmouseout', 'onfocus', 'onblur'],
+  });
 };
 
 export function HtmlEmailViewer({ htmlContent, open, onOpenChange }: HtmlEmailViewerProps) {
