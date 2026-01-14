@@ -43,14 +43,16 @@ import { useReviewFeedback } from '@/hooks/useReviewFeedback';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
+import DOMPurify from 'dompurify';
 
-// Helper to strip HTML tags and get plain text
+// Helper to strip HTML tags and get plain text safely using DOMPurify
 const stripHtml = (html: string): string => {
   if (!html) return '';
-  // Create a temporary div to decode HTML entities and strip tags
-  const tmp = document.createElement('div');
-  tmp.innerHTML = html;
-  return tmp.textContent || tmp.innerText || '';
+  // DOMPurify removes all HTML tags safely, preventing XSS
+  return DOMPurify.sanitize(html, { 
+    ALLOWED_TAGS: [], // Strip all tags
+    KEEP_CONTENT: true // Keep text content
+  });
 };
 
 interface ReviewConversation {
