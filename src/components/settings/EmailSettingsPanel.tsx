@@ -328,9 +328,10 @@ export function EmailSettingsPanel() {
         </CardHeader>
         {showPreview && (
           <CardContent>
-            <div 
+            <div
               className="p-4 bg-muted rounded-lg border"
-              dangerouslySetInnerHTML={{ __html: getSignatureHtml() }}
+              // getSignatureHtml() is sanitized, but we sanitize again at render-time to make the trust boundary explicit.
+              dangerouslySetInnerHTML={{ __html: sanitizeSignatureHtml(getSignatureHtml()) }}
             />
           </CardContent>
         )}
