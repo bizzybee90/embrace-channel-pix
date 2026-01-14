@@ -13,8 +13,56 @@ serve(async (req) => {
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+    // =============================================
+    // SECURITY: Validate JWT authentication
+    // =============================================
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - missing token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Create client with user's auth to verify JWT
+    const userSupabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
+
+    const { data: { user }, error: authError } = await userSupabase.auth.getUser();
+
+    if (authError || !user) {
+      console.error('[export-customer-data] JWT validation failed:', authError);
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - invalid token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const userId = user.id;
+    console.log(`[export-customer-data] Authenticated user: ${userId}`);
+
+    // Get user's workspace
+    const { data: userData, error: userError } = await userSupabase
+      .from('users')
+      .select('workspace_id')
+      .eq('id', userId)
+      .single();
+
+    if (userError || !userData?.workspace_id) {
+      return new Response(
+        JSON.stringify({ error: 'User not associated with a workspace' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const workspaceId = userData.workspace_id;
+
+    // Use service role for data access
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const { customer_identifier, delivery_method } = await req.json();
 
@@ -27,10 +75,13 @@ serve(async (req) => {
 
     console.log('Exporting data for:', customer_identifier);
 
-    // Find customer
+    // =============================================
+    // SECURITY: Only find customers in user's workspace
+    // =============================================
     const { data: customer, error: customerError } = await supabase
       .from('customers')
       .select('*')
+      .eq('workspace_id', workspaceId)
       .or(`email.eq.${customer_identifier},phone.eq.${customer_identifier}`)
       .single();
 
@@ -41,7 +92,7 @@ serve(async (req) => {
       );
     }
 
-    // Get all related data
+    // Get all related data (scoped to workspace via customer)
     const [conversationsResult, consentsResult, deletionRequestsResult] = await Promise.all([
       supabase
         .from('conversations')
@@ -49,7 +100,8 @@ serve(async (req) => {
           *,
           messages (*)
         `)
-        .eq('customer_id', customer.id),
+        .eq('customer_id', customer.id)
+        .eq('workspace_id', workspaceId),
       supabase
         .from('customer_consents')
         .select('*')
@@ -81,6 +133,7 @@ serve(async (req) => {
       .insert({
         action: 'export',
         customer_id: customer.id,
+        performed_by: userId,
         metadata: { delivery_method, export_size: JSON.stringify(exportData).length }
       });
 
