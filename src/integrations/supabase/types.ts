@@ -4752,6 +4752,7 @@ export type Database = {
           retry_count: number | null
           status_code: number | null
           webhook_url: string | null
+          workspace_id: string | null
         }
         Insert: {
           conversation_id?: string | null
@@ -4764,6 +4765,7 @@ export type Database = {
           retry_count?: number | null
           status_code?: number | null
           webhook_url?: string | null
+          workspace_id?: string | null
         }
         Update: {
           conversation_id?: string | null
@@ -4776,6 +4778,7 @@ export type Database = {
           retry_count?: number | null
           status_code?: number | null
           webhook_url?: string | null
+          workspace_id?: string | null
         }
         Relationships: [
           {
@@ -4783,6 +4786,13 @@ export type Database = {
             columns: ["conversation_id"]
             isOneToOne: false
             referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "webhook_logs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
         ]
