@@ -1,19 +1,78 @@
 project_id = "ikioetqbrybnofqkdcib"
 
+# =============================================================================
+# SENSITIVE FUNCTIONS - Require JWT authentication (verify in code)
+# =============================================================================
+
 [functions.email-import]
-verify_jwt = true
+verify_jwt = false
 
 [functions.email-classify]
-verify_jwt = true
+verify_jwt = false
 
 [functions.ai-draft]
-verify_jwt = true
+verify_jwt = false
 
 [functions.draft-verify]
-verify_jwt = true
+verify_jwt = false
 
 [functions.email-send]
-verify_jwt = true
+verify_jwt = false
+
+[functions.export-customer-data]
+verify_jwt = false
+
+[functions.request-deletion]
+verify_jwt = false
+
+[functions.competitor-discover]
+verify_jwt = false
+
+[functions.competitor-scrape]
+verify_jwt = false
+
+[functions.website-scrape]
+verify_jwt = false
+
+[functions.test-conversation]
+verify_jwt = false
+
+[functions.learn-correction]
+verify_jwt = false
+
+[functions.bulk-retriage]
+verify_jwt = false
+
+[functions.voice-learn]
+verify_jwt = false
+
+[functions.business-location]
+verify_jwt = false
+
+[functions.industry-keywords]
+verify_jwt = false
+
+[functions.customer-intelligence]
+verify_jwt = false
+
+[functions.document-process]
+verify_jwt = false
+
+[functions.pattern-detect]
+verify_jwt = false
+
+[functions.image-analyze]
+verify_jwt = false
+
+[functions.audio-process]
+verify_jwt = false
+
+[functions.nuclear-reset]
+verify_jwt = false
+
+# =============================================================================
+# WEBHOOK/SYSTEM FUNCTIONS - No JWT, but require alternate auth (HMAC/secret)
+# =============================================================================
 
 [functions.log-conversation]
 verify_jwt = false
@@ -37,12 +96,6 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.create-consent]
-verify_jwt = false
-
-[functions.export-customer-data]
-verify_jwt = false
-
-[functions.request-deletion]
 verify_jwt = false
 
 [functions.cleanup-old-data]
@@ -93,9 +146,6 @@ verify_jwt = false
 [functions.google-places-autocomplete]
 verify_jwt = false
 
-[functions.competitor-discover]
-verify_jwt = true
-
 [functions.competitor-discover-smart]
 verify_jwt = false
 
@@ -110,9 +160,6 @@ verify_jwt = false
 
 [functions.start-competitor-research]
 verify_jwt = false
-
-[functions.competitor-scrape]
-verify_jwt = true
 
 [functions.competitor-extract-faqs]
 verify_jwt = false
@@ -131,45 +178,6 @@ verify_jwt = false
 
 [functions.aurinko-exchange-token]
 verify_jwt = false
-
-[functions.nuclear-reset]
-verify_jwt = false
-
-[functions.website-scrape]
-verify_jwt = true
-
-[functions.test-conversation]
-verify_jwt = true
-
-[functions.learn-correction]
-verify_jwt = true
-
-[functions.bulk-retriage]
-verify_jwt = false
-
-[functions.voice-learn]
-verify_jwt = true
-
-[functions.business-location]
-verify_jwt = true
-
-[functions.industry-keywords]
-verify_jwt = true
-
-[functions.customer-intelligence]
-verify_jwt = true
-
-[functions.document-process]
-verify_jwt = true
-
-[functions.pattern-detect]
-verify_jwt = true
-
-[functions.image-analyze]
-verify_jwt = true
-
-[functions.audio-process]
-verify_jwt = true
 
 [functions.email-import-v2]
 verify_jwt = false

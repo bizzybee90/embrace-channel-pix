@@ -12,12 +12,62 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // =============================================
+    // SECURITY: Validate JWT authentication
+    // =============================================
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - missing token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    
+    // Create client with user's auth to verify JWT
+    const userSupabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
+    
+    const { data: { user }, error: userError } = await userSupabase.auth.getUser();
+    
+    if (userError || !user) {
+      console.error('[aurinko-exchange-token] JWT validation failed:', userError);
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - invalid token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    const userId = user.id;
+    console.log(`[aurinko-exchange-token] Authenticated user: ${userId}`);
+
     const { code, workspaceId, importMode, provider } = await req.json();
 
     if (!code || !workspaceId) {
       return new Response(
         JSON.stringify({ error: 'Missing code or workspaceId' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // =============================================
+    // SECURITY: Verify user belongs to workspace
+    // =============================================
+    const { data: userWorkspace, error: workspaceError } = await userSupabase
+      .from('users')
+      .select('workspace_id')
+      .eq('id', userId)
+      .single();
+    
+    if (workspaceError || !userWorkspace || userWorkspace.workspace_id !== workspaceId) {
+      console.error('[aurinko-exchange-token] User not authorized for workspace:', workspaceId);
+      return new Response(
+        JSON.stringify({ error: 'Not authorized for this workspace' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -92,32 +142,54 @@ Deno.serve(async (req) => {
 
     console.log(`[aurinko-exchange-token] Got email: ${emailAddress}`);
 
-    // Initialize Supabase client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    // Use service role client for database operations
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Save to email_provider_configs
-    const { error: insertError } = await supabase
+    // =============================================
+    // SECURITY: First insert the record, then encrypt tokens via RPC
+    // =============================================
+    const { data: configData, error: insertError } = await supabase
       .from('email_provider_configs')
       .upsert({
         workspace_id: workspaceId,
         provider: provider || 'gmail',
         email_address: emailAddress,
-        access_token: accessToken,
-        refresh_token: tokenData.refreshToken || null,
+        // Don't store plaintext tokens - will use RPC to encrypt
+        access_token: null,
+        refresh_token: null,
         import_mode: importMode || 'last_1000',
         sync_status: 'connected',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       }, {
         onConflict: 'workspace_id'
-      });
+      })
+      .select('id')
+      .single();
 
     if (insertError) {
       console.error('[aurinko-exchange-token] Database error:', insertError);
       return new Response(
         JSON.stringify({ error: 'Failed to save email configuration' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // =============================================
+    // SECURITY: Store tokens encrypted via secure RPC
+    // =============================================
+    const { error: encryptError } = await supabase.rpc('store_encrypted_token', {
+      p_config_id: configData.id,
+      p_access_token: accessToken,
+      p_refresh_token: tokenData.refreshToken || null
+    });
+
+    if (encryptError) {
+      console.error('[aurinko-exchange-token] Failed to encrypt token:', encryptError);
+      // Delete the config since we couldn't secure the tokens
+      await supabase.from('email_provider_configs').delete().eq('id', configData.id);
+      return new Response(
+        JSON.stringify({ error: 'Failed to securely store credentials' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -136,7 +208,7 @@ Deno.serve(async (req) => {
         onConflict: 'workspace_id'
       });
 
-    console.log(`[aurinko-exchange-token] Successfully connected ${emailAddress} for workspace ${workspaceId}`);
+    console.log(`[aurinko-exchange-token] Successfully connected ${emailAddress} for workspace ${workspaceId} (tokens encrypted)`);
 
     return new Response(
       JSON.stringify({ 

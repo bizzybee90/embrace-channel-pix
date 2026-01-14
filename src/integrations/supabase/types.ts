@@ -21,7 +21,7 @@ export type Database = {
           enabled: boolean | null
           id: string
           ip_address: string
-          workspace_id: string | null
+          workspace_id: string
         }
         Insert: {
           created_at?: string | null
@@ -29,7 +29,7 @@ export type Database = {
           enabled?: boolean | null
           id?: string
           ip_address: string
-          workspace_id?: string | null
+          workspace_id: string
         }
         Update: {
           created_at?: string | null
@@ -37,7 +37,7 @@ export type Database = {
           enabled?: boolean | null
           id?: string
           ip_address?: string
-          workspace_id?: string | null
+          workspace_id?: string
         }
         Relationships: [
           {
@@ -58,7 +58,7 @@ export type Database = {
           provider: string
           requests: number | null
           tokens_used: number | null
-          workspace_id: string | null
+          workspace_id: string
         }
         Insert: {
           cost_estimate?: number | null
@@ -68,7 +68,7 @@ export type Database = {
           provider: string
           requests?: number | null
           tokens_used?: number | null
-          workspace_id?: string | null
+          workspace_id: string
         }
         Update: {
           cost_estimate?: number | null
@@ -78,7 +78,7 @@ export type Database = {
           provider?: string
           requests?: number | null
           tokens_used?: number | null
-          workspace_id?: string | null
+          workspace_id?: string
         }
         Relationships: [
           {
@@ -101,7 +101,7 @@ export type Database = {
           low_confidence_threshold: number | null
           notify_on_low_confidence: boolean | null
           updated_at: string | null
-          workspace_id: string | null
+          workspace_id: string
         }
         Insert: {
           always_verify?: boolean | null
@@ -113,7 +113,7 @@ export type Database = {
           low_confidence_threshold?: number | null
           notify_on_low_confidence?: boolean | null
           updated_at?: string | null
-          workspace_id?: string | null
+          workspace_id: string
         }
         Update: {
           always_verify?: boolean | null
@@ -125,7 +125,7 @@ export type Database = {
           low_confidence_threshold?: number | null
           notify_on_low_confidence?: boolean | null
           updated_at?: string | null
-          workspace_id?: string | null
+          workspace_id?: string
         }
         Relationships: [
           {
@@ -158,7 +158,7 @@ export type Database = {
           updated_at: string | null
           website_faqs_generated: number | null
           website_url: string | null
-          workspace_id: string | null
+          workspace_id: string
         }
         Insert: {
           active_insurance_claim?: boolean | null
@@ -180,7 +180,7 @@ export type Database = {
           updated_at?: string | null
           website_faqs_generated?: number | null
           website_url?: string | null
-          workspace_id?: string | null
+          workspace_id: string
         }
         Update: {
           active_insurance_claim?: boolean | null
@@ -202,7 +202,7 @@ export type Database = {
           updated_at?: string | null
           website_faqs_generated?: number | null
           website_url?: string | null
-          workspace_id?: string | null
+          workspace_id?: string
         }
         Relationships: [
           {
@@ -224,7 +224,7 @@ export type Database = {
           id: string
           metadata: Json | null
           updated_at: string | null
-          workspace_id: string | null
+          workspace_id: string
         }
         Insert: {
           category: string
@@ -235,7 +235,7 @@ export type Database = {
           id?: string
           metadata?: Json | null
           updated_at?: string | null
-          workspace_id?: string | null
+          workspace_id: string
         }
         Update: {
           category?: string
@@ -246,7 +246,7 @@ export type Database = {
           id?: string
           metadata?: Json | null
           updated_at?: string | null
-          workspace_id?: string | null
+          workspace_id?: string
         }
         Relationships: [
           {
@@ -1607,7 +1607,7 @@ export type Database = {
           id: string
           retention_days: number
           updated_at: string | null
-          workspace_id: string | null
+          workspace_id: string
         }
         Insert: {
           anonymize_instead_of_delete?: boolean | null
@@ -1617,7 +1617,7 @@ export type Database = {
           id?: string
           retention_days?: number
           updated_at?: string | null
-          workspace_id?: string | null
+          workspace_id: string
         }
         Update: {
           anonymize_instead_of_delete?: boolean | null
@@ -1627,7 +1627,7 @@ export type Database = {
           id?: string
           retention_days?: number
           updated_at?: string | null
-          workspace_id?: string | null
+          workspace_id?: string
         }
         Relationships: [
           {
@@ -2261,7 +2261,7 @@ export type Database = {
           sentiment_inbound: string | null
           sentiment_outbound: string | null
           subcategory: string | null
-          workspace_id: string | null
+          workspace_id: string
         }
         Insert: {
           category?: string | null
@@ -2288,7 +2288,7 @@ export type Database = {
           sentiment_inbound?: string | null
           sentiment_outbound?: string | null
           subcategory?: string | null
-          workspace_id?: string | null
+          workspace_id: string
         }
         Update: {
           category?: string | null
@@ -2315,7 +2315,7 @@ export type Database = {
           sentiment_inbound?: string | null
           sentiment_outbound?: string | null
           subcategory?: string | null
-          workspace_id?: string | null
+          workspace_id?: string
         }
         Relationships: [
           {
@@ -2690,7 +2690,7 @@ export type Database = {
           responded_at: string | null
           status: Database["public"]["Enums"]["message_status"] | null
           updated_at: string | null
-          workspace_id: string | null
+          workspace_id: string
         }
         Insert: {
           channel: Database["public"]["Enums"]["message_channel"]
@@ -2707,7 +2707,7 @@ export type Database = {
           responded_at?: string | null
           status?: Database["public"]["Enums"]["message_status"] | null
           updated_at?: string | null
-          workspace_id?: string | null
+          workspace_id: string
         }
         Update: {
           channel?: Database["public"]["Enums"]["message_channel"]
@@ -2724,7 +2724,7 @@ export type Database = {
           responded_at?: string | null
           status?: Database["public"]["Enums"]["message_status"] | null
           updated_at?: string | null
-          workspace_id?: string | null
+          workspace_id?: string
         }
         Relationships: [
           {
@@ -2760,7 +2760,7 @@ export type Database = {
           source_company: string | null
           source_url: string | null
           updated_at: string | null
-          workspace_id: string | null
+          workspace_id: string
         }
         Insert: {
           answer: string
@@ -2785,7 +2785,7 @@ export type Database = {
           source_company?: string | null
           source_url?: string | null
           updated_at?: string | null
-          workspace_id?: string | null
+          workspace_id: string
         }
         Update: {
           answer?: string
@@ -2810,7 +2810,7 @@ export type Database = {
           source_company?: string | null
           source_url?: string | null
           updated_at?: string | null
-          workspace_id?: string | null
+          workspace_id?: string
         }
         Relationships: [
           {
@@ -2878,7 +2878,7 @@ export type Database = {
           quality_score: number | null
           rank_in_category: number | null
           selection_reason: string | null
-          workspace_id: string | null
+          workspace_id: string
         }
         Insert: {
           category: string
@@ -2891,7 +2891,7 @@ export type Database = {
           quality_score?: number | null
           rank_in_category?: number | null
           selection_reason?: string | null
-          workspace_id?: string | null
+          workspace_id: string
         }
         Update: {
           category?: string
@@ -2904,7 +2904,7 @@ export type Database = {
           quality_score?: number | null
           rank_in_category?: number | null
           selection_reason?: string | null
-          workspace_id?: string | null
+          workspace_id?: string
         }
         Relationships: [
           {
@@ -2996,7 +2996,7 @@ export type Database = {
           ignore_reason: string | null
           inbound_message_id: string | null
           subject_pattern: string | null
-          workspace_id: string | null
+          workspace_id: string
         }
         Insert: {
           created_at?: string | null
@@ -3005,7 +3005,7 @@ export type Database = {
           ignore_reason?: string | null
           inbound_message_id?: string | null
           subject_pattern?: string | null
-          workspace_id?: string | null
+          workspace_id: string
         }
         Update: {
           created_at?: string | null
@@ -3014,7 +3014,7 @@ export type Database = {
           ignore_reason?: string | null
           inbound_message_id?: string | null
           subject_pattern?: string | null
-          workspace_id?: string | null
+          workspace_id?: string
         }
         Relationships: [
           {
@@ -3545,7 +3545,7 @@ export type Database = {
           title: string
           type: string
           user_id: string | null
-          workspace_id: string | null
+          workspace_id: string
         }
         Insert: {
           body: string
@@ -3556,7 +3556,7 @@ export type Database = {
           title: string
           type?: string
           user_id?: string | null
-          workspace_id?: string | null
+          workspace_id: string
         }
         Update: {
           body?: string
@@ -3567,7 +3567,7 @@ export type Database = {
           title?: string
           type?: string
           user_id?: string | null
-          workspace_id?: string | null
+          workspace_id?: string
         }
         Relationships: [
           {
@@ -3609,7 +3609,7 @@ export type Database = {
           thread_matching_status: string | null
           top_categories: Json | null
           updated_at: string | null
-          workspace_id: string | null
+          workspace_id: string
         }
         Insert: {
           avg_response_time_hours?: number | null
@@ -3633,7 +3633,7 @@ export type Database = {
           thread_matching_status?: string | null
           top_categories?: Json | null
           updated_at?: string | null
-          workspace_id?: string | null
+          workspace_id: string
         }
         Update: {
           avg_response_time_hours?: number | null
@@ -3657,7 +3657,7 @@ export type Database = {
           thread_matching_status?: string | null
           top_categories?: Json | null
           updated_at?: string | null
-          workspace_id?: string | null
+          workspace_id?: string
         }
         Relationships: [
           {
@@ -3697,7 +3697,7 @@ export type Database = {
           updated_at: string | null
           window_price_max: number | null
           window_price_min: number | null
-          workspace_id: string | null
+          workspace_id: string
         }
         Insert: {
           affects_package?: boolean | null
@@ -3726,7 +3726,7 @@ export type Database = {
           updated_at?: string | null
           window_price_max?: number | null
           window_price_min?: number | null
-          workspace_id?: string | null
+          workspace_id: string
         }
         Update: {
           affects_package?: boolean | null
@@ -3755,7 +3755,7 @@ export type Database = {
           updated_at?: string | null
           window_price_max?: number | null
           window_price_min?: number | null
-          workspace_id?: string | null
+          workspace_id?: string
         }
         Relationships: [
           {
@@ -3883,7 +3883,7 @@ export type Database = {
           message_id: string | null
           scenario_type: string | null
           was_edited: boolean | null
-          workspace_id: string | null
+          workspace_id: string
         }
         Insert: {
           ai_confidence?: number | null
@@ -3896,7 +3896,7 @@ export type Database = {
           message_id?: string | null
           scenario_type?: string | null
           was_edited?: boolean | null
-          workspace_id?: string | null
+          workspace_id: string
         }
         Update: {
           ai_confidence?: number | null
@@ -3909,7 +3909,7 @@ export type Database = {
           message_id?: string | null
           scenario_type?: string | null
           was_edited?: boolean | null
-          workspace_id?: string | null
+          workspace_id?: string
         }
         Relationships: [
           {
@@ -4322,7 +4322,7 @@ export type Database = {
           name: string
           prompt: string
           updated_at: string
-          workspace_id: string | null
+          workspace_id: string
         }
         Insert: {
           agent_type: string
@@ -4334,7 +4334,7 @@ export type Database = {
           name: string
           prompt: string
           updated_at?: string
-          workspace_id?: string | null
+          workspace_id: string
         }
         Update: {
           agent_type?: string
@@ -4346,7 +4346,7 @@ export type Database = {
           name?: string
           prompt?: string
           updated_at?: string
-          workspace_id?: string | null
+          workspace_id?: string
         }
         Relationships: [
           {
@@ -4806,7 +4806,7 @@ export type Database = {
           enabled: boolean | null
           id: string
           updated_at: string | null
-          workspace_id: string | null
+          workspace_id: string
         }
         Insert: {
           automation_level?: string | null
@@ -4816,7 +4816,7 @@ export type Database = {
           enabled?: boolean | null
           id?: string
           updated_at?: string | null
-          workspace_id?: string | null
+          workspace_id: string
         }
         Update: {
           automation_level?: string | null
@@ -4826,7 +4826,7 @@ export type Database = {
           enabled?: boolean | null
           id?: string
           updated_at?: string | null
-          workspace_id?: string | null
+          workspace_id?: string
         }
         Relationships: [
           {

@@ -198,13 +198,18 @@ Deno.serve(async (req) => {
     // Store in database
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
+    // =============================================
+    // SECURITY: First insert record WITHOUT plaintext tokens
+    // =============================================
     const { data: configData, error: dbError } = await supabase
       .from('email_provider_configs')
       .upsert({
         workspace_id: workspaceId,
         provider: provider,
         account_id: tokenData.accountId.toString(),
-        access_token: tokenData.accessToken,
+        // SECURITY: Don't store plaintext - will encrypt via RPC
+        access_token: null,
+        refresh_token: null,
         email_address: emailAddress,
         import_mode: importMode,
         connected_at: new Date().toISOString(),
@@ -223,7 +228,22 @@ Deno.serve(async (req) => {
       return redirectToApp(appOrigin, 'error', 'Failed to save email configuration');
     }
 
-    console.log('Email provider config saved successfully with', aliases.length, 'aliases, configId:', configData?.id);
+    // =============================================
+    // SECURITY: Store tokens encrypted via secure RPC
+    // =============================================
+    const { error: encryptError } = await supabase.rpc('store_encrypted_token', {
+      p_config_id: configData.id,
+      p_access_token: tokenData.accessToken,
+      p_refresh_token: tokenData.refreshToken || null
+    });
+
+    if (encryptError) {
+      console.error('Failed to encrypt token:', encryptError);
+      // Don't fail the flow, but log it - the token is not stored which is safe
+      // The user will need to reconnect if decryption fails later
+    }
+
+    console.log('Email provider config saved successfully with', aliases.length, 'aliases, configId:', configData?.id, '(tokens encrypted)');
 
     // =============================================
     // TRIGGER EMAIL SYNC IMMEDIATELY
