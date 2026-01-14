@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useWorkspace } from '@/hooks/useWorkspace';
 import { Upload, Save, Eye, Building2, Code } from 'lucide-react';
+import DOMPurify from 'dompurify';
 
 interface EmailSettings {
   id?: string;
@@ -124,8 +125,17 @@ export function EmailSettingsPanel() {
     `.trim();
   };
 
+  // Sanitize HTML to prevent XSS attacks - allows only safe email signature elements
+  const sanitizeSignatureHtml = (html: string): string => {
+    return DOMPurify.sanitize(html, {
+      ALLOWED_TAGS: ['table', 'tr', 'td', 'th', 'tbody', 'thead', 'div', 'span', 'img', 'a', 'b', 'i', 'strong', 'em', 'br', 'p', 'hr', 'font'],
+      ALLOWED_ATTR: ['style', 'href', 'src', 'alt', 'width', 'height', 'cellpadding', 'cellspacing', 'border', 'align', 'valign', 'bgcolor', 'color', 'face', 'size', 'target', 'rel'],
+    });
+  };
+
   const getSignatureHtml = (): string => {
-    return useCustomHtml ? customHtml : generateSignatureHtml();
+    const rawHtml = useCustomHtml ? customHtml : generateSignatureHtml();
+    return sanitizeSignatureHtml(rawHtml);
   };
 
   const handleSave = async () => {
