@@ -41,14 +41,26 @@ export default function EmailOAuthCallback() {
           throw new Error('Invalid state parameter');
         }
 
+        // Normalize provider coming from older/newer OAuth flows.
+        // - Some flows store provider as "gmail"/"outlook"/"icloud"
+        // - Others store Aurinko serviceType as "Google"/"Office365"/"iCloud"/"IMAP"
+        const normalizeProviderForBackend = (p: string) => {
+          const key = (p || '').toLowerCase();
+          if (key === 'gmail' || key === 'google') return 'Google';
+          if (key === 'outlook' || key === 'office365' || key === 'office') return 'Office365';
+          if (key === 'icloud' || key === 'apple') return 'iCloud';
+          if (key === 'imap') return 'IMAP';
+          return p;
+        };
+
         // Exchange code for token
         const { data, error: fnError } = await supabase.functions.invoke('aurinko-exchange-token', {
           body: {
             code,
             workspaceId: parsedState.workspaceId,
             importMode: parsedState.importMode,
-            provider: parsedState.provider
-          }
+            provider: normalizeProviderForBackend(parsedState.provider),
+          },
         });
 
         if (fnError) throw fnError;
