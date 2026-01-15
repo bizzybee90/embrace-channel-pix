@@ -100,8 +100,7 @@ const MAKE_WEBHOOK_URL = 'https://hook.eu2.make.com/ya89bi65tcxsmyet08ii9jtijssc
 
 // Aurinko OAuth config - uses fixed published URL for consistent callback
 const AURINKO_CLIENT_ID = '6e9db931edb62a956bdac105ddda0354';
-const PUBLISHED_URL = 'https://embrace-channel-pix.lovable.app';
-const AURINKO_REDIRECT_URI = `${PUBLISHED_URL}/auth/email/callback`;
+const AURINKO_REDIRECT_URI = 'https://ikioetqbrybnofqkdcib.supabase.co/functions/v1/aurinko-auth-callback';
 
 export function EmailConnectionStep({ 
   workspaceId, 
@@ -233,11 +232,12 @@ export function EmailConnectionStep({
 
     try {
       // Build OAuth URL directly (original working flow)
-      const state = btoa(JSON.stringify({
-        workspaceId,
-        importMode,
-        provider
-      }));
+    const state = btoa(JSON.stringify({
+      workspaceId,
+      importMode,
+      provider,
+      origin: window.location.origin
+    }));
 
       const serviceType = provider === 'gmail' ? 'Google' : 
                           provider === 'outlook' ? 'Office365' : 
