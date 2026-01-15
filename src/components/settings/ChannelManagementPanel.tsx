@@ -172,12 +172,14 @@ export const ChannelManagementPanel = () => {
     
     setConnecting(true);
     try {
+      // Use fixed published URL for consistent OAuth callback
+      const PUBLISHED_URL = 'https://embrace-channel-pix.lovable.app';
       const { data, error } = await supabase.functions.invoke('aurinko-auth-start', {
         body: { 
           workspaceId: workspace.id,
           provider: selectedProvider,
           importMode: selectedImportMode,
-          origin: window.location.origin
+          origin: PUBLISHED_URL
         },
       });
 

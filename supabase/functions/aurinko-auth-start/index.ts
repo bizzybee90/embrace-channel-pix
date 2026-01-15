@@ -37,11 +37,13 @@ serve(async (req) => {
     const callbackUrl = `${SUPABASE_URL}/functions/v1/aurinko-auth-callback`;
     
     // State contains workspaceId, importMode, and origin for callback redirect
+    // Use fixed published URL for consistent callback handling
+    const PUBLISHED_URL = 'https://embrace-channel-pix.lovable.app';
     const state = btoa(JSON.stringify({ 
       workspaceId, 
       importMode: importMode || 'new_only',
       provider: serviceType,
-      origin: origin || 'https://ikioetqbrybnofqkdcib.lovable.app'
+      origin: origin || PUBLISHED_URL
     }));
 
     // Aurinko OAuth authorize URL

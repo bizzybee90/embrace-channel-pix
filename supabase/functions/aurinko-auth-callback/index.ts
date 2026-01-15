@@ -45,7 +45,8 @@ function safeMessage(text: string): string {
   return text.replace(/\s+/g, ' ').trim().slice(0, 200);
 }
 
-const defaultOrigin = 'https://ikioetqbrybnofqkdcib.lovable.app';
+// Use fixed published URL for consistent redirects
+const defaultOrigin = 'https://embrace-channel-pix.lovable.app';
 
 Deno.serve(async (req) => {
   try {
@@ -95,7 +96,8 @@ Deno.serve(async (req) => {
     }
 
     const { workspaceId, importMode, provider, origin } = stateData;
-    const appOrigin = origin || 'https://ikioetqbrybnofqkdcib.lovable.app';
+    // Use fixed published URL for consistent redirects
+    const appOrigin = origin || 'https://embrace-channel-pix.lovable.app';
     console.log('Decoded state:', { workspaceId, importMode, provider, origin: appOrigin });
 
     const AURINKO_CLIENT_ID = Deno.env.get('AURINKO_CLIENT_ID');

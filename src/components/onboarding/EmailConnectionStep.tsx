@@ -98,9 +98,10 @@ const importModes = [
 // Make.com webhook URL
 const MAKE_WEBHOOK_URL = 'https://hook.eu2.make.com/ya89bi65tcxsmyet08ii9jtijsscbv2b';
 
-// Aurinko OAuth config - uses frontend callback page
+// Aurinko OAuth config - uses fixed published URL for consistent callback
 const AURINKO_CLIENT_ID = '6e9db931edb62a956bdac105ddda0354';
-const AURINKO_REDIRECT_URI = `${window.location.origin}/auth/email/callback`;
+const PUBLISHED_URL = 'https://embrace-channel-pix.lovable.app';
+const AURINKO_REDIRECT_URI = `${PUBLISHED_URL}/auth/email/callback`;
 
 export function EmailConnectionStep({ 
   workspaceId, 
