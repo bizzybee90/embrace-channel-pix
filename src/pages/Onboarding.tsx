@@ -7,15 +7,20 @@ export default function Onboarding() {
   const navigate = useNavigate();
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [initialCheckDone, setInitialCheckDone] = useState(false);
 
   useEffect(() => {
     const checkOnboardingStatus = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
+        // Wait for session to be ready
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session?.user) {
           navigate('/auth');
           return;
         }
+
+        const user = session.user;
 
         // Get user's workspace and onboarding status
         const { data: userData, error } = await supabase
@@ -50,6 +55,8 @@ export default function Onboarding() {
 
           if (wsError) {
             console.error('Error creating workspace:', wsError);
+            setLoading(false);
+            setInitialCheckDone(true);
             return;
           }
 
@@ -67,6 +74,7 @@ export default function Onboarding() {
         console.error('Error in onboarding check:', error);
       } finally {
         setLoading(false);
+        setInitialCheckDone(true);
       }
     };
 
@@ -93,21 +101,24 @@ export default function Onboarding() {
     }
   };
 
-  if (loading) {
+  // Show loading spinner while checking auth/onboarding status
+  if (loading || !initialCheckDone) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-center">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto mb-4" />
-          <p className="text-muted-foreground">Loading...</p>
+          <p className="text-muted-foreground">Loading onboarding...</p>
         </div>
       </div>
     );
   }
 
+  // Show workspace setup if still waiting for workspace
   if (!workspaceId) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto mb-4" />
           <p className="text-muted-foreground">Setting up your workspace...</p>
         </div>
       </div>
