@@ -10,17 +10,23 @@ export default function Onboarding() {
   const [initialCheckDone, setInitialCheckDone] = useState(false);
 
   useEffect(() => {
+    let isMounted = true;
+
     const checkOnboardingStatus = async () => {
       try {
+        console.log('[Onboarding] Starting check...');
+        
         // Wait for session to be ready
         const { data: { session } } = await supabase.auth.getSession();
         
         if (!session?.user) {
+          console.log('[Onboarding] No session, redirecting to auth');
           navigate('/auth');
           return;
         }
 
         const user = session.user;
+        console.log('[Onboarding] User found:', user.id);
 
         // Get user's workspace and onboarding status
         const { data: userData, error } = await supabase
@@ -30,19 +36,23 @@ export default function Onboarding() {
           .single();
 
         if (error) {
-          console.error('Error fetching user:', error);
+          console.error('[Onboarding] Error fetching user:', error);
           navigate('/auth');
           return;
         }
 
+        console.log('[Onboarding] User data:', userData);
+
         // If already onboarded, go to home
         if (userData?.onboarding_completed) {
+          console.log('[Onboarding] Already completed, going home');
           navigate('/');
           return;
         }
 
         // If no workspace, we need to create one
         if (!userData?.workspace_id) {
+          console.log('[Onboarding] No workspace, creating one...');
           // Create a default workspace for the user
           const { data: workspace, error: wsError } = await supabase
             .from('workspaces')
@@ -54,9 +64,11 @@ export default function Onboarding() {
             .single();
 
           if (wsError) {
-            console.error('Error creating workspace:', wsError);
-            setLoading(false);
-            setInitialCheckDone(true);
+            console.error('[Onboarding] Error creating workspace:', wsError);
+            if (isMounted) {
+              setLoading(false);
+              setInitialCheckDone(true);
+            }
             return;
           }
 
@@ -66,19 +78,31 @@ export default function Onboarding() {
             .update({ workspace_id: workspace.id })
             .eq('id', user.id);
 
-          setWorkspaceId(workspace.id);
+          console.log('[Onboarding] Workspace created:', workspace.id);
+          if (isMounted) {
+            setWorkspaceId(workspace.id);
+          }
         } else {
-          setWorkspaceId(userData.workspace_id);
+          console.log('[Onboarding] Using existing workspace:', userData.workspace_id);
+          if (isMounted) {
+            setWorkspaceId(userData.workspace_id);
+          }
         }
       } catch (error) {
-        console.error('Error in onboarding check:', error);
+        console.error('[Onboarding] Error in check:', error);
       } finally {
-        setLoading(false);
-        setInitialCheckDone(true);
+        if (isMounted) {
+          setLoading(false);
+          setInitialCheckDone(true);
+        }
       }
     };
 
     checkOnboardingStatus();
+
+    return () => {
+      isMounted = false;
+    };
   }, [navigate]);
 
   const handleComplete = async () => {
