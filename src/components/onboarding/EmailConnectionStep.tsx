@@ -98,6 +98,10 @@ const importModes = [
 // Make.com webhook URL
 const MAKE_WEBHOOK_URL = 'https://hook.eu2.make.com/ya89bi65tcxsmyet08ii9jtijsscbv2b';
 
+// Aurinko OAuth config - uses frontend callback page
+const AURINKO_CLIENT_ID = '6e9db931edb62a956bdac105ddda0354';
+const AURINKO_REDIRECT_URI = `${window.location.origin}/auth/email/callback`;
+
 export function EmailConnectionStep({ 
   workspaceId, 
   onNext, 
@@ -227,21 +231,24 @@ export function EmailConnectionStep({
     setSelectedProvider(provider);
 
     try {
-      // Call edge function to get auth URL (uses secrets stored in backend)
-      const { data, error } = await supabase.functions.invoke('aurinko-auth-start', {
-        body: {
-          workspaceId,
-          importMode,
-          provider,
-          origin: window.location.origin
-        }
-      });
+      // Build OAuth URL directly (original working flow)
+      const state = btoa(JSON.stringify({
+        workspaceId,
+        importMode,
+        provider
+      }));
 
-      if (error || !data?.authUrl) {
-        throw new Error(error?.message || data?.error || 'Failed to get auth URL');
-      }
+      const serviceType = provider === 'gmail' ? 'Google' : 
+                          provider === 'outlook' ? 'Office365' : 
+                          provider === 'icloud' ? 'iCloud' : 'Google';
 
-      const authUrl = data.authUrl;
+      const authUrl = `https://api.aurinko.io/v1/auth/authorize?` + 
+        `clientId=${AURINKO_CLIENT_ID}` +
+        `&serviceType=${serviceType}` +
+        `&scopes=Mail.ReadWrite Mail.Send` +
+        `&responseType=code` +
+        `&returnUrl=${encodeURIComponent(AURINKO_REDIRECT_URI)}` +
+        `&state=${encodeURIComponent(state)}`;
 
       // Check if in iframe
       const isEmbedded = (() => {
