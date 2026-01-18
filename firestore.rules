@@ -2,8 +2,62 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    
+    // START: Enterprise Wall - Strict Multi-Tenancy
+    // All access requires authentication.
+    // Users can ONLY access data belonging to their workspace.
+    
+    // Helper function to check workspace isolation
+    function belongsToWorkspace(workspaceId) {
+      return request.auth != null && 
+             request.auth.token.workspace_id == workspaceId;
+    }
+
+    // Helper to check if user belongs to the workspace of the resource
+    function canAccessResource() {
+      return request.auth != null && 
+             resource.data.workspace_id == request.auth.token.workspace_id;
+    }
+    
+    // Allow users to read/write their own user profile
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Workspaces: Read-only for members (managed by admin/backend)
+    match /workspaces/{workspaceId} {
+      allow read: if belongsToWorkspace(workspaceId);
+      allow write: if false; // Only via Admin SDK
+    }
+
+    // Conversations: Workspace Isolation
+    match /conversations/{conversationId} {
+      // Allow read/write if the document belongs to the user's workspace
+      // For create: check request data
+      // For read/update/delete: check resource data
+      allow create: if belongsToWorkspace(request.resource.data.workspace_id);
+      allow read, update, delete: if canAccessResource();
+
+      // Messages Sub-collection
+      match /messages/{messageId} {
+        // We need to fetch the parent conversation to check workspace_id
+        // LIMITATION: Use 'get' to check parent, strictly stricter than field check but safer.
+        // However, for performance, we often duplicate workspace_id on sub-resources.
+        // Assuming we duplicate workspace_id on messages or rely on parent check:
+        allow read, write: if canAccessResource(); 
+      }
+    }
+
+    // Customers: Workspace Isolation
+    match /customers/{customerId} {
+      allow create: if belongsToWorkspace(request.resource.data.workspace_id);
+      allow read, update, delete: if canAccessResource();
+    }
+    
+    // Default Deny
     match /{document=**} {
       allow read, write: if false;
     }
+    // END: Enterprise Wall
   }
 }
