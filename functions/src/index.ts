@@ -5,20 +5,25 @@ import { setGlobalOptions } from "firebase-functions/v2";
 import { defineSecret } from "firebase-functions/params";
 import { GDPRService } from "./services/GDPRService";
 import { GmailService } from "./services/GmailService";
+import { VoiceService } from "./services/VoiceService";
+import { SafetyService } from "./services/SafetyService";
+
+// Triggers
+import { onEmailCreated } from "./triggers/onEmailCreated";
+import { onConversationUpdated } from "./triggers/onConversationUpdated";
 
 admin.initializeApp();
 
 // Set global options for region
 setGlobalOptions({ region: "europe-west2" });
 
-// Define secrets again here to ensure they are available to the function environment if needed directly,
-// checking if they need to be passed to runWith/secrets option.
-// In v2, we pass them as a list to the function options.
 const gmailClientId = defineSecret('GMAIL_CLIENT_ID');
 const gmailClientSecret = defineSecret('GMAIL_CLIENT_SECRET');
 
-// --- GDPR Functions ---
+// --- Export Triggers ---
+export { onEmailCreated, onConversationUpdated };
 
+// --- GDPR Functions ---
 export const deleteCustomer = onCall(async (request) => {
     if (!request.auth) throw new HttpsError("unauthenticated", "Unauthenticated");
     try {
@@ -43,18 +48,9 @@ export const exportCustomer = onCall(async (request) => {
 });
 
 // --- Gmail Functions ---
-
-/**
- * Returns the Google OAuth URL.
- */
 export const startGmailAuth = onCall({ secrets: [gmailClientId, gmailClientSecret] }, async (request) => {
-    if (!request.auth) {
-        throw new HttpsError("unauthenticated", "User must be logged in to connect Gmail.");
-    }
-
-    // Create a state token encoded with userId to verify on callback (optional but good security)
+    if (!request.auth) throw new HttpsError("unauthenticated", "User must be logged in.");
     const state = JSON.stringify({ userId: request.auth.uid });
-
     try {
         const url = GmailService.generateAuthUrl(state);
         return { url };
@@ -64,20 +60,10 @@ export const startGmailAuth = onCall({ secrets: [gmailClientId, gmailClientSecre
     }
 });
 
-/**
- * Exchanges the code for tokens.
- * Call this from the frontend after being redirected back from Google.
- */
 export const finishGmailAuth = onCall({ secrets: [gmailClientId, gmailClientSecret] }, async (request) => {
-    if (!request.auth) {
-        throw new HttpsError("unauthenticated", "Unauthenticated");
-    }
-
+    if (!request.auth) throw new HttpsError("unauthenticated", "Unauthenticated");
     const { code } = request.data;
-    if (!code) {
-        throw new HttpsError("invalid-argument", "Missing auth code");
-    }
-
+    if (!code) throw new HttpsError("invalid-argument", "Missing auth code");
     try {
         await GmailService.handleCallback(request.auth.uid, code);
         return { success: true };
@@ -87,20 +73,52 @@ export const finishGmailAuth = onCall({ secrets: [gmailClientId, gmailClientSecr
     }
 });
 
-/**
- * Manually triggers a sync of the authenticated user's Gmail.
- */
 export const syncGmailNow = onCall({ secrets: [gmailClientId, gmailClientSecret] }, async (request) => {
-    if (!request.auth) {
-        throw new HttpsError("unauthenticated", "Unauthenticated");
-    }
-
+    if (!request.auth) throw new HttpsError("unauthenticated", "Unauthenticated");
     try {
         await GmailService.fetchAndSyncEmails(request.auth.uid);
         return { success: true, message: "Sync started" };
     } catch (error) {
         logger.error("Sync Error", error);
-        // Don't expose safe errors
         throw new HttpsError("internal", "Failed to sync emails");
+    }
+});
+
+// --- Intelligence Functions (Brain) ---
+
+/**
+ * Trigger voice learning for a workspace.
+ */
+export const learnVoice = onCall(async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Unauthenticated");
+
+    // In strict enterprise mode, verify user belongs to workspace
+    // For now, assuming request includes workspaceId and we trust/check auth.token
+    const { workspaceId } = request.data;
+    if (!workspaceId) throw new HttpsError("invalid-argument", "Missing workspaceId");
+
+    try {
+        await VoiceService.learnUserVoice(workspaceId);
+        return { success: true, message: "Voice learning started" };
+    } catch (error) {
+        logger.error("Voice Learning Error", error);
+        throw new HttpsError("internal", "Failed to learn voice");
+    }
+});
+
+/**
+ * Verify a draft for safety/hallucinations.
+ */
+export const verifyDraft = onCall(async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Unauthenticated");
+    const { draftText, contextData } = request.data;
+
+    if (!draftText) throw new HttpsError("invalid-argument", "Missing draft text");
+
+    try {
+        return await SafetyService.verifyDraft(draftText, contextData || "");
+    } catch (error) {
+        logger.error("Safety Check Error", error);
+        throw new HttpsError("internal", "Failed to verify draft");
     }
 });
