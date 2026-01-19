@@ -45,6 +45,9 @@ const gmailClientSecret = (0, params_1.defineSecret)('GMAIL_CLIENT_SECRET');
 // For prod, it's your hosting URL + /email-auth-success
 const REDIRECT_URI = 'http://localhost:5173/email-auth-success'; // TODO: Make dynamic or env var
 class GmailService {
+    static getOAuthClient() {
+        return new googleapis_1.google.auth.OAuth2(gmailClientId.value(), gmailClientSecret.value(), REDIRECT_URI);
+    }
     /**
      * Generates the URL for the user to consent to Gmail access.
      */
@@ -55,7 +58,7 @@ class GmailService {
             'https://www.googleapis.com/auth/gmail.modify',
             'https://www.googleapis.com/auth/userinfo.email'
         ];
-        return this.oauth2Client.generateAuthUrl({
+        return this.getOAuthClient().generateAuthUrl({
             access_type: 'offline', // crucial for refresh token
             scope: scopes,
             prompt: 'consent', // force storage of refresh token
@@ -67,7 +70,7 @@ class GmailService {
      */
     static async handleCallback(userId, code) {
         const db = admin.firestore();
-        const { tokens } = await this.oauth2Client.getToken(code);
+        const { tokens } = await this.getOAuthClient().getToken(code);
         // 1. Get User Profile to find Workspace (needed if we were storing config on workspace)
         // But prompt says store in users/{userId}/secrets
         // 2. Store tokens securely
@@ -198,5 +201,4 @@ class GmailService {
     }
 }
 exports.GmailService = GmailService;
-GmailService.oauth2Client = new googleapis_1.google.auth.OAuth2(gmailClientId.value(), gmailClientSecret.value(), REDIRECT_URI);
 //# sourceMappingURL=GmailService.js.map
