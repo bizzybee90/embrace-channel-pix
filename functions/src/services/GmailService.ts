@@ -6,7 +6,7 @@ import { defineSecret } from 'firebase-functions/params';
 const gmailClientId = defineSecret('GMAIL_CLIENT_ID');
 const gmailClientSecret = defineSecret('GMAIL_CLIENT_SECRET');
 
-const db = admin.firestore();
+
 
 // Redirect URI for OAuth flow (configure this in Google Cloud Console)
 // For local dev, this is usually http://localhost:5173/email-auth-success
@@ -43,6 +43,7 @@ export class GmailService {
      * Exchanges authorization code for tokens and saves them securely.
      */
     static async handleCallback(userId: string, code: string): Promise<void> {
+        const db = admin.firestore();
         const { tokens } = await this.oauth2Client.getToken(code);
 
         // 1. Get User Profile to find Workspace (needed if we were storing config on workspace)
@@ -66,6 +67,7 @@ export class GmailService {
      * Fetches the last 20 threads and syncs them to Firestore.
      */
     static async fetchAndSyncEmails(userId: string): Promise<void> {
+        const db = admin.firestore();
         // 1. Retrieve tokens
         const secretDoc = await db.collection('users').doc(userId).collection('secrets').doc('gmail').get();
         if (!secretDoc.exists) {

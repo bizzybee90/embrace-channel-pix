@@ -1,6 +1,6 @@
 import * as admin from 'firebase-admin';
 
-const db = admin.firestore();
+
 
 
 
@@ -13,6 +13,7 @@ export class GDPRService {
      * @param workspaceId The workspace ID the user belongs to (for storage paths).
      */
     static async deleteCustomerData(userId: string, workspaceId: string): Promise<void> {
+        const db = admin.firestore();
         console.log(`Starting GDPR deletion for user: ${userId} in workspace: ${workspaceId}`);
 
         // 1. Delete User Document
@@ -39,6 +40,7 @@ export class GDPRService {
      * @param userId The ID of the user/customer to export.
      */
     static async exportCustomerData(userId: string): Promise<Record<string, any>> {
+        const db = admin.firestore();
         const exportData: Record<string, any> = {};
 
         // 1. Fetch User Profile

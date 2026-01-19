@@ -35,7 +35,6 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.GDPRService = void 0;
 const admin = __importStar(require("firebase-admin"));
-const db = admin.firestore();
 class GDPRService {
     /**
      * Recursively deletes all data associated with a user or customer.
@@ -45,6 +44,7 @@ class GDPRService {
      * @param workspaceId The workspace ID the user belongs to (for storage paths).
      */
     static async deleteCustomerData(userId, workspaceId) {
+        const db = admin.firestore();
         console.log(`Starting GDPR deletion for user: ${userId} in workspace: ${workspaceId}`);
         // 1. Delete User Document
         await db.collection('users').doc(userId).delete();
@@ -66,6 +66,7 @@ class GDPRService {
      * @param userId The ID of the user/customer to export.
      */
     static async exportCustomerData(userId) {
+        const db = admin.firestore();
         const exportData = {};
         // 1. Fetch User Profile
         const userDoc = await db.collection('users').doc(userId).get();

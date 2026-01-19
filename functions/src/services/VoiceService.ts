@@ -1,7 +1,7 @@
 import * as admin from 'firebase-admin';
 import { VertexAI } from '@google-cloud/vertexai';
 
-const db = admin.firestore();
+
 
 // Initialize Vertex AI
 // Note: Requires project_id and location. Cloud Functions usually provide GCLOUD_PROJECT env var.
@@ -22,6 +22,7 @@ export class VoiceService {
      * "The Psychologist"
      */
     static async learnUserVoice(workspaceId: string): Promise<void> {
+        const db = admin.firestore();
         console.log(`Learning voice for workspace: ${workspaceId}`);
 
         // 1. Fetch last 500 SENT messages

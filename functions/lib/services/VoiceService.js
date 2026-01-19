@@ -36,7 +36,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.VoiceService = void 0;
 const admin = __importStar(require("firebase-admin"));
 const vertexai_1 = require("@google-cloud/vertexai");
-const db = admin.firestore();
 // Initialize Vertex AI
 // Note: Requires project_id and location. Cloud Functions usually provide GCLOUD_PROJECT env var.
 // For location, we default to europe-west2 as per requirements, but Gemini availability affects this.
@@ -55,6 +54,7 @@ class VoiceService {
      */
     static async learnUserVoice(workspaceId) {
         var _a;
+        const db = admin.firestore();
         console.log(`Learning voice for workspace: ${workspaceId}`);
         // 1. Fetch last 500 SENT messages
         // DATA_MAP: conversations/{convId}/messages where workspace_id match and direction='outbound'
