@@ -20,20 +20,17 @@ export const AuthGuard = ({ children }: { children: React.ReactNode }) => {
     if (loading || !user || !profile) return;
 
     // Prevent redirect loops
-    if (location.pathname.startsWith('/onboarding')) return;
+    if (location.pathname.startsWith('/onboarding')) {
+      // If user is already completed but tries to access onboarding, maybe redirect to dashboard?
+      // Or let them revisit? For now, let them revisit if they want, but typically we might block.
+      // But if they are NOT complete, they are in the right place.
+      return;
+    }
 
     // Check if onboarding is needed
-    // Assuming '0' means not started or complete.
-    // If onboarding_step is missing or less than "complete" (e.g. 5 steps), redirect.
-    // For now, let's say step 0 means "Needs Onboarding".
-    // Or if `onboarding_completed` flag exists?
-    // The previous prompt suggested `profile?.onboarding_step === 0`.
-
-    // Safety check: Don't redirect if we already checked to avoid fighting navigation
-    if (hasCheckedOnboarding.current) return;
-
-    if (profile.onboarding_step === 0 || profile.onboarding_step === undefined) {
-      console.log("Redirecting to onboarding due to step:", profile.onboarding_step);
+    // We check the explicit boolean flag 'onboarding_completed'
+    if (profile.onboarding_completed !== true) {
+      console.log("Onboarding incomplete, redirecting to wizard.");
       navigate('/onboarding');
       hasCheckedOnboarding.current = true;
     }
