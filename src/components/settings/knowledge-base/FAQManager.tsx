@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useWorkspace } from '@/hooks/useWorkspace';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,8 +8,10 @@ import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { toast } from '@/hooks/use-toast';
-import { Plus, Edit, Trash2, Search, HelpCircle } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, HelpCircle, Loader2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, orderBy } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 interface FAQ {
   id: string;
@@ -19,6 +20,7 @@ interface FAQ {
   answer: string;
   keywords: string[] | null;
   priority: number | null;
+  type?: 'faq';
 }
 
 export function FAQManager() {
@@ -30,6 +32,7 @@ export function FAQManager() {
   const [editingFaq, setEditingFaq] = useState<FAQ | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const { workspace } = useWorkspace();
+  const [saving, setSaving] = useState(false);
 
   const [formData, setFormData] = useState({
     category: '',
@@ -40,21 +43,32 @@ export function FAQManager() {
   });
 
   useEffect(() => {
-    if (workspace) {
+    if (workspace?.id) {
       loadFAQs();
     }
   }, [workspace]);
 
   const loadFAQs = async () => {
+    if (!workspace?.id) return;
+    setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('faq_database')
-        .select('*')
-        .order('priority', { ascending: false });
+      const kbRef = collection(db, 'workspaces', workspace.id, 'knowledge_base');
+      // Firestore composite indexes might be needed for ordering by priority.
+      // For now, simplify query and sort in memory if needed or just query where type == 'faq'
+      const q = query(kbRef, where('type', '==', 'faq'));
+      const snapshot = await getDocs(q);
 
-      if (error) throw error;
-      setFaqs(data || []);
+      const loadedFaqs = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as FAQ[];
+
+      // Sort by priority locally
+      loadedFaqs.sort((a, b) => (b.priority || 0) - (a.priority || 0));
+
+      setFaqs(loadedFaqs);
     } catch (error: any) {
+      console.error(error);
       toast({
         title: 'Error loading FAQs',
         description: error.message,
@@ -77,6 +91,7 @@ export function FAQManager() {
       return;
     }
 
+    setSaving(true);
     try {
       const keywordsArray = formData.keywords
         .split(',')
@@ -84,26 +99,25 @@ export function FAQManager() {
         .filter((k) => k.length > 0);
 
       const payload = {
+        type: 'faq',
         category: formData.category || 'general',
         question: formData.question,
         answer: formData.answer,
         keywords: keywordsArray.length > 0 ? keywordsArray : null,
         priority: formData.priority,
-        workspace_id: workspace?.id,
+        updated_at: new Date().toISOString()
       };
 
-      if (editingFaq) {
-        const { error } = await supabase
-          .from('faq_database')
-          .update(payload)
-          .eq('id', editingFaq.id);
+      const kbRef = collection(db, 'workspaces', workspace!.id, 'knowledge_base');
 
-        if (error) throw error;
+      if (editingFaq) {
+        await updateDoc(doc(kbRef, editingFaq.id), payload);
         toast({ title: 'FAQ updated successfully' });
       } else {
-        const { error } = await supabase.from('faq_database').insert(payload);
-
-        if (error) throw error;
+        await addDoc(kbRef, {
+          ...payload,
+          created_at: new Date().toISOString()
+        });
         toast({ title: 'FAQ created successfully' });
       }
 
@@ -116,6 +130,8 @@ export function FAQManager() {
         description: error.message,
         variant: 'destructive',
       });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -133,9 +149,8 @@ export function FAQManager() {
 
   const handleDelete = async (id: string) => {
     try {
-      const { error } = await supabase.from('faq_database').delete().eq('id', id);
-
-      if (error) throw error;
+      if (!workspace?.id) return;
+      await deleteDoc(doc(db, 'workspaces', workspace.id, 'knowledge_base', id));
       toast({ title: 'FAQ deleted successfully' });
       loadFAQs();
     } catch (error: any) {
@@ -282,7 +297,10 @@ export function FAQManager() {
                 <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                   Cancel
                 </Button>
-                <Button type="submit">{editingFaq ? 'Update' : 'Create'} FAQ</Button>
+                <Button type="submit" disabled={saving}>
+                  {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {editingFaq ? 'Update' : 'Create'} FAQ
+                </Button>
               </div>
             </form>
           </DialogContent>
@@ -291,6 +309,7 @@ export function FAQManager() {
 
       {filteredFaqs.length === 0 ? (
         <Card className="p-12 text-center">
+          {/* Empty State */}
           <HelpCircle className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
           <h3 className="text-lg font-semibold mb-2">No FAQs yet</h3>
           <p className="text-muted-foreground mb-4">Start building your knowledge base by adding your first FAQ</p>

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ErrorBoundary } from '@/components/ui/error-boundary';
 
 interface SettingsSectionProps {
   title: string;
@@ -30,7 +31,9 @@ export function SettingsSection({ title, description, children, defaultOpen = fa
         </CollapsibleTrigger>
         <CollapsibleContent>
           <div className="px-4 pb-4 pt-2">
-            {children}
+            <ErrorBoundary name={title}>
+              {children}
+            </ErrorBoundary>
           </div>
         </CollapsibleContent>
       </div>
