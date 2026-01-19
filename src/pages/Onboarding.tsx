@@ -1,158 +1,72 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
-import { OnboardingWizard } from '@/components/onboarding/OnboardingWizard';
+import { useAuth } from '@/hooks/use-auth';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { doc, updateDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { CheckCircle2 } from 'lucide-react';
 
 export default function Onboarding() {
   const navigate = useNavigate();
-  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [initialCheckDone, setInitialCheckDone] = useState(false);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const checkOnboardingStatus = async () => {
-      try {
-        console.log('[Onboarding] Starting check...');
-        
-        // Wait for session to be ready
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (!session?.user) {
-          console.log('[Onboarding] No session, redirecting to auth');
-          navigate('/auth');
-          return;
-        }
-
-        const user = session.user;
-        console.log('[Onboarding] User found:', user.id);
-
-        // Get user's workspace and onboarding status
-        const { data: userData, error } = await supabase
-          .from('users')
-          .select('workspace_id, onboarding_completed')
-          .eq('id', user.id)
-          .single();
-
-        if (error) {
-          console.error('[Onboarding] Error fetching user:', error);
-          navigate('/auth');
-          return;
-        }
-
-        console.log('[Onboarding] User data:', userData);
-
-        // If already onboarded, go to home
-        if (userData?.onboarding_completed) {
-          console.log('[Onboarding] Already completed, going home');
-          navigate('/');
-          return;
-        }
-
-        // If no workspace, we need to create one
-        if (!userData?.workspace_id) {
-          console.log('[Onboarding] No workspace, creating one...');
-          // Create a default workspace for the user
-          const { data: workspace, error: wsError } = await supabase
-            .from('workspaces')
-            .insert({
-              name: 'My Workspace',
-              slug: `workspace-${user.id.slice(0, 8)}`,
-            })
-            .select()
-            .single();
-
-          if (wsError) {
-            console.error('[Onboarding] Error creating workspace:', wsError);
-            if (isMounted) {
-              setLoading(false);
-              setInitialCheckDone(true);
-            }
-            return;
-          }
-
-          // Update user with workspace
-          await supabase
-            .from('users')
-            .update({ workspace_id: workspace.id })
-            .eq('id', user.id);
-
-          console.log('[Onboarding] Workspace created:', workspace.id);
-          if (isMounted) {
-            setWorkspaceId(workspace.id);
-          }
-        } else {
-          console.log('[Onboarding] Using existing workspace:', userData.workspace_id);
-          if (isMounted) {
-            setWorkspaceId(userData.workspace_id);
-          }
-        }
-      } catch (error) {
-        console.error('[Onboarding] Error in check:', error);
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-          setInitialCheckDone(true);
-        }
-      }
-    };
-
-    checkOnboardingStatus();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [navigate]);
+  const { user, profile } = useAuth();
+  const [loading, setLoading] = useState(false);
 
   const handleComplete = async () => {
+    if (!user) return;
+    setLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        // Mark onboarding as complete
-        await supabase
-          .from('users')
-          .update({ 
-            onboarding_completed: true,
-            onboarding_step: 'complete'
-          })
-          .eq('id', user.id);
-      }
-      navigate('/');
+      // Mark onboarding as complete in Firestore
+      const userRef = doc(db, 'users', user.uid);
+      await updateDoc(userRef, {
+        onboarding_step: 99, // signals complete
+        onboarding_completed: true,
+        workspace_id: `workspace-${user.uid.slice(0, 8)}` // placeholder workspace
+      });
+
+      // Force reload or just navigate? 
+      // The useAuth hook listens to changes, but onSnapshot might be needed for real-time updates.
+      // For now, simple navigation. If AuthGuard checks profile, it might lag if we don't update local state.
+      // However, useAuth fetches profile on auth state change. It doesn't listen to profile changes real-time in the current impl 
+      // (it uses getDoc, not onSnapshot).
+      // So we might need to reload the page to refresh the profile in AuthContext, 
+      // or we accept that the user might get kicked back if the context isn't updated.
+      // Let's force a reload for safety in this "Rescue" phase.
+      window.location.href = '/';
+
     } catch (error) {
       console.error('Error completing onboarding:', error);
-      navigate('/');
+      setLoading(false);
     }
   };
 
-  // Show loading spinner while checking auth/onboarding status
-  if (loading || !initialCheckDone) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="text-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto mb-4" />
-          <p className="text-muted-foreground">Loading onboarding...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Show workspace setup if still waiting for workspace
-  if (!workspaceId) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="text-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto mb-4" />
-          <p className="text-muted-foreground">Setting up your workspace...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <OnboardingWizard 
-      workspaceId={workspaceId} 
-      onComplete={handleComplete} 
-    />
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+      <Card className="w-full max-w-lg shadow-lg">
+        <CardHeader className="text-center">
+          <div className="mx-auto w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-4">
+            <CheckCircle2 className="w-6 h-6 text-green-600" />
+          </div>
+          <CardTitle className="text-2xl font-bold text-gray-900">Welcome to BizzyBee!</CardTitle>
+          <CardDescription>
+            Let's get your workspace ready.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="bg-blue-50 p-4 rounded-md text-blue-800 text-sm">
+            <p className="font-semibold">Hello, {profile?.name || user?.email}!</p>
+            <p>This is a simplified onboarding step to verify your account setup.</p>
+          </div>
+
+          <Button
+            className="w-full h-12 text-lg"
+            onClick={handleComplete}
+            disabled={loading}
+          >
+            {loading ? "Setting up..." : "Complete Setup & Go to Dashboard"}
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
   );
 }

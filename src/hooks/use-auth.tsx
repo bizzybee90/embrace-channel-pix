@@ -4,7 +4,9 @@ import {
     onAuthStateChanged,
     signInWithPopup,
     GoogleAuthProvider,
-    signOut as firebaseSignOut
+    signOut as firebaseSignOut,
+    createUserWithEmailAndPassword,
+    signInWithEmailAndPassword
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
@@ -13,6 +15,7 @@ interface UserProfile {
     id: string;
     workspace_id?: string;
     role?: string;
+    onboarding_step?: number;
     [key: string]: any;
 }
 
@@ -21,6 +24,8 @@ interface AuthContextType {
     profile: UserProfile | null;
     loading: boolean;
     signInWithGoogle: () => Promise<void>;
+    signInWithEmail: (email: string, password: string) => Promise<void>;
+    signUpWithEmail: (email: string, password: string) => Promise<void>;
     signOut: () => Promise<void>;
 }
 
@@ -32,34 +37,65 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-            setUser(currentUser);
+        let mounted = true;
 
-            if (currentUser) {
-                // Fetch User Profile
+        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+            if (!mounted) return;
+
+            // Reset loading state on auth change to prevent UI flash
+            // logic: if currentUser is null, we are done fast. 
+            // If currentUser exists, we need to fetch profile, so keep loading true until done.
+            if (!currentUser) {
+                setUser(null);
+                setProfile(null);
+                setLoading(false);
+                return;
+            }
+
+            setUser(currentUser);
+            // Ensure loading is true while we fetch profile
+            setLoading(true);
+
+            try {
                 const userRef = doc(db, 'users', currentUser.uid);
                 const userSnap = await getDoc(userRef);
 
                 if (userSnap.exists()) {
-                    setProfile({ id: currentUser.uid, ...userSnap.data() } as UserProfile);
+                    if (mounted) {
+                        setProfile({ id: currentUser.uid, ...userSnap.data() } as UserProfile);
+                    }
                 } else {
-                    // Create New User Profile (Onboarding)
+                    // Auto-create profile for new users
+                    // We use the email prefix as a fallback name if displayName is missing
+                    const emailName = currentUser.email?.split('@')[0] || 'User';
                     const newProfile = {
                         email: currentUser.email,
-                        name: currentUser.displayName,
+                        name: currentUser.displayName || emailName,
                         created_at: serverTimestamp(),
-                        // workspace_id will be null initially, handled by onboarding flow
+                        onboarding_step: 0,
+                        role: 'owner', // Default role for first user? Or just 'user'
                     };
+
                     await setDoc(userRef, newProfile);
-                    setProfile({ id: currentUser.uid, ...newProfile });
+
+                    if (mounted) {
+                        setProfile({ id: currentUser.uid, ...newProfile });
+                    }
                 }
-            } else {
-                setProfile(null);
+            } catch (error) {
+                console.error("Error fetching/creating user profile:", error);
+                // In production, maybe show a toast?
+            } finally {
+                if (mounted) {
+                    setLoading(false);
+                }
             }
-            setLoading(false);
         });
 
-        return () => unsubscribe();
+        return () => {
+            mounted = false;
+            unsubscribe();
+        };
     }, []);
 
     const signInWithGoogle = async () => {
@@ -67,12 +103,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await signInWithPopup(auth, provider);
     };
 
+    const signInWithEmail = async (email: string, password: string) => {
+        await signInWithEmailAndPassword(auth, email, password);
+    };
+
+    const signUpWithEmail = async (email: string, password: string) => {
+        await createUserWithEmailAndPassword(auth, email, password);
+    };
+
     const signOut = async () => {
         await firebaseSignOut(auth);
+        setProfile(null);
+        setUser(null);
     };
 
     return (
-        <AuthContext.Provider value={{ user, profile, loading, signInWithGoogle, signOut }}>
+        <AuthContext.Provider value={{ user, profile, loading, signInWithGoogle, signInWithEmail, signUpWithEmail, signOut }}>
             {children}
         </AuthContext.Provider>
     );
