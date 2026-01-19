@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Loader2 } from "lucide-react";
+import { IndustryCombobox } from "./IndustryCombobox";
 
 interface BusinessProfileStepProps {
     onNext: () => void;
@@ -70,14 +71,14 @@ export function BusinessProfileStep({ onNext }: BusinessProfileStepProps) {
                 </div>
 
                 <div className="space-y-2">
-                    <Label htmlFor="industry">Industry</Label>
-                    <Input
-                        id="industry"
-                        placeholder="e.g. Retail, Healthcare, Tech"
+                    <Label>Industry</Label>
+                    <IndustryCombobox
                         value={formData.industry}
-                        onChange={(e) => setFormData({ ...formData, industry: e.target.value })}
-                        required
+                        onChange={(val) => setFormData({ ...formData, industry: val })}
                     />
+                    <p className="text-[0.8rem] text-muted-foreground">
+                        Select from the list or type your own.
+                    </p>
                 </div>
 
                 <div className="space-y-2">
