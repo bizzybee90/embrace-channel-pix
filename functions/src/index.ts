@@ -121,4 +121,12 @@ export const verifyDraft = onCall(async (request) => {
         logger.error("Safety Check Error", error);
         throw new HttpsError("internal", "Failed to verify draft");
     }
+}
 });
+
+
+// --- Master Spec Agents ---
+export * from "./agents/discoverCompetitors";
+export * from "./agents/scrapeWebsite";
+export * from "./agents/generateKnowledge";
+
