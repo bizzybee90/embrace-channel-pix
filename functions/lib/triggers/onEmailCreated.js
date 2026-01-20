@@ -37,9 +37,9 @@ exports.onEmailCreated = void 0;
 const firestore_1 = require("firebase-functions/v2/firestore");
 const admin = __importStar(require("firebase-admin"));
 const vertexai_1 = require("@google-cloud/vertexai");
-const db = admin.firestore();
-const vertexAI = new vertexai_1.VertexAI({ project: process.env.GCLOUD_PROJECT, location: 'europe-west2' });
-const model = vertexAI.preview.getGenerativeModel({ model: 'gemini-1.5-flash-preview-0514' });
+// Lazy load these inside the function
+// const db = admin.firestore();
+// const vertexAI ...
 /**
  * "The Sorter"
  * Triggered when a new message is added to a conversation.
@@ -47,6 +47,9 @@ const model = vertexAI.preview.getGenerativeModel({ model: 'gemini-1.5-flash-pre
  */
 exports.onEmailCreated = (0, firestore_1.onDocumentCreated)("conversations/{convId}/messages/{msgId}", async (event) => {
     var _a;
+    const db = admin.firestore();
+    const vertexAI = new vertexai_1.VertexAI({ project: process.env.GCLOUD_PROJECT, location: 'europe-west2' });
+    const model = vertexAI.preview.getGenerativeModel({ model: 'gemini-1.5-flash-preview-0514' });
     const snapshot = event.data;
     if (!snapshot)
         return;
