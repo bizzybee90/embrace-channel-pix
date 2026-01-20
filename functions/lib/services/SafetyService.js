@@ -2,15 +2,16 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SafetyService = void 0;
 const vertexai_1 = require("@google-cloud/vertexai");
-const vertexAI = new vertexai_1.VertexAI({
-    project: process.env.GCLOUD_PROJECT,
-    location: 'europe-west2'
-});
-// "The Judge" uses Flash for speed/cost
-const model = vertexAI.preview.getGenerativeModel({
-    model: 'gemini-1.5-flash-preview-0514' // Or 'gemini-1.5-flash-001'
-});
 class SafetyService {
+    static getModel() {
+        const vertexAI = new vertexai_1.VertexAI({
+            project: process.env.GCLOUD_PROJECT,
+            location: 'europe-west2'
+        });
+        return vertexAI.preview.getGenerativeModel({
+            model: 'gemini-1.5-flash-preview-0514'
+        });
+    }
     /**
      * Verifies a draft against FAQs and Policies to prevent hallucinations.
      * "The Judge"
@@ -40,7 +41,7 @@ class SafetyService {
         "suggestions": string[]
       }
     `;
-        const result = await model.generateContent(prompt);
+        const result = await this.getModel().generateContent(prompt);
         const response = await result.response;
         const text = (_a = response.candidates) === null || _a === void 0 ? void 0 : _a[0].content.parts[0].text;
         if (!text)

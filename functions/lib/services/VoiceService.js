@@ -40,14 +40,16 @@ const vertexai_1 = require("@google-cloud/vertexai");
 // Note: Requires project_id and location. Cloud Functions usually provide GCLOUD_PROJECT env var.
 // For location, we default to europe-west2 as per requirements, but Gemini availability affects this.
 // Gemini 1.5 Pro is available in europe-west2.
-const vertexAI = new vertexai_1.VertexAI({
-    project: process.env.GCLOUD_PROJECT,
-    location: 'europe-west2'
-});
-const model = vertexAI.preview.getGenerativeModel({
-    model: 'gemini-1.5-pro-preview-0409' // Or 'gemini-1.5-pro-001'
-});
 class VoiceService {
+    static getModel() {
+        const vertexAI = new vertexai_1.VertexAI({
+            project: process.env.GCLOUD_PROJECT,
+            location: 'europe-west2'
+        });
+        return vertexAI.preview.getGenerativeModel({
+            model: 'gemini-1.5-pro-preview-0409'
+        });
+    }
     /**
      * Analyzes recent sent emails to build a voice profile.
      * "The Psychologist"
@@ -90,7 +92,7 @@ class VoiceService {
       Samples:
       ${emailSamples}
     `;
-        const result = await model.generateContent(prompt);
+        const result = await this.getModel().generateContent(prompt);
         const response = await result.response;
         const text = (_a = response.candidates) === null || _a === void 0 ? void 0 : _a[0].content.parts[0].text;
         if (!text)

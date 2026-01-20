@@ -1,14 +1,6 @@
 import { VertexAI } from '@google-cloud/vertexai';
 
-const vertexAI = new VertexAI({
-    project: process.env.GCLOUD_PROJECT,
-    location: 'europe-west2'
-});
 
-// "The Judge" uses Flash for speed/cost
-const model = vertexAI.preview.getGenerativeModel({
-    model: 'gemini-1.5-flash-preview-0514' // Or 'gemini-1.5-flash-001'
-});
 
 export interface DraftVerificationResult {
     verified: boolean;
@@ -17,6 +9,16 @@ export interface DraftVerificationResult {
 }
 
 export class SafetyService {
+    private static getModel() {
+        const vertexAI = new VertexAI({
+            project: process.env.GCLOUD_PROJECT,
+            location: 'europe-west2'
+        });
+        return vertexAI.preview.getGenerativeModel({
+            model: 'gemini-1.5-flash-preview-0514'
+        });
+    }
+
     /**
      * Verifies a draft against FAQs and Policies to prevent hallucinations.
      * "The Judge"
@@ -46,7 +48,7 @@ export class SafetyService {
       }
     `;
 
-        const result = await model.generateContent(prompt);
+        const result = await this.getModel().generateContent(prompt);
         const response = await result.response;
         const text = response.candidates?.[0].content.parts[0].text;
 
