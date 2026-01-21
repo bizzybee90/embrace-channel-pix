@@ -12,7 +12,10 @@ import { onDocumentUpdated } from "firebase-functions/v2/firestore";
  * We can implement logic here that *reacts* to changes (e.g. if priority changes, re-calc SLA),
  * effectively enabling "The Clock" to reset or escalate immediately on interaction.
  */
-export const onConversationUpdated = onDocumentUpdated("conversations/{convId}", async (event) => {
+export const onConversationUpdated = onDocumentUpdated({
+    document: "conversations/{convId}",
+    region: "europe-west2"
+}, async (event) => {
     const change = event.data;
     if (!change) return;
 
