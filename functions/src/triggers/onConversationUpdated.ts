@@ -15,8 +15,8 @@ import { onDocumentUpdated } from "firebase-functions/v2/firestore";
 export const onConversationUpdated = onDocumentUpdated({
     document: "conversations/{convId}",
     region: "europe-west2",
-    memory: "1GiB",
-    timeoutSeconds: 300
+    memory: "2GiB",
+    timeoutSeconds: 540
 }, async (event) => {
     const change = event.data;
     if (!change) return;

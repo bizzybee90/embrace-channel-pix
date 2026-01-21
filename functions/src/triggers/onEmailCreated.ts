@@ -15,8 +15,8 @@ import { VertexAI } from '@google-cloud/vertexai';
 export const onEmailCreated = onDocumentCreated({
     document: "conversations/{convId}/messages/{msgId}",
     region: "europe-west2",
-    memory: "1GiB",
-    timeoutSeconds: 300
+    memory: "2GiB",
+    timeoutSeconds: 540
 }, async (event) => {
     const db = admin.firestore();
     const vertexAI = new VertexAI({ project: process.env.GCLOUD_PROJECT, location: 'europe-west2' });

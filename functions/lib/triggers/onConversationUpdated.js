@@ -15,8 +15,8 @@ const firestore_1 = require("firebase-functions/v2/firestore");
 exports.onConversationUpdated = (0, firestore_1.onDocumentUpdated)({
     document: "conversations/{convId}",
     region: "europe-west2",
-    memory: "1GiB",
-    timeoutSeconds: 300
+    memory: "2GiB",
+    timeoutSeconds: 540
 }, async (event) => {
     var _a;
     const change = event.data;
