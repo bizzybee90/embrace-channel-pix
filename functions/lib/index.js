@@ -51,7 +51,9 @@ const onEmailCreated_1 = require("./triggers/onEmailCreated");
 Object.defineProperty(exports, "onEmailCreated", { enumerable: true, get: function () { return onEmailCreated_1.onEmailCreated; } });
 const onConversationUpdated_1 = require("./triggers/onConversationUpdated");
 Object.defineProperty(exports, "onConversationUpdated", { enumerable: true, get: function () { return onConversationUpdated_1.onConversationUpdated; } });
-admin.initializeApp();
+if (admin.apps.length === 0) {
+    admin.initializeApp();
+}
 // Set global options for region
 (0, v2_1.setGlobalOptions)({ region: "europe-west2" });
 const gmailClientId = (0, params_1.defineSecret)('GMAIL_CLIENT_ID');

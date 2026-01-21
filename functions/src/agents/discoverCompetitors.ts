@@ -7,6 +7,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 const googleApiKey = defineSecret("GOOGLE_API_KEY");
 
 export const discoverCompetitors = onCall({ secrets: [googleApiKey], timeoutSeconds: 300 }, async (request) => {
+    const db = admin.firestore();
     if (!request.auth) throw new HttpsError("unauthenticated", "User must be logged in.");
 
     const { location, radius_miles, industry, business_name } = request.data;
@@ -38,7 +39,7 @@ export const discoverCompetitors = onCall({ secrets: [googleApiKey], timeoutSeco
         const competitors = JSON.parse(jsonStr);
 
         // Save to Firestore
-        const db = admin.firestore();
+        // Save to Firestore
         const batch = db.batch();
         const collectionRef = db.collection(`companies/${request.auth.uid}/competitors`);
 

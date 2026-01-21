@@ -12,7 +12,9 @@ import { SafetyService } from "./services/SafetyService";
 import { onEmailCreated } from "./triggers/onEmailCreated";
 import { onConversationUpdated } from "./triggers/onConversationUpdated";
 
-admin.initializeApp();
+if (admin.apps.length === 0) {
+    admin.initializeApp();
+}
 
 // Set global options for region
 setGlobalOptions({ region: "europe-west2" });

@@ -7,6 +7,7 @@ import axios from "axios";
 const firecrawlApiKey = defineSecret("FIRECRAWL_API_KEY");
 
 export const scrapeWebsite = onCall({ secrets: [firecrawlApiKey], timeoutSeconds: 300 }, async (request) => {
+    const db = admin.firestore();
     if (!request.auth) throw new HttpsError("unauthenticated", "User must be logged in.");
 
     const { url, company_id } = request.data;
@@ -39,7 +40,7 @@ export const scrapeWebsite = onCall({ secrets: [firecrawlApiKey], timeoutSeconds
         const markdown = response.data.data.markdown;
 
         // Save raw content to Firestore for caching
-        await admin.firestore()
+        await db
             .collection(`companies/${company_id}/scrapes`)
             .add({
                 url,

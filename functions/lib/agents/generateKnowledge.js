@@ -41,6 +41,7 @@ const params_1 = require("firebase-functions/params");
 const generative_ai_1 = require("@google/generative-ai");
 const googleApiKey = (0, params_1.defineSecret)("GOOGLE_API_KEY");
 exports.generateKnowledge = (0, https_1.onCall)({ secrets: [googleApiKey], timeoutSeconds: 540 }, async (request) => {
+    const db = admin.firestore();
     if (!request.auth)
         throw new https_1.HttpsError("unauthenticated", "User must be logged in.");
     const { markdown_content, company_id } = request.data;
@@ -92,7 +93,6 @@ exports.generateKnowledge = (0, https_1.onCall)({ secrets: [googleApiKey], timeo
         const text = response.text();
         const jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
         const data = JSON.parse(jsonStr);
-        const db = admin.firestore();
         const batch = db.batch();
         // 1. Update Profile
         const profileRef = db.doc(`companies/${company_id}`);

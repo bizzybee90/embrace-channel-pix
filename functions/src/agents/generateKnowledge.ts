@@ -7,6 +7,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 const googleApiKey = defineSecret("GOOGLE_API_KEY");
 
 export const generateKnowledge = onCall({ secrets: [googleApiKey], timeoutSeconds: 540 }, async (request) => {
+    const db = admin.firestore();
     if (!request.auth) throw new HttpsError("unauthenticated", "User must be logged in.");
 
     const { markdown_content, company_id } = request.data;
@@ -64,7 +65,7 @@ export const generateKnowledge = onCall({ secrets: [googleApiKey], timeoutSecond
         const jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
         const data = JSON.parse(jsonStr);
 
-        const db = admin.firestore();
+
         const batch = db.batch();
 
         // 1. Update Profile
