@@ -12,7 +12,13 @@ import { VertexAI } from '@google-cloud/vertexai';
  * Triggered when a new message is added to a conversation.
  * Classifies inbound emails and updates the parent conversation.
  */
-export const onEmailCreated = onDocumentCreated("conversations/{convId}/messages/{msgId}", async (event) => {
+export const onEmailCreated = onDocumentCreated({
+    document: "conversations/{convId}/messages/{msgId}",
+    region: "europe-west2",
+    memory: "2GiB",
+    timeoutSeconds: 540,
+    maxInstances: 10
+}, async (event) => {
     const db = admin.firestore();
     const vertexAI = new VertexAI({ project: process.env.GCLOUD_PROJECT, location: 'europe-west2' });
     const model = vertexAI.preview.getGenerativeModel({ model: 'gemini-1.5-flash-preview-0514' });
