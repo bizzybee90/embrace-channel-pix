@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { useWorkspace } from '@/hooks/useWorkspace';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,10 +9,8 @@ import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { toast } from '@/hooks/use-toast';
-import { Plus, Edit, Trash2, Search, BookOpen, Loader2 } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, BookOpen } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 
 interface BusinessFact {
   id: string;
@@ -19,7 +18,6 @@ interface BusinessFact {
   fact_key: string;
   fact_value: string;
   metadata: any;
-  type?: 'fact';
 }
 
 export function BusinessFactsManager() {
@@ -31,7 +29,6 @@ export function BusinessFactsManager() {
   const [editingFact, setEditingFact] = useState<BusinessFact | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const { workspace } = useWorkspace();
-  const [saving, setSaving] = useState(false);
 
   const [formData, setFormData] = useState({
     category: '',
@@ -41,31 +38,21 @@ export function BusinessFactsManager() {
   });
 
   useEffect(() => {
-    if (workspace?.id) {
+    if (workspace) {
       loadFacts();
     }
   }, [workspace]);
 
   const loadFacts = async () => {
-    if (!workspace?.id) return;
-    setLoading(true);
     try {
-      const kbRef = collection(db, 'workspaces', workspace.id, 'knowledge_base');
-      const q = query(kbRef, where('type', '==', 'fact'));
-      const snapshot = await getDocs(q);
+      const { data, error } = await supabase
+        .from('business_facts')
+        .select('*')
+        .order('category', { ascending: true })
+        .order('fact_key', { ascending: true });
 
-      const loadedFacts = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as BusinessFact[];
-
-      // Sort by category then key
-      loadedFacts.sort((a, b) => {
-        if (a.category !== b.category) return a.category.localeCompare(b.category);
-        return a.fact_key.localeCompare(b.fact_key);
-      });
-
-      setFacts(loadedFacts);
+      if (error) throw error;
+      setFacts(data || []);
     } catch (error: any) {
       toast({
         title: 'Error loading business facts',
@@ -89,7 +76,6 @@ export function BusinessFactsManager() {
       return;
     }
 
-    setSaving(true);
     try {
       let metadata = null;
       if (formData.metadata.trim()) {
@@ -101,30 +87,30 @@ export function BusinessFactsManager() {
             description: 'Metadata must be valid JSON',
             variant: 'destructive',
           });
-          setSaving(false);
           return;
         }
       }
 
       const payload = {
-        type: 'fact',
         category: formData.category,
         fact_key: formData.fact_key,
         fact_value: formData.fact_value,
         metadata,
-        updated_at: new Date().toISOString()
+        workspace_id: workspace?.id,
       };
 
-      const kbRef = collection(db, 'workspaces', workspace!.id, 'knowledge_base');
-
       if (editingFact) {
-        await updateDoc(doc(kbRef, editingFact.id), payload);
+        const { error } = await supabase
+          .from('business_facts')
+          .update(payload)
+          .eq('id', editingFact.id);
+
+        if (error) throw error;
         toast({ title: 'Business fact updated successfully' });
       } else {
-        await addDoc(kbRef, {
-          ...payload,
-          created_at: new Date().toISOString()
-        });
+        const { error } = await supabase.from('business_facts').insert(payload);
+
+        if (error) throw error;
         toast({ title: 'Business fact created successfully' });
       }
 
@@ -137,8 +123,6 @@ export function BusinessFactsManager() {
         description: error.message,
         variant: 'destructive',
       });
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -154,9 +138,10 @@ export function BusinessFactsManager() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!workspace?.id) return;
     try {
-      await deleteDoc(doc(db, 'workspaces', workspace.id, 'knowledge_base', id));
+      const { error } = await supabase.from('business_facts').delete().eq('id', id);
+
+      if (error) throw error;
       toast({ title: 'Business fact deleted successfully' });
       loadFacts();
     } catch (error: any) {
@@ -301,10 +286,7 @@ export function BusinessFactsManager() {
                 <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                   Cancel
                 </Button>
-                <Button type="submit" disabled={saving}>
-                  {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  {editingFact ? 'Update' : 'Create'} Fact
-                </Button>
+                <Button type="submit">{editingFact ? 'Update' : 'Create'} Fact</Button>
               </div>
             </form>
           </DialogContent>

@@ -1,16 +1,17 @@
 import { useEffect, useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { Card } from '@/components/ui/card';
 import { ThreeColumnLayout } from '@/components/layout/ThreeColumnLayout';
 import { Sidebar } from '@/components/sidebar/Sidebar';
 import { MobilePageLayout } from '@/components/layout/MobilePageLayout';
-import { useAuth } from '@/hooks/use-auth'; // UPDATED
+import { useWorkspace } from '@/hooks/useWorkspace';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useNavigate } from 'react-router-dom';
-import {
-  Mail,
-  AlertTriangle,
-  CheckCircle2,
-  Clock,
+import { 
+  Mail, 
+  AlertTriangle, 
+  CheckCircle2, 
+  Clock, 
   Sparkles,
   Activity,
   FileEdit,
@@ -20,15 +21,13 @@ import {
 import { Button } from '@/components/ui/button';
 import bizzybeelogo from '@/assets/bizzybee-logo.png';
 import { formatDistanceToNow } from 'date-fns';
+import { ActivityFeed } from '@/components/dashboard/ActivityFeed';
+import { DraftMessages } from '@/components/dashboard/DraftMessages';
+import { HumanAIActivityLog } from '@/components/dashboard/HumanAIActivityLog';
+import { AIBriefingWidget } from '@/components/dashboard/AIBriefingWidget';
+import { LearningInsightsWidget } from '@/components/dashboard/LearningInsightsWidget';
+import { InsightsWidget } from '@/components/dashboard/InsightsWidget';
 import { ScrollArea } from '@/components/ui/scroll-area';
-
-// Placeholder or disabled widgets until refactored
-// import { ActivityFeed } from '@/components/dashboard/ActivityFeed';
-// import { DraftMessages } from '@/components/dashboard/DraftMessages';
-// import { HumanAIActivityLog } from '@/components/dashboard/HumanAIActivityLog';
-// import { AIBriefingWidget } from '@/components/dashboard/AIBriefingWidget';
-// import { LearningInsightsWidget } from '@/components/dashboard/LearningInsightsWidget';
-// import { InsightsWidget } from '@/components/dashboard/InsightsWidget';
 
 interface HomeStats {
   clearedToday: number;
@@ -40,7 +39,7 @@ interface HomeStats {
 }
 
 export const Home = () => {
-  const { user, profile } = useAuth(); // UPDATED
+  const { workspace } = useWorkspace();
   const isMobile = useIsMobile();
   const navigate = useNavigate();
   const [stats, setStats] = useState<HomeStats>({
@@ -54,13 +53,109 @@ export const Home = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Temporary: Simulate loading for a moment then show empty state
-    // In future: Replace with Firestore queries
-    const timer = setTimeout(() => {
-      setLoading(false);
-    }, 500);
-    return () => clearTimeout(timer);
-  }, []);
+    const fetchStats = async () => {
+      if (!workspace?.id) return;
+
+      try {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const [
+          clearedResult, 
+          toReplyResult, 
+          atRiskResult, 
+          reviewResult,
+          draftResult,
+          lastHandledResult
+        ] = await Promise.all([
+          // Cleared today (auto_handled + resolved)
+          supabase
+            .from('conversations')
+            .select('id', { count: 'exact', head: true })
+            .eq('workspace_id', workspace.id)
+            .or('decision_bucket.eq.auto_handled,status.eq.resolved')
+            .gte('updated_at', today.toISOString()),
+          // To Reply count
+          supabase
+            .from('conversations')
+            .select('id', { count: 'exact', head: true })
+            .eq('workspace_id', workspace.id)
+            .in('decision_bucket', ['act_now', 'quick_win'])
+            .in('status', ['new', 'open', 'waiting_internal', 'ai_handling', 'escalated']),
+          // At Risk (SLA breached or warning)
+          supabase
+            .from('conversations')
+            .select('id', { count: 'exact', head: true })
+            .eq('workspace_id', workspace.id)
+            .in('sla_status', ['warning', 'breached'])
+            .in('status', ['new', 'open', 'waiting_internal', 'ai_handling', 'escalated']),
+          // Review queue count
+          supabase
+            .from('conversations')
+            .select('id', { count: 'exact', head: true })
+            .eq('workspace_id', workspace.id)
+            .eq('needs_review', true)
+            .is('reviewed_at', null),
+          // Draft count
+          supabase
+            .from('conversations')
+            .select('id', { count: 'exact', head: true })
+            .eq('workspace_id', workspace.id)
+            .not('ai_draft_response', 'is', null)
+            .is('final_response', null)
+            .in('status', ['new', 'open', 'ai_handling'])
+            .in('decision_bucket', ['quick_win', 'act_now'])
+            .eq('requires_reply', true),
+          // Last handled conversation
+          supabase
+            .from('conversations')
+            .select('auto_handled_at')
+            .eq('workspace_id', workspace.id)
+            .eq('decision_bucket', 'auto_handled')
+            .order('auto_handled_at', { ascending: false })
+            .limit(1),
+        ]);
+
+        setStats({
+          clearedToday: clearedResult.count || 0,
+          toReplyCount: toReplyResult.count || 0,
+          atRiskCount: atRiskResult.count || 0,
+          reviewCount: reviewResult.count || 0,
+          draftCount: draftResult.count || 0,
+          lastHandled: lastHandledResult.data?.[0]?.auto_handled_at 
+            ? new Date(lastHandledResult.data[0].auto_handled_at) 
+            : null,
+        });
+      } catch (error) {
+        console.error('Error fetching home stats:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStats();
+
+    // Realtime subscription
+    const channel = supabase
+      .channel('home-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'conversations',
+          filter: `workspace_id=eq.${workspace?.id}`
+        },
+        () => {
+          fetchStats();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [workspace?.id]);
 
   // Get time-appropriate greeting
   const getGreeting = () => {
@@ -91,7 +186,7 @@ export const Home = () => {
               <img src={bizzybeelogo} alt="BizzyBee" className="h-20 w-auto" />
               <div>
                 <h1 className="text-xl font-semibold text-foreground">
-                  {getGreeting()}, {profile?.name || 'there'}!
+                  {getGreeting()}
                 </h1>
                 <p className="text-sm text-muted-foreground">
                   {stats.clearedToday > 0 ? (
@@ -114,17 +209,18 @@ export const Home = () => {
               </div>
             )}
 
-            {/* AI Briefing Widget - COMMENTED OUT UNTIL REFACTORED */}
-            {/* <AIBriefingWidget /> */}
+            {/* AI Briefing Widget */}
+            <AIBriefingWidget />
 
             {/* Action Cards - Priority order with visual hierarchy */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* At Risk - Most urgent, prominent styling */}
-              <Card
-                className={`p-5 cursor-pointer transition-all hover:scale-[1.02] ${stats.atRiskCount > 0
-                    ? 'bg-gradient-to-br from-destructive/10 via-destructive/5 to-background border-destructive/30 shadow-lg shadow-destructive/10'
+              <Card 
+                className={`p-5 cursor-pointer transition-all hover:scale-[1.02] ${
+                  stats.atRiskCount > 0 
+                    ? 'bg-gradient-to-br from-destructive/10 via-destructive/5 to-background border-destructive/30 shadow-lg shadow-destructive/10' 
                     : 'hover:bg-accent/50'
-                  }`}
+                }`}
                 onClick={() => navigate('/to-reply?filter=at-risk')}
               >
                 <div className="flex items-start justify-between">
@@ -149,11 +245,12 @@ export const Home = () => {
               </Card>
 
               {/* Training - Help BizzyBee learn */}
-              <Card
-                className={`p-5 cursor-pointer transition-all hover:scale-[1.02] ${stats.reviewCount > 0
-                    ? 'bg-gradient-to-br from-purple-500/10 via-purple-500/5 to-background border-purple-500/30 shadow-lg shadow-purple-500/10'
+              <Card 
+                className={`p-5 cursor-pointer transition-all hover:scale-[1.02] ${
+                  stats.reviewCount > 0 
+                    ? 'bg-gradient-to-br from-purple-500/10 via-purple-500/5 to-background border-purple-500/30 shadow-lg shadow-purple-500/10' 
                     : 'hover:bg-accent/50'
-                  }`}
+                }`}
                 onClick={() => navigate('/review')}
               >
                 <div className="flex items-start justify-between">
@@ -178,11 +275,12 @@ export const Home = () => {
               </Card>
 
               {/* To Reply - Primary work queue */}
-              <Card
-                className={`p-5 cursor-pointer transition-all hover:scale-[1.02] ${stats.toReplyCount > 0
-                    ? 'bg-gradient-to-br from-primary/10 via-primary/5 to-background border-primary/30'
+              <Card 
+                className={`p-5 cursor-pointer transition-all hover:scale-[1.02] ${
+                  stats.toReplyCount > 0 
+                    ? 'bg-gradient-to-br from-primary/10 via-primary/5 to-background border-primary/30' 
                     : 'hover:bg-accent/50'
-                  }`}
+                }`}
                 onClick={() => navigate('/to-reply?filter=to-reply')}
               >
                 <div className="flex items-start justify-between">
@@ -207,11 +305,12 @@ export const Home = () => {
               </Card>
 
               {/* Drafts Ready - Actionable, quick wins */}
-              <Card
-                className={`p-5 cursor-pointer transition-all hover:scale-[1.02] ${stats.draftCount > 0
-                    ? 'bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-background border-amber-500/30'
+              <Card 
+                className={`p-5 cursor-pointer transition-all hover:scale-[1.02] ${
+                  stats.draftCount > 0 
+                    ? 'bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-background border-amber-500/30' 
                     : 'hover:bg-accent/50'
-                  }`}
+                }`}
                 onClick={() => navigate('/to-reply?filter=drafts')}
               >
                 <div className="flex items-start justify-between">
@@ -243,16 +342,15 @@ export const Home = () => {
                   <CheckCircle2 className="h-5 w-5 text-success" />
                   <div>
                     <p className="font-medium text-foreground">You're all caught up!</p>
-                    <p className="text-sm text-muted-foreground">BizzyBee is checking your inbox...</p>
+                    <p className="text-sm text-muted-foreground">BizzyBee is handling your inbox</p>
                   </div>
                 </div>
               </Card>
             )}
 
-            {/* Main Content Grid - COMMENTED OUT UNTIL WIDGETS REFACTORED */}
-            {/* 
+            {/* Main Content Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              
+              {/* Drafts Section */}
               <Card className="p-4">
                 <div className="flex items-center gap-2 mb-4">
                   <FileEdit className="h-4 w-4 text-warning" />
@@ -270,6 +368,7 @@ export const Home = () => {
                 </Button>
               </Card>
 
+              {/* Activity Feed */}
               <Card className="p-4">
                 <div className="flex items-center gap-2 mb-4">
                   <Activity className="h-4 w-4 text-primary" />
@@ -287,11 +386,15 @@ export const Home = () => {
                 </Button>
               </Card>
 
+              {/* Right Column: Insights + Learning + Activity Log */}
               <div className="space-y-4">
+                {/* AI Insights - New Stage 3 Widget */}
                 {workspace?.id && <InsightsWidget workspaceId={workspace.id} />}
 
+                {/* Enhanced Learning Insights */}
                 <LearningInsightsWidget />
 
+                {/* Human + AI Activity Log */}
                 <Card className="p-4">
                   <div className="flex items-center gap-2 mb-3">
                     <Users className="h-4 w-4 text-success" />
@@ -301,7 +404,6 @@ export const Home = () => {
                 </Card>
               </div>
             </div>
-            */}
 
             {/* System Status Footer */}
             <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground pt-4">

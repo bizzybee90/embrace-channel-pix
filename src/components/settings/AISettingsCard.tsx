@@ -2,17 +2,71 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/com
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
+import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import { Loader2, Bot } from 'lucide-react';
-import { useSettings } from '@/hooks/use-settings';
 
 interface AISettingsCardProps {
-  workspaceId?: string; // Optional now as hook handles it
+  workspaceId: string;
 }
 
 export const AISettingsCard = ({ workspaceId }: AISettingsCardProps) => {
-  const { settings, loading, saving, updateSetting } = useSettings();
+  const [settings, setSettings] = useState({
+    auto_send_enabled: false,
+    auto_send_threshold: 0.95,
+    default_to_drafts: true,
+    always_verify: true,
+    notify_on_low_confidence: true,
+    low_confidence_threshold: 0.7,
+  });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
-  // If loading, show spinner
+  useEffect(() => {
+    const fetchSettings = async () => {
+      const { data, error } = await supabase
+        .from('automation_settings')
+        .select('*')
+        .eq('workspace_id', workspaceId)
+        .maybeSingle();
+      
+      if (data) {
+        setSettings({
+          auto_send_enabled: data.auto_send_enabled ?? false,
+          auto_send_threshold: Number(data.auto_send_threshold) ?? 0.95,
+          default_to_drafts: data.default_to_drafts ?? true,
+          always_verify: data.always_verify ?? true,
+          notify_on_low_confidence: data.notify_on_low_confidence ?? true,
+          low_confidence_threshold: Number(data.low_confidence_threshold) ?? 0.7,
+        });
+      }
+      setLoading(false);
+    };
+    
+    if (workspaceId) fetchSettings();
+  }, [workspaceId]);
+
+  const updateSetting = async (key: string, value: boolean | number) => {
+    const newSettings = { ...settings, [key]: value };
+    setSettings(newSettings);
+    setSaving(true);
+    
+    const { error } = await supabase
+      .from('automation_settings')
+      .upsert({ 
+        workspace_id: workspaceId, 
+        ...newSettings,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'workspace_id' });
+    
+    setSaving(false);
+    if (error) {
+      toast.error('Failed to save settings');
+      console.error('Settings save error:', error);
+    }
+  };
+
   if (loading) {
     return (
       <Card className="flex items-center justify-center h-48">
@@ -61,7 +115,7 @@ export const AISettingsCard = ({ workspaceId }: AISettingsCardProps) => {
             disabled={settings.default_to_drafts}
           />
         </div>
-
+        
         {/* Auto-send threshold slider */}
         {settings.auto_send_enabled && !settings.default_to_drafts && (
           <div className="space-y-3 pl-4 border-l-2 border-primary/20">

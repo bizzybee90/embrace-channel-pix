@@ -1,41 +1,36 @@
 import { useEffect, useState } from 'react';
-import { useAuth } from '@/hooks/use-auth';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { supabase } from '@/integrations/supabase/client';
 import { Workspace } from '@/lib/types';
 
 export const useWorkspace = () => {
-  const { user, profile } = useAuth();
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchWorkspace = async () => {
-      if (!user || !profile?.workspace_id) {
-        setLoading(false);
-        return;
-      }
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-      try {
-        const wsRef = doc(db, 'workspaces', profile.workspace_id);
-        const wsSnap = await getDoc(wsRef);
+      const { data: userData } = await supabase
+        .from('users')
+        .select('workspace_id')
+        .eq('id', user.id)
+        .single();
 
-        if (wsSnap.exists()) {
-          setWorkspace({ id: wsSnap.id, ...wsSnap.data() } as Workspace);
-        }
-      } catch (error) {
-        console.error("Error fetching workspace:", error);
-      } finally {
-        setLoading(false);
+      if (userData?.workspace_id) {
+        const { data: workspaceData } = await supabase
+          .from('workspaces')
+          .select('*')
+          .eq('id', userData.workspace_id)
+          .single();
+
+        setWorkspace(workspaceData);
       }
+      setLoading(false);
     };
 
-    if (profile?.workspace_id) {
-      fetchWorkspace();
-    } else if (!user) {
-      setLoading(false);
-    }
-  }, [user, profile]);
+    fetchWorkspace();
+  }, []);
 
   return { workspace, loading };
 };

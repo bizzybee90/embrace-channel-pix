@@ -1,140 +1,158 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/hooks/use-auth';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
-import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import { CheckCircle2, ChevronRight, Building, MapPin, Mail, Sparkles } from 'lucide-react';
-import { BusinessProfileStep } from '@/components/onboarding/BusinessProfileStep';
-import { LocationStep } from '@/components/onboarding/LocationStep';
-import { EmailConnectionStep } from '@/components/onboarding/EmailConnectionStep';
-import { VoiceAnalysisStep } from '@/components/onboarding/VoiceAnalysisStep';
-import { Logo } from '@/components/ui/logo';
-
-const STEPS = [
-  { id: 'profile', title: 'Business Profile', icon: Building, description: 'Tell us about your company' },
-  { id: 'location', title: 'Location', icon: MapPin, description: 'Where do you operate?' },
-  { id: 'email', title: 'Connect Email', icon: Mail, description: 'Link your Gmail account' },
-  { id: 'voice', title: 'AI Training', icon: Sparkles, description: 'Learn your communication style' },
-  { id: 'complete', title: 'All Set!', icon: CheckCircle2, description: 'Ready to go' }
-];
+import { supabase } from '@/integrations/supabase/client';
+import { OnboardingWizard } from '@/components/onboarding/OnboardingWizard';
 
 export default function Onboarding() {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const [currentStep, setCurrentStep] = useState(0);
-  const [isCompleting, setIsCompleting] = useState(false);
+  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [initialCheckDone, setInitialCheckDone] = useState(false);
 
-  // Calculate progress percentage
-  const progress = ((currentStep) / (STEPS.length - 1)) * 100;
+  useEffect(() => {
+    let isMounted = true;
 
-  const handleNext = () => {
-    if (currentStep < STEPS.length - 1) {
-      setCurrentStep(prev => prev + 1);
-    } else {
-      handleComplete();
-    }
-  };
+    const checkOnboardingStatus = async () => {
+      try {
+        console.log('[Onboarding] Starting check...');
+        
+        // Wait for session to be ready
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session?.user) {
+          console.log('[Onboarding] No session, redirecting to auth');
+          navigate('/auth');
+          return;
+        }
 
-  const handleBack = () => {
-    if (currentStep > 0) {
-      setCurrentStep(prev => prev - 1);
-    }
-  };
+        const user = session.user;
+        console.log('[Onboarding] User found:', user.id);
+
+        // Get user's workspace and onboarding status
+        const { data: userData, error } = await supabase
+          .from('users')
+          .select('workspace_id, onboarding_completed')
+          .eq('id', user.id)
+          .single();
+
+        if (error) {
+          console.error('[Onboarding] Error fetching user:', error);
+          navigate('/auth');
+          return;
+        }
+
+        console.log('[Onboarding] User data:', userData);
+
+        // If already onboarded, go to home
+        if (userData?.onboarding_completed) {
+          console.log('[Onboarding] Already completed, going home');
+          navigate('/');
+          return;
+        }
+
+        // If no workspace, we need to create one
+        if (!userData?.workspace_id) {
+          console.log('[Onboarding] No workspace, creating one...');
+          // Create a default workspace for the user
+          const { data: workspace, error: wsError } = await supabase
+            .from('workspaces')
+            .insert({
+              name: 'My Workspace',
+              slug: `workspace-${user.id.slice(0, 8)}`,
+            })
+            .select()
+            .single();
+
+          if (wsError) {
+            console.error('[Onboarding] Error creating workspace:', wsError);
+            if (isMounted) {
+              setLoading(false);
+              setInitialCheckDone(true);
+            }
+            return;
+          }
+
+          // Update user with workspace
+          await supabase
+            .from('users')
+            .update({ workspace_id: workspace.id })
+            .eq('id', user.id);
+
+          console.log('[Onboarding] Workspace created:', workspace.id);
+          if (isMounted) {
+            setWorkspaceId(workspace.id);
+          }
+        } else {
+          console.log('[Onboarding] Using existing workspace:', userData.workspace_id);
+          if (isMounted) {
+            setWorkspaceId(userData.workspace_id);
+          }
+        }
+      } catch (error) {
+        console.error('[Onboarding] Error in check:', error);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+          setInitialCheckDone(true);
+        }
+      }
+    };
+
+    checkOnboardingStatus();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [navigate]);
 
   const handleComplete = async () => {
-    if (!user) return;
-    setIsCompleting(true);
     try {
-      // Mark onboarding as complete in Firestore
-      const userRef = doc(db, 'users', user.uid);
-      await updateDoc(userRef, {
-        onboarding_step: STEPS.length,
-        onboarding_completed: true,
-      });
-
-      // Redirect to dashboard
-      // Force reload to ensure all guards leverage the new profile state
-      window.location.href = '/';
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        // Mark onboarding as complete
+        await supabase
+          .from('users')
+          .update({ 
+            onboarding_completed: true,
+            onboarding_step: 'complete'
+          })
+          .eq('id', user.id);
+      }
+      navigate('/');
     } catch (error) {
       console.error('Error completing onboarding:', error);
-      setIsCompleting(false);
+      navigate('/');
     }
   };
 
-  const renderStep = () => {
-    switch (currentStep) {
-      case 0:
-        return <BusinessProfileStep onNext={handleNext} />;
-      case 1:
-        return <LocationStep onNext={handleNext} onBack={handleBack} />;
-      case 2:
-        return <EmailConnectionStep onNext={handleNext} onBack={handleBack} />;
-      case 3:
-        return <VoiceAnalysisStep onNext={handleNext} onBack={handleBack} />;
-      case 4:
-        return (
-          <div className="text-center space-y-6 py-8 animate-in fade-in zoom-in duration-500">
-            <div className="mx-auto w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mb-6">
-              <CheckCircle2 className="w-12 h-12 text-green-600" />
-            </div>
-            <h2 className="text-2xl font-bold">You're all set!</h2>
-            <p className="text-muted-foreground">
-              Your workspace is ready. BizzyBee is now active and monitoring your authorized channels.
-            </p>
-            <Button size="lg" className="w-full" onClick={handleComplete} disabled={isCompleting}>
-              {isCompleting ? "Finishing Up..." : "Go to Dashboard"}
-              {!isCompleting && <ChevronRight className="ml-2 w-4 h-4" />}
-            </Button>
-          </div>
-        );
-      default:
-        return null;
-    }
-  };
+  // Show loading spinner while checking auth/onboarding status
+  if (loading || !initialCheckDone) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading onboarding...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show workspace setup if still waiting for workspace
+  if (!workspaceId) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto mb-4" />
+          <p className="text-muted-foreground">Setting up your workspace...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50/50 p-4">
-      <div className="w-full max-w-2xl space-y-8">
-        {/* Branding */}
-        <div className="flex flex-col items-center justify-center space-y-4">
-          <Logo className="w-48 h-auto" />
-        </div>
-
-        {/* Progress Header */}
-        <div className="space-y-2">
-          <div className="flex justify-between text-sm font-medium text-muted-foreground px-1">
-            <span>Step {currentStep + 1} of {STEPS.length}</span>
-            <span>{Math.round(progress)}% Complete</span>
-          </div>
-          <Progress value={progress} className="h-2" />
-        </div>
-
-        <Card className="shadow-xl bg-white/80 backdrop-blur-sm border-t-4 border-t-primary">
-          <CardHeader className="border-b bg-gray-50/50 pb-6">
-            <div className="flex items-center gap-4">
-              <div className="bg-primary/10 p-3 rounded-xl">
-                {(() => {
-                  const Icon = STEPS[currentStep].icon;
-                  return <Icon className="w-6 h-6 text-primary" />;
-                })()}
-              </div>
-              <div>
-                <CardTitle className="text-xl">{STEPS[currentStep].title}</CardTitle>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {STEPS[currentStep].description}
-                </p>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-8 min-h-[400px]">
-            {renderStep()}
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+    <OnboardingWizard 
+      workspaceId={workspaceId} 
+      onComplete={handleComplete} 
+    />
   );
 }
-

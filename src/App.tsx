@@ -4,7 +4,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import React from "react";
-import { AuthProvider } from "@/hooks/use-auth";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import Settings from "./pages/Settings";
@@ -26,7 +25,7 @@ import Diagnostics from "./pages/Diagnostics";
 import LearningPage from "./pages/LearningPage";
 import GDPRPortal from "./pages/GDPRPortal";
 import EmailAuthSuccess from "./pages/EmailAuthSuccess";
-
+import EmailOAuthCallback from "./pages/EmailOAuthCallback";
 import KnowledgeBase from "./pages/KnowledgeBase";
 import TestDashboard from "./pages/TestDashboard";
 import DevOpsDashboard from "./pages/admin/DevOpsDashboard";
@@ -40,124 +39,124 @@ const RouterContent = () => {
       <Route path="/auth" element={<Auth />} />
       <Route path="/onboarding" element={<Onboarding />} />
       <Route path="/email-auth-success" element={<EmailAuthSuccess />} />
-
-
+      <Route path="/auth/email/callback" element={<EmailOAuthCallback />} />
+      
       {/* Home - Calm reassurance screen */}
-      <Route
-        path="/"
+      <Route 
+        path="/" 
         element={
           <AuthGuard>
             <Home />
           </AuthGuard>
-        }
+        } 
       />
-
+      
       {/* To Reply - Primary view */}
-      <Route
-        path="/to-reply"
+      <Route 
+        path="/to-reply" 
         element={
           <AuthGuard>
             <EscalationHub filter="needs-me" />
           </AuthGuard>
-        }
+        } 
       />
-
+      
       {/* Redirect old needs-me route */}
       <Route path="/needs-me" element={<Navigate to="/to-reply" replace />} />
-
+      
       {/* Done - Auto-handled + resolved */}
-      <Route
-        path="/done"
+      <Route 
+        path="/done" 
         element={
           <AuthGuard>
             <EscalationHub filter="cleared" />
           </AuthGuard>
-        }
+        } 
       />
-
+      
       {/* Redirect old cleared route */}
       <Route path="/cleared" element={<Navigate to="/done" replace />} />
-
+      
       {/* Review - Reconciliation flow */}
-      <Route
-        path="/review"
+      <Route 
+        path="/review" 
         element={
           <AuthGuard>
             <Review />
           </AuthGuard>
-        }
+        } 
       />
-
+      
       {/* Snoozed */}
-      <Route
-        path="/snoozed"
+      <Route 
+        path="/snoozed" 
         element={
           <AuthGuard>
             <EscalationHub filter="snoozed" />
           </AuthGuard>
-        }
+        } 
       />
-
+      
       {/* Sent */}
-      <Route
-        path="/sent"
+      <Route 
+        path="/sent" 
         element={
           <AuthGuard>
             <EscalationHub filter="sent" />
           </AuthGuard>
-        }
+        } 
       />
-
+      
       {/* All Open (Inbox All) */}
-      <Route
-        path="/all-open"
+      <Route 
+        path="/all-open" 
         element={
           <AuthGuard>
             <EscalationHub filter="all-open" />
           </AuthGuard>
-        }
+        } 
       />
-
+      
       {/* Legacy routes */}
-      <Route
-        path="/my-tickets"
+      <Route 
+        path="/my-tickets" 
         element={
           <AuthGuard>
             <EscalationHub filter="my-tickets" />
           </AuthGuard>
-        }
+        } 
       />
-      <Route
-        path="/unassigned"
+      <Route 
+        path="/unassigned" 
         element={
           <AuthGuard>
             <EscalationHub filter="unassigned" />
           </AuthGuard>
-        }
+        } 
       />
-      <Route
-        path="/sla-risk"
+      <Route 
+        path="/sla-risk" 
         element={
           <AuthGuard>
             <EscalationHub filter="sla-risk" />
           </AuthGuard>
-        }
+        } 
       />
-      <Route
-        path="/awaiting-reply"
+      <Route 
+        path="/awaiting-reply" 
         element={
           <AuthGuard>
             <EscalationHub filter="awaiting-reply" />
           </AuthGuard>
-        }
+        } 
       />
-      <Route
-        path="/triaged"
+      <Route 
+        path="/triaged" 
         element={
           <AuthGuard>
             <EscalationHub filter="triaged" />
           </AuthGuard>
-        }
+        } 
       />
       <Route
         path="/high-priority"
@@ -165,52 +164,52 @@ const RouterContent = () => {
           <AuthGuard>
             <EscalationHub filter="high-priority" />
           </AuthGuard>
-        }
+        } 
       />
-      <Route
-        path="/vip-customers"
+      <Route 
+        path="/vip-customers" 
         element={
           <AuthGuard>
             <EscalationHub filter="vip-customers" />
           </AuthGuard>
-        }
+        } 
       />
-      <Route
-        path="/escalations"
+      <Route 
+        path="/escalations" 
         element={
           <AuthGuard>
             <Escalations />
           </AuthGuard>
-        }
+        } 
       />
-      <Route
-        path="/channels"
+      <Route 
+        path="/channels" 
         element={
           <AuthGuard>
             <ChannelsDashboard />
           </AuthGuard>
-        }
+        } 
       />
-      <Route
-        path="/channel/:channel"
+      <Route 
+        path="/channel/:channel" 
         element={
           <AuthGuard>
             <ChannelConversations />
           </AuthGuard>
-        }
+        } 
       />
-      <Route
-        path="/analytics"
+      <Route 
+        path="/analytics" 
         element={
           <AuthGuard>
             <AnalyticsDashboard />
           </AuthGuard>
-        }
+        } 
       />
 
       {/* Activity Page - Full activity timeline */}
-      <Route
-        path="/activity"
+      <Route 
+        path="/activity" 
         element={
           <AuthGuard>
             <ActivityPage />
@@ -219,8 +218,8 @@ const RouterContent = () => {
       />
 
       {/* Learning Page - AI training and patterns */}
-      <Route
-        path="/learning"
+      <Route 
+        path="/learning" 
         element={
           <AuthGuard>
             <LearningPage />
@@ -237,86 +236,84 @@ const RouterContent = () => {
         }
       />
 
-      <Route
+      <Route 
         path="/settings"
         element={
           <AuthGuard>
             <Settings />
           </AuthGuard>
-        }
+        } 
       />
-      <Route
-        path="/webhooks"
+      <Route 
+        path="/webhooks" 
         element={
           <AuthGuard>
             <WebhookLogs />
           </AuthGuard>
-        }
+        } 
       />
       <Route path="/privacy" element={<Privacy />} />
       <Route path="/terms" element={<Terms />} />
-
+      
       {/* Public GDPR Self-Service Portal */}
       <Route path="/gdpr-portal" element={<GDPRPortal />} />
       <Route path="/gdpr-portal/:workspaceSlug" element={<GDPRPortal />} />
+      
+        <Route
+          path="/diagnostics" 
+          element={
+            <AuthGuard>
+              <Diagnostics />
+            </AuthGuard>
+          } 
+        />
 
-      <Route
-        path="/diagnostics"
-        element={
-          <AuthGuard>
-            <Diagnostics />
-          </AuthGuard>
-        }
-      />
+        {/* Knowledge Base */}
+        <Route
+          path="/knowledge-base"
+          element={
+            <AuthGuard>
+              <KnowledgeBase />
+            </AuthGuard>
+          }
+        />
 
-      {/* Knowledge Base */}
-      <Route
-        path="/knowledge-base"
-        element={
-          <AuthGuard>
-            <KnowledgeBase />
-          </AuthGuard>
-        }
-      />
+        {/* Admin Test Dashboard - Development only */}
+        <Route
+          path="/admin/test"
+          element={
+            <AuthGuard>
+              <TestDashboard />
+            </AuthGuard>
+          }
+        />
 
-      {/* Admin Test Dashboard - Development only */}
-      <Route
-        path="/admin/test"
-        element={
-          <AuthGuard>
-            <TestDashboard />
-          </AuthGuard>
-        }
-      />
+        {/* DevOps Dashboard - Admin only */}
+        <Route
+          path="/admin/devops"
+          element={
+            <AuthGuard>
+              <DevOpsDashboard />
+            </AuthGuard>
+          }
+        />
 
-      {/* DevOps Dashboard - Admin only */}
-      <Route
-        path="/admin/devops"
-        element={
-          <AuthGuard>
-            <DevOpsDashboard />
-          </AuthGuard>
-        }
-      />
-
-      {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-      {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-      <Route path="*" element={<NotFound />} />
+        {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+        {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+        <Route path="*" element={<NotFound />} />
     </Routes>
   );
 };
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <RouterContent />
-        </BrowserRouter>
-      </TooltipProvider>
-    </AuthProvider>
+    <TooltipProvider>
+      <Toaster />
+      <Sonner />
+      <BrowserRouter>
+        <RouterContent />
+      </BrowserRouter>
+    </TooltipProvider>
   </QueryClientProvider>
 );
 

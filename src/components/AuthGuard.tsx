@@ -1,55 +1,99 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { useAuth } from "@/hooks/use-auth";
+import { supabase } from "@/integrations/supabase/client";
+import { User, Session } from "@supabase/supabase-js";
 
 export const AuthGuard = ({ children }: { children: React.ReactNode }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, profile, loading } = useAuth();
+  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [loading, setLoading] = useState(true);
+  const checkingOnboardingRef = useRef(false);
   const hasCheckedOnboarding = useRef(false);
 
   useEffect(() => {
-    if (!loading && !user) {
-      navigate("/auth");
-    }
-  }, [user, loading, navigate]);
+    // Set up auth state listener first
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setSession(session);
+        setUser(session?.user ?? null);
+        setLoading(false);
+      }
+    );
 
-  // Check onboarding status
+    // Then check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      setLoading(false);
+      
+      if (!session) {
+        navigate("/auth");
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [navigate]);
+
+  // Check onboarding status ONCE after user is loaded
   useEffect(() => {
-    // Wait for everything to be ready
-    if (loading || !user || !profile) return;
+    const checkOnboarding = async () => {
+      if (!user || checkingOnboardingRef.current || hasCheckedOnboarding.current) return;
+      
+      // Skip onboarding check if already on onboarding page
+      if (location.pathname === '/onboarding') return;
 
-    // Prevent redirect loops
-    if (location.pathname.startsWith('/onboarding')) {
-      // If user is already completed but tries to access onboarding, maybe redirect to dashboard?
-      // Or let them revisit? For now, let them revisit if they want, but typically we might block.
-      // But if they are NOT complete, they are in the right place.
-      return;
-    }
+      checkingOnboardingRef.current = true;
+      try {
+        const { data: userData, error } = await supabase
+          .from('users')
+          .select('onboarding_completed')
+          .eq('id', user.id)
+          .single();
 
-    // Check if onboarding is needed
-    // We check the explicit boolean flag 'onboarding_completed'
-    if (profile.onboarding_completed !== true) {
-      console.log("Onboarding incomplete, redirecting to wizard.");
-      navigate('/onboarding');
-      hasCheckedOnboarding.current = true;
-    }
+        if (error) {
+          console.error('Error checking onboarding status:', error);
+          return;
+        }
 
-  }, [user, profile, loading, navigate, location.pathname]);
+        hasCheckedOnboarding.current = true;
+
+        // Redirect to onboarding if not completed
+        if (userData && userData.onboarding_completed === false) {
+          navigate('/onboarding');
+        }
+      } catch (error) {
+        console.error('Error in onboarding check:', error);
+      } finally {
+        checkingOnboardingRef.current = false;
+      }
+    };
+
+    checkOnboarding();
+  }, [user, navigate, location.pathname]);
 
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-center">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto mb-4" />
-          <p className="text-muted-foreground">Loading your workspace...</p>
+          <p className="text-muted-foreground">Loading...</p>
         </div>
       </div>
     );
   }
 
-  if (!user) {
-    return null; // Will redirect via effect
+  if (!user || !session) {
+    // Show loading state instead of null to prevent flash
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto mb-4" />
+          <p className="text-muted-foreground">Redirecting...</p>
+        </div>
+      </div>
+    );
   }
 
   return <>{children}</>;

@@ -1,86 +1,356 @@
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/hooks/use-auth";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { LogIn, AlertCircle } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useToast } from "@/hooks/use-toast";
+import { Loader2, Shield } from "lucide-react";
 
-export default function Auth() {
+const Auth = () => {
   const navigate = useNavigate();
-  const { user, signInWithGoogle, signInWithEmail, signUpWithEmail } = useAuth();
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (user) {
-      navigate("/");
-    }
-  }, [user, navigate]);
+    // Check if already authenticated
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        navigate("/");
+      }
+    });
 
-  const handleSubmit = async (e: React.FormEvent) => {
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (session) {
+          navigate("/");
+        }
+      }
+    );
+
+    return () => subscription.unsubscribe();
+  }, [navigate]);
+
+  const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
+    
+    if (!email || !password) {
+      toast({
+        title: "Error",
+        description: "Please fill in all fields",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
 
     try {
       if (isSignUp) {
-        await signUpWithEmail(email, password);
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/`,
+          },
+        });
+
+        if (error) throw error;
+
+        toast({
+          title: "Success!",
+          description: "Account created. You can now sign in.",
+        });
+        setIsSignUp(false);
       } else {
-        await signInWithEmail(email, password);
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+        if (error) throw error;
+
+        toast({
+          title: "Welcome back!",
+          description: "Successfully signed in.",
+        });
       }
-    } catch (err: any) {
-      console.error(err);
-      if (err.code === 'auth/invalid-credential') {
-        setError('Invalid email or password.');
-      } else if (err.code === 'auth/email-already-in-use') {
-        setError('Email already in use. Please sign in.');
-      } else if (err.code === 'auth/weak-password') {
-        setError('Password should be at least 6 characters.');
-      } else {
-        setError('An error occurred. Please try again.');
-      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "An error occurred",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
   };
 
+  const handleDemoLogin = async () => {
+    setLoading(true);
+    
+    try {
+      // Try to sign in with demo account first
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email: "demo@agent.local",
+        password: "demo123456",
+      });
+
+      if (signInError) {
+        // If demo account doesn't exist, create it
+        const { error: signUpError } = await supabase.auth.signUp({
+          email: "demo@agent.local",
+          password: "demo123456",
+          options: {
+            emailRedirectTo: `${window.location.origin}/`,
+            data: {
+              name: "Demo Agent"
+            }
+          },
+        });
+
+        if (signUpError) throw signUpError;
+
+        // Try signing in again
+        const { data: retryData, error: retryError } = await supabase.auth.signInWithPassword({
+          email: "demo@agent.local",
+          password: "demo123456",
+        });
+
+        if (retryError) throw retryError;
+      }
+
+      // After successful login, set up demo workspace and data
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setTimeout(async () => {
+          try {
+            await setupDemoData(user.id);
+          } catch (error) {
+            console.error('Error setting up demo data:', error);
+          }
+        }, 0);
+      }
+
+      toast({
+        title: "Demo mode activated",
+        description: "Signed in as demo agent with test data",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to access demo account",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const setupDemoData = async (userId: string) => {
+    // Check if user already has a workspace
+    const { data: userData } = await supabase
+      .from('users')
+      .select('workspace_id')
+      .eq('id', userId)
+      .single();
+
+    let workspaceId = userData?.workspace_id;
+
+    // Create workspace if it doesn't exist
+    if (!workspaceId) {
+      const { data: workspace, error: workspaceError } = await supabase
+        .from('workspaces')
+        .insert({
+          name: 'Demo Workspace',
+          slug: `demo-${userId.substring(0, 8)}`,
+          timezone: 'America/New_York',
+          business_hours_start: '09:00',
+          business_hours_end: '17:00',
+          business_days: [1, 2, 3, 4, 5]
+        })
+        .select()
+        .single();
+
+      if (workspaceError) throw workspaceError;
+      workspaceId = workspace.id;
+
+      // Update user's workspace_id
+      await supabase
+        .from('users')
+        .update({ workspace_id: workspaceId })
+        .eq('id', userId);
+    }
+
+    // Check if demo data already exists
+    const { data: existingConversations } = await supabase
+      .from('conversations')
+      .select('id')
+      .eq('workspace_id', workspaceId)
+      .limit(1);
+
+    if (existingConversations && existingConversations.length > 0) {
+      return; // Demo data already exists
+    }
+
+    // Create demo customers
+    const { data: customers, error: customersError } = await supabase
+      .from('customers')
+      .insert([
+        {
+          workspace_id: workspaceId,
+          name: 'Sarah Johnson',
+          email: 'sarah.j@example.com',
+          phone: '+1-555-0123',
+          tier: 'premium',
+          preferred_channel: 'email'
+        },
+        {
+          workspace_id: workspaceId,
+          name: 'Mike Chen',
+          email: 'mike.chen@example.com',
+          phone: '+1-555-0456',
+          tier: 'regular',
+          preferred_channel: 'webchat'
+        },
+        {
+          workspace_id: workspaceId,
+          name: 'Emma Williams',
+          email: 'emma.w@example.com',
+          phone: '+1-555-0789',
+          tier: 'vip',
+          preferred_channel: 'phone'
+        }
+      ])
+      .select();
+
+    if (customersError) throw customersError;
+
+    // Create demo conversations
+    const now = new Date();
+    const conversations = [
+      {
+        workspace_id: workspaceId,
+        customer_id: customers[0].id,
+        title: 'Billing Issue - Premium Account',
+        channel: 'email',
+        status: 'new',
+        priority: 'high',
+        category: 'billing',
+        ai_sentiment: 'frustrated',
+        ai_confidence: 0.87,
+        ai_reason_for_escalation: 'Customer reports unauthorized charges on premium account',
+        summary_for_human: 'Premium customer Sarah Johnson is concerned about unexpected charges',
+        sla_status: 'safe',
+        sla_target_minutes: 120,
+        sla_due_at: new Date(now.getTime() + 2 * 60 * 60 * 1000).toISOString()
+      },
+      {
+        workspace_id: workspaceId,
+        customer_id: customers[1].id,
+        title: 'Feature Request - API Integration',
+        channel: 'webchat',
+        status: 'new',
+        priority: 'medium',
+        category: 'technical',
+        ai_sentiment: 'curious',
+        ai_confidence: 0.92,
+        ai_reason_for_escalation: 'Complex API integration question requiring technical expertise',
+        summary_for_human: 'Mike Chen asking about custom API integration capabilities',
+        sla_status: 'safe',
+        sla_target_minutes: 240,
+        sla_due_at: new Date(now.getTime() + 4 * 60 * 60 * 1000).toISOString()
+      },
+      {
+        workspace_id: workspaceId,
+        customer_id: customers[2].id,
+        title: 'VIP - Urgent Account Access',
+        channel: 'phone',
+        status: 'new',
+        priority: 'critical',
+        category: 'account',
+        ai_sentiment: 'urgent',
+        ai_confidence: 0.95,
+        ai_reason_for_escalation: 'VIP customer unable to access account, potential security issue',
+        summary_for_human: 'VIP customer Emma Williams locked out of account',
+        sla_status: 'at_risk',
+        sla_target_minutes: 60,
+        sla_due_at: new Date(now.getTime() + 30 * 60 * 1000).toISOString()
+      }
+    ];
+
+    const { data: createdConversations, error: conversationsError } = await supabase
+      .from('conversations')
+      .insert(conversations)
+      .select();
+
+    if (conversationsError) throw conversationsError;
+
+    // Create demo messages for each conversation
+    const messages = [
+      {
+        conversation_id: createdConversations[0].id,
+        body: "I noticed some unusual charges on my premium account this month. I was charged twice for the same service. Can someone please look into this urgently?",
+        channel: 'email',
+        direction: 'inbound',
+        actor_type: 'customer',
+        actor_name: 'Sarah Johnson'
+      },
+      {
+        conversation_id: createdConversations[1].id,
+        body: "Hi, I'm building a custom integration with your API. I need to understand if your webhook system supports retry logic for failed deliveries. The documentation doesn't cover this scenario.",
+        channel: 'webchat',
+        direction: 'inbound',
+        actor_type: 'customer',
+        actor_name: 'Mike Chen'
+      },
+      {
+        conversation_id: createdConversations[2].id,
+        body: "This is extremely urgent. I cannot access my account and I have a critical presentation in 2 hours. I've tried resetting my password three times but I'm not receiving the reset emails. Please help immediately!",
+        channel: 'phone',
+        direction: 'inbound',
+        actor_type: 'customer',
+        actor_name: 'Emma Williams'
+      }
+    ];
+
+    await supabase
+      .from('messages')
+      .insert(messages);
+  };
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-      <Card className="w-full max-w-md shadow-lg border-t-4 border-t-primary">
-        <CardHeader className="text-center space-y-1">
-          <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-4">
-            <LogIn className="w-6 h-6 text-primary" />
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="space-y-1 text-center">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+            <Shield className="h-6 w-6 text-primary" />
           </div>
-          <CardTitle className="text-2xl font-bold text-gray-900">
-            {isSignUp ? "Create Account" : "Welcome Back"}
+          <CardTitle className="text-2xl font-bold">
+            {isSignUp ? "Create Agent Account" : "Agent Sign In"}
           </CardTitle>
           <CardDescription>
-            {isSignUp ? "Enter your details to get started" : "Sign in to access your Escalation Hub"}
+            {isSignUp
+              ? "Create your account to access the escalation dashboard"
+              : "Sign in to access the customer service escalation dashboard"}
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {error && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-
+        <CardContent>
+          <form onSubmit={handleAuth} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
                 type="email"
-                placeholder="name@company.com"
+                placeholder="agent@company.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                disabled={loading}
                 required
               />
             </div>
@@ -89,71 +359,70 @@ export default function Auth() {
               <Input
                 id="password"
                 type="password"
+                placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                disabled={loading}
                 required
+                minLength={6}
               />
             </div>
-
-            <Button
-              type="submit"
-              className="w-full h-10"
-              disabled={loading}
-            >
-              {loading ? "Loading..." : (isSignUp ? "Create Account" : "Sign In")}
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {isSignUp ? "Creating account..." : "Signing in..."}
+                </>
+              ) : (
+                <>{isSignUp ? "Create Account" : "Sign In"}</>
+              )}
             </Button>
           </form>
-
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
+          
+          <div className="mt-4">
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-border" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-card px-2 text-muted-foreground">Or</span>
+              </div>
             </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-white px-2 text-muted-foreground">
-                Or continue with
-              </span>
-            </div>
+            
+            <Button 
+              type="button"
+              variant="outline" 
+              className="w-full mt-4" 
+              onClick={handleDemoLogin}
+              disabled={loading}
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Accessing demo...
+                </>
+              ) : (
+                "Quick Demo Login"
+              )}
+            </Button>
           </div>
-
-          <Button
-            className="w-full h-10"
-            onClick={signInWithGoogle}
-            variant="outline"
-            type="button"
-          >
-            <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
-              <path
-                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                fill="#4285F4"
-              />
-              <path
-                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                fill="#34A853"
-              />
-              <path
-                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                fill="#FBBC05"
-              />
-              <path
-                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                fill="#EA4335"
-              />
-            </svg>
-            Google
-          </Button>
+          
+          <div className="mt-4 text-center text-sm">
+            <button
+              type="button"
+              onClick={() => setIsSignUp(!isSignUp)}
+              className="text-primary hover:underline"
+              disabled={loading}
+            >
+              {isSignUp
+                ? "Already have an account? Sign in"
+                : "Don't have an account? Sign up"}
+            </button>
+          </div>
         </CardContent>
-        <CardFooter className="flex justify-center">
-          <Button
-            variant="link"
-            onClick={() => {
-              setIsSignUp(!isSignUp);
-              setError(null);
-            }}
-          >
-            {isSignUp ? "Already have an account? Sign In" : "Don't have an account? Sign Up"}
-          </Button>
-        </CardFooter>
       </Card>
     </div>
   );
-}
+};
+
+export default Auth;
