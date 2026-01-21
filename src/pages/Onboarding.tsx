@@ -7,38 +7,54 @@ export default function Onboarding() {
   const navigate = useNavigate();
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [initialCheckDone, setInitialCheckDone] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
 
-    const checkOnboardingStatus = async () => {
+    const initializeOnboarding = async (userId: string) => {
       try {
-        console.log('[Onboarding] Starting check...');
-        
-        // Wait for session to be ready
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (!session?.user) {
-          console.log('[Onboarding] No session, redirecting to auth');
-          navigate('/auth');
-          return;
-        }
-
-        const user = session.user;
-        console.log('[Onboarding] User found:', user.id);
+        console.log('[Onboarding] Initializing for user:', userId);
 
         // Get user's workspace and onboarding status
-        const { data: userData, error } = await supabase
+        const { data: userData, error: userError } = await supabase
           .from('users')
           .select('workspace_id, onboarding_completed')
-          .eq('id', user.id)
+          .eq('id', userId)
           .single();
 
-        if (error) {
-          console.error('[Onboarding] Error fetching user:', error);
-          navigate('/auth');
-          return;
+        if (userError) {
+          console.error('[Onboarding] Error fetching user:', userError);
+          // User might not exist yet - wait a bit for trigger
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          const { data: retryData, error: retryError } = await supabase
+            .from('users')
+            .select('workspace_id, onboarding_completed')
+            .eq('id', userId)
+            .single();
+          
+          if (retryError) {
+            console.error('[Onboarding] Retry failed:', retryError);
+            if (isMounted) {
+              setError('Failed to load user data. Please refresh the page.');
+              setLoading(false);
+            }
+            return;
+          }
+          
+          if (retryData?.onboarding_completed) {
+            navigate('/');
+            return;
+          }
+          
+          if (retryData?.workspace_id) {
+            if (isMounted) {
+              setWorkspaceId(retryData.workspace_id);
+              setLoading(false);
+            }
+            return;
+          }
         }
 
         console.log('[Onboarding] User data:', userData);
@@ -50,58 +66,77 @@ export default function Onboarding() {
           return;
         }
 
-        // If no workspace, we need to create one
-        if (!userData?.workspace_id) {
-          console.log('[Onboarding] No workspace, creating one...');
-          // Create a default workspace for the user
-          const { data: workspace, error: wsError } = await supabase
-            .from('workspaces')
-            .insert({
-              name: 'My Workspace',
-              slug: `workspace-${user.id.slice(0, 8)}`,
-            })
-            .select()
-            .single();
-
-          if (wsError) {
-            console.error('[Onboarding] Error creating workspace:', wsError);
-            if (isMounted) {
-              setLoading(false);
-              setInitialCheckDone(true);
-            }
-            return;
-          }
-
-          // Update user with workspace
-          await supabase
-            .from('users')
-            .update({ workspace_id: workspace.id })
-            .eq('id', user.id);
-
-          console.log('[Onboarding] Workspace created:', workspace.id);
-          if (isMounted) {
-            setWorkspaceId(workspace.id);
-          }
-        } else {
+        // If workspace exists, use it
+        if (userData?.workspace_id) {
           console.log('[Onboarding] Using existing workspace:', userData.workspace_id);
           if (isMounted) {
             setWorkspaceId(userData.workspace_id);
+            setLoading(false);
           }
+          return;
         }
-      } catch (error) {
-        console.error('[Onboarding] Error in check:', error);
-      } finally {
+
+        // Create a new workspace
+        console.log('[Onboarding] Creating workspace...');
+        const { data: workspace, error: wsError } = await supabase
+          .from('workspaces')
+          .insert({
+            name: 'My Workspace',
+            slug: `workspace-${userId.slice(0, 8)}`,
+          })
+          .select()
+          .single();
+
+        if (wsError) {
+          console.error('[Onboarding] Error creating workspace:', wsError);
+          if (isMounted) {
+            setError('Failed to create workspace. Please refresh the page.');
+            setLoading(false);
+          }
+          return;
+        }
+
+        // Update user with workspace
+        const { error: updateError } = await supabase
+          .from('users')
+          .update({ workspace_id: workspace.id })
+          .eq('id', userId);
+
+        if (updateError) {
+          console.error('[Onboarding] Error updating user:', updateError);
+        }
+
+        console.log('[Onboarding] Workspace created:', workspace.id);
         if (isMounted) {
+          setWorkspaceId(workspace.id);
           setLoading(false);
-          setInitialCheckDone(true);
+        }
+      } catch (err) {
+        console.error('[Onboarding] Unexpected error:', err);
+        if (isMounted) {
+          setError('An unexpected error occurred. Please refresh the page.');
+          setLoading(false);
         }
       }
     };
 
-    checkOnboardingStatus();
+    // Use onAuthStateChange for reliable session detection
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('[Onboarding] Auth event:', event);
+      
+      if (event === 'SIGNED_OUT' || !session?.user) {
+        navigate('/auth');
+        return;
+      }
+
+      if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') {
+        initializeOnboarding(session.user.id);
+      }
+    });
 
     return () => {
       isMounted = false;
+      subscription.unsubscribe();
     };
   }, [navigate]);
 
@@ -119,14 +154,37 @@ export default function Onboarding() {
           .eq('id', user.id);
       }
       navigate('/');
-    } catch (error) {
-      console.error('Error completing onboarding:', error);
+    } catch (err) {
+      console.error('Error completing onboarding:', err);
       navigate('/');
     }
   };
 
+  // Show error state
+  if (error) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="text-center max-w-md p-6">
+          <div className="text-destructive mb-4">
+            <svg className="h-12 w-12 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <h2 className="text-lg font-semibold mb-2">Something went wrong</h2>
+          <p className="text-muted-foreground mb-4">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+          >
+            Refresh Page
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   // Show loading spinner while checking auth/onboarding status
-  if (loading || !initialCheckDone) {
+  if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-center">
