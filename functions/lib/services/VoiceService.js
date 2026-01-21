@@ -35,14 +35,14 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.VoiceService = void 0;
 const admin = __importStar(require("firebase-admin"));
-const vertexai_1 = require("@google-cloud/vertexai");
 // Initialize Vertex AI
 // Note: Requires project_id and location. Cloud Functions usually provide GCLOUD_PROJECT env var.
 // For location, we default to europe-west2 as per requirements, but Gemini availability affects this.
 // Gemini 1.5 Pro is available in europe-west2.
 class VoiceService {
-    static getModel() {
-        const vertexAI = new vertexai_1.VertexAI({
+    static async getModel() {
+        const { VertexAI } = await Promise.resolve().then(() => __importStar(require('@google-cloud/vertexai')));
+        const vertexAI = new VertexAI({
             project: process.env.GCLOUD_PROJECT,
             location: 'europe-west2'
         });
@@ -92,7 +92,8 @@ class VoiceService {
       Samples:
       ${emailSamples}
     `;
-        const result = await this.getModel().generateContent(prompt);
+        const model = await this.getModel();
+        const result = await model.generateContent(prompt);
         const response = await result.response;
         const text = (_a = response.candidates) === null || _a === void 0 ? void 0 : _a[0].content.parts[0].text;
         if (!text)

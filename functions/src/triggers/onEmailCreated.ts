@@ -1,6 +1,5 @@
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import * as admin from "firebase-admin";
-import { VertexAI } from '@google-cloud/vertexai';
 
 
 // Lazy load these inside the function
@@ -20,6 +19,7 @@ export const onEmailCreated = onDocumentCreated({
     maxInstances: 10
 }, async (event) => {
     const db = admin.firestore();
+    const { VertexAI } = await import('@google-cloud/vertexai');
     const vertexAI = new VertexAI({ project: process.env.GCLOUD_PROJECT, location: 'europe-west2' });
     const model = vertexAI.preview.getGenerativeModel({ model: 'gemini-1.5-flash-preview-0514' });
 

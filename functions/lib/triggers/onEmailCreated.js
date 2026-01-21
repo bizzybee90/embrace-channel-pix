@@ -36,7 +36,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.onEmailCreated = void 0;
 const firestore_1 = require("firebase-functions/v2/firestore");
 const admin = __importStar(require("firebase-admin"));
-const vertexai_1 = require("@google-cloud/vertexai");
 // Lazy load these inside the function
 // const db = admin.firestore();
 // const vertexAI ...
@@ -54,7 +53,8 @@ exports.onEmailCreated = (0, firestore_1.onDocumentCreated)({
 }, async (event) => {
     var _a;
     const db = admin.firestore();
-    const vertexAI = new vertexai_1.VertexAI({ project: process.env.GCLOUD_PROJECT, location: 'europe-west2' });
+    const { VertexAI } = await Promise.resolve().then(() => __importStar(require('@google-cloud/vertexai')));
+    const vertexAI = new VertexAI({ project: process.env.GCLOUD_PROJECT, location: 'europe-west2' });
     const model = vertexAI.preview.getGenerativeModel({ model: 'gemini-1.5-flash-preview-0514' });
     const snapshot = event.data;
     if (!snapshot)
