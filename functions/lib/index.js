@@ -95,7 +95,7 @@ exports.startGmailAuth = (0, https_1.onCall)({ secrets: [gmailClientId, gmailCli
         throw new https_1.HttpsError("unauthenticated", "User must be logged in.");
     const state = JSON.stringify({ userId: request.auth.uid });
     try {
-        const url = GmailService_1.GmailService.generateAuthUrl(state);
+        const url = await GmailService_1.GmailService.generateAuthUrl(state);
         return { url };
     }
     catch (error) {

@@ -59,7 +59,7 @@ export const startGmailAuth = onCall({ secrets: [gmailClientId, gmailClientSecre
     if (!request.auth) throw new HttpsError("unauthenticated", "User must be logged in.");
     const state = JSON.stringify({ userId: request.auth.uid });
     try {
-        const url = GmailService.generateAuthUrl(state);
+        const url = await GmailService.generateAuthUrl(state);
         return { url };
     } catch (error) {
         logger.error("Error generating auth URL", error);
