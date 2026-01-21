@@ -17,7 +17,12 @@ if (admin.apps.length === 0) {
 }
 
 // Set global options for region
-setGlobalOptions({ region: "europe-west2" });
+setGlobalOptions({
+    region: "europe-west2",
+    memory: "2GiB",
+    timeoutSeconds: 540,
+    maxInstances: 10
+});
 
 const gmailClientId = defineSecret('GMAIL_CLIENT_ID');
 const gmailClientSecret = defineSecret('GMAIL_CLIENT_SECRET');

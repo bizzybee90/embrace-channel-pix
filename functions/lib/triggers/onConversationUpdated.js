@@ -12,13 +12,7 @@ const firestore_1 = require("firebase-functions/v2/firestore");
  * We can implement logic here that *reacts* to changes (e.g. if priority changes, re-calc SLA),
  * effectively enabling "The Clock" to reset or escalate immediately on interaction.
  */
-exports.onConversationUpdated = (0, firestore_1.onDocumentUpdated)({
-    document: "conversations/{convId}",
-    region: "europe-west2",
-    memory: "2GiB",
-    timeoutSeconds: 540,
-    maxInstances: 10
-}, async (event) => {
+exports.onConversationUpdated = (0, firestore_1.onDocumentUpdated)("conversations/{convId}", async (event) => {
     var _a;
     const change = event.data;
     if (!change)

@@ -55,7 +55,12 @@ if (admin.apps.length === 0) {
     admin.initializeApp();
 }
 // Set global options for region
-(0, v2_1.setGlobalOptions)({ region: "europe-west2" });
+(0, v2_1.setGlobalOptions)({
+    region: "europe-west2",
+    memory: "2GiB",
+    timeoutSeconds: 540,
+    maxInstances: 10
+});
 const gmailClientId = (0, params_1.defineSecret)('GMAIL_CLIENT_ID');
 const gmailClientSecret = (0, params_1.defineSecret)('GMAIL_CLIENT_SECRET');
 // --- GDPR Functions ---

@@ -45,13 +45,7 @@ const vertexai_1 = require("@google-cloud/vertexai");
  * Triggered when a new message is added to a conversation.
  * Classifies inbound emails and updates the parent conversation.
  */
-exports.onEmailCreated = (0, firestore_1.onDocumentCreated)({
-    document: "conversations/{convId}/messages/{msgId}",
-    region: "europe-west2",
-    memory: "2GiB",
-    timeoutSeconds: 540,
-    maxInstances: 10
-}, async (event) => {
+exports.onEmailCreated = (0, firestore_1.onDocumentCreated)("conversations/{convId}/messages/{msgId}", async (event) => {
     var _a;
     const db = admin.firestore();
     const vertexAI = new vertexai_1.VertexAI({ project: process.env.GCLOUD_PROJECT, location: 'europe-west2' });
