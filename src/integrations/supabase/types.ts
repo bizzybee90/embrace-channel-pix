@@ -5049,7 +5049,7 @@ export type Database = {
         }[]
       }
       get_decrypted_access_token: {
-        Args: { config_id: string }
+        Args: { p_workspace_id: string }
         Returns: string
       }
       get_my_workspace_id: { Args: never; Returns: string }
@@ -5204,6 +5204,14 @@ export type Database = {
           question: string
           similarity: number
         }[]
+      }
+      store_encrypted_token: {
+        Args: {
+          p_access_token: string
+          p_config_id: string
+          p_refresh_token?: string
+        }
+        Returns: undefined
       }
       user_has_workspace_access: {
         Args: { _workspace_id: string }

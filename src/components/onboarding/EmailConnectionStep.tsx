@@ -98,10 +98,9 @@ const importModes = [
 // Make.com webhook URL
 const MAKE_WEBHOOK_URL = 'https://hook.eu2.make.com/ya89bi65tcxsmyet08ii9jtijsscbv2b';
 
-// Aurinko OAuth config - uses fixed published URL for consistent callback
-const AURINKO_CLIENT_ID = '6e9db931edb62a956bdac105ddda0354';
+// Published URL for redirects after OAuth
 const PUBLISHED_URL = 'https://embrace-channel-pix.lovable.app';
-const AURINKO_REDIRECT_URI = `${PUBLISHED_URL}/auth/email/callback`;
+// Note: OAuth callback is now handled by edge function (aurinko-auth-callback)
 
 export function EmailConnectionStep({ 
   workspaceId, 
@@ -232,24 +231,29 @@ export function EmailConnectionStep({
     setSelectedProvider(provider);
 
     try {
-      // Build OAuth URL directly (original working flow)
-      const state = btoa(JSON.stringify({
-        workspaceId,
-        importMode,
-        provider
-      }));
+      // Use edge function for OAuth - keeps secrets server-side
+      const { data, error } = await supabase.functions.invoke('aurinko-auth-start', {
+        body: {
+          workspaceId,
+          provider,
+          importMode,
+          origin: window.location.origin
+        }
+      });
 
-      const serviceType = provider === 'gmail' ? 'Google' : 
-                          provider === 'outlook' ? 'Office365' : 
-                          provider === 'icloud' ? 'iCloud' : 'Google';
+      if (error) {
+        console.error('Error from aurinko-auth-start:', error);
+        toast.error('Failed to start email connection');
+        setIsConnecting(false);
+        return;
+      }
 
-      const authUrl = `https://api.aurinko.io/v1/auth/authorize?` + 
-        `clientId=${AURINKO_CLIENT_ID}` +
-        `&serviceType=${serviceType}` +
-        `&scopes=Mail.ReadWrite Mail.Send` +
-        `&responseType=code` +
-        `&returnUrl=${encodeURIComponent(AURINKO_REDIRECT_URI)}` +
-        `&state=${encodeURIComponent(state)}`;
+      if (!data?.authUrl) {
+        console.error('No auth URL returned');
+        toast.error('Failed to get authentication URL');
+        setIsConnecting(false);
+        return;
+      }
 
       // Check if in iframe
       const isEmbedded = (() => {
@@ -257,7 +261,7 @@ export function EmailConnectionStep({
       })();
 
       if (isEmbedded) {
-        const popup = window.open(authUrl, '_blank', 'noopener,noreferrer');
+        const popup = window.open(data.authUrl, '_blank', 'noopener,noreferrer');
         if (!popup) {
           toast.error('Popup blocked — please allow popups and try again.');
           setIsConnecting(false);
@@ -265,7 +269,7 @@ export function EmailConnectionStep({
         }
         toast.message('Complete the email connection in the new tab, then come back here.');
       } else {
-        window.location.href = authUrl;
+        window.location.href = data.authUrl;
       }
     } catch (error) {
       console.error('Error starting OAuth:', error);
