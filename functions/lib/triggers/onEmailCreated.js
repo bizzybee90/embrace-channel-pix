@@ -49,7 +49,8 @@ exports.onEmailCreated = (0, firestore_1.onDocumentCreated)({
     document: "conversations/{convId}/messages/{msgId}",
     region: "europe-west2",
     memory: "2GiB",
-    timeoutSeconds: 540
+    timeoutSeconds: 540,
+    maxInstances: 10
 }, async (event) => {
     var _a;
     const db = admin.firestore();

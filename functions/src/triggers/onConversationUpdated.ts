@@ -16,7 +16,8 @@ export const onConversationUpdated = onDocumentUpdated({
     document: "conversations/{convId}",
     region: "europe-west2",
     memory: "2GiB",
-    timeoutSeconds: 540
+    timeoutSeconds: 540,
+    maxInstances: 10
 }, async (event) => {
     const change = event.data;
     if (!change) return;
