@@ -10,6 +10,27 @@ const FUNCTION_NAME = 'website-scrape';
 const GEMINI_API = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 const FIRECRAWL_API = 'https://api.firecrawl.dev/v1';
 
+// Priority pages to scrape for FAQ extraction
+const PRIORITY_PAGE_PATTERNS = [
+  /faq/i,
+  /frequently.asked/i,
+  /questions/i,
+  /help/i,
+  /support/i,
+  /about/i,
+  /services/i,
+  /pricing/i,
+  /price/i,
+  /rates/i,
+  /contact/i,
+  /policy/i,
+  /terms/i,
+  /how.it.works/i,
+  /booking/i,
+];
+
+const MAX_PAGES_TO_SCRAPE = 10;
+
 interface ExtractedData {
   business_info: {
     name?: string;
@@ -24,6 +45,12 @@ interface ExtractedData {
     answer: string;
     category: string;
   }>;
+}
+
+interface PageContent {
+  url: string;
+  markdown: string;
+  title?: string;
 }
 
 serve(async (req) => {
@@ -54,7 +81,7 @@ serve(async (req) => {
     if (!body.workspace_id) throw new Error('workspace_id is required');
     if (!body.website_url) throw new Error('website_url is required');
 
-    const { workspace_id, website_url } = body;
+    const { workspace_id, website_url, multi_page = true } = body;
 
     // Validate URL format
     let url = website_url.trim();
@@ -62,56 +89,126 @@ serve(async (req) => {
       url = 'https://' + url;
     }
 
-    console.log(`[${FUNCTION_NAME}] Starting:`, { workspace_id, website_url: url });
+    console.log(`[${FUNCTION_NAME}] Starting:`, { workspace_id, website_url: url, multi_page });
 
     // -------------------------------------------------------------------------
-    // Step 1: Scrape website with Firecrawl
+    // Step 1: Discover pages with Firecrawl Map (if multi-page enabled)
     // -------------------------------------------------------------------------
-    console.log(`[${FUNCTION_NAME}] Scraping with Firecrawl...`);
-    
-    const scrapeResponse = await fetch(`${FIRECRAWL_API}/scrape`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${firecrawlApiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        url,
-        formats: ['markdown'],
-        onlyMainContent: true
-      })
-    });
+    let pagesToScrape: string[] = [url];
 
-    if (!scrapeResponse.ok) {
-      const errorText = await scrapeResponse.text();
-      console.error(`[${FUNCTION_NAME}] Firecrawl error:`, errorText);
-      throw new Error(`Firecrawl error: ${scrapeResponse.status}`);
+    if (multi_page) {
+      console.log(`[${FUNCTION_NAME}] Mapping site for priority pages...`);
+      
+      try {
+        const mapResponse = await fetch(`${FIRECRAWL_API}/map`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${firecrawlApiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            url,
+            limit: 100 // Get up to 100 URLs to filter
+          })
+        });
+
+        if (mapResponse.ok) {
+          const mapData = await mapResponse.json();
+          const allLinks: string[] = mapData.links || mapData.data?.links || [];
+          
+          console.log(`[${FUNCTION_NAME}] Found ${allLinks.length} pages on site`);
+
+          // Filter to priority pages
+          const priorityPages = allLinks.filter(link => 
+            PRIORITY_PAGE_PATTERNS.some(pattern => pattern.test(link))
+          );
+
+          // Always include homepage + priority pages, up to max
+          const uniquePages = [...new Set([url, ...priorityPages])];
+          pagesToScrape = uniquePages.slice(0, MAX_PAGES_TO_SCRAPE);
+          
+          console.log(`[${FUNCTION_NAME}] Selected ${pagesToScrape.length} priority pages:`, 
+            pagesToScrape.map(p => new URL(p).pathname)
+          );
+        } else {
+          console.warn(`[${FUNCTION_NAME}] Map failed, falling back to single page`);
+        }
+      } catch (mapError) {
+        console.warn(`[${FUNCTION_NAME}] Map error, falling back to single page:`, mapError);
+      }
     }
 
-    const scrapeData = await scrapeResponse.json();
-    const markdown = scrapeData.data?.markdown || scrapeData.markdown || '';
+    // -------------------------------------------------------------------------
+    // Step 2: Scrape all selected pages in parallel
+    // -------------------------------------------------------------------------
+    console.log(`[${FUNCTION_NAME}] Scraping ${pagesToScrape.length} pages...`);
+    
+    const scrapePromises = pagesToScrape.map(async (pageUrl): Promise<PageContent | null> => {
+      try {
+        const scrapeResponse = await fetch(`${FIRECRAWL_API}/scrape`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${firecrawlApiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            url: pageUrl,
+            formats: ['markdown'],
+            onlyMainContent: true
+          })
+        });
 
-    if (!markdown || markdown.length < 100) {
+        if (!scrapeResponse.ok) {
+          console.warn(`[${FUNCTION_NAME}] Failed to scrape ${pageUrl}: ${scrapeResponse.status}`);
+          return null;
+        }
+
+        const scrapeData = await scrapeResponse.json();
+        const markdown = scrapeData.data?.markdown || scrapeData.markdown || '';
+        const title = scrapeData.data?.metadata?.title || '';
+
+        if (markdown.length < 50) {
+          return null;
+        }
+
+        return { url: pageUrl, markdown, title };
+      } catch (err) {
+        console.warn(`[${FUNCTION_NAME}] Error scraping ${pageUrl}:`, err);
+        return null;
+      }
+    });
+
+    const scrapedPages = (await Promise.all(scrapePromises)).filter(Boolean) as PageContent[];
+    
+    if (scrapedPages.length === 0) {
       throw new Error('Could not extract meaningful content from website');
     }
 
-    console.log(`[${FUNCTION_NAME}] Scraped ${markdown.length} characters`);
+    // Combine all page content with section headers
+    const combinedMarkdown = scrapedPages.map(page => {
+      const pagePath = new URL(page.url).pathname || '/';
+      return `\n\n## PAGE: ${page.title || pagePath}\nURL: ${page.url}\n\n${page.markdown}`;
+    }).join('\n\n---\n');
+
+    const totalChars = combinedMarkdown.length;
+    console.log(`[${FUNCTION_NAME}] Scraped ${scrapedPages.length} pages, ${totalChars} total characters`);
 
     // -------------------------------------------------------------------------
-    // Step 2: Extract FAQs and business info with Gemini Pro
+    // Step 3: Extract FAQs and business info with Gemini
     // -------------------------------------------------------------------------
-    const prompt = `You are analyzing a business website. Extract FAQs and business information.
+    const prompt = `You are analyzing a business website (multiple pages). Extract FAQs and business information.
 
-WEBSITE CONTENT:
-${markdown.substring(0, 100000)}
+WEBSITE CONTENT (${scrapedPages.length} pages):
+${combinedMarkdown.substring(0, 120000)}
 
 Extract the following:
 
 1. **Business Details**: Name, services, service area, contact info, opening hours
-2. **FAQs**: Any explicit Q&A sections
+2. **FAQs**: Any explicit Q&A sections from any page
 3. **Implicit FAQs**: Turn service descriptions, pricing info, policies into Q&A format
 
 For FAQs, create questions customers would actually ask, with answers based on the website content.
+Since you have multiple pages, you should find MORE FAQs than a single-page scrape.
 
 Respond with JSON in this exact format:
 {
@@ -132,12 +229,14 @@ Respond with JSON in this exact format:
   ]
 }
 
-Generate 15-30 high-quality FAQs. Focus on:
-- Services offered
-- Pricing (if mentioned)
+Generate 20-50 high-quality FAQs. Focus on:
+- Services offered (from services pages)
+- Pricing (from pricing pages)
 - Coverage area
 - Booking process
-- Policies (cancellation, payment)
+- Policies (cancellation, payment, from policy pages)
+- Frequently asked questions (from FAQ pages)
+- About the company (from about pages)
 - Unique selling points`;
 
     const geminiResponse = await fetch(`${GEMINI_API}?key=${googleApiKey}`, {
@@ -147,7 +246,7 @@ Generate 15-30 high-quality FAQs. Focus on:
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
           temperature: 0.2,
-          maxOutputTokens: 8192
+          maxOutputTokens: 16384 // Increased for more FAQs
         }
       })
     });
@@ -171,10 +270,10 @@ Generate 15-30 high-quality FAQs. Focus on:
       throw new Error('Failed to parse extraction response');
     }
 
-    console.log(`[${FUNCTION_NAME}] Extracted ${extractedData.faqs?.length || 0} FAQs`);
+    console.log(`[${FUNCTION_NAME}] Extracted ${extractedData.faqs?.length || 0} FAQs from ${scrapedPages.length} pages`);
 
     // -------------------------------------------------------------------------
-    // Step 3: Save FAQs with priority 10 (gold standard)
+    // Step 4: Save FAQs with priority 10 (gold standard)
     // -------------------------------------------------------------------------
     const faqsToInsert = (extractedData.faqs || []).map((faq) => ({
       workspace_id,
@@ -201,7 +300,7 @@ Generate 15-30 high-quality FAQs. Focus on:
     }
 
     // -------------------------------------------------------------------------
-    // Step 4: Update business profile
+    // Step 5: Update business profile
     // -------------------------------------------------------------------------
     if (extractedData.business_info) {
       const bi = extractedData.business_info;
@@ -220,7 +319,7 @@ Generate 15-30 high-quality FAQs. Focus on:
     }
 
     // -------------------------------------------------------------------------
-    // Step 5: Update business context
+    // Step 6: Update business context
     // -------------------------------------------------------------------------
     await supabase
       .from('business_context')
@@ -233,11 +332,13 @@ Generate 15-30 high-quality FAQs. Focus on:
       }, { onConflict: 'workspace_id' });
 
     const duration = Date.now() - startTime;
-    console.log(`[${FUNCTION_NAME}] Completed in ${duration}ms: ${faqsCreated} FAQs created`);
+    console.log(`[${FUNCTION_NAME}] Completed in ${duration}ms: ${faqsCreated} FAQs from ${scrapedPages.length} pages`);
 
     return new Response(
       JSON.stringify({
         success: true,
+        pages_scraped: scrapedPages.length,
+        pages_found: pagesToScrape.length,
         faqs_extracted: faqsCreated,
         business_info: extractedData.business_info,
         duration_ms: duration
