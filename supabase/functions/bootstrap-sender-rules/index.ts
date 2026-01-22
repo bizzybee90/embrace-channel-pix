@@ -23,6 +23,9 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const startTime = Date.now();
+  const functionName = 'bootstrap-sender-rules';
+
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -37,7 +40,7 @@ serve(async (req) => {
       });
     }
 
-    console.log(`[bootstrap-rules] Analyzing patterns for workspace ${workspaceId}`);
+    console.log(`[${functionName}] Analyzing patterns for workspace ${workspaceId}`);
 
     // Get existing sender rules to exclude
     const { data: existingRules } = await supabase
@@ -190,16 +193,87 @@ serve(async (req) => {
       return b.totalEmails - a.totalEmails;
     });
 
-    console.log(`[bootstrap-rules] Generated ${suggestions.length} suggestions`);
+    console.log(`[${functionName}] Generated ${suggestions.length} suggestions`);
+
+    // =========================================================================
+    // AUTO-CREATE HIGH-CONFIDENCE RULES (>= 85%)
+    // =========================================================================
+    const autoCreateRules = suggestions.filter(s => s.confidence >= 85);
+    let rulesCreated = 0;
+
+    for (const rule of autoCreateRules) {
+      const { error: upsertError } = await supabase
+        .from('sender_rules')
+        .upsert({
+          workspace_id: workspaceId,
+          sender_pattern: `@${rule.senderDomain}`,
+          default_classification: rule.suggestedClassification,
+          override_bucket: rule.suggestedBucket,
+          auto_created: true,
+          is_active: true,
+          confidence_score: rule.confidence,
+          email_count: rule.totalEmails,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'workspace_id,sender_pattern' });
+
+      if (!upsertError) {
+        rulesCreated++;
+      } else {
+        console.error(`[${functionName}] Failed to create rule for ${rule.senderDomain}:`, upsertError);
+      }
+    }
+
+    console.log(`[${functionName}] Auto-created ${rulesCreated} high-confidence rules`);
+
+    // =========================================================================
+    // MARK EMAIL PIPELINE COMPLETE
+    // =========================================================================
+    await supabase
+      .from('email_import_progress')
+      .upsert({
+        workspace_id: workspaceId,
+        current_phase: 'complete',
+        playbook_complete: true,
+        completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'workspace_id' });
+
+    // Update email provider config sync status
+    await supabase
+      .from('email_provider_configs')
+      .update({
+        sync_status: 'complete',
+        sync_stage: 'complete',
+        sync_completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('workspace_id', workspaceId);
+
+    // Mark user onboarding as complete
+    await supabase
+      .from('users')
+      .update({
+        onboarding_completed: true,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('workspace_id', workspaceId);
+
+    const duration = Date.now() - startTime;
+    console.log(`[${functionName}] Pipeline complete for workspace ${workspaceId} in ${duration}ms`);
 
     return new Response(JSON.stringify({ 
-      suggestions: suggestions.slice(0, 20), // Return top 20
+      success: true,
+      suggestions: suggestions.slice(0, 20), // Return top 20 for UI display
       totalAnalyzed: Object.keys(domainStats).length,
+      rulesAutoCreated: rulesCreated,
+      pipelineComplete: true,
+      duration_ms: duration,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error: any) {
-    console.error('[bootstrap-rules] Error:', error);
+    console.error(`[${functionName}] Error:`, error);
     return new Response(JSON.stringify({ error: error?.message || 'Unknown error' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

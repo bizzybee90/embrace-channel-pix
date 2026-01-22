@@ -1,9 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { chainNextBatch } from '../_shared/batch-processor.ts';
 
 // =============================================================================
-// ROBUST EMAIL CLASSIFICATION WITH RATE LIMITING & FRONTEND-DRIVEN CONTINUATION
-// Handles 30,000+ emails with Gemini rate limit management
+// ROBUST EMAIL CLASSIFICATION WITH RELAY RACE SELF-INVOCATION
+// Handles 30,000+ emails autonomously with mega-batching
 // =============================================================================
 
 const corsHeaders = {
@@ -12,11 +13,12 @@ const corsHeaders = {
 };
 
 const FUNCTION_NAME = 'email-classify-v2';
-const BATCH_SIZE = 30; // Smaller batches to avoid token limits
+const BATCH_SIZE = 2000; // Mega-batch per PRD
 const TIMEOUT_BUFFER_MS = 50000;
 const MAX_RETRIES = 5;
 const BASE_DELAY_MS = 2000;
 const MAX_DELAY_MS = 60000;
+const MAX_RELAY_DEPTH = 100; // Safety: max 200,000 emails (100 × 2000)
 
 // Use Gemini 2.0 Flash for speed
 const GEMINI_API = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
@@ -80,13 +82,27 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const body = await req.json();
-    const { workspace_id, job_id } = body;
+    const { workspace_id, job_id, _relay_depth = 0 } = body;
 
     if (!workspace_id) {
       throw new Error('workspace_id is required');
     }
 
-    console.log(`[${FUNCTION_NAME}] Starting:`, { workspace_id, job_id });
+    // Safety check: prevent infinite loops
+    if (_relay_depth >= MAX_RELAY_DEPTH) {
+      console.error(`[${FUNCTION_NAME}] MAX_RELAY_DEPTH (${MAX_RELAY_DEPTH}) exceeded, stopping`);
+      await supabase
+        .from('email_import_progress')
+        .upsert({
+          workspace_id,
+          current_phase: 'error',
+          last_error: 'Max relay depth exceeded during classification',
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'workspace_id' });
+      return createResponse({ success: false, error: 'Max relay depth exceeded' });
+    }
+
+    console.log(`[${FUNCTION_NAME}] Starting: relay_depth=${_relay_depth}`, { workspace_id, job_id });
 
     // -------------------------------------------------------------------------
     // Get or Create Classification Job
@@ -170,24 +186,26 @@ serve(async (req) => {
         break;
       }
 
-      console.log(`[${FUNCTION_NAME}] Processing batch of ${emails.length} emails`);
+      console.log(`[${FUNCTION_NAME}] Processing mega-batch of ${emails.length} emails`);
 
-      // Build Gemini prompt
+      // Build optimized Gemini prompt with compact format
+      // Format: index|from|subject|snippet (150 chars max per email)
       const emailSummaries = emails.map((e: any, i: number) =>
-        `[${i}] From: ${e.from_email} | Subject: ${e.subject || '(no subject)'} | Direction: ${e.direction || 'unknown'}\nBody: ${(e.body || '').substring(0, 150)}...`
-      ).join('\n\n---\n\n');
+        `${i}|${e.from_email}|${e.subject || '(none)'}|${(e.body || '').substring(0, 150).replace(/\n/g, ' ')}`
+      ).join('\n');
 
       const prompt = `Classify each email. Categories: inquiry, booking, quote, complaint, follow_up, spam, notification, personal.
 
-Return JSON array ONLY:
-[{"index":0,"category":"inquiry","confidence":0.95,"requires_reply":true,"reasoning":"..."}]
+Return JSON array ONLY. Format: [{"i":0,"c":"inquiry","r":true}]
+Where: i=index, c=category, r=requires_reply (boolean)
 
-EMAILS:
+EMAILS (format: index|from|subject|snippet):
 ${emailSummaries}`;
 
-      // Call Gemini with retries
+      // Call Gemini with retries and temperature-zero fallback
       let classifications: any[] | null = null;
       let retryCount = 0;
+      let useTemperatureZero = false;
 
       while (retryCount < MAX_RETRIES && !classifications) {
         try {
@@ -196,7 +214,10 @@ ${emailSummaries}`;
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               contents: [{ parts: [{ text: prompt }] }],
-              generationConfig: { temperature: 0.1, maxOutputTokens: 4096 }
+              generationConfig: { 
+                temperature: useTemperatureZero ? 0.0 : 0.1, 
+                maxOutputTokens: 8192 
+              }
             })
           });
 
@@ -208,17 +229,25 @@ ${emailSummaries}`;
             
             // Check if we have time to wait
             if (!shouldContinueProcessing(startTime)) {
-              console.log(`[${FUNCTION_NAME}] No time for retry, saving checkpoint`);
+              console.log(`[${FUNCTION_NAME}] No time for retry, self-invoking after delay`);
               await saveCheckpoint(supabase, job);
+              await updateProgress(supabase, workspace_id, 'classifying', job.classified_count);
+              
+              // Self-invoke after delay
+              setTimeout(() => {
+                chainNextBatch(supabaseUrl, FUNCTION_NAME, {
+                  workspace_id,
+                  job_id: job.id,
+                  _relay_depth: _relay_depth + 1,
+                }, supabaseServiceKey);
+              }, Math.min(rateLimitDelay, 5000));
               
               return createResponse({
                 success: true,
                 status: 'rate_limited',
                 job_id: job.id,
                 classified_this_run: classifiedThisRun,
-                message: 'Rate limited, please continue after delay',
-                should_continue: true,
-                continue_after_ms: rateLimitDelay,
+                message: 'Rate limited, continuing after delay',
               });
             }
             
@@ -237,8 +266,19 @@ ${emailSummaries}`;
           // Parse JSON from response
           const jsonMatch = responseText.match(/\[[\s\S]*\]/);
           if (jsonMatch) {
-            classifications = JSON.parse(jsonMatch[0]);
-            consecutiveFailures = 0;
+            try {
+              classifications = JSON.parse(jsonMatch[0]);
+              consecutiveFailures = 0;
+            } catch (parseErr) {
+              // JSON parse failed - retry with temperature=0
+              if (!useTemperatureZero) {
+                console.log(`[${FUNCTION_NAME}] JSON parse failed, retrying with temperature=0`);
+                useTemperatureZero = true;
+                retryCount++;
+                continue;
+              }
+              throw parseErr;
+            }
           } else {
             throw new Error('No JSON array in Gemini response');
           }
@@ -263,7 +303,9 @@ ${emailSummaries}`;
 
       // Update emails with classifications
       for (const c of classifications) {
-        const email = emails[c.index];
+        // Handle both full format and compact format
+        const index = c.index ?? c.i;
+        const email = emails[index];
         if (!email) continue;
 
         const { error: updateError } = await supabase
@@ -282,6 +324,7 @@ ${emailSummaries}`;
       // Update checkpoint
       job.last_processed_id = emails[emails.length - 1].id;
       await saveCheckpoint(supabase, job);
+      await updateProgress(supabase, workspace_id, 'classifying', job.classified_count);
       batchesProcessed++;
 
       console.log(`[${FUNCTION_NAME}] Batch ${batchesProcessed}: +${classifications.length}, total: ${job.classified_count}`);
@@ -299,6 +342,9 @@ ${emailSummaries}`;
     const isComplete = !remaining || remaining === 0;
 
     if (isComplete) {
+      // =========================================================================
+      // CLASSIFICATION COMPLETE - Chain to voice-learn
+      // =========================================================================
       await supabase
         .from('classification_jobs')
         .update({
@@ -307,32 +353,71 @@ ${emailSummaries}`;
         })
         .eq('id', job.id);
 
+      // Update progress phase
+      await updateProgress(supabase, workspace_id, 'learning', job.classified_count);
+
+      console.log(`[${FUNCTION_NAME}] Classification complete (${job.classified_count}), chaining to voice-learn`);
+
+      // Chain to voice learning
+      chainNextBatch(supabaseUrl, 'voice-learn', {
+        workspace_id,
+      }, supabaseServiceKey);
+
       return createResponse({
         success: true,
         status: 'completed',
         job_id: job.id,
         total_classified: job.classified_count,
         duration_ms: Date.now() - startTime,
-        should_continue: false,
+        chained_to: 'voice-learn',
       });
     }
 
-    // More work to do - frontend should call again
+    // -------------------------------------------------------------------------
+    // More work to do - SELF INVOKE (Relay Race)
+    // -------------------------------------------------------------------------
     await saveCheckpoint(supabase, job);
+    await updateProgress(supabase, workspace_id, 'classifying', job.classified_count);
+
+    console.log(`[${FUNCTION_NAME}] Self-invoking: depth=${_relay_depth + 1}, remaining=${remaining}`);
+
+    // Fire and forget - self invoke
+    chainNextBatch(supabaseUrl, FUNCTION_NAME, {
+      workspace_id,
+      job_id: job.id,
+      _relay_depth: _relay_depth + 1,
+    }, supabaseServiceKey);
 
     return createResponse({
       success: true,
-      status: 'in_progress',
+      status: 'continuing',
       job_id: job.id,
       batches_this_run: batchesProcessed,
       classified_this_run: classifiedThisRun,
       remaining,
-      should_continue: true,
-      continue_after_ms: rateLimitDelay || 2000, // Frontend should wait before next call
+      relay_depth: _relay_depth,
     });
 
   } catch (error: any) {
     console.error(`[${FUNCTION_NAME}] Error:`, error.message);
+
+    // Update progress with error
+    try {
+      const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+      const body = await req.clone().json().catch(() => ({}));
+      if (body.workspace_id) {
+        await supabase
+          .from('email_import_progress')
+          .upsert({
+            workspace_id: body.workspace_id,
+            current_phase: 'error',
+            last_error: error.message,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'workspace_id' });
+      }
+    } catch (e) {
+      // Ignore error logging errors
+    }
 
     return new Response(
       JSON.stringify({
@@ -359,6 +444,22 @@ async function saveCheckpoint(supabase: SupabaseClient, job: ClassifyJob): Promi
       updated_at: new Date().toISOString(),
     })
     .eq('id', job.id);
+}
+
+async function updateProgress(
+  supabase: SupabaseClient,
+  workspace_id: string,
+  phase: string,
+  emails_classified: number
+): Promise<void> {
+  await supabase
+    .from('email_import_progress')
+    .upsert({
+      workspace_id,
+      current_phase: phase,
+      emails_classified,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'workspace_id' });
 }
 
 function createResponse(data: Record<string, unknown>): Response {

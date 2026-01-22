@@ -60,7 +60,7 @@ export function InboxLearningStep({ workspaceId, onComplete, onBack }: InboxLear
     try {
       console.log('[InboxLearning] Starting voice learning with Claude...');
       
-      const { data, error: fnError } = await supabase.functions.invoke('learn-from-inbox', {
+      const { data, error: fnError } = await supabase.functions.invoke('voice-learn', {
         body: { workspace_id: workspaceId }
       });
 
