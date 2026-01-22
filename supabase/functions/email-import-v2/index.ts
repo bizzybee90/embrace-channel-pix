@@ -1,9 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { chainNextBatch } from '../_shared/batch-processor.ts';
 
 // =============================================================================
-// ROBUST EMAIL IMPORT WITH CHECKPOINTING & FRONTEND-DRIVEN CONTINUATION
-// Handles 30,000+ emails with automatic resumption and rate limiting
+// ROBUST EMAIL IMPORT WITH RELAY RACE SELF-INVOCATION
+// Handles 30,000+ emails autonomously without frontend polling
 // =============================================================================
 
 const corsHeaders = {
@@ -13,10 +14,11 @@ const corsHeaders = {
 
 const AURINKO_API_BASE = 'https://api.aurinko.io/v1';
 const FUNCTION_NAME = 'email-import-v2';
-const BATCH_SIZE = 50;
+const BATCH_SIZE = 100; // Increased for efficiency
 const TIMEOUT_BUFFER_MS = 50000; // Stop 10s before 60s timeout
 const MAX_RETRIES = 3;
 const BASE_DELAY_MS = 1000;
+const MAX_RELAY_DEPTH = 500; // Safety: max 50,000 emails (500 × 100)
 
 interface ImportJob {
   id: string;
@@ -70,13 +72,27 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const body = await req.json();
-    const { workspace_id, job_id, import_mode = 'full' } = body;
+    const { workspace_id, job_id, import_mode = 'full', _relay_depth = 0 } = body;
 
     if (!workspace_id) {
       throw new Error('workspace_id is required');
     }
 
-    console.log(`[${FUNCTION_NAME}] Starting:`, { workspace_id, job_id, import_mode });
+    // Safety check: prevent infinite loops
+    if (_relay_depth >= MAX_RELAY_DEPTH) {
+      console.error(`[${FUNCTION_NAME}] MAX_RELAY_DEPTH (${MAX_RELAY_DEPTH}) exceeded, stopping`);
+      await supabase
+        .from('email_import_progress')
+        .upsert({
+          workspace_id,
+          current_phase: 'error',
+          last_error: 'Max relay depth exceeded - possible infinite loop',
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'workspace_id' });
+      return createResponse({ success: false, error: 'Max relay depth exceeded' });
+    }
+
+    console.log(`[${FUNCTION_NAME}] Starting: relay_depth=${_relay_depth}`, { workspace_id, job_id, import_mode });
 
     // -------------------------------------------------------------------------
     // Get Email Provider Config
@@ -93,7 +109,7 @@ serve(async (req) => {
 
     // Get decrypted access token securely
     const { data: accessToken, error: tokenError } = await supabase
-      .rpc('get_decrypted_access_token', { config_id: emailConfig.id });
+      .rpc('get_decrypted_access_token', { p_workspace_id: workspace_id });
 
     if (tokenError || !accessToken) {
       throw new Error('Email access token is missing. Please reconnect your email account.');
@@ -208,17 +224,29 @@ serve(async (req) => {
           const delay = retryAfter ? parseInt(retryAfter) * 1000 : getBackoffDelay(retryCount);
           console.log(`[${FUNCTION_NAME}] Rate limited, waiting ${delay}ms`);
           
-          // If delay would exceed timeout, save checkpoint and return for frontend to continue
+          // If delay would exceed timeout, save checkpoint and self-invoke
           if (!shouldContinueProcessing(startTime)) {
-            await saveCheckpoint(supabase, job, 'paused');
+            await saveCheckpoint(supabase, job, 'in_progress');
+            await updateProgress(supabase, workspace_id, 'importing', job.sent_imported + job.inbox_imported);
+            
+            console.log(`[${FUNCTION_NAME}] Timeout approaching, self-invoking with delay ${delay}ms`);
+            
+            // Wait a bit then self-invoke
+            setTimeout(() => {
+              chainNextBatch(supabaseUrl, FUNCTION_NAME, {
+                workspace_id,
+                job_id: job.id,
+                import_mode,
+                _relay_depth: _relay_depth + 1,
+              }, supabaseServiceKey);
+            }, Math.min(delay, 5000)); // Cap at 5s for the setTimeout
+            
             return createResponse({
               success: true,
-              status: 'paused',
+              status: 'continuing',
               job_id: job.id,
-              message: 'Rate limited, please continue',
+              message: 'Rate limited, continuing after delay',
               progress: getProgress(job),
-              should_continue: true,
-              continue_after_ms: delay,
             });
           }
           
@@ -300,6 +328,9 @@ serve(async (req) => {
       // Save checkpoint every batch
       await saveCheckpoint(supabase, job, 'in_progress');
 
+      // Update progress for frontend UI
+      await updateProgress(supabase, workspace_id, 'importing', job.sent_imported + job.inbox_imported);
+
       console.log(`[${FUNCTION_NAME}] Batch ${batchesProcessed}: ${folder} +${savedCount}, total: ${job.sent_imported + job.inbox_imported}`);
 
       // No more pages
@@ -317,9 +348,13 @@ serve(async (req) => {
     // -------------------------------------------------------------------------
     const totalImported = job.sent_imported + job.inbox_imported;
     const isComplete = totalImported >= job.total_target || 
-                      (job.inbox_imported >= targetPerFolder && job.sent_imported >= targetPerFolder);
+                      (job.inbox_imported >= targetPerFolder && job.sent_imported >= targetPerFolder) ||
+                      (!job.inbox_page_token && !job.sent_page_token && job.current_folder === 'INBOX');
 
     if (isComplete) {
+      // =========================================================================
+      // IMPORT COMPLETE - Chain to email-classify-v2
+      // =========================================================================
       await supabase
         .from('email_import_jobs')
         .update({
@@ -327,6 +362,17 @@ serve(async (req) => {
           completed_at: new Date().toISOString(),
         })
         .eq('id', job.id);
+
+      // Update progress phase
+      await updateProgress(supabase, workspace_id, 'classifying', totalImported);
+
+      console.log(`[${FUNCTION_NAME}] Import complete (${totalImported} emails), chaining to email-classify-v2`);
+
+      // Chain to classification
+      chainNextBatch(supabaseUrl, 'email-classify-v2', {
+        workspace_id,
+        _relay_depth: 0, // Reset depth for new phase
+      }, supabaseServiceKey);
 
       return createResponse({
         success: true,
@@ -336,26 +382,56 @@ serve(async (req) => {
         sent_count: job.sent_imported,
         inbox_count: job.inbox_imported,
         duration_ms: Date.now() - startTime,
-        should_continue: false,
+        chained_to: 'email-classify-v2',
       });
     }
 
-    // More work to do - frontend should call again
+    // -------------------------------------------------------------------------
+    // More work to do - SELF INVOKE (Relay Race)
+    // -------------------------------------------------------------------------
     await saveCheckpoint(supabase, job, 'in_progress');
+    await updateProgress(supabase, workspace_id, 'importing', totalImported);
+
+    console.log(`[${FUNCTION_NAME}] Self-invoking: depth=${_relay_depth + 1}, progress=${totalImported}/${job.total_target}`);
+
+    // Fire and forget - self invoke
+    chainNextBatch(supabaseUrl, FUNCTION_NAME, {
+      workspace_id,
+      job_id: job.id,
+      import_mode,
+      _relay_depth: _relay_depth + 1,
+    }, supabaseServiceKey);
 
     return createResponse({
       success: true,
-      status: 'in_progress',
+      status: 'continuing',
       job_id: job.id,
       batches_this_run: batchesProcessed,
       imported_this_run: totalImportedThisRun,
       progress: getProgress(job),
-      should_continue: true,
-      continue_after_ms: 1000, // Frontend should wait 1s before next call
+      relay_depth: _relay_depth,
     });
 
   } catch (error: any) {
     console.error(`[${FUNCTION_NAME}] Error:`, error.message);
+    
+    // Update progress with error
+    try {
+      const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+      const body = await req.clone().json().catch(() => ({}));
+      if (body.workspace_id) {
+        await supabase
+          .from('email_import_progress')
+          .upsert({
+            workspace_id: body.workspace_id,
+            current_phase: 'error',
+            last_error: error.message,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'workspace_id' });
+      }
+    } catch (e) {
+      // Ignore error logging errors
+    }
     
     return new Response(
       JSON.stringify({
@@ -391,6 +467,22 @@ async function saveCheckpoint(
       updated_at: new Date().toISOString(),
     })
     .eq('id', job.id);
+}
+
+async function updateProgress(
+  supabase: SupabaseClient,
+  workspace_id: string,
+  phase: string,
+  emails_received: number
+): Promise<void> {
+  await supabase
+    .from('email_import_progress')
+    .upsert({
+      workspace_id,
+      current_phase: phase,
+      emails_received,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'workspace_id' });
 }
 
 function getProgress(job: ImportJob): { sent: number; inbox: number; total: number; percent: number } {

@@ -1,4 +1,5 @@
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/+esm';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { chainNextBatch } from '../_shared/batch-processor.ts';
 
 // Redirect helper that uses origin from state
 
@@ -201,6 +202,24 @@ Deno.serve(async (req) => {
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
     // =============================================
+    // IDEMPOTENCY CHECK: Prevent double-triggering
+    // =============================================
+    const { data: existingProgress } = await supabase
+      .from('email_import_progress')
+      .select('current_phase, updated_at')
+      .eq('workspace_id', workspaceId)
+      .single();
+
+    const isAlreadyRunning = existingProgress && 
+      ['importing', 'classifying', 'learning'].includes(existingProgress.current_phase) &&
+      new Date(existingProgress.updated_at).getTime() > Date.now() - 2 * 60 * 1000; // Updated within 2 min
+
+    if (isAlreadyRunning) {
+      console.log('[aurinko-auth-callback] Import already running, skipping trigger');
+      return redirectToApp(appOrigin, 'success');
+    }
+
+    // =============================================
     // SECURITY: First insert record WITHOUT plaintext tokens
     // =============================================
     const { data: configData, error: dbError } = await supabase
@@ -248,45 +267,44 @@ Deno.serve(async (req) => {
     console.log('Email provider config saved successfully with', aliases.length, 'aliases, configId:', configData?.id, '(tokens encrypted)');
 
     // =============================================
-    // TRIGGER EMAIL SYNC IMMEDIATELY
-    // This is the key fix - start syncing right after OAuth
+    // INITIALIZE PROGRESS TRACKING
+    // =============================================
+    await supabase
+      .from('email_import_progress')
+      .upsert({
+        workspace_id: workspaceId,
+        current_phase: 'importing',
+        emails_received: 0,
+        emails_classified: 0,
+        started_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'workspace_id' });
+
+    // =============================================
+    // TRIGGER EMAIL IMPORT V2 (RELAY RACE START)
+    // Fire and forget - let it run autonomously
     // =============================================
     if (configData?.id) {
-      console.log('Triggering email-sync for configId:', configData.id, 'mode:', importMode);
+      console.log('[aurinko-auth-callback] Triggering email-import-v2 for workspace:', workspaceId);
       
-      try {
-        // Call email-sync function asynchronously (don't wait for it to complete)
-        const syncPromise = supabase.functions.invoke('email-sync', {
-          body: {
-            configId: configData.id,
-            mode: importMode,
-            // For all_history and last_1000, we'll let the function handle pagination
-            maxMessages: importMode === 'all_history' ? 10000 : 
-                        importMode === 'last_1000' ? 1000 : 100,
-          }
-        });
+      // Update sync status to indicate sync is starting
+      await supabase
+        .from('email_provider_configs')
+        .update({ 
+          sync_status: 'syncing',
+          sync_stage: 'fetching_sent',
+          sync_started_at: new Date().toISOString()
+        })
+        .eq('id', configData.id);
 
-        // Don't await - let it run in background
-        syncPromise.then((result: any) => {
-          console.log('Email sync started in background:', result.data || result.error);
-        }).catch((err: any) => {
-          console.error('Background sync failed to start:', err);
-        });
+      // Fire the relay race - chainNextBatch is fire-and-forget
+      chainNextBatch(SUPABASE_URL!, 'email-import-v2', {
+        workspace_id: workspaceId,
+        import_mode: importMode,
+        _relay_depth: 0,
+      }, SUPABASE_SERVICE_ROLE_KEY!);
 
-        // Update sync status to indicate sync is starting
-        await supabase
-          .from('email_provider_configs')
-          .update({ 
-            sync_status: 'syncing',
-            sync_stage: 'fetching_inbox',
-            sync_started_at: new Date().toISOString()
-          })
-          .eq('id', configData.id);
-
-      } catch (syncError) {
-        console.error('Error triggering email sync:', syncError);
-        // Don't fail the OAuth flow, just log the error
-      }
+      console.log('[aurinko-auth-callback] Relay race started - email-import-v2 triggered');
     }
 
     // Redirect back into the app instead of showing an inline HTML page.

@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { chainNextBatch } from '../_shared/batch-processor.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -17,10 +18,9 @@ serve(async (req) => {
   const functionName = 'voice-learn';
 
   try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    );
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) throw new Error('LOVABLE_API_KEY not configured');
@@ -41,8 +41,35 @@ serve(async (req) => {
 
     if (emailError) throw emailError;
 
+    // Handle case with not enough emails - still chain to next step
     if (!emails || emails.length < 10) {
-      throw new Error(`Need at least 10 sent emails for voice analysis. Found: ${emails?.length || 0}`);
+      console.log(`[${functionName}] Not enough emails (${emails?.length || 0}), skipping voice profile but continuing pipeline`);
+      
+      // Update progress - still mark as learning complete
+      await supabase
+        .from('email_import_progress')
+        .upsert({
+          workspace_id: body.workspace_id,
+          voice_profile_complete: false,
+          current_phase: 'learning',
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'workspace_id' });
+
+      // Chain to bootstrap-sender-rules anyway
+      chainNextBatch(supabaseUrl, 'bootstrap-sender-rules', {
+        workspaceId: body.workspace_id,
+      }, supabaseServiceKey);
+
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          skipped: true,
+          reason: `Need at least 10 sent emails for voice analysis. Found: ${emails?.length || 0}`,
+          chained_to: 'bootstrap-sender-rules',
+          duration_ms: Date.now() - startTime
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     console.log(`[${functionName}] Analyzing ${emails.length} sent emails`);
@@ -229,6 +256,24 @@ Respond with ONLY a JSON object:
       })
       .eq('workspace_id', body.workspace_id);
 
+    // =========================================================================
+    // VOICE LEARNING COMPLETE - Update progress and chain to bootstrap-sender-rules
+    // =========================================================================
+    await supabase
+      .from('email_import_progress')
+      .upsert({
+        workspace_id: body.workspace_id,
+        voice_profile_complete: true,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'workspace_id' });
+
+    console.log(`[${functionName}] Voice profile saved, chaining to bootstrap-sender-rules`);
+
+    // Chain to sender rules
+    chainNextBatch(supabaseUrl, 'bootstrap-sender-rules', {
+      workspaceId: body.workspace_id,
+    }, supabaseServiceKey);
+
     const duration = Date.now() - startTime;
     console.log(`[${functionName}] Completed in ${duration}ms`);
 
@@ -237,13 +282,43 @@ Respond with ONLY a JSON object:
         success: true, 
         profile_summary: profile.summary,
         emails_analyzed: emails.length,
-        duration_ms: duration
+        duration_ms: duration,
+        chained_to: 'bootstrap-sender-rules',
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error: any) {
     console.error(`[${functionName}] Error:`, error);
+
+    // Update progress with error but still try to chain
+    try {
+      const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+      const body = await req.clone().json().catch(() => ({}));
+      if (body.workspace_id) {
+        await supabase
+          .from('email_import_progress')
+          .upsert({
+            workspace_id: body.workspace_id,
+            voice_profile_complete: false,
+            last_error: error.message,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'workspace_id' });
+
+        // Still chain to bootstrap-sender-rules even if voice learning failed
+        // The pipeline should continue
+        console.log(`[${functionName}] Error occurred but still chaining to bootstrap-sender-rules`);
+        chainNextBatch(
+          Deno.env.get('SUPABASE_URL')!, 
+          'bootstrap-sender-rules', 
+          { workspaceId: body.workspace_id }, 
+          Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+        );
+      }
+    } catch (e) {
+      // Ignore error logging errors
+    }
+
     return new Response(
       JSON.stringify({ 
         success: false, 
