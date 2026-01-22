@@ -493,6 +493,7 @@ export type Database = {
           created_at: string | null
           duplicate_of: string | null
           embedding: string | null
+          ground_truth_validated: boolean | null
           id: string
           is_duplicate: boolean | null
           is_refined: boolean | null
@@ -502,6 +503,7 @@ export type Database = {
           refined_faq_id: string | null
           similarity_score: number | null
           site_id: string | null
+          skipped_reason: string | null
           source_business: string | null
           source_url: string | null
           workspace_id: string
@@ -512,6 +514,7 @@ export type Database = {
           created_at?: string | null
           duplicate_of?: string | null
           embedding?: string | null
+          ground_truth_validated?: boolean | null
           id?: string
           is_duplicate?: boolean | null
           is_refined?: boolean | null
@@ -521,6 +524,7 @@ export type Database = {
           refined_faq_id?: string | null
           similarity_score?: number | null
           site_id?: string | null
+          skipped_reason?: string | null
           source_business?: string | null
           source_url?: string | null
           workspace_id: string
@@ -531,6 +535,7 @@ export type Database = {
           created_at?: string | null
           duplicate_of?: string | null
           embedding?: string | null
+          ground_truth_validated?: boolean | null
           id?: string
           is_duplicate?: boolean | null
           is_refined?: boolean | null
@@ -540,6 +545,7 @@ export type Database = {
           refined_faq_id?: string | null
           similarity_score?: number | null
           site_id?: string | null
+          skipped_reason?: string | null
           source_business?: string | null
           source_url?: string | null
           workspace_id?: string
@@ -763,13 +769,16 @@ export type Database = {
           distance_miles: number | null
           domain: string
           domain_type: string | null
+          faqs_added: number | null
           faqs_generated: number | null
+          faqs_validated: number | null
           has_faq_page: boolean | null
           has_pricing_page: boolean | null
           id: string
           is_directory: boolean | null
           is_valid: boolean | null
           job_id: string
+          last_error: string | null
           latitude: number | null
           longitude: number | null
           pages_scraped: number | null
@@ -802,13 +811,16 @@ export type Database = {
           distance_miles?: number | null
           domain: string
           domain_type?: string | null
+          faqs_added?: number | null
           faqs_generated?: number | null
+          faqs_validated?: number | null
           has_faq_page?: boolean | null
           has_pricing_page?: boolean | null
           id?: string
           is_directory?: boolean | null
           is_valid?: boolean | null
           job_id: string
+          last_error?: string | null
           latitude?: number | null
           longitude?: number | null
           pages_scraped?: number | null
@@ -841,13 +853,16 @@ export type Database = {
           distance_miles?: number | null
           domain?: string
           domain_type?: string | null
+          faqs_added?: number | null
           faqs_generated?: number | null
+          faqs_validated?: number | null
           has_faq_page?: boolean | null
           has_pricing_page?: boolean | null
           id?: string
           is_directory?: boolean | null
           is_valid?: boolean | null
           job_id?: string
+          last_error?: string | null
           latitude?: number | null
           longitude?: number | null
           pages_scraped?: number | null
@@ -2988,6 +3003,47 @@ export type Database = {
           },
         ]
       }
+      ground_truth_facts: {
+        Row: {
+          confidence: number | null
+          created_at: string | null
+          fact_key: string
+          fact_type: string
+          fact_value: string
+          id: string
+          source_url: string | null
+          workspace_id: string
+        }
+        Insert: {
+          confidence?: number | null
+          created_at?: string | null
+          fact_key: string
+          fact_type: string
+          fact_value: string
+          id?: string
+          source_url?: string | null
+          workspace_id: string
+        }
+        Update: {
+          confidence?: number | null
+          created_at?: string | null
+          fact_key?: string
+          fact_type?: string
+          fact_value?: string
+          id?: string
+          source_url?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ground_truth_facts_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ignored_emails: {
         Row: {
           created_at: string | null
@@ -3270,6 +3326,65 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      knowledge_base_faqs: {
+        Row: {
+          answer: string
+          category: string | null
+          created_at: string | null
+          embedding: string | null
+          id: string
+          is_validated: boolean | null
+          priority: number | null
+          question: string
+          source: string
+          source_domain: string | null
+          source_url: string | null
+          updated_at: string | null
+          validation_notes: string | null
+          workspace_id: string
+        }
+        Insert: {
+          answer: string
+          category?: string | null
+          created_at?: string | null
+          embedding?: string | null
+          id?: string
+          is_validated?: boolean | null
+          priority?: number | null
+          question: string
+          source: string
+          source_domain?: string | null
+          source_url?: string | null
+          updated_at?: string | null
+          validation_notes?: string | null
+          workspace_id: string
+        }
+        Update: {
+          answer?: string
+          category?: string | null
+          created_at?: string | null
+          embedding?: string | null
+          id?: string
+          is_validated?: boolean | null
+          priority?: number | null
+          question?: string
+          source?: string
+          source_domain?: string | null
+          source_url?: string | null
+          updated_at?: string | null
+          validation_notes?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "knowledge_base_faqs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       learned_responses: {
         Row: {
@@ -4972,12 +5087,15 @@ export type Database = {
           business_type: string | null
           core_services: string[] | null
           created_at: string | null
+          ground_truth_generated: boolean | null
           hiring_mode: boolean | null
           id: string
+          knowledge_base_status: string | null
           name: string
           slug: string
           timezone: string | null
           vip_domains: string[] | null
+          website_url: string | null
         }
         Insert: {
           business_days?: number[] | null
@@ -4986,12 +5104,15 @@ export type Database = {
           business_type?: string | null
           core_services?: string[] | null
           created_at?: string | null
+          ground_truth_generated?: boolean | null
           hiring_mode?: boolean | null
           id?: string
+          knowledge_base_status?: string | null
           name: string
           slug: string
           timezone?: string | null
           vip_domains?: string[] | null
+          website_url?: string | null
         }
         Update: {
           business_days?: number[] | null
@@ -5000,12 +5121,15 @@ export type Database = {
           business_type?: string | null
           core_services?: string[] | null
           created_at?: string | null
+          ground_truth_generated?: boolean | null
           hiring_mode?: boolean | null
           id?: string
+          knowledge_base_status?: string | null
           name?: string
           slug?: string
           timezone?: string | null
           vip_domains?: string[] | null
+          website_url?: string | null
         }
         Relationships: []
       }
