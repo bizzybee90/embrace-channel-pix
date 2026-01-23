@@ -29,6 +29,37 @@ interface MakeProgress {
   completed_at: string | null;
 }
 
+type ImportPhase =
+  | 'idle'
+  | 'connecting'
+  | 'importing'
+  | 'classifying'
+  | 'analyzing'
+  | 'learning'
+  | 'complete'
+  | 'error';
+
+function mapImportProgressRowToMakeProgress(row: any): MakeProgress {
+  // We intentionally keep this component’s existing UI model (MakeProgress)
+  // and adapt the new pipeline table (`email_import_progress`) into it.
+  const status = (row?.current_phase || 'idle') as ImportPhase;
+  const emailsReceived = Number(row?.emails_received ?? 0);
+  const emailsClassified = Number(row?.emails_classified ?? 0);
+  const estimatedTotal = Number(row?.estimated_total_emails ?? 0);
+
+  return {
+    status,
+    // Best-effort: older UI wants “emails_imported”; pipeline tracks received.
+    emails_imported: emailsReceived,
+    emails_classified: emailsClassified,
+    emails_total: estimatedTotal,
+    voice_profile_complete: Boolean(row?.voice_profile_complete ?? false),
+    error_message: row?.last_error ?? null,
+    started_at: row?.started_at ?? null,
+    completed_at: row?.completed_at ?? null,
+  };
+}
+
 const emailProviders = [
   { 
     id: 'gmail' as Provider, 
@@ -124,26 +155,28 @@ export function EmailConnectionStep({
     checkEmailConnection(true);
   }, [workspaceId]);
 
-  // Poll make_progress when import is started
+  // Poll email_import_progress when import is started (new pipeline)
   useEffect(() => {
     if (!importStarted || !workspaceId) return;
 
     const poll = async () => {
       const { data, error } = await supabase
-        .from('make_progress')
+        .from('email_import_progress')
         .select('*')
         .eq('workspace_id', workspaceId)
         .maybeSingle();
 
-      if (!error && data) {
-        setProgress(data as MakeProgress);
-        
-        // Stop polling if complete or error
-        if (data.status === 'complete' || data.status === 'error') {
-          if (pollIntervalRef.current) {
-            window.clearInterval(pollIntervalRef.current);
-            pollIntervalRef.current = undefined;
-          }
+      if (error) return;
+      if (!data) return;
+
+      const mapped = mapImportProgressRowToMakeProgress(data);
+      setProgress(mapped);
+
+      // Stop polling if complete or error
+      if (mapped.status === 'complete' || mapped.status === 'error') {
+        if (pollIntervalRef.current) {
+          window.clearInterval(pollIntervalRef.current);
+          pollIntervalRef.current = undefined;
         }
       }
     };
@@ -202,19 +235,9 @@ export function EmailConnectionStep({
       ]);
 
       if (!progressResult.error && progressResult.data) {
-        // Map email_import_progress fields to our local progress state
-        const p = progressResult.data;
-        setProgress({
-          status: p.current_phase || 'idle',
-          emails_imported: (p.inbox_email_count || 0) + (p.sent_email_count || 0),
-          emails_classified: p.emails_classified || 0,
-          emails_total: p.estimated_total_emails || 0,
-          voice_profile_complete: p.voice_profile_complete || false,
-          error_message: p.last_error || null,
-          started_at: p.started_at,
-          completed_at: p.phase3_completed_at || null,
-        });
-        if (p.current_phase && p.current_phase !== 'idle') {
+        const mapped = mapImportProgressRowToMakeProgress(progressResult.data);
+        setProgress(mapped);
+        if (mapped.status && mapped.status !== 'idle') {
           setImportStarted(true);
         } else {
           setImportStarted(false);
@@ -346,12 +369,14 @@ export function EmailConnectionStep({
 
   const handleRetry = async () => {
     try {
+      // Reset the new pipeline progress row so the UI can restart cleanly.
+      // (If the row doesn't exist, this is a no-op.)
       await supabase
-        .from('make_progress')
-        .update({ 
-          status: 'idle', 
-          error_message: null,
-          updated_at: new Date().toISOString()
+        .from('email_import_progress')
+        .update({
+          current_phase: 'idle',
+          last_error: null,
+          updated_at: new Date().toISOString(),
         })
         .eq('workspace_id', workspaceId);
       
