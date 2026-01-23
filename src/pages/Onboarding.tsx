@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { OnboardingWizard } from '@/components/onboarding/OnboardingWizard';
+import { isOnboardingComplete } from '@/lib/onboardingStatus';
 
 export default function Onboarding() {
   const navigate = useNavigate();
@@ -26,7 +27,7 @@ export default function Onboarding() {
         // Get user's workspace and onboarding status
         const { data: userData, error: userError } = await supabase
           .from('users')
-          .select('workspace_id, onboarding_completed')
+          .select('workspace_id, onboarding_completed, onboarding_step')
           .eq('id', userId)
           .single();
 
@@ -37,7 +38,7 @@ export default function Onboarding() {
           
           const { data: retryData, error: retryError } = await supabase
             .from('users')
-            .select('workspace_id, onboarding_completed')
+            .select('workspace_id, onboarding_completed, onboarding_step')
             .eq('id', userId)
             .single();
           
@@ -50,7 +51,7 @@ export default function Onboarding() {
             return;
           }
           
-          if (retryData?.onboarding_completed) {
+          if (isOnboardingComplete(retryData)) {
             navigate('/');
             return;
           }
@@ -67,7 +68,7 @@ export default function Onboarding() {
         console.log('[Onboarding] User data:', userData);
 
         // If already onboarded, go to home
-        if (userData?.onboarding_completed) {
+        if (isOnboardingComplete(userData)) {
           console.log('[Onboarding] Already completed, going home');
           navigate('/');
           return;

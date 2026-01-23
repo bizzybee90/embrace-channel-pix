@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { User, Session } from "@supabase/supabase-js";
+import { isOnboardingComplete } from "@/lib/onboardingStatus";
 
 export const AuthGuard = ({ children }: { children: React.ReactNode }) => {
   const navigate = useNavigate();
@@ -11,6 +12,7 @@ export const AuthGuard = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const checkingOnboardingRef = useRef(false);
   const hasCheckedOnboarding = useRef(false);
+  const lastCheckedUserIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     // Set up auth state listener first
@@ -40,6 +42,11 @@ export const AuthGuard = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     const checkOnboarding = async () => {
       if (!user || checkingOnboardingRef.current || hasCheckedOnboarding.current) return;
+
+       // If user changes (sign out/in), allow a new check.
+       if (lastCheckedUserIdRef.current && lastCheckedUserIdRef.current !== user.id) {
+         hasCheckedOnboarding.current = false;
+       }
       
       // Skip onboarding check if already on onboarding page
       if (location.pathname === '/onboarding') return;
@@ -48,7 +55,7 @@ export const AuthGuard = ({ children }: { children: React.ReactNode }) => {
       try {
         const { data: userData, error } = await supabase
           .from('users')
-          .select('onboarding_completed')
+            .select('onboarding_completed, onboarding_step')
           .eq('id', user.id)
           .single();
 
@@ -58,9 +65,10 @@ export const AuthGuard = ({ children }: { children: React.ReactNode }) => {
         }
 
         hasCheckedOnboarding.current = true;
+        lastCheckedUserIdRef.current = user.id;
 
         // Redirect to onboarding if not completed
-        if (userData && userData.onboarding_completed === false) {
+        if (!isOnboardingComplete(userData)) {
           navigate('/onboarding');
         }
       } catch (error) {
