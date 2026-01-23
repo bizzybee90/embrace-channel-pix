@@ -184,3 +184,12 @@ verify_jwt = false
 
 [functions.email-classify-v2]
 verify_jwt = false
+
+[functions.kb-start-job]
+verify_jwt = false
+
+[functions.kb-discover-competitors]
+verify_jwt = false
+
+[functions.kb-mine-site]
+verify_jwt = false

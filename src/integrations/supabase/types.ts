@@ -770,6 +770,7 @@ export type Database = {
           domain: string
           domain_type: string | null
           faqs_added: number | null
+          faqs_extracted: number | null
           faqs_generated: number | null
           faqs_validated: number | null
           has_faq_page: boolean | null
@@ -812,6 +813,7 @@ export type Database = {
           domain: string
           domain_type?: string | null
           faqs_added?: number | null
+          faqs_extracted?: number | null
           faqs_generated?: number | null
           faqs_validated?: number | null
           has_faq_page?: boolean | null
@@ -854,6 +856,7 @@ export type Database = {
           domain?: string
           domain_type?: string | null
           faqs_added?: number | null
+          faqs_extracted?: number | null
           faqs_generated?: number | null
           faqs_validated?: number | null
           has_faq_page?: boolean | null
