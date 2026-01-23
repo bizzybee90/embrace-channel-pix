@@ -12,6 +12,13 @@ export default function Onboarding() {
   useEffect(() => {
     let isMounted = true;
 
+    // Prevent indefinite "Loading onboarding..." if auth events don't arrive for any reason
+    const loadingSafetyTimeout = window.setTimeout(() => {
+      if (!isMounted) return;
+      setError('Onboarding is taking longer than expected. Please refresh the page.');
+      setLoading(false);
+    }, 20000);
+
     const initializeOnboarding = async (userId: string) => {
       try {
         console.log('[Onboarding] Initializing for user:', userId);
@@ -120,11 +127,29 @@ export default function Onboarding() {
       }
     };
 
-    // Use onAuthStateChange for reliable session detection
+    // 1) Immediate session check (handles refreshes where INITIAL_SESSION event can be missed)
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (!isMounted) return;
+
+      if (error) {
+        console.error('[Onboarding] getSession error:', error);
+      }
+
+      if (!session?.user) {
+        setLoading(false);
+        navigate('/auth');
+        return;
+      }
+
+      initializeOnboarding(session.user.id);
+    });
+
+    // 2) Keep listening for auth state changes (sign-in, refresh, sign-out)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log('[Onboarding] Auth event:', event);
-      
+
       if (event === 'SIGNED_OUT' || !session?.user) {
+        if (isMounted) setLoading(false);
         navigate('/auth');
         return;
       }
@@ -136,6 +161,7 @@ export default function Onboarding() {
 
     return () => {
       isMounted = false;
+      window.clearTimeout(loadingSafetyTimeout);
       subscription.unsubscribe();
     };
   }, [navigate]);
