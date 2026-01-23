@@ -133,8 +133,9 @@ serve(async (req) => {
     }
 
     // Get decrypted access token securely
+    // The function expects p_workspace_id, not config_id
     const { data: accessToken, error: tokenError } = await supabase
-      .rpc('get_decrypted_access_token', { config_id: emailConfig.id });
+      .rpc('get_decrypted_access_token', { p_workspace_id: emailConfig.workspace_id });
 
     if (tokenError || !accessToken) {
       console.error('Failed to get access token for account:', accountId, tokenError);
