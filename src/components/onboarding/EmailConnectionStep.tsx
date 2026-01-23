@@ -273,9 +273,36 @@ export function EmailConnectionStep({
   const startImport = async () => {
     if (!workspaceId || importStarted) return;
     
+    // Optimistically show a progress UI immediately so the user isn't left on a blank screen
     setImportStarted(true);
+    setProgress(prev =>
+      prev ?? {
+        status: 'importing',
+        emails_imported: 0,
+        emails_classified: 0,
+        emails_total: 0,
+        voice_profile_complete: false,
+        error_message: null,
+        started_at: new Date().toISOString(),
+        completed_at: null,
+      }
+    );
     
     try {
+      // Ensure a progress row exists so polling has something to read even before the importer updates it.
+      // (This prevents the UI from getting stuck when the progress record hasn't been created yet.)
+      await supabase
+        .from('make_progress')
+        .upsert(
+          {
+            workspace_id: workspaceId,
+            status: 'importing',
+            started_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          } as any,
+          { onConflict: 'workspace_id' }
+        );
+
       // Trigger Make.com webhook
       const response = await fetch(MAKE_WEBHOOK_URL, {
         method: 'POST',
@@ -295,6 +322,7 @@ export function EmailConnectionStep({
       console.error('Error starting import:', error);
       toast.error('Failed to start email import');
       setImportStarted(false);
+      setProgress(null);
     }
   };
 
