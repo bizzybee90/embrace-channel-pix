@@ -398,8 +398,8 @@ export function EmailConnectionStep({
             </Button>
           </div>
 
-          {/* Start Import button */}
-          {!importStarted && !progress && (
+          {/* Start Import button - show when not started or status is idle */}
+          {!importStarted && (!progress || progress.status === 'idle') && (
             <div className="space-y-4">
               <Button onClick={startImport} className="w-full gap-2">
                 Start Learning from Emails
