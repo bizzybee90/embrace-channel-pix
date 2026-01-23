@@ -95,8 +95,8 @@ const importModes = [
   },
 ];
 
-// Make.com webhook URL
-const MAKE_WEBHOOK_URL = 'https://hook.eu2.make.com/ya89bi65tcxsmyet08ii9jtijsscbv2b';
+// Supabase project URL for edge functions
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
 // Published URL for redirects after OAuth
 const PUBLISHED_URL = 'https://embrace-channel-pix.lovable.app';
@@ -195,15 +195,26 @@ export function EmailConnectionStep({
           .limit(1)
           .maybeSingle(),
         supabase
-          .from('make_progress')
+          .from('email_import_progress')
           .select('*')
           .eq('workspace_id', workspaceId)
           .maybeSingle()
       ]);
 
       if (!progressResult.error && progressResult.data) {
-        setProgress(progressResult.data as MakeProgress);
-        if (progressResult.data.status !== 'idle') {
+        // Map email_import_progress fields to our local progress state
+        const p = progressResult.data;
+        setProgress({
+          status: p.current_phase || 'idle',
+          emails_imported: (p.inbox_email_count || 0) + (p.sent_email_count || 0),
+          emails_classified: p.emails_classified || 0,
+          emails_total: p.estimated_total_emails || 0,
+          voice_profile_complete: p.voice_profile_complete || false,
+          error_message: p.last_error || null,
+          started_at: p.started_at,
+          completed_at: p.phase3_completed_at || null,
+        });
+        if (p.current_phase && p.current_phase !== 'idle') {
           setImportStarted(true);
         } else {
           setImportStarted(false);
@@ -275,38 +286,26 @@ export function EmailConnectionStep({
     
     // Optimistically show a progress UI immediately so the user isn't left on a blank screen
     setImportStarted(true);
-    setProgress(prev =>
-      prev ?? {
-        status: 'importing',
-        emails_imported: 0,
-        emails_classified: 0,
-        emails_total: 0,
-        voice_profile_complete: false,
-        error_message: null,
-        started_at: new Date().toISOString(),
-        completed_at: null,
-      }
-    );
+    setProgress({
+      status: 'importing',
+      emails_imported: 0,
+      emails_classified: 0,
+      emails_total: 0,
+      voice_profile_complete: false,
+      error_message: null,
+      started_at: new Date().toISOString(),
+      completed_at: null,
+    });
     
     try {
-      // Ensure a progress row exists so polling has something to read even before the importer updates it.
-      // (This prevents the UI from getting stuck when the progress record hasn't been created yet.)
-      await supabase
-        .from('make_progress')
-        .upsert(
-          {
-            workspace_id: workspaceId,
-            status: 'importing',
-            started_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          } as any,
-          { onConflict: 'workspace_id' }
-        );
-
-      // Trigger Make.com webhook
-      const response = await fetch(MAKE_WEBHOOK_URL, {
+      // Call the email-import-v2 edge function to trigger the relay-race import
+      const { data: session } = await supabase.auth.getSession();
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/email-import-v2`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.session?.access_token || ''}`,
+        },
         body: JSON.stringify({
           workspace_id: workspaceId,
           import_mode: importMode
@@ -314,6 +313,8 @@ export function EmailConnectionStep({
       });
 
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Import error response:', errorText);
         throw new Error('Failed to trigger import');
       }
 
@@ -330,7 +331,7 @@ export function EmailConnectionStep({
     try {
       await Promise.all([
         supabase.from('email_provider_configs').delete().eq('workspace_id', workspaceId),
-        supabase.from('make_progress').delete().eq('workspace_id', workspaceId)
+        supabase.from('email_import_progress').delete().eq('workspace_id', workspaceId)
       ]);
 
       setConnectedEmail(null);
