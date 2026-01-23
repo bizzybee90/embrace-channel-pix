@@ -205,7 +205,13 @@ export function EmailConnectionStep({
         setProgress(progressResult.data as MakeProgress);
         if (progressResult.data.status !== 'idle') {
           setImportStarted(true);
+        } else {
+          setImportStarted(false);
         }
+      } else {
+        // No progress record exists - reset state
+        setProgress(null);
+        setImportStarted(false);
       }
 
       if (!configResult.error && configResult.data?.email_address) {
