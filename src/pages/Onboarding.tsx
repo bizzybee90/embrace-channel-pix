@@ -13,6 +13,10 @@ export default function Onboarding() {
   useEffect(() => {
     let isMounted = true;
 
+    const clearSafetyTimeout = (timeoutId: number | undefined) => {
+      if (timeoutId) window.clearTimeout(timeoutId);
+    };
+
     // Prevent indefinite "Loading onboarding..." if auth events don't arrive for any reason
     const loadingSafetyTimeout = window.setTimeout(() => {
       if (!isMounted) return;
@@ -45,6 +49,7 @@ export default function Onboarding() {
           if (retryError) {
             console.error('[Onboarding] Retry failed:', retryError);
             if (isMounted) {
+              clearSafetyTimeout(loadingSafetyTimeout);
               setError('Failed to load user data. Please refresh the page.');
               setLoading(false);
             }
@@ -58,6 +63,7 @@ export default function Onboarding() {
           
           if (retryData?.workspace_id) {
             if (isMounted) {
+              clearSafetyTimeout(loadingSafetyTimeout);
               setWorkspaceId(retryData.workspace_id);
               setLoading(false);
             }
@@ -70,6 +76,7 @@ export default function Onboarding() {
         // If already onboarded, go to home
         if (isOnboardingComplete(userData)) {
           console.log('[Onboarding] Already completed, going home');
+          clearSafetyTimeout(loadingSafetyTimeout);
           navigate('/');
           return;
         }
@@ -78,6 +85,7 @@ export default function Onboarding() {
         if (userData?.workspace_id) {
           console.log('[Onboarding] Using existing workspace:', userData.workspace_id);
           if (isMounted) {
+            clearSafetyTimeout(loadingSafetyTimeout);
             setWorkspaceId(userData.workspace_id);
             setLoading(false);
           }
@@ -98,6 +106,7 @@ export default function Onboarding() {
         if (wsError) {
           console.error('[Onboarding] Error creating workspace:', wsError);
           if (isMounted) {
+            clearSafetyTimeout(loadingSafetyTimeout);
             setError('Failed to create workspace. Please refresh the page.');
             setLoading(false);
           }
@@ -116,12 +125,14 @@ export default function Onboarding() {
 
         console.log('[Onboarding] Workspace created:', workspace.id);
         if (isMounted) {
+          clearSafetyTimeout(loadingSafetyTimeout);
           setWorkspaceId(workspace.id);
           setLoading(false);
         }
       } catch (err) {
         console.error('[Onboarding] Unexpected error:', err);
         if (isMounted) {
+          clearSafetyTimeout(loadingSafetyTimeout);
           setError('An unexpected error occurred. Please refresh the page.');
           setLoading(false);
         }
@@ -137,6 +148,7 @@ export default function Onboarding() {
       }
 
       if (!session?.user) {
+        clearSafetyTimeout(loadingSafetyTimeout);
         setLoading(false);
         navigate('/auth');
         return;
@@ -150,6 +162,7 @@ export default function Onboarding() {
       console.log('[Onboarding] Auth event:', event);
 
       if (event === 'SIGNED_OUT' || !session?.user) {
+        clearSafetyTimeout(loadingSafetyTimeout);
         if (isMounted) setLoading(false);
         navigate('/auth');
         return;
@@ -162,7 +175,7 @@ export default function Onboarding() {
 
     return () => {
       isMounted = false;
-      window.clearTimeout(loadingSafetyTimeout);
+      clearSafetyTimeout(loadingSafetyTimeout);
       subscription.unsubscribe();
     };
   }, [navigate]);
