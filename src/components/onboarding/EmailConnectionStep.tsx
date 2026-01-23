@@ -255,22 +255,8 @@ export function EmailConnectionStep({
         return;
       }
 
-      // Check if in iframe
-      const isEmbedded = (() => {
-        try { return window.self !== window.top; } catch { return true; }
-      })();
-
-      if (isEmbedded) {
-        const popup = window.open(data.authUrl, '_blank', 'noopener,noreferrer');
-        if (!popup) {
-          toast.error('Popup blocked — please allow popups and try again.');
-          setIsConnecting(false);
-          return;
-        }
-        toast.message('Complete the email connection in the new tab, then come back here.');
-      } else {
-        window.location.href = data.authUrl;
-      }
+      // Always use same-tab redirect for seamless experience
+      window.location.href = data.authUrl;
     } catch (error) {
       console.error('Error starting OAuth:', error);
       toast.error('Failed to start email connection');

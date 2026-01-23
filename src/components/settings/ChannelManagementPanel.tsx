@@ -172,49 +172,19 @@ export const ChannelManagementPanel = () => {
     
     setConnecting(true);
     try {
-      // Use fixed published URL for consistent OAuth callback
-      const PUBLISHED_URL = 'https://embrace-channel-pix.lovable.app';
       const { data, error } = await supabase.functions.invoke('aurinko-auth-start', {
         body: { 
           workspaceId: workspace.id,
           provider: selectedProvider,
           importMode: selectedImportMode,
-          origin: PUBLISHED_URL
+          origin: window.location.origin
         },
       });
 
       if (error) throw error;
       if (data?.authUrl) {
-        window.open(data.authUrl, '_blank', 'width=600,height=700');
-        
-        // Listen for success/cancel/error message from popup
-        const handleMessage = (event: MessageEvent) => {
-          if (event.data?.type === 'aurinko-auth-success') {
-            toast({ title: 'Email account connected successfully!' });
-            fetchEmailConfigs();
-            setConnecting(false);
-            window.removeEventListener('message', handleMessage);
-          } else if (event.data?.type === 'aurinko-auth-cancelled') {
-            // User cancelled - just reset state silently
-            setConnecting(false);
-            window.removeEventListener('message', handleMessage);
-          } else if (event.data?.type === 'aurinko-auth-error') {
-            toast({ 
-              title: 'Failed to connect email', 
-              description: event.data.error,
-              variant: 'destructive' 
-            });
-            setConnecting(false);
-            window.removeEventListener('message', handleMessage);
-          }
-        };
-        window.addEventListener('message', handleMessage);
-        
-        // Timeout after 5 minutes
-        setTimeout(() => {
-          window.removeEventListener('message', handleMessage);
-          setConnecting(false);
-        }, 300000);
+        // Use same-tab redirect for seamless experience
+        window.location.href = data.authUrl;
       }
     } catch (error) {
       console.error('Error starting email OAuth:', error);
