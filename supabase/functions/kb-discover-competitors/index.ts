@@ -7,25 +7,21 @@ const corsHeaders = {
 };
 
 const FUNCTION_NAME = 'kb-discover-competitors';
-const FIRECRAWL_API = 'https://api.firecrawl.dev/v1';
 
 // Directories and aggregators to exclude
-const DIRECTORY_DOMAINS = [
-  'yelp.com', 'yell.com', 'checkatrade.com', 'trustatrader.com', 'bark.com',
-  'mybuilder.com', 'ratedpeople.com', 'freeindex.co.uk', 'thomsonlocal.com',
-  'facebook.com', 'twitter.com', 'instagram.com', 'linkedin.com', 'youtube.com',
-  'pinterest.com', 'tiktok.com', 'reddit.com', 'wikipedia.org', 'amazon.com',
-  'ebay.com', 'gumtree.com', 'craigslist.org', 'nextdoor.com', 'trustpilot.com',
-  'google.com', 'apple.com', 'microsoft.com', 'gov.uk', 'nhs.uk',
-  'which.co.uk', 'moneysupermarket.com', 'comparethemarket.com'
+const BLOCKLIST = [
+  'yell.com', 'yelp.com', 'checkatrade.com', 'bark.com', 'trustatrader.com',
+  'mybuilder.com', 'rated-people.com', 'trustpilot.com', 'facebook.com',
+  'instagram.com', 'twitter.com', 'linkedin.com', 'youtube.com',
+  'gumtree.com', 'freeindex.co.uk', 'google.com', 'wikipedia.org',
+  'pinterest.com', 'tiktok.com', 'reddit.com', 'amazon.com', 'ebay.com',
+  'nextdoor.com', 'gov.uk', 'nhs.uk', 'which.co.uk', 'moneysupermarket.com',
+  'comparethemarket.com', 'thomsonlocal.com', 'x.com'
 ];
 
 interface DiscoveredCompetitor {
-  company_name: string;
-  website_url: string;
-  domain: string;
-  description?: string;
-  source_query: string;
+  name: string;
+  website: string;
 }
 
 serve(async (req) => {
@@ -38,18 +34,17 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const firecrawlApiKey = Deno.env.get('FIRECRAWL_API_KEY');
+    const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    if (!firecrawlApiKey) throw new Error('FIRECRAWL_API_KEY not configured');
+    if (!GEMINI_API_KEY) throw new Error('GEMINI_API_KEY not configured');
 
-    const { job_id, workspace_id, niche_query, service_area, target_count = 15, exclude_domains = [] } = await req.json();
+    const { job_id, workspace_id } = await req.json();
 
     if (!job_id) throw new Error('job_id is required');
     if (!workspace_id) throw new Error('workspace_id is required');
-    if (!niche_query) throw new Error('niche_query is required');
 
-    console.log(`[${FUNCTION_NAME}] Discovering competitors for job:`, job_id);
+    console.log(`[${FUNCTION_NAME}] Starting competitor discovery for job:`, job_id);
 
     // Update job status
     await supabase
@@ -60,137 +55,193 @@ serve(async (req) => {
       })
       .eq('id', job_id);
 
-    // Load user's own website to exclude
-    const { data: profile } = await supabase
+    // STEP 1: Load search_keywords and website from business_profile
+    const { data: profile, error: profileError } = await supabase
       .from('business_profile')
-      .select('website, search_keywords')
+      .select('search_keywords, website, service_area, formatted_address')
       .eq('workspace_id', workspace_id)
       .single();
 
-    const ownDomain = profile?.website ? extractDomain(profile.website) : null;
-    const searchKeywords = profile?.search_keywords || [];
+    if (profileError || !profile) {
+      throw new Error('Business profile not found. Please run website analysis first.');
+    }
 
-    // Build search queries
-    const queries: string[] = [];
+    const searchKeywords = profile.search_keywords || [];
+    if (searchKeywords.length === 0) {
+      throw new Error('No search keywords. Run website analysis first.');
+    }
+
+    const userWebsiteUrl = profile.website || '';
+    const serviceArea = profile.service_area || profile.formatted_address || '';
     
-    // Main query
-    queries.push(`${niche_query}${service_area ? ` in ${service_area}` : ''}`);
-    
-    // Query with "near me" variation
-    queries.push(`${niche_query} services${service_area ? ` ${service_area}` : ''}`);
-    
-    // Use search keywords from website analysis
-    for (const keyword of searchKeywords.slice(0, 2)) {
-      if (keyword !== niche_query) {
-        queries.push(`${keyword}${service_area ? ` ${service_area}` : ''}`);
+    // Get user's domain to exclude
+    let userDomain = '';
+    if (userWebsiteUrl) {
+      try {
+        userDomain = new URL(userWebsiteUrl).hostname.replace('www.', '').toLowerCase();
+      } catch (e) {
+        console.warn(`[${FUNCTION_NAME}] Could not parse user website URL:`, userWebsiteUrl);
       }
     }
 
-    console.log(`[${FUNCTION_NAME}] Running ${queries.length} search queries`);
+    console.log(`[${FUNCTION_NAME}] Using keywords:`, searchKeywords.slice(0, 5));
+    console.log(`[${FUNCTION_NAME}] Service area:`, serviceArea);
+    console.log(`[${FUNCTION_NAME}] User domain to exclude:`, userDomain);
 
-    // Execute searches in parallel
+    // STEP 2: For each keyword, call Gemini with Google Grounding
     const allCompetitors: DiscoveredCompetitor[] = [];
-    const excludeSet = new Set([
-      ...DIRECTORY_DOMAINS,
-      ...exclude_domains.map((d: string) => d.toLowerCase()),
-      ...(ownDomain ? [ownDomain.toLowerCase()] : [])
-    ]);
+    const keywordsToUse = searchKeywords.slice(0, 5);
 
-    const searchPromises = queries.map(async (query) => {
+    for (let i = 0; i < keywordsToUse.length; i++) {
+      const keyword = keywordsToUse[i];
+      const searchQuery = serviceArea ? `${keyword} ${serviceArea}` : keyword;
+      
+      console.log(`[${FUNCTION_NAME}] Searching for keyword ${i + 1}/${keywordsToUse.length}: "${searchQuery}"`);
+
       try {
-        const response = await fetch(`${FIRECRAWL_API}/search`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${firecrawlApiKey}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            query,
-            limit: 10,
-            scrapeOptions: { formats: [] } // Just get URLs, no content
-          })
-        });
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{
+                parts: [{
+                  text: `Search Google for: "${searchQuery}"
+
+I need a list of REAL LOCAL BUSINESSES with their websites.
+
+IMPORTANT RULES:
+1. Only include actual service provider businesses (companies that DO the work)
+2. EXCLUDE all of these:
+   - Directory sites (Yell, Checkatrade, Bark, Yelp, Trustpilot, etc.)
+   - Lead generation sites
+   - Social media profiles (Facebook, Instagram, LinkedIn, etc.)
+   - News articles or blog posts
+   ${userWebsiteUrl ? `- The business website: ${userWebsiteUrl}` : ''}
+3. Only include businesses with their own website domain
+
+Return a JSON array:
+[{"name": "Business Name", "website": "https://theirwebsite.com"}, ...]
+
+Find up to 15 real local businesses. Return ONLY the JSON array.`
+                }]
+              }],
+              tools: [{
+                googleSearch: {}
+              }],
+              generationConfig: {
+                temperature: 0.1,
+                maxOutputTokens: 2000
+              }
+            })
+          }
+        );
 
         if (!response.ok) {
-          console.warn(`[${FUNCTION_NAME}] Search failed for "${query}": ${response.status}`);
-          return [];
+          const errorText = await response.text();
+          console.error(`[${FUNCTION_NAME}] Gemini API error for keyword "${keyword}":`, response.status, errorText);
+          continue;
         }
 
         const data = await response.json();
-        const results = data.data || [];
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
-        return results.map((result: any) => ({
-          company_name: result.title || extractDomain(result.url),
-          website_url: result.url,
-          domain: extractDomain(result.url),
-          description: result.description,
-          source_query: query
-        }));
+        // Parse JSON from response
+        const jsonMatch = text.match(/\[[\s\S]*?\]/);
+        if (jsonMatch) {
+          try {
+            const competitors = JSON.parse(jsonMatch[0]) as DiscoveredCompetitor[];
+            console.log(`[${FUNCTION_NAME}] Found ${competitors.length} competitors for "${keyword}"`);
+            allCompetitors.push(...competitors);
+          } catch (parseErr) {
+            console.warn(`[${FUNCTION_NAME}] Failed to parse JSON for keyword "${keyword}":`, parseErr);
+          }
+        } else {
+          console.warn(`[${FUNCTION_NAME}] No JSON array found in response for "${keyword}"`);
+        }
+
+        // Rate limit: wait 1.5 seconds between calls
+        if (i < keywordsToUse.length - 1) {
+          await new Promise(r => setTimeout(r, 1500));
+        }
       } catch (err) {
-        console.warn(`[${FUNCTION_NAME}] Search error for "${query}":`, err);
-        return [];
+        console.error(`[${FUNCTION_NAME}] Error searching for "${keyword}":`, err);
       }
-    });
-
-    const searchResults = await Promise.all(searchPromises);
-    
-    for (const results of searchResults) {
-      allCompetitors.push(...results);
     }
 
-    // Deduplicate by domain and filter excluded
-    const seenDomains = new Set<string>();
-    const validCompetitors = allCompetitors.filter(comp => {
-      const domain = comp.domain.toLowerCase();
-      
-      // Skip if already seen
-      if (seenDomains.has(domain)) return false;
-      seenDomains.add(domain);
-      
-      // Skip directories and excluded domains
-      if (isExcludedDomain(domain, excludeSet)) return false;
-      
-      // Skip if it's the user's own website
-      if (ownDomain && domain === ownDomain.toLowerCase()) return false;
-      
-      return true;
-    }).slice(0, target_count);
+    console.log(`[${FUNCTION_NAME}] Total raw competitors found: ${allCompetitors.length}`);
 
-    console.log(`[${FUNCTION_NAME}] Found ${validCompetitors.length} valid competitors from ${allCompetitors.length} total`);
+    // STEP 3: Deduplicate and filter results
+    const uniqueCompetitors = new Map<string, DiscoveredCompetitor>();
+    
+    for (const comp of allCompetitors) {
+      if (!comp.website) continue;
+      
+      try {
+        const domain = new URL(comp.website).hostname.replace('www.', '').toLowerCase();
+        
+        // Skip user's own site
+        if (userDomain && domain === userDomain) continue;
+        
+        // Skip blocklisted domains
+        if (BLOCKLIST.some(blocked => domain.includes(blocked))) continue;
+        
+        // Skip duplicates
+        if (uniqueCompetitors.has(domain)) continue;
+        
+        uniqueCompetitors.set(domain, comp);
+      } catch (e) {
+        // Invalid URL, skip
+      }
+    }
 
-    // Insert competitors into database
-    if (validCompetitors.length > 0) {
-      const sitesToInsert = validCompetitors.map(comp => ({
-        job_id,
-        workspace_id,
-        domain: comp.domain,
-        url: comp.website_url,
-        business_name: comp.company_name,
-        description: comp.description,
-        discovery_query: comp.source_query,
-        discovery_source: 'firecrawl_search',
-        status: 'approved', // Ready for mining
-        scrape_status: 'pending',
-        discovered_at: new Date().toISOString()
-      }));
+    const finalCompetitors = Array.from(uniqueCompetitors.values()).slice(0, 40);
+    console.log(`[${FUNCTION_NAME}] After dedup/filter: ${finalCompetitors.length} competitors`);
+
+    // STEP 4: Insert into competitor_sites table
+    if (finalCompetitors.length > 0) {
+      const sitesToInsert = finalCompetitors.map(comp => {
+        let domain = '';
+        try {
+          domain = new URL(comp.website).hostname.replace('www.', '').toLowerCase();
+        } catch {
+          domain = comp.website;
+        }
+        
+        return {
+          job_id,
+          workspace_id,
+          domain,
+          url: comp.website,
+          business_name: comp.name,
+          discovery_source: 'gemini_grounded',
+          status: 'approved',
+          scrape_status: 'pending',
+          discovered_at: new Date().toISOString()
+        };
+      });
 
       const { error: insertError } = await supabase
         .from('competitor_sites')
-        .insert(sitesToInsert);
+        .upsert(sitesToInsert, { 
+          onConflict: 'job_id,domain',
+          ignoreDuplicates: true 
+        });
 
       if (insertError) {
         console.error(`[${FUNCTION_NAME}] Insert error:`, insertError);
       }
     }
 
-    // Update job with discovery results
+    // STEP 5: Update job with discovery results
     await supabase
       .from('competitor_research_jobs')
       .update({
         status: 'sites_ready',
-        sites_discovered: validCompetitors.length,
-        sites_approved: validCompetitors.length,
-        search_queries: queries,
+        sites_discovered: finalCompetitors.length,
+        sites_approved: finalCompetitors.length,
+        search_queries: keywordsToUse.map((k: string) => serviceArea ? `${k} ${serviceArea}` : k),
         heartbeat_at: new Date().toISOString()
       })
       .eq('id', job_id);
@@ -202,19 +253,18 @@ serve(async (req) => {
       .eq('id', workspace_id);
 
     const duration = Date.now() - startTime;
-    console.log(`[${FUNCTION_NAME}] Completed in ${duration}ms: ${validCompetitors.length} competitors`);
+    console.log(`[${FUNCTION_NAME}] Completed in ${duration}ms: ${finalCompetitors.length} competitors`);
 
     return new Response(
       JSON.stringify({
         success: true,
         job_id,
-        competitors_found: validCompetitors.length,
-        competitors: validCompetitors.map(c => ({
-          domain: c.domain,
-          name: c.company_name,
-          url: c.website_url
+        competitors_found: finalCompetitors.length,
+        competitors: finalCompetitors.map(c => ({
+          name: c.name,
+          website: c.website
         })),
-        queries_used: queries,
+        keywords_used: keywordsToUse,
         duration_ms: duration
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -235,28 +285,3 @@ serve(async (req) => {
     );
   }
 });
-
-function extractDomain(url: string): string {
-  try {
-    const hostname = new URL(url).hostname;
-    return hostname.replace(/^www\./, '');
-  } catch {
-    return url;
-  }
-}
-
-function isExcludedDomain(domain: string, excludeSet: Set<string>): boolean {
-  const lowerDomain = domain.toLowerCase();
-  
-  // Direct match
-  if (excludeSet.has(lowerDomain)) return true;
-  
-  // Check if domain ends with excluded domain (e.g., "business.facebook.com")
-  for (const excluded of excludeSet) {
-    if (lowerDomain.endsWith('.' + excluded) || lowerDomain === excluded) {
-      return true;
-    }
-  }
-  
-  return false;
-}
