@@ -24,7 +24,7 @@ interface ImportJob {
   id: string;
   workspace_id: string;
   config_id: string;
-  status: 'pending' | 'in_progress' | 'paused' | 'completed' | 'failed';
+  status: string;
   import_mode: string;
   total_target: number;
   inbox_imported: number;
@@ -35,6 +35,10 @@ interface ImportJob {
   error_message: string | null;
   retry_count: number;
   last_batch_at: string | null;
+}
+
+function folderToJobStatus(folder: 'SENT' | 'INBOX'): 'scanning_sent' | 'scanning_inbox' {
+  return folder === 'SENT' ? 'scanning_sent' : 'scanning_inbox';
 }
 
 // =============================================================================
@@ -133,37 +137,42 @@ serve(async (req) => {
       }
       job = data as ImportJob;
     } else {
-      // Create new job
+      // Create new job - use minimal insert, let DB defaults handle the rest
       const totalTarget = import_mode === 'last_100' ? 100 : 
                          import_mode === 'last_1000' ? 1000 : 30000;
+
+      console.log(`[${FUNCTION_NAME}] Creating new job for config_id: ${emailConfig.id}, mode: ${import_mode}, target: ${totalTarget}`);
 
       const { data, error } = await supabase
         .from('email_import_jobs')
         .insert({
           workspace_id,
           config_id: emailConfig.id,
-          status: 'in_progress',
           import_mode,
           total_target: totalTarget,
-          inbox_imported: 0,
-          sent_imported: 0,
-          inbox_page_token: null,
-          sent_page_token: null,
-          current_folder: 'SENT',
-          retry_count: 0,
           started_at: new Date().toISOString(),
         })
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error(`[${FUNCTION_NAME}] Job insert failed:`, JSON.stringify(error));
+        throw new Error(`Failed to create import job: ${error.message}`);
+      }
+      
       job = data as ImportJob;
+      // Initialize defaults for tracking fields if not returned
+      job.inbox_imported = job.inbox_imported ?? 0;
+      job.sent_imported = job.sent_imported ?? 0;
+      job.current_folder = job.current_folder ?? 'SENT';
+      
+      console.log(`[${FUNCTION_NAME}] Created job ${job.id}, status: ${job.status}`);
     }
 
-    // Update job to in_progress
+    // Update job to active scanning status
     await supabase
       .from('email_import_jobs')
-      .update({ status: 'in_progress', last_batch_at: new Date().toISOString() })
+      .update({ status: folderToJobStatus(job.current_folder), last_batch_at: new Date().toISOString() })
       .eq('id', job.id);
 
     // -------------------------------------------------------------------------
@@ -226,7 +235,7 @@ serve(async (req) => {
           
           // If delay would exceed timeout, save checkpoint and self-invoke
           if (!shouldContinueProcessing(startTime)) {
-            await saveCheckpoint(supabase, job, 'in_progress');
+            await saveCheckpoint(supabase, job, folderToJobStatus(job.current_folder));
             await updateProgress(supabase, workspace_id, 'importing', job.sent_imported + job.inbox_imported);
             
             console.log(`[${FUNCTION_NAME}] Timeout approaching, self-invoking with delay ${delay}ms`);
@@ -326,7 +335,7 @@ serve(async (req) => {
       }
 
       // Save checkpoint every batch
-      await saveCheckpoint(supabase, job, 'in_progress');
+      await saveCheckpoint(supabase, job, folderToJobStatus(job.current_folder));
 
       // Update progress for frontend UI
       await updateProgress(supabase, workspace_id, 'importing', job.sent_imported + job.inbox_imported);
@@ -389,7 +398,7 @@ serve(async (req) => {
     // -------------------------------------------------------------------------
     // More work to do - SELF INVOKE (Relay Race)
     // -------------------------------------------------------------------------
-    await saveCheckpoint(supabase, job, 'in_progress');
+    await saveCheckpoint(supabase, job, folderToJobStatus(job.current_folder));
     await updateProgress(supabase, workspace_id, 'importing', totalImported);
 
     console.log(`[${FUNCTION_NAME}] Self-invoking: depth=${_relay_depth + 1}, progress=${totalImported}/${job.total_target}`);
