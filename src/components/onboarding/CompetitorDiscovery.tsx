@@ -3,7 +3,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Search, Loader2, CheckCircle, Building2, Star, X, MapPin } from 'lucide-react';
+import { Search, Loader2, CheckCircle, Building2, Star, X, MapPin, Globe, AlertCircle } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
 interface Competitor {
   name: string;
@@ -25,6 +26,7 @@ export const CompetitorDiscovery = ({ workspaceId, onComplete, onBack }: Competi
   const [competitors, setCompetitors] = useState<Competitor[]>([]);
   const [jobId, setJobId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [locationInfo, setLocationInfo] = useState<{ name?: string; radius?: number } | null>(null);
 
   const discoverCompetitors = async () => {
     setStatus('searching');
@@ -43,8 +45,17 @@ export const CompetitorDiscovery = ({ workspaceId, onComplete, onBack }: Competi
 
       setCompetitors(data.competitors || []);
       setJobId(data.job_id);
+      setLocationInfo({
+        name: data.location?.name,
+        radius: data.radius_miles
+      });
       setStatus('complete');
-      toast.success(`Found ${data.competitors_found} competitors`);
+      
+      if (data.competitors_found > 0) {
+        toast.success(`Found ${data.competitors_found} local competitors via Google Maps`);
+      } else {
+        toast.info('No competitors found. You can continue without competitor analysis.');
+      }
 
     } catch (e: any) {
       console.error('Competitor discovery error:', e);
@@ -57,7 +68,6 @@ export const CompetitorDiscovery = ({ workspaceId, onComplete, onBack }: Competi
   const removeCompetitor = async (website: string) => {
     setCompetitors(prev => prev.filter(c => c.website !== website));
     
-    // Also update the database to mark as removed
     if (jobId) {
       try {
         const domain = new URL(website).hostname.replace('www.', '').toLowerCase();
@@ -77,11 +87,11 @@ export const CompetitorDiscovery = ({ workspaceId, onComplete, onBack }: Competi
       <Card className="w-full max-w-2xl mx-auto">
         <CardContent className="p-8 text-center">
           <div className="text-destructive mb-4">
-            <X className="h-12 w-12 mx-auto" />
+            <AlertCircle className="h-12 w-12 mx-auto" />
           </div>
           <h3 className="text-lg font-semibold mb-2">Discovery Failed</h3>
-          <p className="text-muted-foreground mb-6">{error}</p>
-          <div className="flex gap-3 justify-center">
+          <p className="text-muted-foreground mb-6 text-sm">{error}</p>
+          <div className="flex gap-3 justify-center flex-wrap">
             {onBack && (
               <Button variant="outline" onClick={onBack}>
                 Go Back
@@ -105,17 +115,28 @@ export const CompetitorDiscovery = ({ workspaceId, onComplete, onBack }: Competi
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <CheckCircle className="h-5 w-5 text-green-500" />
-            Competitors Found
+            Local Competitors Found
           </CardTitle>
-          <CardDescription>
-            Review and remove any that aren't relevant
+          <CardDescription className="space-y-1">
+            <span>Found via Google Maps - real verified businesses</span>
+            {locationInfo?.name && (
+              <div className="flex items-center gap-1.5 text-xs">
+                <MapPin className="h-3 w-3" />
+                {locationInfo.name}
+                {locationInfo.radius && ` (${locationInfo.radius} mile radius)`}
+              </div>
+            )}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {competitors.length === 0 ? (
             <div className="text-center py-8">
+              <Globe className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
               <p className="text-muted-foreground mb-4">
-                No competitors found. You can continue without competitor analysis.
+                No competitors with websites found in your area.
+              </p>
+              <p className="text-xs text-muted-foreground mb-6">
+                You can continue without competitor analysis or try adjusting your business location.
               </p>
               <Button onClick={onComplete}>Continue</Button>
             </div>
@@ -127,25 +148,31 @@ export const CompetitorDiscovery = ({ workspaceId, onComplete, onBack }: Competi
                     key={c.website} 
                     className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border"
                   >
-                    <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
                       <Building2 className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <p className="font-medium truncate">{c.name}</p>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
                           {c.city && (
                             <span className="flex items-center gap-1">
                               <MapPin className="h-3 w-3" />
                               {c.city}
                             </span>
                           )}
-                          {c.distance_miles && (
-                            <span>• {c.distance_miles}mi</span>
+                          {c.distance_miles !== undefined && c.distance_miles !== null && (
+                            <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                              {c.distance_miles}mi
+                            </Badge>
                           )}
                           {c.rating && (
-                            <span className="flex items-center gap-1 text-amber-500">
+                            <span className="flex items-center gap-1 text-warning">
                               <Star className="h-3 w-3 fill-current" /> 
-                              {c.rating}
-                              {c.review_count && ` (${c.review_count})`}
+                              {c.rating.toFixed(1)}
+                              {c.review_count && (
+                                <span className="text-muted-foreground">
+                                  ({c.review_count})
+                                </span>
+                              )}
                             </span>
                           )}
                         </div>
@@ -181,22 +208,31 @@ export const CompetitorDiscovery = ({ workspaceId, onComplete, onBack }: Competi
     <Card className="w-full max-w-2xl mx-auto">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Search className="h-5 w-5" />
-          Find Competitors
+          <MapPin className="h-5 w-5 text-primary" />
+          Find Local Competitors
         </CardTitle>
         <CardDescription>
-          We'll search for similar businesses in your area to learn from their FAQs
+          We'll use Google Maps to find verified businesses in your area
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         {status === 'idle' && (
           <>
             <div className="bg-muted/50 rounded-lg p-4 space-y-3">
-              <h4 className="font-medium">What we'll do:</h4>
+              <h4 className="font-medium text-sm">How it works:</h4>
               <ul className="text-sm text-muted-foreground space-y-2">
-                <li>• Search for businesses in your industry and area</li>
-                <li>• Find real business websites (not directories)</li>
-                <li>• Prepare them for FAQ extraction</li>
+                <li className="flex items-start gap-2">
+                  <MapPin className="h-4 w-4 mt-0.5 text-primary flex-shrink-0" />
+                  <span>Search Google Maps for businesses in your industry and location</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <CheckCircle className="h-4 w-4 mt-0.5 text-primary flex-shrink-0" />
+                  <span>Only real, verified businesses with websites (no directories)</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Star className="h-4 w-4 mt-0.5 text-warning flex-shrink-0" />
+                  <span>Includes ratings and distance from your location</span>
+                </li>
               </ul>
             </div>
             
@@ -214,9 +250,9 @@ export const CompetitorDiscovery = ({ workspaceId, onComplete, onBack }: Competi
         {status === 'searching' && (
           <div className="text-center py-8">
             <Loader2 className="h-10 w-10 animate-spin mx-auto text-primary mb-4" />
-            <p className="font-medium">Searching for competitors...</p>
+            <p className="font-medium">Searching Google Maps...</p>
             <p className="text-sm text-muted-foreground mt-2">
-              Using Google to find local businesses in your area
+              Finding verified local businesses in your area
             </p>
           </div>
         )}
