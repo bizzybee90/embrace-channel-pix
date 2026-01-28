@@ -5155,6 +5155,86 @@ export type Database = {
           },
         ]
       }
+      website_scrape_jobs: {
+        Row: {
+          business_info: Json | null
+          completed_at: string | null
+          error_message: string | null
+          faqs_extracted: number | null
+          ground_truth_facts: number | null
+          id: string
+          map_job_id: string | null
+          pages_extracted: number | null
+          pages_found: number | null
+          pages_scraped: number | null
+          priority_pages: string[] | null
+          retry_count: number | null
+          scrape_job_id: string | null
+          scraped_pages: Json | null
+          search_keywords: string[] | null
+          started_at: string | null
+          status: string | null
+          updated_at: string | null
+          voice_profile: Json | null
+          website_url: string
+          workspace_id: string
+        }
+        Insert: {
+          business_info?: Json | null
+          completed_at?: string | null
+          error_message?: string | null
+          faqs_extracted?: number | null
+          ground_truth_facts?: number | null
+          id?: string
+          map_job_id?: string | null
+          pages_extracted?: number | null
+          pages_found?: number | null
+          pages_scraped?: number | null
+          priority_pages?: string[] | null
+          retry_count?: number | null
+          scrape_job_id?: string | null
+          scraped_pages?: Json | null
+          search_keywords?: string[] | null
+          started_at?: string | null
+          status?: string | null
+          updated_at?: string | null
+          voice_profile?: Json | null
+          website_url: string
+          workspace_id: string
+        }
+        Update: {
+          business_info?: Json | null
+          completed_at?: string | null
+          error_message?: string | null
+          faqs_extracted?: number | null
+          ground_truth_facts?: number | null
+          id?: string
+          map_job_id?: string | null
+          pages_extracted?: number | null
+          pages_found?: number | null
+          pages_scraped?: number | null
+          priority_pages?: string[] | null
+          retry_count?: number | null
+          scrape_job_id?: string | null
+          scraped_pages?: Json | null
+          search_keywords?: string[] | null
+          started_at?: string | null
+          status?: string | null
+          updated_at?: string | null
+          voice_profile?: Json | null
+          website_url?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "website_scrape_jobs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_channels: {
         Row: {
           automation_level: string | null

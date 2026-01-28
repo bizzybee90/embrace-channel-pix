@@ -229,3 +229,9 @@ verify_jwt = false
 
 [functions.refine-competitor-faqs]
 verify_jwt = false
+
+[functions.start-website-scrape]
+verify_jwt = false
+
+[functions.extract-website-faqs]
+verify_jwt = false
