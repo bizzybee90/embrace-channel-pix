@@ -168,10 +168,21 @@ export const ChannelManagementPanel = () => {
   };
 
   const handleConnectEmail = async () => {
-    if (!workspace?.id) return;
+    console.log('[ChannelManagementPanel] handleConnectEmail called', { 
+      workspaceId: workspace?.id, 
+      selectedProvider, 
+      selectedImportMode 
+    });
+    
+    if (!workspace?.id) {
+      console.error('[ChannelManagementPanel] No workspace ID available');
+      toast({ title: 'Workspace not loaded', description: 'Please refresh the page', variant: 'destructive' });
+      return;
+    }
     
     setConnecting(true);
     try {
+      console.log('[ChannelManagementPanel] Calling aurinko-auth-start...');
       const { data, error } = await supabase.functions.invoke('aurinko-auth-start', {
         body: { 
           workspaceId: workspace.id,
@@ -181,13 +192,20 @@ export const ChannelManagementPanel = () => {
         },
       });
 
+      console.log('[ChannelManagementPanel] aurinko-auth-start response:', { data, error });
+
       if (error) throw error;
+      
       if (data?.authUrl) {
-        // Use same-tab redirect for seamless experience
+        console.log('[ChannelManagementPanel] Redirecting to:', data.authUrl);
         window.location.href = data.authUrl;
+      } else {
+        console.error('[ChannelManagementPanel] No authUrl in response');
+        toast({ title: 'Failed to get auth URL', variant: 'destructive' });
+        setConnecting(false);
       }
     } catch (error) {
-      console.error('Error starting email OAuth:', error);
+      console.error('[ChannelManagementPanel] Error starting email OAuth:', error);
       toast({ title: 'Failed to connect email', variant: 'destructive' });
       setConnecting(false);
     }
