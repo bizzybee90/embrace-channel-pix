@@ -45,8 +45,10 @@ export function useLearningProgress(workspaceId: string | null) {
     const voiceComplete = data.voice_profile_complete || false;
     const playbookComplete = data.playbook_complete || false;
     const lastUpdatedAt = (data.updated_at ?? null) as string | null;
+    const phase1Status = data.phase1_status || 'pending';
+    const phase2Status = data.phase2_status || 'pending';
     
-    // Determine current phase based on status flags
+    // Determine current phase based on actual completion flags
     let phaseIndex = 0;
     let estimatedSeconds: number | null = null;
     
@@ -55,18 +57,17 @@ export function useLearningProgress(workspaceId: string | null) {
       phaseIndex = 3; // complete
       estimatedSeconds = 0;
     } else if (voiceComplete) {
-      // Voice done, doing embeddings
+      // Voice done, doing embeddings/playbook
       phaseIndex = 2;
-      // ~50 examples at 10/sec = 5 seconds
       estimatedSeconds = Math.ceil(50 / RATES.embeddings);
-    } else if (pairsAnalyzed > 0) {
-      // Pairs found, extracting voice DNA
+    } else if (emailCount >= 10) {
+      // We have enough emails for voice learning - it's either running or about to
+      // Show that voice DNA extraction is happening
       phaseIndex = 1;
-      // Voice extraction takes ~15-30 seconds for Claude call
-      estimatedSeconds = 20;
-    } else if (data.current_phase === 'learning') {
-      // Learning is queued/starting, but we don't have reliable counters for pairing progress.
-      // Avoid showing a misleading ETA until the backend starts emitting progress signals.
+      // Voice extraction with 500 emails takes ~60-90 seconds
+      estimatedSeconds = 60;
+    } else if (data.current_phase === 'learning' || data.current_phase === 'importing') {
+      // Still importing/pairing emails
       phaseIndex = 0;
       estimatedSeconds = null;
     }

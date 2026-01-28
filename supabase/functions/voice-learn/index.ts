@@ -31,11 +31,13 @@ serve(async (req) => {
     if (!body.workspace_id) throw new Error('workspace_id is required');
 
     // Get ALL sent emails (Gemini 2.5 Pro can handle large context)
+    // NOTE: email-import-v2 writes to email_import_queue, not raw_emails
     const { data: emails, error: emailError } = await supabase
-      .from('raw_emails')
-      .select('from_name, to_email, to_name, subject, body_text, received_at')
+      .from('email_import_queue')
+      .select('from_name, from_email, to_emails, subject, body, received_at')
       .eq('workspace_id', body.workspace_id)
-      .eq('email_type', 'outbound')
+      .eq('direction', 'outbound')
+      .not('body', 'is', null)
       .order('received_at', { ascending: false })
       .limit(500);
 
@@ -77,11 +79,11 @@ serve(async (req) => {
     // Format emails for analysis
     const emailsText = emails.map((e: any, i: number) => 
       `--- EMAIL ${i + 1} ---
-To: ${e.to_name || e.to_email}
+To: ${e.to_emails?.[0] || 'Unknown'}
 Subject: ${e.subject}
 Date: ${e.received_at}
 Body:
-${e.body_text || '[No text content]'}
+${e.body || '[No text content]'}
 `
     ).join('\n\n');
 

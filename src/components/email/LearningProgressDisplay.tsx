@@ -27,20 +27,25 @@ export function LearningProgressDisplay({ workspaceId, emailsImported }: Learnin
     );
   }
 
-  const { currentPhase, phaseIndex, totalPhases, estimatedSecondsRemaining, isComplete, lastUpdatedAt } = progress;
-  const overallProgress = isComplete ? 100 : Math.round((phaseIndex / totalPhases) * 100);
+  const { currentPhase, phaseIndex, totalPhases, estimatedSecondsRemaining, isComplete, lastUpdatedAt, voiceProfileComplete } = progress;
+  
+  // Calculate progress based on actual phase completion
+  // Phase 0 (pairing) = 17%, Phase 1 (voice) = 50%, Phase 2 (memory) = 83%, Complete = 100%
+  const phaseProgress = isComplete ? 100 : Math.round(((phaseIndex + 0.5) / totalPhases) * 100);
   const PhaseIcon = phaseIcons[currentPhase.id];
 
   const lastUpdatedText = lastUpdatedAt
-    ? `${formatDistanceToNowStrict(new Date(lastUpdatedAt), { addSuffix: true })}`
+    ? formatDistanceToNowStrict(new Date(lastUpdatedAt), { addSuffix: true })
     : null;
-  const isStale = lastUpdatedAt
+  
+  // Only show stale warning if we haven't completed AND no update for 5 minutes
+  const isStale = !isComplete && lastUpdatedAt
     ? Date.now() - new Date(lastUpdatedAt).getTime() > 5 * 60 * 1000
     : false;
 
   const displayLabel = !isComplete && isStale ? 'Waiting for analysis to resume' : currentPhase.label;
   const displayDescription = !isComplete && isStale
-    ? 'No backend progress has been reported recently. We’ll keep checking automatically.'
+    ? "No backend progress has been reported recently. We'll keep checking automatically."
     : currentPhase.description;
 
   return (
@@ -72,7 +77,7 @@ export function LearningProgressDisplay({ workspaceId, emailsImported }: Learnin
           )}
         </div>
 
-        {lastUpdatedText && (
+        {lastUpdatedText && !isComplete && (
           <div className="flex items-center justify-between text-[11px] text-muted-foreground">
             <span>Last updated {lastUpdatedText}</span>
             {isStale && <span className="text-destructive">No progress recently</span>}
@@ -82,10 +87,10 @@ export function LearningProgressDisplay({ workspaceId, emailsImported }: Learnin
         {/* Phase progress */}
         {!isComplete && (
           <div className="space-y-1">
-            <Progress value={overallProgress} className="h-1.5" />
+            <Progress value={phaseProgress} className="h-1.5" />
             <div className="flex justify-between text-xs text-muted-foreground">
               <span>Phase {phaseIndex + 1} of {totalPhases}</span>
-              <span>{overallProgress}%</span>
+              <span>{phaseProgress}%</span>
             </div>
           </div>
         )}
