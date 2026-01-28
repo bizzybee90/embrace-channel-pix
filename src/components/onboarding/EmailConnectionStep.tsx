@@ -479,15 +479,29 @@ export function EmailConnectionStep({
                 <span className="font-medium text-sm">
                   {progress.status === 'importing' && `Importing emails... ${progress.emails_imported.toLocaleString()}`}
                   {progress.status === 'classifying' && `Classifying... ${progress.emails_classified.toLocaleString()}`}
-                  {progress.status === 'learning' && 'Learning your style...'}
+                  {progress.status === 'learning' && `Analyzing ${progress.emails_imported.toLocaleString()} emails...`}
                 </span>
               </div>
 
-              {progressPercent > 0 && (
+              {/* Show progress bar for importing/classifying */}
+              {progress.status !== 'learning' && progressPercent > 0 && (
                 <div className="space-y-1">
                   <Progress value={progressPercent} className="h-2" />
                   <p className="text-xs text-center text-muted-foreground">
                     {progressPercent}% complete
+                  </p>
+                </div>
+              )}
+
+              {/* Learning phase shows completion badge + explanation */}
+              {progress.status === 'learning' && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-xs text-success">
+                    <CheckCircle2 className="h-4 w-4" />
+                    <span>{progress.emails_imported.toLocaleString()} emails imported successfully</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Building your voice profile and learning your response patterns. This happens in the background.
                   </p>
                 </div>
               )}
@@ -497,7 +511,7 @@ export function EmailConnectionStep({
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
                 </span>
-                <span>Actively importing</span>
+                <span>{progress.status === 'learning' ? 'Processing in background' : 'Actively importing'}</span>
               </div>
 
               <p className="text-xs text-center text-muted-foreground">
