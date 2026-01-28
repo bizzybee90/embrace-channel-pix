@@ -211,3 +211,9 @@ verify_jwt = false
 
 [functions.save-classification-correction]
 verify_jwt = false
+
+[functions.competitor-places-discover]
+verify_jwt = false
+
+[functions.places-webhook]
+verify_jwt = false
