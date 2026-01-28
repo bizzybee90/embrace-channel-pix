@@ -235,3 +235,12 @@ verify_jwt = false
 
 [functions.extract-website-faqs]
 verify_jwt = false
+
+[functions.start-own-website-scrape]
+verify_jwt = false
+
+[functions.process-own-website-scrape]
+verify_jwt = false
+
+[functions.handle-scrape-failed]
+verify_jwt = false
