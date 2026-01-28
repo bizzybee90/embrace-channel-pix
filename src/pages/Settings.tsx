@@ -27,6 +27,7 @@ import { LowConfidenceWizard } from '@/components/settings/LowConfidenceWizard';
 import { LearningAnalyticsDashboard } from '@/components/settings/LearningAnalyticsDashboard';
 import { InboxLearningInsightsPanel } from '@/components/settings/InboxLearningInsightsPanel';
 import { DataResetPanel } from '@/components/settings/DataResetPanel';
+import { OnboardingTriggerPanel } from '@/components/settings/OnboardingTriggerPanel';
 import { TestMessageGenerator } from '@/components/TestMessageGenerator';
 import { BackButton } from '@/components/shared/BackButton';
 import { SettingsSection } from '@/components/settings/SettingsSection';
@@ -215,6 +216,12 @@ export default function Settings() {
               </Card>
             </div>
           </SettingsSection>
+
+          {workspace?.id && (
+            <SettingsSection title="Re-run Setup Wizard" description="Start onboarding again">
+              <OnboardingTriggerPanel workspaceId={workspace.id} />
+            </SettingsSection>
+          )}
 
           {workspace?.id && (
             <SettingsSection title="Data Reset" description="Reset data and re-onboard">
