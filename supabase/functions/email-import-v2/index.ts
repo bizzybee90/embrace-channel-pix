@@ -305,7 +305,7 @@ serve(async (req) => {
         body_html: msg.htmlBody || null,
         received_at: msg.receivedAt || msg.createdAt,
         direction: folder === 'SENT' ? 'outbound' : 'inbound',
-        status: 'pending',
+        status: 'scanned',
         has_body: !!(msg.textBody || msg.bodySnippet),
       }));
 
