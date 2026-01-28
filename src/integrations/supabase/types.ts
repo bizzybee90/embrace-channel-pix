@@ -692,26 +692,34 @@ export type Database = {
           completed_at: string | null
           created_at: string | null
           current_scraping_domain: string | null
+          discovery_run_id: string | null
           error_message: string | null
           exclude_domains: string[] | null
+          extraction_run_id: string | null
           faqs_added: number | null
           faqs_after_dedup: number | null
           faqs_embedded: number | null
           faqs_extracted: number | null
           faqs_generated: number | null
           faqs_refined: number | null
+          geocoded_lat: number | null
+          geocoded_lng: number | null
           heartbeat_at: string | null
           id: string
           industry: string | null
           location: string | null
+          max_competitors: number | null
           niche_query: string
           pages_scraped: number | null
+          radius_km: number | null
           radius_miles: number | null
           retry_count: number | null
+          scrape_run_id: string | null
           search_queries: Json | null
           service_area: string | null
           sites_approved: number | null
           sites_discovered: number | null
+          sites_filtered: number | null
           sites_scraped: number | null
           sites_validated: number | null
           started_at: string | null
@@ -725,26 +733,34 @@ export type Database = {
           completed_at?: string | null
           created_at?: string | null
           current_scraping_domain?: string | null
+          discovery_run_id?: string | null
           error_message?: string | null
           exclude_domains?: string[] | null
+          extraction_run_id?: string | null
           faqs_added?: number | null
           faqs_after_dedup?: number | null
           faqs_embedded?: number | null
           faqs_extracted?: number | null
           faqs_generated?: number | null
           faqs_refined?: number | null
+          geocoded_lat?: number | null
+          geocoded_lng?: number | null
           heartbeat_at?: string | null
           id?: string
           industry?: string | null
           location?: string | null
+          max_competitors?: number | null
           niche_query: string
           pages_scraped?: number | null
+          radius_km?: number | null
           radius_miles?: number | null
           retry_count?: number | null
+          scrape_run_id?: string | null
           search_queries?: Json | null
           service_area?: string | null
           sites_approved?: number | null
           sites_discovered?: number | null
+          sites_filtered?: number | null
           sites_scraped?: number | null
           sites_validated?: number | null
           started_at?: string | null
@@ -758,26 +774,34 @@ export type Database = {
           completed_at?: string | null
           created_at?: string | null
           current_scraping_domain?: string | null
+          discovery_run_id?: string | null
           error_message?: string | null
           exclude_domains?: string[] | null
+          extraction_run_id?: string | null
           faqs_added?: number | null
           faqs_after_dedup?: number | null
           faqs_embedded?: number | null
           faqs_extracted?: number | null
           faqs_generated?: number | null
           faqs_refined?: number | null
+          geocoded_lat?: number | null
+          geocoded_lng?: number | null
           heartbeat_at?: string | null
           id?: string
           industry?: string | null
           location?: string | null
+          max_competitors?: number | null
           niche_query?: string
           pages_scraped?: number | null
+          radius_km?: number | null
           radius_miles?: number | null
           retry_count?: number | null
+          scrape_run_id?: string | null
           search_queries?: Json | null
           service_area?: string | null
           sites_approved?: number | null
           sites_discovered?: number | null
+          sites_filtered?: number | null
           sites_scraped?: number | null
           sites_validated?: number | null
           started_at?: string | null
@@ -807,6 +831,7 @@ export type Database = {
           discovered_at: string | null
           discovery_query: string | null
           discovery_source: string | null
+          distance_km: number | null
           distance_miles: number | null
           domain: string
           domain_type: string | null
@@ -814,6 +839,7 @@ export type Database = {
           faqs_extracted: number | null
           faqs_generated: number | null
           faqs_validated: number | null
+          filter_reason: string | null
           has_faq_page: boolean | null
           has_pricing_page: boolean | null
           id: string
@@ -830,6 +856,7 @@ export type Database = {
           rating: number | null
           rejection_reason: string | null
           review_count: number | null
+          reviews_count: number | null
           scrape_error: string | null
           scrape_status: string | null
           scraped_at: string | null
@@ -850,6 +877,7 @@ export type Database = {
           discovered_at?: string | null
           discovery_query?: string | null
           discovery_source?: string | null
+          distance_km?: number | null
           distance_miles?: number | null
           domain: string
           domain_type?: string | null
@@ -857,6 +885,7 @@ export type Database = {
           faqs_extracted?: number | null
           faqs_generated?: number | null
           faqs_validated?: number | null
+          filter_reason?: string | null
           has_faq_page?: boolean | null
           has_pricing_page?: boolean | null
           id?: string
@@ -873,6 +902,7 @@ export type Database = {
           rating?: number | null
           rejection_reason?: string | null
           review_count?: number | null
+          reviews_count?: number | null
           scrape_error?: string | null
           scrape_status?: string | null
           scraped_at?: string | null
@@ -893,6 +923,7 @@ export type Database = {
           discovered_at?: string | null
           discovery_query?: string | null
           discovery_source?: string | null
+          distance_km?: number | null
           distance_miles?: number | null
           domain?: string
           domain_type?: string | null
@@ -900,6 +931,7 @@ export type Database = {
           faqs_extracted?: number | null
           faqs_generated?: number | null
           faqs_validated?: number | null
+          filter_reason?: string | null
           has_faq_page?: boolean | null
           has_pricing_page?: boolean | null
           id?: string
@@ -916,6 +948,7 @@ export type Database = {
           rating?: number | null
           rejection_reason?: string | null
           review_count?: number | null
+          reviews_count?: number | null
           scrape_error?: string | null
           scrape_status?: string | null
           scraped_at?: string | null
@@ -1697,6 +1730,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      directory_blocklist: {
+        Row: {
+          created_at: string | null
+          domain: string
+          id: string
+          reason: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          domain: string
+          id?: string
+          reason?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          domain?: string
+          id?: string
+          reason?: string | null
+        }
+        Relationships: []
       }
       document_chunks: {
         Row: {
