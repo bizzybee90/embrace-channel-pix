@@ -2909,6 +2909,7 @@ export type Database = {
           answer: string
           archived: boolean | null
           category: string
+          confidence: number | null
           created_at: string | null
           embedding: string | null
           enabled: boolean | null
@@ -2921,11 +2922,14 @@ export type Database = {
           keywords: string[] | null
           original_faq_id: string | null
           priority: number | null
+          quality_score: number | null
           question: string
           refined_at: string | null
           relevance_score: number | null
           source_business: string | null
           source_company: string | null
+          source_page_url: string | null
+          source_type: string | null
           source_url: string | null
           updated_at: string | null
           workspace_id: string
@@ -2934,6 +2938,7 @@ export type Database = {
           answer: string
           archived?: boolean | null
           category: string
+          confidence?: number | null
           created_at?: string | null
           embedding?: string | null
           enabled?: boolean | null
@@ -2946,11 +2951,14 @@ export type Database = {
           keywords?: string[] | null
           original_faq_id?: string | null
           priority?: number | null
+          quality_score?: number | null
           question: string
           refined_at?: string | null
           relevance_score?: number | null
           source_business?: string | null
           source_company?: string | null
+          source_page_url?: string | null
+          source_type?: string | null
           source_url?: string | null
           updated_at?: string | null
           workspace_id: string
@@ -2959,6 +2967,7 @@ export type Database = {
           answer?: string
           archived?: boolean | null
           category?: string
+          confidence?: number | null
           created_at?: string | null
           embedding?: string | null
           enabled?: boolean | null
@@ -2971,11 +2980,14 @@ export type Database = {
           keywords?: string[] | null
           original_faq_id?: string | null
           priority?: number | null
+          quality_score?: number | null
           question?: string
           refined_at?: string | null
           relevance_score?: number | null
           source_business?: string | null
           source_company?: string | null
+          source_page_url?: string | null
+          source_type?: string | null
           source_url?: string | null
           updated_at?: string | null
           workspace_id?: string
@@ -4312,6 +4324,118 @@ export type Database = {
           },
         ]
       }
+      scraped_pages: {
+        Row: {
+          content_length: number | null
+          content_markdown: string | null
+          created_at: string | null
+          faqs_extracted: number | null
+          id: string
+          job_id: string
+          page_type: string | null
+          status: string | null
+          title: string | null
+          url: string
+          workspace_id: string
+        }
+        Insert: {
+          content_length?: number | null
+          content_markdown?: string | null
+          created_at?: string | null
+          faqs_extracted?: number | null
+          id?: string
+          job_id: string
+          page_type?: string | null
+          status?: string | null
+          title?: string | null
+          url: string
+          workspace_id: string
+        }
+        Update: {
+          content_length?: number | null
+          content_markdown?: string | null
+          created_at?: string | null
+          faqs_extracted?: number | null
+          id?: string
+          job_id?: string
+          page_type?: string | null
+          status?: string | null
+          title?: string | null
+          url?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scraped_pages_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "scraping_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scraping_jobs: {
+        Row: {
+          apify_dataset_id: string | null
+          apify_run_id: string | null
+          completed_at: string | null
+          created_at: string | null
+          error_message: string | null
+          faqs_found: number | null
+          faqs_stored: number | null
+          id: string
+          job_type: string
+          pages_processed: number | null
+          started_at: string | null
+          status: string | null
+          total_pages_found: number | null
+          website_url: string | null
+          workspace_id: string
+        }
+        Insert: {
+          apify_dataset_id?: string | null
+          apify_run_id?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          faqs_found?: number | null
+          faqs_stored?: number | null
+          id?: string
+          job_type?: string
+          pages_processed?: number | null
+          started_at?: string | null
+          status?: string | null
+          total_pages_found?: number | null
+          website_url?: string | null
+          workspace_id: string
+        }
+        Update: {
+          apify_dataset_id?: string | null
+          apify_run_id?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          faqs_found?: number | null
+          faqs_stored?: number | null
+          id?: string
+          job_type?: string
+          pages_processed?: number | null
+          started_at?: string | null
+          status?: string | null
+          total_pages_found?: number | null
+          website_url?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scraping_jobs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       security_incidents: {
         Row: {
           affected_customers: Json | null
@@ -5579,6 +5703,14 @@ export type Database = {
       }
       increment_emails_received: {
         Args: { p_workspace_id: string }
+        Returns: undefined
+      }
+      increment_scraping_progress: {
+        Args: {
+          p_faqs_found?: number
+          p_job_id: string
+          p_pages_processed?: number
+        }
         Returns: undefined
       }
       mark_noise_emails: {

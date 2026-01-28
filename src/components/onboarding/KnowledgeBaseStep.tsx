@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { ChevronLeft, ChevronRight, Loader2, CheckCircle2, Globe, AlertCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2, CheckCircle2, Globe, AlertCircle, FileText, Sparkles } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 
 interface KnowledgeBaseStepProps {
@@ -15,95 +15,113 @@ interface KnowledgeBaseStepProps {
   onBack: () => void;
 }
 
-type Status = 'idle' | 'scraping' | 'complete' | 'error';
+interface ScrapingJob {
+  id: string;
+  status: string;
+  total_pages_found: number;
+  pages_processed: number;
+  faqs_found: number;
+  faqs_stored: number;
+  error_message: string | null;
+}
+
+type Status = 'idle' | 'starting' | 'scraping' | 'processing' | 'complete' | 'error';
 
 export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, onBack }: KnowledgeBaseStepProps) {
   const [status, setStatus] = useState<Status>('idle');
-  const [websiteFaqsGenerated, setWebsiteFaqsGenerated] = useState(0);
-  const [pagesScraped, setPagesScraped] = useState(0);
+  const [jobId, setJobId] = useState<string | null>(null);
+  const [progress, setProgress] = useState({
+    totalPages: 0,
+    pagesProcessed: 0,
+    faqsFound: 0,
+    faqsStored: 0
+  });
   const [error, setError] = useState<string | null>(null);
-  const [progress, setProgress] = useState(0);
 
+  // If no website URL, skip straight to complete
   useEffect(() => {
-    startKnowledgeBaseGeneration();
+    if (!businessContext.websiteUrl) {
+      setStatus('complete');
+    } else {
+      // Auto-start scraping
+      startScraping();
+    }
   }, []);
 
-  const startKnowledgeBaseGeneration = async () => {
-    // If no website URL, skip straight to complete
-    if (!businessContext.websiteUrl) {
-      console.log('No website URL provided, skipping scraping');
-      setStatus('complete');
-      setProgress(100);
-      return;
-    }
+  // Subscribe to job updates
+  useEffect(() => {
+    if (!jobId) return;
 
-    setStatus('scraping');
-    setProgress(15);
+    const channel = supabase
+      .channel(`scraping-job-${jobId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'scraping_jobs',
+          filter: `id=eq.${jobId}`
+        },
+        (payload) => {
+          const job = payload.new as ScrapingJob;
+          
+          setProgress({
+            totalPages: job.total_pages_found || 0,
+            pagesProcessed: job.pages_processed || 0,
+            faqsFound: job.faqs_found || 0,
+            faqsStored: job.faqs_stored || 0
+          });
+          
+          switch (job.status) {
+            case 'scraping':
+              setStatus('scraping');
+              break;
+            case 'processing':
+              setStatus('processing');
+              break;
+            case 'completed':
+              setStatus('complete');
+              break;
+            case 'failed':
+              setStatus('error');
+              setError(job.error_message || 'Something went wrong');
+              break;
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [jobId]);
+
+  const startScraping = async () => {
+    if (!businessContext.websiteUrl) return;
+    
+    setStatus('starting');
+    setError(null);
 
     try {
-      console.log('Scraping website:', businessContext.websiteUrl);
-
-      // Kick off backend job (returns immediately now)
-      const scrapeResult = await supabase.functions.invoke('website-scrape', {
+      const { data, error: invokeError } = await supabase.functions.invoke('start-own-website-scrape', {
         body: {
           workspaceId,
-          websiteUrl: businessContext.websiteUrl,
-          businessName: businessContext.companyName,
-          businessType: businessContext.businessType,
-        },
+          websiteUrl: businessContext.websiteUrl
+        }
       });
 
-      if (scrapeResult.error) {
-        console.error('Error scraping website:', scrapeResult.error);
-        throw new Error(scrapeResult.error.message || 'Failed to scrape website');
+      if (invokeError) {
+        throw new Error(invokeError.message || 'Failed to start scraping');
       }
 
-      // Poll DB for completion
-      setProgress(25);
-      const startedAt = Date.now();
+      if (!data?.success) {
+        throw new Error(data?.error || 'Failed to start scraping');
+      }
 
-      const poll = async () => {
-        const { data, error } = await supabase
-          .from('business_context')
-          .select('knowledge_base_status, website_faqs_generated, custom_flags')
-          .eq('workspace_id', workspaceId)
-          .maybeSingle();
-
-        if (error) {
-          throw error;
-        }
-
-        const kbStatus = (data?.knowledge_base_status || 'scraping') as Status;
-        const faqs = data?.website_faqs_generated || 0;
-        const customFlags = data?.custom_flags as { website_scrape?: { pages_scraped?: number } } | null;
-        const pages = customFlags?.website_scrape?.pages_scraped || 0;
-
-        if (kbStatus === 'complete') {
-          setWebsiteFaqsGenerated(faqs);
-          setPagesScraped(pages);
-          setProgress(100);
-          setStatus('complete');
-          return;
-        }
-
-        if (kbStatus === 'error') {
-          throw new Error('Website scraping failed');
-        }
-
-        // Keep progress moving while scraping
-        setProgress((prev) => Math.min(prev + 4, 95));
-
-        // Timeout after 4 minutes
-        if (Date.now() - startedAt > 4 * 60 * 1000) {
-          throw new Error('Website scraping is taking too long');
-        }
-
-        setTimeout(poll, 5000);
-      };
-
-      poll();
+      setJobId(data.jobId);
+      setStatus('scraping');
     } catch (err: any) {
-      console.error('Knowledge base generation error:', err);
+      console.error('Start scraping error:', err);
       setError(err.message || 'Something went wrong');
       setStatus('error');
     }
@@ -111,16 +129,14 @@ export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, on
 
   const handleRetry = () => {
     setError(null);
-    setWebsiteFaqsGenerated(0);
-    setPagesScraped(0);
-    setProgress(0);
-    startKnowledgeBaseGeneration();
+    setProgress({ totalPages: 0, pagesProcessed: 0, faqsFound: 0, faqsStored: 0 });
+    startScraping();
   };
 
   const handleContinue = () => {
     onComplete({
-      industryFaqs: 0, // No industry templates for now
-      websiteFaqs: websiteFaqsGenerated
+      industryFaqs: 0,
+      websiteFaqs: progress.faqsStored || progress.faqsFound
     });
   };
 
@@ -131,6 +147,28 @@ export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, on
     });
   };
 
+  // Calculate progress percentage
+  const calculateProgress = () => {
+    if (status === 'starting') return 5;
+    if (status === 'complete') return 100;
+    if (status === 'error') return 0;
+    
+    if (status === 'scraping') {
+      // Scraping phase: 0-40%
+      return 10 + Math.min(30, progress.totalPages * 2);
+    }
+    
+    if (status === 'processing') {
+      // Processing phase: 40-100%
+      if (progress.totalPages === 0) return 45;
+      const processingProgress = (progress.pagesProcessed / progress.totalPages) * 60;
+      return 40 + processingProgress;
+    }
+    
+    return 0;
+  };
+
+  // Error state
   if (status === 'error') {
     return (
       <div className="space-y-6">
@@ -162,7 +200,10 @@ export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, on
     );
   }
 
+  // Complete state
   if (status === 'complete') {
+    const faqCount = progress.faqsStored || progress.faqsFound;
+    
     return (
       <div className="space-y-6">
         <div className="text-center space-y-4">
@@ -171,10 +212,10 @@ export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, on
           </div>
           <div className="space-y-2">
             <h2 className="text-xl font-semibold">
-              {websiteFaqsGenerated > 0 ? 'Knowledge base ready!' : 'Ready to continue'}
+              {faqCount > 0 ? 'Knowledge base ready!' : 'Ready to continue'}
             </h2>
             <p className="text-sm text-muted-foreground">
-              {websiteFaqsGenerated > 0 
+              {faqCount > 0 
                 ? 'BizzyBee can now answer questions about your business'
                 : 'You can add FAQs manually in Settings → Knowledge Base later'
               }
@@ -182,20 +223,20 @@ export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, on
           </div>
         </div>
 
-        {websiteFaqsGenerated > 0 && (
+        {faqCount > 0 && (
           <div className="bg-muted/30 rounded-lg p-6 text-center">
             <Globe className="h-8 w-8 mx-auto mb-3 text-green-600" />
-            <div className="text-3xl font-bold text-green-600">{websiteFaqsGenerated}</div>
+            <div className="text-3xl font-bold text-green-600">{faqCount}</div>
             <div className="text-sm text-muted-foreground mt-1">FAQs extracted from your website</div>
-            {pagesScraped > 0 && (
+            {progress.pagesProcessed > 0 && (
               <div className="text-xs text-muted-foreground mt-2">
-                Analyzed {pagesScraped} pages
+                Analyzed {progress.pagesProcessed} pages
               </div>
             )}
           </div>
         )}
 
-        {websiteFaqsGenerated === 0 && businessContext.websiteUrl && (
+        {faqCount === 0 && businessContext.websiteUrl && (
           <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
             <p className="text-sm text-amber-800 dark:text-amber-200">
               We couldn't extract FAQs from your website, but that's okay! 
@@ -218,33 +259,93 @@ export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, on
     );
   }
 
-  // Loading state - website scraping
+  // Loading states
+  const getStatusMessage = () => {
+    switch (status) {
+      case 'starting':
+        return 'Connecting to your website...';
+      case 'scraping':
+        return progress.totalPages > 0 
+          ? `Found ${progress.totalPages} pages to analyze...`
+          : 'Discovering pages on your website...';
+      case 'processing':
+        return `Analyzing ${progress.pagesProcessed}/${progress.totalPages} pages...`;
+      default:
+        return 'Preparing...';
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="text-center space-y-2">
         <h2 className="text-xl font-semibold">Learning from your website</h2>
         <p className="text-sm text-muted-foreground">
-          This takes 1-2 minutes
+          This takes 1-3 minutes
         </p>
       </div>
 
-      <Progress value={progress} className="h-2" />
+      <Progress value={calculateProgress()} className="h-2" />
 
       <div className="space-y-4">
-        <div className="flex items-start gap-4 p-4 bg-muted/30 rounded-lg">
+        {/* Scraping status */}
+        <div className={`flex items-start gap-4 p-4 rounded-lg transition-colors ${
+          status === 'scraping' || status === 'starting' ? 'bg-primary/5 border border-primary/20' : 'bg-muted/30'
+        }`}>
           <div className="mt-0.5">
-            <Loader2 className="h-5 w-5 animate-spin text-primary" />
+            {(status === 'scraping' || status === 'starting') ? (
+              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+            ) : status === 'processing' ? (
+              <CheckCircle2 className="h-5 w-5 text-green-600" />
+            ) : (
+              <Globe className="h-5 w-5 text-muted-foreground" />
+            )}
           </div>
           <div className="flex-1">
-            <p className="font-medium">Scraping your website...</p>
+            <p className="font-medium">Scraping your website</p>
             <p className="text-xs text-muted-foreground truncate">
               {businessContext.websiteUrl}
             </p>
-            <p className="text-xs text-muted-foreground mt-2">
-              Extracting prices, services, policies, and FAQs
-            </p>
+            {progress.totalPages > 0 && (
+              <p className="text-xs text-muted-foreground mt-1">
+                {progress.totalPages} pages found
+              </p>
+            )}
           </div>
         </div>
+
+        {/* Processing status */}
+        <div className={`flex items-start gap-4 p-4 rounded-lg transition-colors ${
+          status === 'processing' ? 'bg-primary/5 border border-primary/20' : 'bg-muted/30'
+        }`}>
+          <div className="mt-0.5">
+            {status === 'processing' ? (
+              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+            ) : (
+              <FileText className="h-5 w-5 text-muted-foreground" />
+            )}
+          </div>
+          <div className="flex-1">
+            <p className="font-medium">Extracting FAQs</p>
+            {status === 'processing' && (
+              <p className="text-xs text-muted-foreground mt-1">
+                {progress.pagesProcessed}/{progress.totalPages} pages • {progress.faqsFound} FAQs found
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* AI Analysis indicator */}
+        {status === 'processing' && progress.faqsFound > 0 && (
+          <div className="flex items-center gap-2 justify-center text-xs text-muted-foreground">
+            <Sparkles className="h-3 w-3" />
+            <span>AI is analyzing your content...</span>
+          </div>
+        )}
+      </div>
+
+      {/* Status message */}
+      <div className="text-center text-sm text-muted-foreground">
+        {getStatusMessage()}
       </div>
 
       <div className="flex gap-3">
