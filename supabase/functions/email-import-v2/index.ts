@@ -18,7 +18,7 @@ const BATCH_SIZE = 100; // Increased for efficiency
 const TIMEOUT_BUFFER_MS = 50000; // Stop 10s before 60s timeout
 const MAX_RETRIES = 3;
 const BASE_DELAY_MS = 1000;
-const MAX_RELAY_DEPTH = 500; // Safety: max 50,000 emails (500 × 100)
+const MAX_STALLED_RELAYS = 10; // Stop only if no progress for 10 consecutive relays
 
 interface ImportJob {
   id: string;
@@ -76,25 +76,13 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const body = await req.json();
-    const { workspace_id, job_id, import_mode = 'full', _relay_depth = 0 } = body;
+    const { workspace_id, job_id, import_mode = 'full', _relay_depth = 0, _last_progress = 0, _stalled_count = 0 } = body;
 
     if (!workspace_id) {
       throw new Error('workspace_id is required');
     }
 
-    // Safety check: prevent infinite loops
-    if (_relay_depth >= MAX_RELAY_DEPTH) {
-      console.error(`[${FUNCTION_NAME}] MAX_RELAY_DEPTH (${MAX_RELAY_DEPTH}) exceeded, stopping`);
-      await supabase
-        .from('email_import_progress')
-        .upsert({
-          workspace_id,
-          current_phase: 'error',
-          last_error: 'Max relay depth exceeded - possible infinite loop',
-          updated_at: new Date().toISOString(),
-        }, { onConflict: 'workspace_id' });
-      return createResponse({ success: false, error: 'Max relay depth exceeded' });
-    }
+    // Note: No more hard depth limit - we use stall detection instead
 
     console.log(`[${FUNCTION_NAME}] Starting: relay_depth=${_relay_depth}`, { workspace_id, job_id, import_mode });
 
@@ -199,6 +187,16 @@ serve(async (req) => {
             .eq('id', job.id);
           continue;
         } else {
+          // INBOX is complete - check if SENT still needs work
+          if (job.sent_imported < targetPerFolder) {
+            // Switch back to SENT to finish it
+            job.current_folder = 'SENT';
+            await supabase
+              .from('email_import_jobs')
+              .update({ current_folder: 'SENT' })
+              .eq('id', job.id);
+            continue;
+          }
           // Both folders complete
           break;
         }
@@ -396,12 +394,28 @@ serve(async (req) => {
     }
 
     // -------------------------------------------------------------------------
-    // More work to do - SELF INVOKE (Relay Race)
+    // More work to do - SELF INVOKE (Relay Race) with Stall Detection
     // -------------------------------------------------------------------------
     await saveCheckpoint(supabase, job, folderToJobStatus(job.current_folder));
     await updateProgress(supabase, workspace_id, 'importing', totalImported);
 
-    console.log(`[${FUNCTION_NAME}] Self-invoking: depth=${_relay_depth + 1}, progress=${totalImported}/${job.total_target}`);
+    // Stall detection: track if we're making progress
+    const newStalledCount = totalImported <= _last_progress ? _stalled_count + 1 : 0;
+
+    if (newStalledCount >= MAX_STALLED_RELAYS) {
+      console.error(`[${FUNCTION_NAME}] Stalled for ${MAX_STALLED_RELAYS} consecutive relays, stopping`);
+      await supabase
+        .from('email_import_progress')
+        .upsert({
+          workspace_id,
+          current_phase: 'error',
+          last_error: `Import stalled - no progress for ${MAX_STALLED_RELAYS} consecutive attempts`,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'workspace_id' });
+      return createResponse({ success: false, error: 'Import stalled', progress: getProgress(job) });
+    }
+
+    console.log(`[${FUNCTION_NAME}] Self-invoking: depth=${_relay_depth + 1}, progress=${totalImported}/${job.total_target}, stalled=${newStalledCount}`);
 
     // Fire and forget - self invoke
     chainNextBatch(supabaseUrl, FUNCTION_NAME, {
@@ -409,6 +423,8 @@ serve(async (req) => {
       job_id: job.id,
       import_mode,
       _relay_depth: _relay_depth + 1,
+      _last_progress: totalImported,
+      _stalled_count: newStalledCount,
     }, supabaseServiceKey);
 
     return createResponse({
