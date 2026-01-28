@@ -19,6 +19,7 @@ const TIMEOUT_BUFFER_MS = 50000; // Stop 10s before 60s timeout
 const MAX_RETRIES = 3;
 const BASE_DELAY_MS = 1000;
 const MAX_STALLED_RELAYS = 10; // Stop only if no progress for 10 consecutive relays
+const TRANSIENT_HTTP_STATUSES = new Set([408, 409, 425, 429, 500, 502, 503, 504]);
 
 interface ImportJob {
   id: string;
@@ -141,6 +142,21 @@ serve(async (req) => {
       }
       job = data as ImportJob;
     } else {
+      // Prefer resuming the most recent active job for this workspace to avoid
+      // accidental parallel jobs when the user hits "restart".
+      const { data: existingJob } = await supabase
+        .from('email_import_jobs')
+        .select('*')
+        .eq('workspace_id', workspace_id)
+        .in('status', ['queued', 'scanning_sent', 'scanning_inbox', 'importing', 'classifying'])
+        .order('started_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (existingJob) {
+        job = existingJob as ImportJob;
+        console.log(`[${FUNCTION_NAME}] Resuming existing job ${job.id}, status: ${job.status}`);
+      } else {
       // Create new job - use minimal insert, let DB defaults handle the rest
       const totalTarget = import_mode === 'last_100' ? 100 : 
                          import_mode === 'last_1000' ? 1000 : 30000;
@@ -171,6 +187,7 @@ serve(async (req) => {
       job.current_folder = job.current_folder ?? 'SENT';
       
       console.log(`[${FUNCTION_NAME}] Created job ${job.id}, status: ${job.status}`);
+      }
     }
 
     // Update job to active scanning status
@@ -242,10 +259,12 @@ serve(async (req) => {
 
         if (response.ok) break;
 
-        if (response.status === 429) {
+        // Treat Aurinko timeouts / transient upstream failures as retryable.
+        // 408 in particular has been observed to stall the pipeline.
+        if (TRANSIENT_HTTP_STATUSES.has(response.status)) {
           const retryAfter = response.headers.get('Retry-After');
           const delay = retryAfter ? parseInt(retryAfter) * 1000 : getBackoffDelay(retryCount);
-          console.log(`[${FUNCTION_NAME}] Rate limited, waiting ${delay}ms`);
+          console.log(`[${FUNCTION_NAME}] Transient Aurinko error ${response.status}, waiting ${delay}ms`);
           
           // If delay would exceed timeout, save checkpoint and self-invoke
           if (!shouldContinueProcessing(startTime)) {
@@ -274,7 +293,7 @@ serve(async (req) => {
               success: true,
               status: 'continuing',
               job_id: job.id,
-              message: 'Rate limited, continuing after delay',
+              message: `Transient upstream error (${response.status}), continuing after delay`,
               progress: getProgress(job),
             });
           }
