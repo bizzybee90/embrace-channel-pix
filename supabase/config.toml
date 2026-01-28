@@ -202,3 +202,12 @@ verify_jwt = false
 
 [functions.learn-from-edit]
 verify_jwt = false
+
+[functions.classify-emails]
+verify_jwt = false
+
+[functions.classification-worker]
+verify_jwt = false
+
+[functions.save-classification-correction]
+verify_jwt = false

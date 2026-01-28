@@ -359,6 +359,47 @@ export type Database = {
           },
         ]
       }
+      classification_corrections: {
+        Row: {
+          corrected_category: string | null
+          corrected_requires_reply: boolean | null
+          created_at: string | null
+          email_id: string | null
+          id: string
+          original_category: string | null
+          original_text: string | null
+          workspace_id: string
+        }
+        Insert: {
+          corrected_category?: string | null
+          corrected_requires_reply?: boolean | null
+          created_at?: string | null
+          email_id?: string | null
+          id?: string
+          original_category?: string | null
+          original_text?: string | null
+          workspace_id: string
+        }
+        Update: {
+          corrected_category?: string | null
+          corrected_requires_reply?: boolean | null
+          created_at?: string | null
+          email_id?: string | null
+          id?: string
+          original_category?: string | null
+          original_text?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "classification_corrections_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       classification_jobs: {
         Row: {
           classified_count: number | null
@@ -3458,6 +3499,47 @@ export type Database = {
           },
         ]
       }
+      known_senders: {
+        Row: {
+          category: string
+          created_at: string | null
+          id: string
+          is_global: boolean | null
+          pattern: string
+          pattern_type: string
+          requires_reply: boolean | null
+          workspace_id: string | null
+        }
+        Insert: {
+          category: string
+          created_at?: string | null
+          id?: string
+          is_global?: boolean | null
+          pattern: string
+          pattern_type: string
+          requires_reply?: boolean | null
+          workspace_id?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          id?: string
+          is_global?: boolean | null
+          pattern?: string
+          pattern_type?: string
+          requires_reply?: boolean | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "known_senders_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       learned_responses: {
         Row: {
           created_at: string | null
@@ -3958,10 +4040,13 @@ export type Database = {
         Row: {
           body_html: string | null
           body_text: string | null
+          category: string | null
           classification: Json | null
           classification_category: string | null
           classification_confidence: number | null
           classification_reasoning: string | null
+          classified_at: string | null
+          classified_by: string | null
           confidence: number | null
           created_at: string | null
           email_type: string | null
@@ -3984,15 +4069,19 @@ export type Database = {
           thread_id: string | null
           to_email: string | null
           to_name: string | null
+          urgency: string | null
           workspace_id: string
         }
         Insert: {
           body_html?: string | null
           body_text?: string | null
+          category?: string | null
           classification?: Json | null
           classification_category?: string | null
           classification_confidence?: number | null
           classification_reasoning?: string | null
+          classified_at?: string | null
+          classified_by?: string | null
           confidence?: number | null
           created_at?: string | null
           email_type?: string | null
@@ -4015,15 +4104,19 @@ export type Database = {
           thread_id?: string | null
           to_email?: string | null
           to_name?: string | null
+          urgency?: string | null
           workspace_id: string
         }
         Update: {
           body_html?: string | null
           body_text?: string | null
+          category?: string | null
           classification?: Json | null
           classification_category?: string | null
           classification_confidence?: number | null
           classification_reasoning?: string | null
+          classified_at?: string | null
+          classified_by?: string | null
           confidence?: number | null
           created_at?: string | null
           email_type?: string | null
@@ -4046,6 +4139,7 @@ export type Database = {
           thread_id?: string | null
           to_email?: string | null
           to_name?: string | null
+          urgency?: string | null
           workspace_id?: string
         }
         Relationships: [
@@ -5330,6 +5424,16 @@ export type Database = {
           summary_for_human: string
           title: string
           updated_at: string
+        }[]
+      }
+      get_unprocessed_batch: {
+        Args: { p_batch_size?: number; p_workspace_id: string }
+        Returns: {
+          body_text: string
+          folder: string
+          from_email: string
+          id: string
+          subject: string
         }[]
       }
       has_role: {
