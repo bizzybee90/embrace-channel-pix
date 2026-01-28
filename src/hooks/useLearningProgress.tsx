@@ -65,10 +65,10 @@ export function useLearningProgress(workspaceId: string | null) {
       // Voice extraction takes ~15-30 seconds for Claude call
       estimatedSeconds = 20;
     } else if (data.current_phase === 'learning') {
-      // Just started learning, pairing conversations
+      // Learning is queued/starting, but we don't have reliable counters for pairing progress.
+      // Avoid showing a misleading ETA until the backend starts emitting progress signals.
       phaseIndex = 0;
-      // Pairing is fast, ~2-5 seconds typically
-      estimatedSeconds = Math.ceil(emailCount / RATES.pairing) + 5;
+      estimatedSeconds = null;
     }
     
     return {

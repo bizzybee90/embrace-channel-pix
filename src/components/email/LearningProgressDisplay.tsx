@@ -38,6 +38,11 @@ export function LearningProgressDisplay({ workspaceId, emailsImported }: Learnin
     ? Date.now() - new Date(lastUpdatedAt).getTime() > 5 * 60 * 1000
     : false;
 
+  const displayLabel = !isComplete && isStale ? 'Waiting for analysis to resume' : currentPhase.label;
+  const displayDescription = !isComplete && isStale
+    ? 'No backend progress has been reported recently. We’ll keep checking automatically.'
+    : currentPhase.description;
+
   return (
     <div className="space-y-4">
       {/* Success badge for emails imported */}
@@ -57,10 +62,10 @@ export function LearningProgressDisplay({ workspaceId, emailsImported }: Learnin
             )}
           </div>
           <div className="flex-1">
-            <p className="font-medium text-sm">{currentPhase.label}</p>
-            <p className="text-xs text-muted-foreground">{currentPhase.description}</p>
+            <p className="font-medium text-sm">{displayLabel}</p>
+            <p className="text-xs text-muted-foreground">{displayDescription}</p>
           </div>
-          {!isComplete && estimatedSecondsRemaining && (
+          {!isComplete && !isStale && estimatedSecondsRemaining && (
             <span className="text-xs text-muted-foreground">
               {formatTimeRemaining(estimatedSecondsRemaining)}
             </span>
