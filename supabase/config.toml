@@ -217,3 +217,15 @@ verify_jwt = false
 
 [functions.places-webhook]
 verify_jwt = false
+
+[functions.handle-discovery-complete]
+verify_jwt = false
+
+[functions.handle-scrape-complete]
+verify_jwt = false
+
+[functions.extract-competitor-faqs]
+verify_jwt = false
+
+[functions.refine-competitor-faqs]
+verify_jwt = false
