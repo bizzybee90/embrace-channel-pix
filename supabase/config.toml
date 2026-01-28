@@ -253,3 +253,6 @@ verify_jwt = false
 
 [functions.hydrate-worker]
 verify_jwt = false
+
+[functions.process-worker]
+verify_jwt = false
