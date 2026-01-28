@@ -75,12 +75,28 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const body = await req.json();
-    const { workspace_id, job_id, import_mode = 'full', _relay_depth = 0, _last_progress = 0, _stalled_count = 0 } = body;
+		const body = await req.json();
+		const {
+			workspace_id,
+			job_id,
+			import_mode = 'full',
+			_relay_depth = 0,
+			_last_progress = 0,
+			_stalled_count = 0,
+			_sleep_ms = 0,
+		} = body;
 
     if (!workspace_id) {
       throw new Error('workspace_id is required');
     }
+
+		// Optional backoff sleep used for self-invoked retries (e.g., rate limit handling)
+		// NOTE: Avoid relying on setTimeout in edge runtimes; do backoff at the start of the next invocation instead.
+		if (typeof _sleep_ms === 'number' && _sleep_ms > 0) {
+			const ms = Math.min(Math.max(_sleep_ms, 0), 30000);
+			console.log(`[${FUNCTION_NAME}] Backoff sleep ${ms}ms before continuing`);
+			await sleep(ms);
+		}
 
     // Note: No more hard depth limit - we use stall detection instead
 
@@ -236,17 +252,23 @@ serve(async (req) => {
             await saveCheckpoint(supabase, job, folderToJobStatus(job.current_folder));
             await updateProgress(supabase, workspace_id, 'importing', job.sent_imported + job.inbox_imported);
             
-            console.log(`[${FUNCTION_NAME}] Timeout approaching, self-invoking with delay ${delay}ms`);
-            
-            // Wait a bit then self-invoke
-            setTimeout(() => {
-              chainNextBatch(supabaseUrl, FUNCTION_NAME, {
-                workspace_id,
-                job_id: job.id,
-                import_mode,
-                _relay_depth: _relay_depth + 1,
-              }, supabaseServiceKey);
-            }, Math.min(delay, 5000)); // Cap at 5s for the setTimeout
+						console.log(`[${FUNCTION_NAME}] Timeout approaching, self-invoking with backoff ${delay}ms`);
+						
+						// Self-invoke immediately and let the next invocation perform the backoff sleep.
+						chainNextBatch(
+							supabaseUrl,
+							FUNCTION_NAME,
+							{
+								workspace_id,
+								job_id: job.id,
+								import_mode,
+								_relay_depth: _relay_depth + 1,
+								_last_progress: job.sent_imported + job.inbox_imported,
+								_stalled_count: _stalled_count,
+								_sleep_ms: delay,
+							},
+							supabaseServiceKey
+						);
             
             return createResponse({
               success: true,
@@ -307,7 +329,7 @@ serve(async (req) => {
         has_body: !!(msg.textBody || msg.bodySnippet),
       }));
 
-      const { error: insertError, data: insertedData } = await supabase
+			const { error: insertError, data: insertedData } = await supabase
         .from('email_import_queue')
         .upsert(emailsToSave, {
           onConflict: 'workspace_id,external_id',
@@ -319,7 +341,10 @@ serve(async (req) => {
         console.error(`[${FUNCTION_NAME}] Insert error:`, insertError.message);
       }
 
-      const savedCount = insertedData?.length || messages.length;
+			// IMPORTANT: Only count what the database actually accepted.
+			// Aurinko pages can contain duplicates (or previously scanned messages).
+			// Falling back to `messages.length` would inflate progress and can falsely appear "stuck" near completion.
+			const savedCount = insertedData?.length ?? 0;
       totalImportedThisRun += savedCount;
       batchesProcessed++;
 
