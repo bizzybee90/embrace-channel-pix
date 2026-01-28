@@ -3,56 +3,65 @@ import { supabase } from '@/integrations/supabase/client';
 import { Progress } from '@/components/ui/progress';
 import { 
   Mail, 
-  MessageSquare, 
+  Download,
   Brain, 
   CheckCircle, 
   Loader2,
-  Clock
+  Clock,
+  AlertCircle
 } from 'lucide-react';
 
-interface ImportProgress {
-  current_phase: string;
-  emails_received: number;
-  emails_classified: number;
-  conversations_found: number;
-  conversations_with_replies: number;
-  pairs_analyzed: number;
-  voice_profile_complete: boolean;
-  playbook_complete: boolean;
-  started_at: string;
-  phase1_completed_at: string | null;
-  phase2_completed_at: string | null;
-  phase3_completed_at: string | null;
-  estimated_total_emails: number | null;
+interface ImportJob {
+  id: string;
+  status: string;
+  total_scanned: number;
+  total_hydrated: number;
+  total_processed: number;
+  total_estimated: number | null;
+  error_message: string | null;
+  started_at: string | null;
+  completed_at: string | null;
 }
 
 interface EmailImportProgressProps {
-  workspaceId: string;
+  jobId?: string;
+  workspaceId?: string;
   onComplete?: () => void;
 }
 
-export function EmailImportProgress({ workspaceId, onComplete }: EmailImportProgressProps) {
-  const [progress, setProgress] = useState<ImportProgress | null>(null);
+export function EmailImportProgress({ jobId, workspaceId, onComplete }: EmailImportProgressProps) {
+  const [job, setJob] = useState<ImportJob | null>(null);
+  const [activeJobId, setActiveJobId] = useState<string | null>(jobId || null);
 
   useEffect(() => {
-    // Initial fetch
-    fetchProgress();
+    // If we have a jobId, use it directly
+    if (jobId) {
+      setActiveJobId(jobId);
+      fetchJob(jobId);
+    } else if (workspaceId) {
+      // Otherwise find the most recent active job for this workspace
+      findActiveJob(workspaceId);
+    }
+  }, [jobId, workspaceId]);
 
-    // Subscribe to realtime updates
+  useEffect(() => {
+    if (!activeJobId) return;
+
+    // Subscribe to changes
     const channel = supabase
-      .channel('email-import-progress')
+      .channel(`import-job-${activeJobId}`)
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'UPDATE',
           schema: 'public',
-          table: 'email_import_progress',
-          filter: `workspace_id=eq.${workspaceId}`
+          table: 'import_jobs',
+          filter: `id=eq.${activeJobId}`
         },
         (payload) => {
-          const newProgress = payload.new as ImportProgress;
-          setProgress(newProgress);
-          if (newProgress.current_phase === 'complete' && onComplete) {
+          const newJob = payload.new as ImportJob;
+          setJob(newJob);
+          if (newJob.status === 'completed' && onComplete) {
             onComplete();
           }
         }
@@ -62,66 +71,85 @@ export function EmailImportProgress({ workspaceId, onComplete }: EmailImportProg
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [workspaceId, onComplete]);
+  }, [activeJobId, onComplete]);
 
-  const fetchProgress = async () => {
+  const fetchJob = async (id: string) => {
     const { data } = await supabase
-      .from('email_import_progress')
+      .from('import_jobs')
       .select('*')
-      .eq('workspace_id', workspaceId)
+      .eq('id', id)
       .single();
     
     if (data) {
-      setProgress(data as unknown as ImportProgress);
-      if (data.current_phase === 'complete' && onComplete) {
+      setJob(data as ImportJob);
+      if (data.status === 'completed' && onComplete) {
         onComplete();
       }
     }
   };
 
-  if (!progress) return null;
+  const findActiveJob = async (wsId: string) => {
+    const { data } = await supabase
+      .from('import_jobs')
+      .select('*')
+      .eq('workspace_id', wsId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+    
+    if (data) {
+      setActiveJobId(data.id);
+      setJob(data as ImportJob);
+      if (data.status === 'completed' && onComplete) {
+        onComplete();
+      }
+    }
+  };
 
-  // Calculate overall progress percentage
+  if (!job) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        <span className="ml-2 text-muted-foreground">Loading...</span>
+      </div>
+    );
+  }
+
+  // Calculate progress percentages
+  const scanProgress = job.total_estimated 
+    ? Math.min(100, Math.round((job.total_scanned / job.total_estimated) * 100))
+    : (job.total_scanned > 0 ? 100 : 0);
+  
+  const hydrateProgress = job.total_scanned > 0
+    ? Math.min(100, Math.round((job.total_hydrated / job.total_scanned) * 100))
+    : 0;
+  
+  const processProgress = job.total_hydrated > 0
+    ? Math.min(100, Math.round((job.total_processed / job.total_hydrated) * 100))
+    : 0;
+
+  // Calculate overall progress
   const getOverallProgress = () => {
-    switch (progress.current_phase) {
-      case 'connecting': return 5;
-      case 'importing': return 15;
-      case 'classifying': 
-        if (progress.emails_received === 0) return 20;
-        return 20 + (progress.emails_classified / progress.emails_received) * 40;
-      case 'analyzing': return 65;
-      case 'learning': return 80;
-      case 'complete': return 100;
+    switch (job.status) {
+      case 'initializing': return 5;
+      case 'scanning': return 10 + (scanProgress * 0.2);
+      case 'hydrating': return 30 + (hydrateProgress * 0.4);
+      case 'processing': return 70 + (processProgress * 0.25);
+      case 'completed': return 100;
+      case 'failed': return 0;
       default: return 0;
     }
   };
 
-  // Calculate time remaining estimate using: totalEmails / 500 + 15 min for classification/learning
+  // Calculate time remaining
   const getTimeRemaining = () => {
-    if (progress.current_phase === 'complete') return null;
+    if (job.status === 'completed' || job.status === 'failed') return null;
     
-    const totalEmails = progress.estimated_total_emails || progress.emails_received;
-    if (totalEmails === 0) return 'Calculating...';
+    const emailsRemaining = job.total_scanned - job.total_hydrated;
+    if (emailsRemaining <= 0) return null;
     
-    // 500 emails/min import + 15 min for classification/learning
-    const totalEstimatedMinutes = Math.ceil(totalEmails / 500) + 15;
-    
-    // Calculate how far along we are
-    let completedMinutes = 0;
-    if (progress.emails_received > 0) {
-      completedMinutes = Math.ceil(progress.emails_received / 500);
-    }
-    if (progress.current_phase === 'classifying') {
-      completedMinutes += Math.ceil((progress.emails_classified / Math.max(progress.emails_received, 1)) * 5);
-    }
-    if (progress.current_phase === 'analyzing') {
-      completedMinutes = totalEstimatedMinutes - 10;
-    }
-    if (progress.current_phase === 'learning') {
-      completedMinutes = totalEstimatedMinutes - 5;
-    }
-    
-    const minutesRemaining = Math.max(1, totalEstimatedMinutes - completedMinutes);
+    // ~450 emails/min for hydration
+    const minutesRemaining = Math.ceil(emailsRemaining / 450);
     
     if (minutesRemaining >= 60) {
       const hours = Math.floor(minutesRemaining / 60);
@@ -131,75 +159,66 @@ export function EmailImportProgress({ workspaceId, onComplete }: EmailImportProg
     
     return `~${minutesRemaining} min remaining`;
   };
-  
-  // Get import count display
-  const getImportCountDisplay = () => {
-    const totalEmails = progress.estimated_total_emails || 0;
-    const received = progress.emails_received || 0;
-    
-    if (totalEmails > 0 && received > 0) {
-      return `${received.toLocaleString()} of ~${totalEmails.toLocaleString()} emails`;
-    }
-    if (received > 0) {
-      return `${received.toLocaleString()} emails received`;
-    }
-    return 'Starting import...';
-  };
 
   const phases = [
     {
-      id: 'import',
-      label: 'Import Emails',
-      description: getImportCountDisplay(),
-      status: progress.emails_received > 0 ? 'complete' : 
-              progress.current_phase === 'importing' ? 'active' : 'pending',
-      icon: Mail
+      id: 'scan',
+      label: 'Finding Emails',
+      description: job.total_estimated 
+        ? `${job.total_scanned.toLocaleString()} / ~${job.total_estimated.toLocaleString()}`
+        : `${job.total_scanned.toLocaleString()} found`,
+      status: job.status === 'scanning' ? 'active' :
+              job.total_scanned > 0 ? 'complete' : 'pending',
+      icon: Mail,
+      progress: scanProgress
     },
     {
-      id: 'classify',
-      label: 'Classify Emails',
-      description: `${progress.emails_classified.toLocaleString()} / ${progress.emails_received.toLocaleString()} classified`,
-      status: progress.current_phase === 'classifying' ? 'active' :
-              progress.emails_classified === progress.emails_received && progress.emails_received > 0 ? 'complete' : 'pending',
-      icon: MessageSquare
+      id: 'hydrate',
+      label: 'Downloading Content',
+      description: `${job.total_hydrated.toLocaleString()} / ${job.total_scanned.toLocaleString()}`,
+      status: job.status === 'hydrating' ? 'active' :
+              job.total_hydrated === job.total_scanned && job.total_scanned > 0 ? 'complete' : 'pending',
+      icon: Download,
+      progress: hydrateProgress
     },
     {
-      id: 'analyze',
-      label: 'Analyze Conversations',
-      description: progress.conversations_with_replies > 0 
-        ? `${progress.conversations_with_replies} conversations with replies`
-        : 'Matching replies to emails',
-      status: progress.current_phase === 'analyzing' ? 'active' :
-              progress.phase2_completed_at ? 'complete' : 'pending',
-      icon: Brain
-    },
-    {
-      id: 'learn',
-      label: 'Learn Your Style',
-      description: progress.voice_profile_complete 
-        ? 'Voice profile complete!'
-        : `Analyzing ${progress.pairs_analyzed} conversation pairs`,
-      status: progress.current_phase === 'learning' ? 'active' :
-              progress.phase3_completed_at ? 'complete' : 'pending',
-      icon: Brain
+      id: 'process',
+      label: 'Analyzing Emails',
+      description: `${job.total_processed.toLocaleString()} / ${job.total_hydrated.toLocaleString()}`,
+      status: job.status === 'processing' ? 'active' :
+              job.status === 'completed' ? 'complete' : 'pending',
+      icon: Brain,
+      progress: processProgress
     }
   ];
+
+  const isComplete = job.status === 'completed';
+  const isFailed = job.status === 'failed';
 
   return (
     <div className="space-y-6 p-6 bg-card rounded-lg border">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold">
-            {progress.current_phase === 'complete' 
-              ? 'Import Complete!' 
-              : 'Importing Your Emails'}
-          </h3>
-          <p className="text-sm text-muted-foreground">
-            {progress.current_phase === 'complete'
-              ? 'BizzyBee now understands how you communicate'
-              : 'BizzyBee is learning from your email history'}
-          </p>
+        <div className="flex items-center gap-3">
+          {isComplete ? (
+            <CheckCircle className="h-6 w-6 text-green-600" />
+          ) : isFailed ? (
+            <AlertCircle className="h-6 w-6 text-destructive" />
+          ) : (
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+          )}
+          <div>
+            <h3 className="text-lg font-semibold">
+              {isComplete ? 'Import Complete!' : 
+               isFailed ? 'Import Failed' : 
+               'Importing Your Emails'}
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              {isComplete ? 'BizzyBee now understands how you communicate' :
+               isFailed ? job.error_message :
+               'BizzyBee is learning from your email history'}
+            </p>
+          </div>
         </div>
         {getTimeRemaining() && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -240,33 +259,45 @@ export function EmailImportProgress({ workspaceId, onComplete }: EmailImportProg
               )}
             </div>
             <div className="flex-1">
-              <p className={`font-medium ${
-                phase.status === 'active' ? 'text-amber-900 dark:text-amber-200' :
-                phase.status === 'complete' ? 'text-green-900 dark:text-green-200' : 'text-muted-foreground'
-              }`}>
-                {phase.label}
-              </p>
-              <p className={`text-sm ${
-                phase.status === 'active' ? 'text-amber-700 dark:text-amber-400' :
-                phase.status === 'complete' ? 'text-green-700 dark:text-green-400' : 'text-muted-foreground/70'
-              }`}>
-                {phase.description}
-              </p>
+              <div className="flex justify-between items-center">
+                <p className={`font-medium ${
+                  phase.status === 'active' ? 'text-amber-900 dark:text-amber-200' :
+                  phase.status === 'complete' ? 'text-green-900 dark:text-green-200' : 'text-muted-foreground'
+                }`}>
+                  {phase.label}
+                </p>
+                <p className={`text-sm ${
+                  phase.status === 'active' ? 'text-amber-700 dark:text-amber-400' :
+                  phase.status === 'complete' ? 'text-green-700 dark:text-green-400' : 'text-muted-foreground/70'
+                }`}>
+                  {phase.description}
+                </p>
+              </div>
+              {phase.status === 'active' && (
+                <Progress value={phase.progress} className="h-1 mt-2" />
+              )}
             </div>
           </div>
         ))}
       </div>
 
       {/* Completion Summary */}
-      {progress.current_phase === 'complete' && (
+      {isComplete && (
         <div className="mt-6 p-4 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800">
           <h4 className="font-medium text-green-900 dark:text-green-200 mb-2">What BizzyBee Learned</h4>
           <ul className="space-y-1 text-sm text-green-800 dark:text-green-300">
-            <li>✓ Analyzed {progress.emails_classified.toLocaleString()} emails</li>
-            <li>✓ Found {progress.conversations_with_replies} conversations with replies</li>
+            <li>✓ Imported {job.total_scanned.toLocaleString()} emails</li>
+            <li>✓ Analyzed {job.total_processed.toLocaleString()} emails</li>
             <li>✓ Learned your communication style</li>
-            <li>✓ Created response playbook for common scenarios</li>
+            <li>✓ Ready to help you respond faster</li>
           </ul>
+        </div>
+      )}
+
+      {/* Error Display */}
+      {isFailed && job.error_message && (
+        <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+          <p className="text-sm text-destructive">{job.error_message}</p>
         </div>
       )}
     </div>
