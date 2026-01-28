@@ -250,3 +250,6 @@ verify_jwt = false
 
 [functions.scan-worker]
 verify_jwt = false
+
+[functions.hydrate-worker]
+verify_jwt = false
