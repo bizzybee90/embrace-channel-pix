@@ -2351,11 +2351,25 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "email_pairs_inbound_message_id_fkey"
+            columns: ["inbound_message_id"]
+            isOneToOne: false
+            referencedRelation: "training_pairs"
+            referencedColumns: ["inbound_id"]
+          },
+          {
             foreignKeyName: "email_pairs_outbound_message_id_fkey"
             columns: ["outbound_message_id"]
             isOneToOne: false
             referencedRelation: "messages"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_pairs_outbound_message_id_fkey"
+            columns: ["outbound_message_id"]
+            isOneToOne: false
+            referencedRelation: "training_pairs"
+            referencedColumns: ["inbound_id"]
           },
           {
             foreignKeyName: "email_pairs_workspace_id_fkey"
@@ -2754,6 +2768,47 @@ export type Database = {
           },
         ]
       }
+      example_responses: {
+        Row: {
+          category: string | null
+          created_at: string | null
+          id: string
+          inbound_embedding: string | null
+          inbound_text: string
+          outbound_text: string
+          response_time_hours: number | null
+          workspace_id: string
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string | null
+          id?: string
+          inbound_embedding?: string | null
+          inbound_text: string
+          outbound_text: string
+          response_time_hours?: number | null
+          workspace_id: string
+        }
+        Update: {
+          category?: string | null
+          created_at?: string | null
+          id?: string
+          inbound_embedding?: string | null
+          inbound_text?: string
+          outbound_text?: string
+          response_time_hours?: number | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "example_responses_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       faq_database: {
         Row: {
           answer: string
@@ -3084,6 +3139,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "ignored_emails_inbound_message_id_fkey"
+            columns: ["inbound_message_id"]
+            isOneToOne: false
+            referencedRelation: "training_pairs"
+            referencedColumns: ["inbound_id"]
+          },
+          {
             foreignKeyName: "ignored_emails_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
@@ -3136,6 +3198,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "messages"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "image_analyses_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "training_pairs"
+            referencedColumns: ["inbound_id"]
           },
           {
             foreignKeyName: "image_analyses_workspace_id_fkey"
@@ -4045,6 +4114,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "response_feedback_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "training_pairs"
+            referencedColumns: ["inbound_id"]
+          },
+          {
             foreignKeyName: "response_feedback_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
@@ -4673,6 +4749,7 @@ export type Database = {
           example_responses: Json | null
           examples: Json | null
           examples_count: number | null
+          examples_stored: number | null
           exclamation_frequency: number | null
           formality_score: number | null
           greeting_patterns: Json | null
@@ -4684,6 +4761,7 @@ export type Database = {
           objection_handling_style: string | null
           outbound_emails_found: number | null
           personality_traits: Json | null
+          playbook: Json | null
           price_mention_style: string | null
           reply_triggers: Json | null
           response_patterns: Json | null
@@ -4698,6 +4776,7 @@ export type Database = {
           updated_at: string | null
           uses_emojis: boolean | null
           uses_exclamations: boolean | null
+          voice_dna: Json | null
           warmth_level: number | null
           workspace_id: string | null
         }
@@ -4718,6 +4797,7 @@ export type Database = {
           example_responses?: Json | null
           examples?: Json | null
           examples_count?: number | null
+          examples_stored?: number | null
           exclamation_frequency?: number | null
           formality_score?: number | null
           greeting_patterns?: Json | null
@@ -4729,6 +4809,7 @@ export type Database = {
           objection_handling_style?: string | null
           outbound_emails_found?: number | null
           personality_traits?: Json | null
+          playbook?: Json | null
           price_mention_style?: string | null
           reply_triggers?: Json | null
           response_patterns?: Json | null
@@ -4743,6 +4824,7 @@ export type Database = {
           updated_at?: string | null
           uses_emojis?: boolean | null
           uses_exclamations?: boolean | null
+          voice_dna?: Json | null
           warmth_level?: number | null
           workspace_id?: string | null
         }
@@ -4763,6 +4845,7 @@ export type Database = {
           example_responses?: Json | null
           examples?: Json | null
           examples_count?: number | null
+          examples_stored?: number | null
           exclamation_frequency?: number | null
           formality_score?: number | null
           greeting_patterns?: Json | null
@@ -4774,6 +4857,7 @@ export type Database = {
           objection_handling_style?: string | null
           outbound_emails_found?: number | null
           personality_traits?: Json | null
+          playbook?: Json | null
           price_mention_style?: string | null
           reply_triggers?: Json | null
           response_patterns?: Json | null
@@ -4788,6 +4872,7 @@ export type Database = {
           updated_at?: string | null
           uses_emojis?: boolean | null
           uses_exclamations?: boolean | null
+          voice_dna?: Json | null
           warmth_level?: number | null
           workspace_id?: string | null
         }
@@ -4848,6 +4933,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "messages"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "voicemail_transcripts_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "training_pairs"
+            referencedColumns: ["inbound_id"]
           },
           {
             foreignKeyName: "voicemail_transcripts_workspace_id_fkey"
@@ -5138,7 +5230,33 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      training_pairs: {
+        Row: {
+          conversation_id: string | null
+          customer_text: string | null
+          inbound_id: string | null
+          owner_text: string | null
+          response_hours: number | null
+          subject: string | null
+          workspace_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversations_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       analyze_email_threads: {
@@ -5260,6 +5378,20 @@ export type Database = {
           document_id: string
           id: string
           page_number: number
+          similarity: number
+        }[]
+      }
+      match_examples: {
+        Args: {
+          match_count?: number
+          match_workspace: string
+          query_embedding: string
+        }
+        Returns: {
+          category: string
+          id: string
+          inbound_text: string
+          outbound_text: string
           similarity: number
         }[]
       }

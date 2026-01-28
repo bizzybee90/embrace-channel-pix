@@ -193,3 +193,12 @@ verify_jwt = false
 
 [functions.kb-mine-site]
 verify_jwt = false
+
+[functions.voice-learning]
+verify_jwt = false
+
+[functions.generate-response]
+verify_jwt = false
+
+[functions.learn-from-edit]
+verify_jwt = false
