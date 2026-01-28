@@ -102,11 +102,11 @@ export function LearningProgressDisplay({ workspaceId, emailsImported }: Learnin
         })}
       </div>
 
-      {/* Background processing note */}
+      {/* Single background note */}
       <p className="text-xs text-center text-muted-foreground">
         {isComplete 
-          ? 'Your voice profile is ready. You can continue onboarding.'
-          : 'This happens in the background. You can continue onboarding.'}
+          ? 'Your voice profile is ready!'
+          : 'You can continue onboarding while this runs.'}
       </p>
     </div>
   );
