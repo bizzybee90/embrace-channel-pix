@@ -3103,6 +3103,56 @@ export type Database = {
           },
         ]
       }
+      folder_cursors: {
+        Row: {
+          created_at: string | null
+          emails_found: number | null
+          folder_id: string | null
+          folder_name: string
+          id: string
+          is_complete: boolean | null
+          job_id: string
+          last_processed_at: string | null
+          next_page_token: string | null
+          priority: number | null
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          emails_found?: number | null
+          folder_id?: string | null
+          folder_name: string
+          id?: string
+          is_complete?: boolean | null
+          job_id: string
+          last_processed_at?: string | null
+          next_page_token?: string | null
+          priority?: number | null
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string | null
+          emails_found?: number | null
+          folder_id?: string | null
+          folder_name?: string
+          id?: string
+          is_complete?: boolean | null
+          job_id?: string
+          last_processed_at?: string | null
+          next_page_token?: string | null
+          priority?: number | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "folder_cursors_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "import_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       gmail_channel_configs: {
         Row: {
           access_token: string | null
@@ -3315,6 +3365,65 @@ export type Database = {
           },
           {
             foreignKeyName: "image_analyses_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      import_jobs: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          error_message: string | null
+          hydrating_completed_at: string | null
+          id: string
+          retry_count: number | null
+          scanning_completed_at: string | null
+          started_at: string | null
+          status: string | null
+          total_estimated: number | null
+          total_hydrated: number | null
+          total_processed: number | null
+          total_scanned: number | null
+          workspace_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          hydrating_completed_at?: string | null
+          id?: string
+          retry_count?: number | null
+          scanning_completed_at?: string | null
+          started_at?: string | null
+          status?: string | null
+          total_estimated?: number | null
+          total_hydrated?: number | null
+          total_processed?: number | null
+          total_scanned?: number | null
+          workspace_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          hydrating_completed_at?: string | null
+          id?: string
+          retry_count?: number | null
+          scanning_completed_at?: string | null
+          started_at?: string | null
+          status?: string | null
+          total_estimated?: number | null
+          total_hydrated?: number | null
+          total_processed?: number | null
+          total_scanned?: number | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_jobs_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -4104,6 +4213,7 @@ export type Database = {
       }
       raw_emails: {
         Row: {
+          aurinko_id: string | null
           body_html: string | null
           body_text: string | null
           category: string | null
@@ -4123,6 +4233,7 @@ export type Database = {
           from_name: string | null
           has_attachments: boolean | null
           id: string
+          job_id: string | null
           lane: string | null
           processed: boolean | null
           processing_completed_at: string | null
@@ -4139,6 +4250,7 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          aurinko_id?: string | null
           body_html?: string | null
           body_text?: string | null
           category?: string | null
@@ -4158,6 +4270,7 @@ export type Database = {
           from_name?: string | null
           has_attachments?: boolean | null
           id?: string
+          job_id?: string | null
           lane?: string | null
           processed?: boolean | null
           processing_completed_at?: string | null
@@ -4174,6 +4287,7 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          aurinko_id?: string | null
           body_html?: string | null
           body_text?: string | null
           category?: string | null
@@ -4193,6 +4307,7 @@ export type Database = {
           from_name?: string | null
           has_attachments?: boolean | null
           id?: string
+          job_id?: string | null
           lane?: string | null
           processed?: boolean | null
           processing_completed_at?: string | null
@@ -4209,6 +4324,13 @@ export type Database = {
           workspace_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "raw_emails_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "import_jobs"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "raw_emails_workspace_id_fkey"
             columns: ["workspace_id"]
@@ -5400,6 +5522,41 @@ export type Database = {
           },
         ]
       }
+      workspace_credentials: {
+        Row: {
+          access_token: string | null
+          id: string
+          provider: string
+          refresh_token: string | null
+          updated_at: string | null
+          workspace_id: string
+        }
+        Insert: {
+          access_token?: string | null
+          id?: string
+          provider: string
+          refresh_token?: string | null
+          updated_at?: string | null
+          workspace_id: string
+        }
+        Update: {
+          access_token?: string | null
+          id?: string
+          provider?: string
+          refresh_token?: string | null
+          updated_at?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_credentials_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_deletion_requests: {
         Row: {
           completed_at: string | null
@@ -5649,6 +5806,14 @@ export type Database = {
         Args: { p_workspace_id: string }
         Returns: string
       }
+      get_emails_to_hydrate: {
+        Args: { p_batch_size?: number; p_job_id: string }
+        Returns: {
+          aurinko_id: string
+          folder: string
+          id: string
+        }[]
+      }
       get_my_workspace_id: { Args: never; Returns: string }
       get_research_job_stats: {
         Args: { p_job_id: string }
@@ -5703,6 +5868,15 @@ export type Database = {
       }
       increment_emails_received: {
         Args: { p_workspace_id: string }
+        Returns: undefined
+      }
+      increment_import_counts: {
+        Args: {
+          p_hydrated?: number
+          p_job_id: string
+          p_processed?: number
+          p_scanned?: number
+        }
         Returns: undefined
       }
       increment_scraping_progress: {
