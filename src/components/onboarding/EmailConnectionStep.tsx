@@ -7,6 +7,7 @@ import { Mail, CheckCircle2, Loader2, ArrowRight, AlertCircle, RotateCcw } from 
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
+import { LearningProgressDisplay } from '@/components/email/LearningProgressDisplay';
 
 interface EmailConnectionStepProps {
   workspaceId: string;
@@ -493,17 +494,12 @@ export function EmailConnectionStep({
                 </div>
               )}
 
-              {/* Learning phase shows completion badge + explanation */}
+              {/* Learning phase shows detailed progress with phases + time estimate */}
               {progress.status === 'learning' && (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2 text-xs text-success">
-                    <CheckCircle2 className="h-4 w-4" />
-                    <span>{progress.emails_imported.toLocaleString()} emails imported successfully</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Building your voice profile and learning your response patterns. This happens in the background.
-                  </p>
-                </div>
+                <LearningProgressDisplay 
+                  workspaceId={workspaceId}
+                  emailsImported={progress.emails_imported}
+                />
               )}
 
               <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
