@@ -1,6 +1,7 @@
 import { CheckCircle2, Loader2, Brain, Search, Database } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { useLearningProgress, formatTimeRemaining } from '@/hooks/useLearningProgress';
+import { formatDistanceToNowStrict } from 'date-fns';
 
 interface LearningProgressDisplayProps {
   workspaceId: string;
@@ -26,9 +27,16 @@ export function LearningProgressDisplay({ workspaceId, emailsImported }: Learnin
     );
   }
 
-  const { currentPhase, phaseIndex, totalPhases, estimatedSecondsRemaining, isComplete } = progress;
+  const { currentPhase, phaseIndex, totalPhases, estimatedSecondsRemaining, isComplete, lastUpdatedAt } = progress;
   const overallProgress = isComplete ? 100 : Math.round((phaseIndex / totalPhases) * 100);
   const PhaseIcon = phaseIcons[currentPhase.id];
+
+  const lastUpdatedText = lastUpdatedAt
+    ? `${formatDistanceToNowStrict(new Date(lastUpdatedAt), { addSuffix: true })}`
+    : null;
+  const isStale = lastUpdatedAt
+    ? Date.now() - new Date(lastUpdatedAt).getTime() > 5 * 60 * 1000
+    : false;
 
   return (
     <div className="space-y-4">
@@ -58,6 +66,13 @@ export function LearningProgressDisplay({ workspaceId, emailsImported }: Learnin
             </span>
           )}
         </div>
+
+        {lastUpdatedText && (
+          <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+            <span>Last updated {lastUpdatedText}</span>
+            {isStale && <span className="text-destructive">No progress recently</span>}
+          </div>
+        )}
 
         {/* Phase progress */}
         {!isComplete && (

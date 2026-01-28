@@ -32,6 +32,7 @@ interface LearningProgress {
   voiceProfileComplete: boolean;
   playbookComplete: boolean;
   isComplete: boolean;
+  lastUpdatedAt: string | null;
 }
 
 export function useLearningProgress(workspaceId: string | null) {
@@ -43,6 +44,7 @@ export function useLearningProgress(workspaceId: string | null) {
     const pairsAnalyzed = data.pairs_analyzed || 0;
     const voiceComplete = data.voice_profile_complete || false;
     const playbookComplete = data.playbook_complete || false;
+    const lastUpdatedAt = (data.updated_at ?? null) as string | null;
     
     // Determine current phase based on status flags
     let phaseIndex = 0;
@@ -78,7 +80,8 @@ export function useLearningProgress(workspaceId: string | null) {
       pairsAnalyzed,
       voiceProfileComplete: voiceComplete,
       playbookComplete: playbookComplete,
-      isComplete: phaseIndex === 3
+      isComplete: phaseIndex === 3,
+      lastUpdatedAt,
     };
   }, []);
 
@@ -99,6 +102,10 @@ export function useLearningProgress(workspaceId: string | null) {
     };
 
     fetchProgress();
+
+    // Poll as a fallback in case realtime doesn't deliver updates.
+    // This also lets the UI detect a stale backend (no updates for a while).
+    const pollId = window.setInterval(fetchProgress, 10_000);
 
     // Subscribe to changes
     const channel = supabase
@@ -128,6 +135,7 @@ export function useLearningProgress(workspaceId: string | null) {
       .subscribe();
 
     return () => {
+      window.clearInterval(pollId);
       supabase.removeChannel(channel);
     };
   }, [workspaceId, calculateProgress, hasNotified]);
