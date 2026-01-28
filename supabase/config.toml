@@ -247,3 +247,6 @@ verify_jwt = false
 
 [functions.start-email-import]
 verify_jwt = false
+
+[functions.scan-worker]
+verify_jwt = false
