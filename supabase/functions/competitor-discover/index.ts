@@ -8,6 +8,39 @@ const corsHeaders = {
 
 const FUNCTION_NAME = 'competitor-discover';
 
+// UK city coordinates for common locations (ensures UK-first discovery)
+const UK_COORDINATES: Record<string, { lat: number; lng: number }> = {
+  'luton': { lat: 51.8787, lng: -0.4200 },
+  'london': { lat: 51.5074, lng: -0.1278 },
+  'manchester': { lat: 53.4808, lng: -2.2426 },
+  'birmingham': { lat: 52.4862, lng: -1.8904 },
+  'leeds': { lat: 53.8008, lng: -1.5491 },
+  'milton keynes': { lat: 52.0406, lng: -0.7594 },
+  'bedford': { lat: 52.1356, lng: -0.4685 },
+  'st albans': { lat: 51.7520, lng: -0.3390 },
+  'dunstable': { lat: 51.8859, lng: -0.5214 },
+  'harpenden': { lat: 51.8154, lng: -0.3565 },
+  'watford': { lat: 51.6565, lng: -0.3903 },
+  'hemel hempstead': { lat: 51.7526, lng: -0.4692 },
+  'stevenage': { lat: 51.9017, lng: -0.2019 },
+  'hitchin': { lat: 51.9466, lng: -0.2818 },
+  'letchworth': { lat: 51.9789, lng: -0.2299 },
+  'cambridge': { lat: 52.2053, lng: 0.1218 },
+  'oxford': { lat: 51.7520, lng: -1.2577 },
+  'reading': { lat: 51.4543, lng: -0.9781 },
+  'bristol': { lat: 51.4545, lng: -2.5879 },
+  'liverpool': { lat: 53.4084, lng: -2.9916 },
+  'sheffield': { lat: 53.3811, lng: -1.4701 },
+  'newcastle': { lat: 54.9783, lng: -1.6178 },
+  'nottingham': { lat: 52.9548, lng: -1.1581 },
+  'leicester': { lat: 52.6369, lng: -1.1398 },
+  'coventry': { lat: 52.4068, lng: -1.5197 },
+  'glasgow': { lat: 55.8642, lng: -4.2518 },
+  'edinburgh': { lat: 55.9533, lng: -3.1883 },
+  'cardiff': { lat: 51.4816, lng: -3.1791 },
+  'belfast': { lat: 54.5973, lng: -5.9301 },
+};
+
 // Domains to exclude (directories, aggregators, etc.)
 const EXCLUDED_DOMAINS = new Set([
   // UK directories
@@ -61,34 +94,44 @@ serve(async (req) => {
     // Support both parameter naming conventions
     const workspaceId = body.workspaceId || body.workspace_id;
     const jobId = body.jobId || body.job_id;
-    const nicheQuery = body.nicheQuery || body.niche_query;
-    const serviceArea = body.serviceArea || body.service_area;
+    const nicheQueryParam = body.nicheQuery || body.niche_query;
+    const serviceAreaParam = body.serviceArea || body.service_area;
     const targetCount = body.targetCount || body.target_count || 50;
     const radiusMiles = body.radiusMiles || body.radius_miles || 25;
 
     if (!workspaceId) throw new Error('workspace_id is required');
 
     console.log(`[${FUNCTION_NAME}] Starting discovery:`, { 
-      jobId, workspaceId, nicheQuery, serviceArea, radiusMiles 
+      jobId, workspaceId, nicheQueryParam, serviceAreaParam, radiusMiles 
     });
 
-    // Get business profile for location and industry
-    const { data: profile } = await supabase
+    // Try to get profile data - but DON'T fail if not found
+    const { data: businessProfile } = await supabase
       .from('business_profile')
       .select('*')
       .eq('workspace_id', workspaceId)
       .single();
 
-    if (!profile) {
-      throw new Error('Business profile not found. Please set your location first.');
+    // Also check business_context as fallback
+    const { data: businessContext } = await supabase
+      .from('business_context')
+      .select('*')
+      .eq('workspace_id', workspaceId)
+      .single();
+
+    // USE PARAMETERS FIRST, then fall back to profile data
+    const industry = nicheQueryParam || businessProfile?.industry || businessContext?.business_type || 'local business';
+    
+    // Parse service area (remove radius suffix if present)
+    let locationRaw = serviceAreaParam || businessProfile?.formatted_address || businessProfile?.service_area || businessContext?.service_area || '';
+    // Clean: "Luton (20 miles)" -> "Luton"
+    const location = locationRaw.replace(/\s*\(\d+\s*miles?\)$/i, '').split(',')[0].trim();
+
+    if (!location) {
+      throw new Error('No service area provided. Please enter a location for competitor research.');
     }
 
-    const industry = nicheQuery || profile.industry || 'local business';
-    const location = serviceArea || profile.formatted_address || profile.county || profile.service_area;
-    const lat = profile.latitude;
-    const lng = profile.longitude;
-
-    console.log(`[${FUNCTION_NAME}] Profile:`, { industry, location, lat, lng });
+    console.log(`[${FUNCTION_NAME}] Using: industry="${industry}", location="${location}"`);
 
     // Get or create job
     let currentJobId = jobId;
@@ -120,45 +163,60 @@ serve(async (req) => {
         .eq('id', currentJobId);
     }
 
-    // Get location coordinates if not in profile
-    let centerLat = lat;
-    let centerLng = lng;
+    // Get location coordinates
+    let centerLat: number | null = businessProfile?.latitude || null;
+    let centerLng: number | null = businessProfile?.longitude || null;
     
+    // Try UK coordinates lookup first (most reliable for UK locations)
     if (!centerLat || !centerLng) {
-      if (location) {
-        // Geocode the location
-        const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(location)}&key=${googleApiKey}&region=gb`;
-        const geocodeRes = await fetch(geocodeUrl);
-        const geocodeData = await geocodeRes.json();
-        
-        if (geocodeData.results?.[0]?.geometry?.location) {
-          centerLat = geocodeData.results[0].geometry.location.lat;
-          centerLng = geocodeData.results[0].geometry.location.lng;
-          
-          // Save coordinates to profile for future use
-          await supabase
-            .from('business_profile')
-            .update({ latitude: centerLat, longitude: centerLng })
-            .eq('workspace_id', workspaceId);
-        }
+      const locationKey = location.toLowerCase().trim();
+      if (UK_COORDINATES[locationKey]) {
+        centerLat = UK_COORDINATES[locationKey].lat;
+        centerLng = UK_COORDINATES[locationKey].lng;
+        console.log(`[${FUNCTION_NAME}] Using UK coordinates for: ${locationKey}`);
+      }
+    }
+    
+    // Fall back to Google Geocoding with UK bias
+    if (!centerLat || !centerLng) {
+      console.log(`[${FUNCTION_NAME}] Geocoding location: ${location}`);
+      const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(location + ', UK')}&key=${googleApiKey}&region=gb`;
+      const geocodeRes = await fetch(geocodeUrl);
+      const geocodeData = await geocodeRes.json();
+      
+      if (geocodeData.results?.[0]?.geometry?.location) {
+        centerLat = geocodeData.results[0].geometry.location.lat;
+        centerLng = geocodeData.results[0].geometry.location.lng;
+        console.log(`[${FUNCTION_NAME}] Geocoded to: ${centerLat}, ${centerLng}`);
       }
     }
 
     if (!centerLat || !centerLng) {
-      throw new Error('Unable to determine location coordinates. Please set your business location first.');
+      throw new Error(`Unable to find location coordinates for "${location}". Try a UK city name.`);
     }
 
     console.log(`[${FUNCTION_NAME}] Center: ${centerLat}, ${centerLng}`);
 
+    // Update job with coordinates
+    await supabase
+      .from('competitor_research_jobs')
+      .update({
+        geocoded_lat: centerLat,
+        geocoded_lng: centerLng,
+        location: location
+      })
+      .eq('id', currentJobId);
+
     // Convert miles to meters (max 50km for Places API)
     const radiusMeters = Math.min(radiusMiles * 1609.34, 50000);
 
-    // Build search queries based on industry keywords
-    const searchKeywords = profile.search_keywords || [industry];
-    const searchQueries = searchKeywords.slice(0, 4).flatMap((kw: string) => [
-      kw,
-      `${kw} services`,
-    ]);
+    // Build search queries based on industry
+    const searchQueries = [
+      industry,
+      `${industry} services`,
+      `${industry} near me`,
+      `best ${industry}`,
+    ];
 
     console.log(`[${FUNCTION_NAME}] Search queries:`, searchQueries);
 
@@ -225,7 +283,7 @@ serve(async (req) => {
             let distanceMiles: number | null = null;
             if (details.geometry?.location) {
               distanceMiles = calculateDistance(
-                centerLat, centerLng,
+                centerLat!, centerLng!,
                 details.geometry.location.lat, 
                 details.geometry.location.lng
               );
