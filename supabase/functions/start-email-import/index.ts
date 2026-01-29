@@ -85,13 +85,26 @@ serve(async (req) => {
     
     await supabase.from('folder_cursors').insert(cursors)
 
-    // Store access token for background workers
-    await supabase.from('workspace_credentials').upsert({
-      workspace_id: workspaceId,
-      provider: 'aurinko',
-      access_token: accessToken,
-      updated_at: new Date().toISOString()
-    }, { onConflict: 'workspace_id,provider' })
+    // Store access token securely using encrypted storage RPC
+    // The token is passed from the OAuth callback and we need to store it encrypted
+    const { error: storeError } = await supabase.rpc('store_encrypted_token', {
+      p_workspace_id: workspaceId,
+      p_access_token: accessToken,
+      p_refresh_token: null, // Not provided in this flow
+      p_expires_at: null,    // Not provided in this flow
+      p_token_type: 'aurinko'
+    });
+    
+    if (storeError) {
+      console.error('Failed to store encrypted token:', storeError);
+      // Fall back to workspace_credentials for backward compatibility
+      await supabase.from('workspace_credentials').upsert({
+        workspace_id: workspaceId,
+        provider: 'aurinko',
+        access_token: accessToken,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'workspace_id,provider' });
+    }
 
     // Trigger scan-worker (fire and forget)
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!

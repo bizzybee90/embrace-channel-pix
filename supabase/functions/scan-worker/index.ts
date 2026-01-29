@@ -22,16 +22,13 @@ serve(async (req) => {
     const AURINKO_API_URL = 'https://api.aurinko.io/v1'
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 
-    // Get access token
-    const { data: creds } = await supabase
-      .from('workspace_credentials')
-      .select('access_token')
-      .eq('workspace_id', workspaceId)
-      .eq('provider', 'aurinko')
-      .single()
+    // Get access token securely via RPC (uses encrypted storage)
+    const { data: accessToken, error: tokenError } = await supabase
+      .rpc('get_decrypted_access_token', { p_workspace_id: workspaceId });
     
-    if (!creds?.access_token) {
-      throw new Error('No Aurinko access token found')
+    if (tokenError || !accessToken) {
+      console.error('[scan-worker] Failed to get access token:', tokenError);
+      throw new Error('No Aurinko access token found');
     }
 
     // Get next incomplete folder cursor (lowest priority number first)
@@ -73,7 +70,7 @@ serve(async (req) => {
     }
     
     const response = await fetch(url, {
-      headers: { 'Authorization': `Bearer ${creds.access_token}` }
+      headers: { 'Authorization': `Bearer ${accessToken}` }
     })
     
     if (!response.ok) {

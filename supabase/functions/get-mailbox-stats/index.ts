@@ -20,14 +20,14 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    // Get email provider config with access token
+    // Get email provider config (without access_token - we'll get that from RPC)
     const { data: config, error: configError } = await supabase
       .from('email_provider_configs')
-      .select('access_token, email_address, provider')
+      .select('id, email_address, provider')
       .eq('workspace_id', workspaceId)
       .single();
 
-    if (configError || !config?.access_token) {
+    if (configError || !config) {
       console.error('[get-mailbox-stats] No email config found:', configError);
       return new Response(JSON.stringify({ error: 'No email connected' }), {
         status: 400,
@@ -35,9 +35,21 @@ serve(async (req) => {
       });
     }
 
-    // Fetch folder stats from Aurinko
+    // Get decrypted access token securely via RPC
+    const { data: accessToken, error: tokenError } = await supabase
+      .rpc('get_decrypted_access_token', { p_workspace_id: workspaceId });
+
+    if (tokenError || !accessToken) {
+      console.error('[get-mailbox-stats] Failed to get access token:', tokenError);
+      return new Response(JSON.stringify({ error: 'Email token missing, please reconnect' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Fetch folder stats from Aurinko using decrypted token
     const response = await fetch('https://api.aurinko.io/v1/email/folders', {
-      headers: { 'Authorization': `Bearer ${config.access_token}` }
+      headers: { 'Authorization': `Bearer ${accessToken}` }
     });
 
     if (!response.ok) {
