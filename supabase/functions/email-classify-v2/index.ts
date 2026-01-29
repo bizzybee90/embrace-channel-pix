@@ -547,14 +547,46 @@ ${emailSummaries}`;
 
     // -------------------------------------------------------------------------
     // STEP 5: Check if Complete or Need Continuation
+    // IMPORTANT: Only emails with bodies are classifiable. If there are scanned
+    // emails without bodies, we must NOT self-invoke in a tight loop.
     // -------------------------------------------------------------------------
-    const { count: remaining } = await supabase
-      .from('email_import_queue')
-      .select('id', { count: 'exact', head: true })
-      .eq('workspace_id', workspace_id)
-      .eq('status', 'scanned');
+    const [{ count: remainingScannedTotal }, { count: remainingClassifiable }] = await Promise.all([
+      supabase
+        .from('email_import_queue')
+        .select('id', { count: 'exact', head: true })
+        .eq('workspace_id', workspace_id)
+        .eq('status', 'scanned'),
+      supabase
+        .from('email_import_queue')
+        .select('id', { count: 'exact', head: true })
+        .eq('workspace_id', workspace_id)
+        .eq('status', 'scanned')
+        .eq('has_body', true),
+    ]);
 
-    const isComplete = !remaining || remaining === 0;
+    // True completion means there are no scanned emails left at all.
+    const isComplete = (remainingScannedTotal || 0) === 0;
+
+    // If there are scanned emails but none are classifiable (missing bodies),
+    // exit cleanly and let the import pipeline/hydration layer catch up.
+    if (!isComplete && (remainingClassifiable || 0) === 0 && (remainingScannedTotal || 0) > 0) {
+      await saveCheckpoint(supabase, job);
+      await updateProgress(supabase, workspace_id, 'importing', job.classified_count);
+      await releaseLock(supabase, workspace_id, LOCK_FUNCTION_NAME);
+
+      console.warn(
+        `[${FUNCTION_NAME}] Waiting for email bodies: scanned=${remainingScannedTotal}, classifiable=${remainingClassifiable}. Not self-invoking.`
+      );
+
+      return createResponse({
+        success: true,
+        status: 'waiting_for_bodies',
+        job_id: job.id,
+        scanned_remaining: remainingScannedTotal,
+        classifiable_remaining: remainingClassifiable,
+        classified_this_run: classifiedThisRun,
+      });
+    }
 
     if (isComplete) {
       // CLASSIFICATION COMPLETE
@@ -592,12 +624,18 @@ ${emailSummaries}`;
     await updateProgress(supabase, workspace_id, 'classifying', job.classified_count);
     await releaseLock(supabase, workspace_id, LOCK_FUNCTION_NAME);
 
-    console.log(`[${FUNCTION_NAME}] Self-invoking: depth=${_relay_depth + 1}, remaining=${remaining}`);
+    // Reset relay depth when we made progress in this invocation; depth should
+    // only measure consecutive relays without a full reset.
+    const nextRelayDepth = classifiedThisRun > 0 ? 0 : _relay_depth + 1;
+
+    console.log(
+      `[${FUNCTION_NAME}] Self-invoking: depth=${nextRelayDepth}, remaining=${remainingClassifiable}, progressed=${classifiedThisRun > 0}`
+    );
 
     chainNextBatch(supabaseUrl, FUNCTION_NAME, {
       workspace_id,
       job_id: job.id,
-      _relay_depth: _relay_depth + 1,
+      _relay_depth: nextRelayDepth,
     }, supabaseServiceKey);
 
     return createResponse({
@@ -606,8 +644,8 @@ ${emailSummaries}`;
       job_id: job.id,
       batches_this_run: batchesProcessed,
       classified_this_run: classifiedThisRun,
-      remaining,
-      relay_depth: _relay_depth,
+      remaining: remainingClassifiable,
+      relay_depth: nextRelayDepth,
     });
 
   } catch (error: any) {
