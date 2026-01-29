@@ -5894,6 +5894,14 @@ export type Database = {
           updated_at: string
         }[]
       }
+      get_training_pair_threads: {
+        Args: { p_limit?: number; p_workspace_id: string }
+        Returns: {
+          inbound_count: number
+          outbound_count: number
+          thread_id: string
+        }[]
+      }
       get_unprocessed_batch: {
         Args: { p_batch_size?: number; p_workspace_id: string }
         Returns: {

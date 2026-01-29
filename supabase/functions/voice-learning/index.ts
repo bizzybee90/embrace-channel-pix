@@ -60,102 +60,129 @@ async function buildPairsFromEmailQueue(
   workspace_id: string
 ): Promise<TrainingPair[]> {
   // Strategy:
-  // 1) Pull recent outbound replies (business owner messages)
-  // 2) Pull inbound messages for the same threads
-  // 3) For each outbound, find the closest preceding inbound and form a pair
-
-  const { data: outbound, error: outboundError } = await supabase
-    .from('email_import_queue')
-    .select('thread_id,direction,body,subject,received_at')
-    .eq('workspace_id', workspace_id)
-    .eq('direction', 'outbound')
-    .eq('is_noise', false)
-    .not('body', 'is', null)
-    .order('received_at', { ascending: false })
-    .limit(250)
-
-  if (outboundError) {
-    console.error('[voice-learning] Error fetching outbound emails:', outboundError)
-    return []
-  }
-
-  const outboundRows = (outbound || []) as QueueEmail[]
-  const threadIds = Array.from(
-    new Set(outboundRows.map((e) => e.thread_id).filter(Boolean))
-  ) as string[]
-
-  if (threadIds.length === 0) return []
-
-  // IMPORTANT:
-  // We cannot reliably fetch "all inbound for these threads" in one query because
-  // PostgREST applies row limits; that can drop the *relevant* inbound message for
-  // a given outbound. Instead, for each outbound we fetch the single best inbound
-  // candidate (closest preceding inbound in the same thread).
-
-  const pairs: TrainingPair[] = []
-
-  // Only attempt pairing for the first 120 outbound messages; we stop once we have 100 pairs.
-  const outboundCandidates = outboundRows.slice(0, 120)
-
-  for (const out of outboundCandidates) {
-    if (!out.thread_id || !out.body) continue
-
-    // Prefer an inbound message that occurred before the outbound (true reply pairing).
-    // If none exists (common when the import has partial thread history), fall back to
-    // the closest inbound in the same thread so learning can still proceed.
-
-    let candidate: any = null
-
-    const { data: priorCandidate, error: candidateError } = await supabase
+  // 1) Find threads that have BOTH inbound AND outbound messages (true conversations)
+  // 2) For each such thread, pair the outbound reply with its preceding inbound
+  
+  // First, get threads that have both directions (using SQL for efficiency)
+  const { data: threadsWithBoth, error: threadError } = await supabase
+    .rpc('get_training_pair_threads', { 
+      p_workspace_id: workspace_id,
+      p_limit: 150 
+    })
+  
+  // Fallback: if RPC doesn't exist, use a simpler approach
+  let threadIds: string[] = []
+  
+  if (threadError || !threadsWithBoth?.length) {
+    console.log('[voice-learning] RPC not available, using direct query')
+    
+    // Direct approach: Query inbound emails and check for outbound in same thread
+    // This is more efficient because inbound emails are the "triggers" for replies
+    const { data: inbound } = await supabase
       .from('email_import_queue')
-      .select('thread_id,body,received_at')
+      .select('thread_id')
       .eq('workspace_id', workspace_id)
       .eq('direction', 'inbound')
       .eq('is_noise', false)
-      .eq('thread_id', out.thread_id)
       .not('body', 'is', null)
-      .lte('received_at', out.received_at)
-      .order('received_at', { ascending: false })
+      .not('thread_id', 'is', null)
+      .limit(2000)
+    
+    const uniqueInboundThreads = [...new Set((inbound || []).map((e: { thread_id: string }) => e.thread_id))]
+    console.log(`[voice-learning] Checking ${uniqueInboundThreads.length} unique inbound threads for outbound replies`)
+    
+    // Check which threads also have outbound (owner's replies)
+    for (const tid of uniqueInboundThreads) {
+      const { count } = await supabase
+        .from('email_import_queue')
+        .select('id', { count: 'exact', head: true })
+        .eq('workspace_id', workspace_id)
+        .eq('thread_id', tid)
+        .eq('direction', 'outbound')
+        .eq('is_noise', false)
+        .not('body', 'is', null)
+        .limit(1)
+      
+      if (count && count > 0) {
+        threadIds.push(tid as string)
+        if (threadIds.length >= 100) break
+      }
+    }
+  } else {
+    threadIds = threadsWithBoth.map((t: any) => t.thread_id)
+  }
+  
+  if (threadIds.length === 0) {
+    console.log('[voice-learning] No threads with both inbound and outbound found')
+    return []
+  }
+  
+  console.log(`[voice-learning] Found ${threadIds.length} threads with paired messages`)
+  
+  const pairs: TrainingPair[] = []
+  
+  for (const tid of threadIds) {
+    if (pairs.length >= 100) break
+    
+    // Get the outbound message (owner's reply)
+    const { data: outboundMsg } = await supabase
+      .from('email_import_queue')
+      .select('body,received_at')
+      .eq('workspace_id', workspace_id)
+      .eq('thread_id', tid)
+      .eq('direction', 'outbound')
+      .eq('is_noise', false)
+      .not('body', 'is', null)
+      .order('received_at', { ascending: true }) // Get earliest outbound (likely the actual reply)
       .limit(1)
       .maybeSingle()
-
-    if (candidateError) {
-      console.error('[voice-learning] Error fetching inbound candidate:', candidateError)
-      continue
-    }
-
-    candidate = priorCandidate
-
-    if (!candidate?.body) {
-      const { data: fallbackCandidate, error: fallbackError } = await supabase
+    
+    if (!outboundMsg?.body) continue
+    
+    // Get the inbound message that preceded it
+    const { data: inboundMsg } = await supabase
+      .from('email_import_queue')
+      .select('body,received_at')
+      .eq('workspace_id', workspace_id)
+      .eq('thread_id', tid)
+      .eq('direction', 'inbound')
+      .eq('is_noise', false)
+      .not('body', 'is', null)
+      .lte('received_at', outboundMsg.received_at)
+      .order('received_at', { ascending: false }) // Get the latest inbound before the outbound
+      .limit(1)
+      .maybeSingle()
+    
+    // If no inbound before, try any inbound in thread (partial history case)
+    let customerText = inboundMsg?.body
+    let customerReceivedAt = inboundMsg?.received_at
+    
+    if (!customerText) {
+      const { data: fallbackInbound } = await supabase
         .from('email_import_queue')
-        .select('thread_id,body,received_at')
+        .select('body,received_at')
         .eq('workspace_id', workspace_id)
+        .eq('thread_id', tid)
         .eq('direction', 'inbound')
         .eq('is_noise', false)
-        .eq('thread_id', out.thread_id)
         .not('body', 'is', null)
         .order('received_at', { ascending: false })
         .limit(1)
         .maybeSingle()
-
-      if (fallbackError) {
-        console.error('[voice-learning] Error fetching inbound fallback:', fallbackError)
-      }
-      candidate = fallbackCandidate
+      
+      if (!fallbackInbound?.body) continue
+      customerText = fallbackInbound.body
+      customerReceivedAt = fallbackInbound.received_at
     }
-
-    if (!candidate?.body) continue
-
+    
     pairs.push({
-      customer_text: candidate.body,
-      owner_text: out.body,
-      response_hours: hoursBetween(candidate.received_at, out.received_at),
+      customer_text: customerText,
+      owner_text: outboundMsg.body,
+      response_hours: hoursBetween(customerReceivedAt, outboundMsg.received_at),
     })
-
-    if (pairs.length >= 100) break
   }
-
+  
+  console.log(`[voice-learning] Built ${pairs.length} training pairs`)
   return pairs
 }
 
