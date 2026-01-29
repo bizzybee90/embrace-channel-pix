@@ -530,12 +530,11 @@ serve(async (req) => {
       // Release lock before chaining
       await releaseLock(supabase, workspace_id, FUNCTION_NAME);
 
-      console.log(`[${FUNCTION_NAME}] Import complete (${totalImported} emails), chaining to email-classify-v2`);
+      console.log(`[${FUNCTION_NAME}] Import complete (${totalImported} emails), chaining to email-classify-bulk`);
 
-      // Chain to classification
-      chainNextBatch(supabaseUrl, 'email-classify-v2', {
+      // Chain to simplified bulk classification (ONE Gemini call for all emails)
+      chainNextBatch(supabaseUrl, 'email-classify-bulk', {
         workspace_id,
-        _relay_depth: 0, // Reset depth for new phase
       }, supabaseServiceKey);
 
       return createResponse({
@@ -546,7 +545,7 @@ serve(async (req) => {
         sent_count: job.sent_imported,
         inbox_count: job.inbox_imported,
         duration_ms: Date.now() - startTime,
-        chained_to: 'email-classify-v2',
+        chained_to: 'email-classify-bulk',
       });
     }
 

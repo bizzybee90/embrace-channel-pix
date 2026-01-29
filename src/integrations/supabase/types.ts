@@ -2255,6 +2255,8 @@ export type Database = {
         Row: {
           body: string | null
           body_html: string | null
+          category: string | null
+          classified_at: string | null
           config_id: string
           created_at: string | null
           direction: string
@@ -2270,6 +2272,7 @@ export type Database = {
           noise_reason: string | null
           processed_at: string | null
           received_at: string | null
+          requires_reply: boolean | null
           status: string | null
           subject: string | null
           thread_id: string
@@ -2279,6 +2282,8 @@ export type Database = {
         Insert: {
           body?: string | null
           body_html?: string | null
+          category?: string | null
+          classified_at?: string | null
           config_id: string
           created_at?: string | null
           direction: string
@@ -2294,6 +2299,7 @@ export type Database = {
           noise_reason?: string | null
           processed_at?: string | null
           received_at?: string | null
+          requires_reply?: boolean | null
           status?: string | null
           subject?: string | null
           thread_id: string
@@ -2303,6 +2309,8 @@ export type Database = {
         Update: {
           body?: string | null
           body_html?: string | null
+          category?: string | null
+          classified_at?: string | null
           config_id?: string
           created_at?: string | null
           direction?: string
@@ -2318,6 +2326,7 @@ export type Database = {
           noise_reason?: string | null
           processed_at?: string | null
           received_at?: string | null
+          requires_reply?: boolean | null
           status?: string | null
           subject?: string | null
           thread_id?: string
