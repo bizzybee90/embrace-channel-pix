@@ -204,8 +204,8 @@ export function OnboardingWizard({ workspaceId, onComplete }: OnboardingWizardPr
         </CardHeader>
 
         <CardContent className="space-y-6">
-          {/* Background import banner - shows on all steps after email connection */}
-          {currentStep !== 'welcome' && currentStep !== 'email' && (
+          {/* Background import banner - shows after business context step when import is running */}
+          {currentStep !== 'welcome' && currentStep !== 'email' && currentStep !== 'business' && (
             <BackgroundImportBanner workspaceId={workspaceId} />
           )}
           
