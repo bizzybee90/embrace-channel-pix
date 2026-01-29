@@ -259,36 +259,53 @@ export function EmailPipelineProgress({
     };
   }, [workspaceId]);
 
-  // Derive stage statuses from phase
+  // Derive stage statuses from ACTUAL DATA, not just the phase field
+  // (The phase field can get stuck due to edge function issues)
   const getStageStatuses = (): { import: StageStatus; classify: StageStatus; learn: StageStatus } => {
-    const { phase } = stats;
+    const { phase, emailsReceived, emailsClassified, voiceProfileComplete } = stats;
+    const totalEmails = stats.inboxCount + stats.sentCount;
 
+    // If error phase, determine which stage errored
     if (phase === 'error') {
-      // Determine which stage errored based on progress
-      if (stats.emailsClassified === 0 && stats.emailsReceived === 0) {
+      if (emailsClassified === 0 && emailsReceived === 0) {
         return { import: 'error', classify: 'pending', learn: 'pending' };
       }
-      if (stats.emailsClassified < stats.emailsReceived) {
+      if (emailsClassified < emailsReceived) {
         return { import: 'done', classify: 'error', learn: 'pending' };
       }
       return { import: 'done', classify: 'done', learn: 'error' };
     }
 
-    switch (phase) {
-      case 'idle':
-      case 'connecting':
-        return { import: 'in_progress', classify: 'pending', learn: 'pending' };
-      case 'importing':
-        return { import: 'in_progress', classify: 'pending', learn: 'pending' };
-      case 'classifying':
-        return { import: 'done', classify: 'in_progress', learn: 'pending' };
-      case 'learning':
-        return { import: 'done', classify: 'done', learn: 'in_progress' };
-      case 'complete':
-        return { import: 'done', classify: 'done', learn: 'done' };
-      default:
-        return { import: 'pending', classify: 'pending', learn: 'pending' };
+    // SMART DETECTION: Derive actual state from data, not just phase
+    const importComplete = totalEmails > 0 && emailsReceived > 0;
+    const classifyComplete = emailsClassified >= emailsReceived && emailsReceived > 0;
+
+    // All stages complete
+    if (classifyComplete && voiceProfileComplete) {
+      return { import: 'done', classify: 'done', learn: 'done' };
     }
+
+    // Classification complete, learning in progress or complete
+    if (classifyComplete && !voiceProfileComplete) {
+      return { import: 'done', classify: 'done', learn: 'in_progress' };
+    }
+
+    // Import complete, classification in progress
+    if (importComplete && emailsClassified > 0 && !classifyComplete) {
+      return { import: 'done', classify: 'in_progress', learn: 'pending' };
+    }
+
+    // Import complete, classification hasn't started
+    if (importComplete && emailsClassified === 0) {
+      // Check phase to see if classification should start
+      if (phase === 'classifying') {
+        return { import: 'done', classify: 'in_progress', learn: 'pending' };
+      }
+      return { import: 'done', classify: 'pending', learn: 'pending' };
+    }
+
+    // Still importing
+    return { import: 'in_progress', classify: 'pending', learn: 'pending' };
   };
 
   const stageStatuses = getStageStatuses();
