@@ -25,19 +25,14 @@ interface WebsitePipelineProgressProps {
   onRetry: () => void;
 }
 
-type PipelinePhase = 'pending' | 'mapping' | 'scraping' | 'extracting' | 'completed' | 'failed';
+// Maps to scraping_jobs.status values
+type PipelinePhase = 'pending' | 'scraping' | 'processing' | 'completed' | 'failed';
 
 interface PipelineStats {
   phase: PipelinePhase;
   pagesFound: number;
   pagesScraped: number;
-  pagesExtracted: number;
   faqsExtracted: number;
-  groundTruthFacts: number;
-  businessInfo: {
-    name?: string;
-    services?: string[];
-  } | null;
   errorMessage: string | null;
 }
 
@@ -182,20 +177,17 @@ export function WebsitePipelineProgress({
     phase: 'pending',
     pagesFound: 0,
     pagesScraped: 0,
-    pagesExtracted: 0,
     faqsExtracted: 0,
-    groundTruthFacts: 0,
-    businessInfo: null,
     errorMessage: null,
   });
 
-  // Subscribe to job updates via realtime
+  // Subscribe to job updates via realtime - now using scraping_jobs table
   useEffect(() => {
     if (!jobId) return;
 
     const fetchStats = async () => {
       const { data } = await supabase
-        .from('website_scrape_jobs')
+        .from('scraping_jobs')
         .select('*')
         .eq('id', jobId)
         .single();
@@ -203,12 +195,9 @@ export function WebsitePipelineProgress({
       if (data) {
         setStats({
           phase: data.status as PipelinePhase,
-          pagesFound: data.pages_found || 0,
-          pagesScraped: data.pages_scraped || 0,
-          pagesExtracted: data.pages_extracted || 0,
-          faqsExtracted: data.faqs_extracted || 0,
-          groundTruthFacts: data.ground_truth_facts || 0,
-          businessInfo: data.business_info as PipelineStats['businessInfo'],
+          pagesFound: data.total_pages_found || 0,
+          pagesScraped: data.pages_processed || 0,
+          faqsExtracted: data.faqs_found || 0,
           errorMessage: data.error_message || null,
         });
       }
@@ -217,13 +206,13 @@ export function WebsitePipelineProgress({
     fetchStats();
 
     const channel = supabase
-      .channel(`website-scrape-${jobId}`)
+      .channel(`scraping-job-${jobId}`)
       .on(
         'postgres_changes',
         {
           event: 'UPDATE',
           schema: 'public',
-          table: 'website_scrape_jobs',
+          table: 'scraping_jobs',
           filter: `id=eq.${jobId}`,
         },
         () => {
@@ -241,33 +230,41 @@ export function WebsitePipelineProgress({
     };
   }, [jobId]);
 
-  // Derive stage statuses from phase
+  // Derive stage statuses from phase and data
   const getStageStatuses = (): { discover: StageStatus; scrape: StageStatus; extract: StageStatus } => {
-    const { phase } = stats;
+    const { phase, pagesFound, pagesScraped, faqsExtracted } = stats;
 
     if (phase === 'failed') {
-      if (stats.pagesFound === 0) {
+      if (pagesFound === 0) {
         return { discover: 'error', scrape: 'pending', extract: 'pending' };
       }
-      if (stats.pagesScraped < stats.pagesFound) {
+      if (pagesScraped < pagesFound) {
         return { discover: 'done', scrape: 'error', extract: 'pending' };
       }
       return { discover: 'done', scrape: 'done', extract: 'error' };
     }
 
-    switch (phase) {
-      case 'pending':
-      case 'mapping':
-        return { discover: 'in_progress', scrape: 'pending', extract: 'pending' };
-      case 'scraping':
-        return { discover: 'done', scrape: 'in_progress', extract: 'pending' };
-      case 'extracting':
-        return { discover: 'done', scrape: 'done', extract: 'in_progress' };
-      case 'completed':
-        return { discover: 'done', scrape: 'done', extract: 'done' };
-      default:
-        return { discover: 'pending', scrape: 'pending', extract: 'pending' };
+    if (phase === 'completed') {
+      return { discover: 'done', scrape: 'done', extract: 'done' };
     }
+
+    // 'scraping' status means Apify is running (discover + scrape happening together)
+    if (phase === 'scraping') {
+      // If pages found, discovery is done, scraping in progress
+      if (pagesFound > 0) {
+        return { discover: 'done', scrape: 'in_progress', extract: 'pending' };
+      }
+      // Still discovering
+      return { discover: 'in_progress', scrape: 'pending', extract: 'pending' };
+    }
+
+    // 'processing' status means extraction is happening
+    if (phase === 'processing') {
+      return { discover: 'done', scrape: 'done', extract: 'in_progress' };
+    }
+
+    // Default: pending
+    return { discover: 'pending', scrape: 'pending', extract: 'pending' };
   };
 
   const stageStatuses = getStageStatuses();
@@ -412,19 +409,10 @@ export function WebsitePipelineProgress({
             <div className="space-y-2 text-sm">
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground flex items-center gap-2">
-                  <span className="text-xs">├─</span> FAQs
+                  <span className="text-xs">└─</span> FAQs extracted
                 </span>
                 <span className="font-medium flex items-center gap-1">
                   {stats.faqsExtracted}
-                  <CheckCircle2 className="h-3.5 w-3.5 text-success" />
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground flex items-center gap-2">
-                  <span className="text-xs">└─</span> Business facts
-                </span>
-                <span className="font-medium flex items-center gap-1">
-                  {stats.groundTruthFacts}
                   <CheckCircle2 className="h-3.5 w-3.5 text-success" />
                 </span>
               </div>
@@ -459,13 +447,8 @@ export function WebsitePipelineProgress({
           <CheckCircle2 className="h-6 w-6 text-success mx-auto mb-2" />
           <p className="text-sm font-medium text-success">Website Analysed!</p>
           <p className="text-xs text-muted-foreground mt-1">
-            {stats.faqsExtracted} FAQs and {stats.groundTruthFacts} facts extracted from your website.
+            {stats.faqsExtracted} FAQs extracted from {stats.pagesScraped} pages.
           </p>
-          {stats.businessInfo?.name && (
-            <p className="text-xs text-muted-foreground mt-1">
-              Business: <strong>{stats.businessInfo.name}</strong>
-            </p>
-          )}
         </div>
       )}
 
