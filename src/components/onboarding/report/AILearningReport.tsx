@@ -4,8 +4,10 @@ import { ClassificationBreakdown } from './ClassificationBreakdown';
 import { VoiceDNASummary } from './VoiceDNASummary';
 import { ResponsePlaybook } from './ResponsePlaybook';
 import { ConfidenceAssessment } from './ConfidenceAssessment';
+import { generateLearningReportPDF } from './generatePDF';
 import { supabase } from '@/integrations/supabase/client';
-import { ArrowLeft, ArrowRight, CheckCircle2, Loader2, Brain } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CheckCircle2, Loader2, Brain, Download } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface AILearningReportProps {
   workspaceId: string;
@@ -16,6 +18,21 @@ interface AILearningReportProps {
 export function AILearningReport({ workspaceId, onNext, onBack }: AILearningReportProps) {
   const [isReady, setIsReady] = useState(false);
   const [checking, setChecking] = useState(true);
+  const [downloading, setDownloading] = useState(false);
+  const [companyName, setCompanyName] = useState<string | undefined>();
+
+  const handleDownloadPDF = async () => {
+    setDownloading(true);
+    try {
+      await generateLearningReportPDF(workspaceId, companyName);
+      toast.success('Report downloaded!');
+    } catch (err) {
+      console.error('PDF generation error:', err);
+      toast.error('Failed to generate PDF');
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   useEffect(() => {
     async function checkStatus() {
@@ -26,6 +43,17 @@ export function AILearningReport({ workspaceId, onNext, onBack }: AILearningRepo
           .select('voice_dna, playbook, emails_analyzed')
           .eq('workspace_id', workspaceId)
           .single();
+
+        // Get company name for PDF
+        const { data: context } = await supabase
+          .from('business_context')
+          .select('company_name')
+          .eq('workspace_id', workspaceId)
+          .single();
+        
+        if (context?.company_name) {
+          setCompanyName(context.company_name);
+        }
 
         // Check if we have classified emails
         const { count: emailCount } = await supabase
@@ -107,21 +135,31 @@ export function AILearningReport({ workspaceId, onNext, onBack }: AILearningRepo
       </div>
 
       {/* Success message */}
-      <div className="flex items-center justify-center gap-2 py-2 text-sm text-green-600 dark:text-green-400">
+      <div className="flex items-center justify-center gap-2 py-2 text-sm text-success">
         <CheckCircle2 className="h-4 w-4" />
         <span>Your digital clone is ready!</span>
       </div>
 
       {/* Navigation */}
-      <div className="flex justify-between pt-4 border-t">
+      <div className="flex justify-between items-center pt-4 border-t">
         <Button variant="ghost" onClick={onBack}>
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back
         </Button>
-        <Button onClick={onNext}>
-          Looks Good
-          <ArrowRight className="ml-2 h-4 w-4" />
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleDownloadPDF} disabled={downloading}>
+            {downloading ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="mr-2 h-4 w-4" />
+            )}
+            Download PDF
+          </Button>
+          <Button onClick={onNext}>
+            Looks Good
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
+        </div>
       </div>
     </div>
   );
