@@ -41,6 +41,32 @@ export async function generateLearningReportPDF(workspaceId: string, companyName
   const contentWidth = pageWidth - margin * 2;
   let y = margin;
 
+  // The backend client is strongly typed for known tables; PDF generation needs dynamic pagination.
+  // We intentionally use `any` here to avoid type-instantiation explosions.
+  const sb: any = supabase as any;
+
+  const fetchAll = async <T,>(
+    table: string,
+    select: string,
+    build?: (q: any) => any
+  ): Promise<T[]> => {
+    const pageSize = 1000;
+    let from = 0;
+    const rows: T[] = [];
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      let q: any = sb.from(table).select(select).eq('workspace_id', workspaceId).range(from, from + pageSize - 1);
+      if (build) q = build(q);
+      const { data, error } = await q;
+      if (error) throw error;
+      const page = (data || []) as T[];
+      rows.push(...page);
+      if (page.length < pageSize) break;
+      from += pageSize;
+    }
+    return rows;
+  };
+
   // Helper functions
   const addTitle = (text: string, size = 18) => {
     doc.setFontSize(size);
@@ -89,21 +115,14 @@ export async function generateLearningReportPDF(workspaceId: string, companyName
   };
 
   // Fetch all data
-  const [profileResult, emailsResult, examplesResult] = await Promise.all([
+  const [profileResult, emails, examples] = await Promise.all([
     supabase
       .from('voice_profiles')
       .select('voice_dna, playbook, emails_analyzed')
       .eq('workspace_id', workspaceId)
       .single(),
-    supabase
-      .from('email_import_queue')
-      .select('category')
-      .eq('workspace_id', workspaceId)
-      .not('category', 'is', null),
-    supabase
-      .from('example_responses')
-      .select('category')
-      .eq('workspace_id', workspaceId),
+    fetchAll<{ category: string | null }>('email_import_queue', 'category', (q) => q.not('category', 'is', null)),
+    fetchAll<{ category: string | null }>('example_responses', 'category'),
   ]);
 
   const voiceDNA = profileResult.data?.voice_dna as unknown as VoiceDNA | null;
@@ -112,7 +131,7 @@ export async function generateLearningReportPDF(workspaceId: string, companyName
 
   // Aggregate category counts
   const categoryCounts: Record<string, number> = {};
-  (emailsResult.data || []).forEach(row => {
+  (emails || []).forEach(row => {
     const cat = row.category || 'unknown';
     categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
   });
@@ -121,7 +140,7 @@ export async function generateLearningReportPDF(workspaceId: string, companyName
 
   // Example counts by category
   const exampleCounts: Record<string, number> = {};
-  (examplesResult.data || []).forEach(row => {
+  (examples || []).forEach(row => {
     const cat = row.category || 'general';
     exampleCounts[cat] = (exampleCounts[cat] || 0) + 1;
   });

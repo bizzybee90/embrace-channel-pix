@@ -11,10 +11,13 @@ import {
   RotateCcw,
   Mail,
   Brain,
-  Sparkles
+  Sparkles,
+  Download
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { LearningProgressDisplay } from '@/components/email/LearningProgressDisplay';
+import { toast } from 'sonner';
+import { generateLearningReportPDF } from './report/generatePDF';
 
 interface EmailPipelineProgressProps {
   workspaceId: string;
@@ -184,6 +187,8 @@ export function EmailPipelineProgress({
     errorMessage: null,
   });
 
+  const [downloading, setDownloading] = useState(false);
+
   // Fetch initial stats and subscribe to updates
   useEffect(() => {
     if (!workspaceId) return;
@@ -310,6 +315,22 @@ export function EmailPipelineProgress({
   };
 
   const stageStatuses = getStageStatuses();
+
+  const canDownloadReport = stageStatuses.import === 'done' && stageStatuses.classify === 'done' && stageStatuses.learn === 'done';
+
+  const handleDownloadPDF = async () => {
+    if (!canDownloadReport || downloading) return;
+    setDownloading(true);
+    try {
+      await generateLearningReportPDF(workspaceId);
+      toast.success('Report downloaded');
+    } catch (err) {
+      console.error('PDF generation error:', err);
+      toast.error('Failed to generate PDF');
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   // Calculate current stage for progress line (0-3)
   const getCurrentStage = (): number => {
@@ -502,13 +523,34 @@ export function EmailPipelineProgress({
       )}
 
       {/* Completion Message */}
-      {isComplete && (
-        <div className="p-3 bg-success/10 border border-success/30 rounded-lg text-center">
-          <CheckCircle2 className="h-6 w-6 text-success mx-auto mb-2" />
-          <p className="text-sm font-medium text-success">Setup Complete!</p>
-          <p className="text-xs text-muted-foreground mt-1">
-            BizzyBee is ready to help you with emails.
-          </p>
+      {(isComplete || canDownloadReport) && (
+        <div className="p-3 bg-success/10 border border-success/30 rounded-lg text-center space-y-2">
+          <div>
+            <CheckCircle2 className="h-6 w-6 text-success mx-auto mb-2" />
+            <p className="text-sm font-medium text-success">Setup Complete!</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              BizzyBee is ready to help you with emails.
+            </p>
+          </div>
+
+          {canDownloadReport && (
+            <div className="pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleDownloadPDF}
+                disabled={downloading}
+                className="w-full gap-2"
+              >
+                {downloading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4" />
+                )}
+                Download PDF
+              </Button>
+            </div>
+          )}
         </div>
       )}
 
