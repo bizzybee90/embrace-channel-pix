@@ -3,9 +3,18 @@ import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-
 import { chainNextBatch } from '../_shared/batch-processor.ts';
 
 // =============================================================================
-// ROBUST EMAIL CLASSIFICATION WITH RELAY RACE SELF-INVOCATION + WORKER LOCKS
-// Handles 30,000+ emails autonomously with mega-batching
-// Features: Single-worker enforcement, rate limit handling, adaptive backoff
+// BULLETPROOF EMAIL CLASSIFICATION WITH THREE-LAYER RELIABILITY
+// 
+// Layer 1: Self-Invocation Relay (every 30-60s)
+// Layer 2: External Watchdog via pg_cron (every 2 min)
+// Layer 3: Job State Machine (pending → in_progress → completed/failed/paused)
+// 
+// Features:
+// - Single active job enforcement per workspace
+// - Ghost job auto-cleanup
+// - Heartbeat during long operations
+// - Graceful degradation on persistent errors
+// - Worker lock to prevent thundering herd
 // =============================================================================
 
 const corsHeaders = {
@@ -14,21 +23,16 @@ const corsHeaders = {
 };
 
 const FUNCTION_NAME = 'email-classify-v2';
-const DB_BATCH_SIZE = 500; // Fetch from DB at once
-const LLM_BATCH_SIZE = 100; // Send to Gemini at once (prevents malformed responses)
+const DB_BATCH_SIZE = 500;
+const LLM_BATCH_SIZE = 100;
 const TIMEOUT_BUFFER_MS = 50000;
 const MAX_RETRIES = 5;
 const BASE_DELAY_MS = 2000;
 const MAX_DELAY_MS = 60000;
-const MAX_RELAY_DEPTH = 100; // Safety: max 200,000 emails (100 × 2000)
+const MAX_RELAY_DEPTH = 100;
 const LOCK_FUNCTION_NAME = 'email-classify-v2';
+const MAX_CONSECUTIVE_FAILURES = 10; // Trigger graceful degradation
 
-// NOTE:
-// - v2 import pipeline writes into `email_import_queue` with statuses like: scanned → queued_for_fetch → fetched → processed.
-// - In this project, scanned rows already contain `body` + `has_body=true`, so classification should run against `scanned`.
-// - Avoid relying on `setTimeout` inside edge runtimes; do backoff by self-invoking with `_sleep_ms`.
-
-// Use Gemini 2.0 Flash for speed
 const GEMINI_API = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
 interface ClassifyJob {
@@ -69,7 +73,7 @@ function parseRetryDelay(errorText: string): number | null {
 }
 
 // =============================================================================
-// WORKER LOCK FUNCTIONS - Prevent thundering herd
+// WORKER LOCK FUNCTIONS
 // =============================================================================
 
 async function acquireLock(
@@ -179,7 +183,7 @@ serve(async (req) => {
       });
     }
 
-    // Optional backoff sleep used for self-invoked retries (e.g., rate limit handling)
+    // Optional backoff sleep
     if (typeof _sleep_ms === 'number' && _sleep_ms > 0) {
       const ms = Math.min(Math.max(_sleep_ms, 0), 60000);
       console.log(`[${FUNCTION_NAME}] Backoff sleep ${ms}ms before continuing`);
@@ -204,35 +208,87 @@ serve(async (req) => {
     console.log(`[${FUNCTION_NAME}] Starting: relay_depth=${_relay_depth}`, { workspace_id, job_id });
 
     // -------------------------------------------------------------------------
-    // Get or Create Classification Job
+    // STEP 1: Clean up any ghost jobs (total_to_classify = 0)
+    // -------------------------------------------------------------------------
+    const { data: ghostsCleaned } = await supabase
+      .from('classification_jobs')
+      .update({ 
+        status: 'failed', 
+        completed_at: new Date().toISOString(),
+        error_message: 'No emails to classify' 
+      })
+      .eq('workspace_id', workspace_id)
+      .eq('status', 'in_progress')
+      .eq('total_to_classify', 0)
+      .select('id');
+    
+    if (ghostsCleaned && ghostsCleaned.length > 0) {
+      console.log(`[${FUNCTION_NAME}] Cleaned up ${ghostsCleaned.length} ghost jobs`);
+    }
+
+    // -------------------------------------------------------------------------
+    // STEP 2: Get or Create Classification Job (SINGLE ACTIVE JOB ENFORCEMENT)
     // -------------------------------------------------------------------------
     let job: ClassifyJob;
 
     if (job_id) {
+      // Resume existing job
       const { data, error } = await supabase
         .from('classification_jobs')
         .select('*')
         .eq('id', job_id)
-        .single();
+        .maybeSingle();
 
       if (error || !data) {
-        throw new Error(`Job ${job_id} not found`);
+        console.warn(`[${FUNCTION_NAME}] Job ${job_id} not found, looking for active job`);
+      } else {
+        job = data as ClassifyJob;
       }
-      job = data as ClassifyJob;
-    } else {
-      // Count unclassified emails in queue (status='scanned' from v2 import)
+    }
+
+    // If no job from job_id, check for existing active job with work
+    if (!job!) {
+      const { data: existingJob } = await supabase
+        .from('classification_jobs')
+        .select('*')
+        .eq('workspace_id', workspace_id)
+        .in('status', ['in_progress', 'paused'])
+        .gt('total_to_classify', 0)
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (existingJob) {
+        console.log(`[${FUNCTION_NAME}] Resuming existing job ${existingJob.id} (${existingJob.classified_count}/${existingJob.total_to_classify})`);
+        job = existingJob as ClassifyJob;
+      }
+    }
+
+    // If still no job, create new one
+    if (!job!) {
+      // Count unclassified emails
       const { count } = await supabase
         .from('email_import_queue')
         .select('id', { count: 'exact', head: true })
         .eq('workspace_id', workspace_id)
         .eq('status', 'scanned');
 
+      if (!count || count === 0) {
+        console.log(`[${FUNCTION_NAME}] No emails to classify, exiting`);
+        await releaseLock(supabase, workspace_id, LOCK_FUNCTION_NAME);
+        return createResponse({
+          success: true,
+          status: 'no_work',
+          message: 'No emails to classify',
+        });
+      }
+
       const { data, error } = await supabase
         .from('classification_jobs')
         .insert({
           workspace_id,
           status: 'in_progress',
-          total_to_classify: count || 0,
+          total_to_classify: count,
           classified_count: 0,
           failed_count: 0,
           last_processed_id: null,
@@ -244,24 +300,29 @@ serve(async (req) => {
 
       if (error) throw error;
       job = data as ClassifyJob;
+      console.log(`[${FUNCTION_NAME}] Created new job ${job.id} for ${count} emails`);
     }
 
-    // Update job status
+    // Update job status to in_progress (in case it was paused)
     await supabase
       .from('classification_jobs')
-      .update({ status: 'in_progress' })
+      .update({ 
+        status: 'in_progress',
+        updated_at: new Date().toISOString(),
+      })
       .eq('id', job.id);
 
     // -------------------------------------------------------------------------
-    // Process Batches Until Timeout
+    // STEP 3: Process Batches Until Timeout
     // -------------------------------------------------------------------------
     let batchesProcessed = 0;
     let classifiedThisRun = 0;
     let consecutiveFailures = 0;
     let rateLimitDelay = 0;
+    let subBatchIndex = 0;
 
-    while (shouldContinueProcessing(startTime) && consecutiveFailures < MAX_RETRIES) {
-      // Fetch next batch of unclassified emails from queue
+    while (shouldContinueProcessing(startTime) && consecutiveFailures < MAX_CONSECUTIVE_FAILURES) {
+      // Fetch next batch
       let query = supabase
         .from('email_import_queue')
         .select('id, from_email, from_name, subject, body, direction')
@@ -286,13 +347,23 @@ serve(async (req) => {
 
       console.log(`[${FUNCTION_NAME}] Fetched ${emails.length} emails, processing in sub-batches of ${LLM_BATCH_SIZE}`);
 
-      // Process emails in smaller sub-batches for LLM reliability
+      // Process in sub-batches
       for (let subBatchStart = 0; subBatchStart < emails.length; subBatchStart += LLM_BATCH_SIZE) {
         if (!shouldContinueProcessing(startTime)) break;
 
         const subBatch = emails.slice(subBatchStart, subBatchStart + LLM_BATCH_SIZE);
+        subBatchIndex++;
         
-        // Build optimized Gemini prompt
+        // HEARTBEAT: Refresh lock + job timestamp every 2 sub-batches
+        if (subBatchIndex % 2 === 0) {
+          await refreshLock(supabase, workspace_id, LOCK_FUNCTION_NAME);
+          await supabase
+            .from('classification_jobs')
+            .update({ updated_at: new Date().toISOString() })
+            .eq('id', job.id);
+        }
+
+        // Build prompt
         const emailSummaries = subBatch.map((e: any, i: number) =>
           `${i}|${e.from_email}|${e.subject || '(none)'}|${(e.body || '').substring(0, 150).replace(/\n/g, ' ')}`
         ).join('\n');
@@ -369,7 +440,7 @@ ${emailSummaries}`;
             if (jsonMatch) {
               try {
                 classifications = JSON.parse(jsonMatch[0]);
-                consecutiveFailures = 0;
+                consecutiveFailures = 0; // Reset on success
               } catch (parseErr) {
                 if (!useTemperatureZero) {
                   console.log(`[${FUNCTION_NAME}] JSON parse failed, retrying with temperature=0`);
@@ -420,11 +491,11 @@ ${emailSummaries}`;
           }
         }
 
-        // Refresh lock periodically
+        // Refresh lock after each sub-batch
         await refreshLock(supabase, workspace_id, LOCK_FUNCTION_NAME);
       }
 
-      // Update checkpoint after processing all sub-batches
+      // Update checkpoint
       job.last_processed_id = emails[emails.length - 1].id;
       await saveCheckpoint(supabase, job);
       await updateProgress(supabase, workspace_id, 'classifying', job.classified_count);
@@ -434,7 +505,42 @@ ${emailSummaries}`;
     }
 
     // -------------------------------------------------------------------------
-    // Check if Complete or Need Continuation
+    // STEP 4: Check for graceful degradation
+    // -------------------------------------------------------------------------
+    if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+      console.error(`[${FUNCTION_NAME}] Too many consecutive failures (${consecutiveFailures}), entering paused state`);
+      
+      await supabase
+        .from('classification_jobs')
+        .update({ 
+          status: 'paused',
+          error_message: `Too many LLM failures (${consecutiveFailures}), waiting for retry`,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', job.id);
+      
+      await releaseLock(supabase, workspace_id, LOCK_FUNCTION_NAME);
+      
+      // Self-invoke with extended delay (30 seconds)
+      chainNextBatch(supabaseUrl, FUNCTION_NAME, {
+        workspace_id,
+        job_id: job.id,
+        _relay_depth: _relay_depth + 1,
+        _sleep_ms: 30000,
+      }, supabaseServiceKey);
+      
+      return createResponse({
+        success: true,
+        status: 'paused',
+        job_id: job.id,
+        classified_this_run: classifiedThisRun,
+        consecutive_failures: consecutiveFailures,
+        message: 'Paused due to consecutive failures, will retry in 30s',
+      });
+    }
+
+    // -------------------------------------------------------------------------
+    // STEP 5: Check if Complete or Need Continuation
     // -------------------------------------------------------------------------
     const { count: remaining } = await supabase
       .from('email_import_queue')
@@ -445,9 +551,7 @@ ${emailSummaries}`;
     const isComplete = !remaining || remaining === 0;
 
     if (isComplete) {
-      // =========================================================================
-      // CLASSIFICATION COMPLETE - Chain to voice-learn
-      // =========================================================================
+      // CLASSIFICATION COMPLETE
       await supabase
         .from('classification_jobs')
         .update({
@@ -456,15 +560,11 @@ ${emailSummaries}`;
         })
         .eq('id', job.id);
 
-      // Update progress phase
       await updateProgress(supabase, workspace_id, 'learning', job.classified_count);
-
-      // Release lock before chaining
       await releaseLock(supabase, workspace_id, LOCK_FUNCTION_NAME);
 
       console.log(`[${FUNCTION_NAME}] Classification complete (${job.classified_count}), chaining to voice-learn`);
 
-      // Chain to voice learning
       chainNextBatch(supabaseUrl, 'voice-learn', {
         workspace_id,
       }, supabaseServiceKey);
@@ -484,13 +584,10 @@ ${emailSummaries}`;
     // -------------------------------------------------------------------------
     await saveCheckpoint(supabase, job);
     await updateProgress(supabase, workspace_id, 'classifying', job.classified_count);
-
-    // Release lock before self-invoking (next invocation will acquire its own)
     await releaseLock(supabase, workspace_id, LOCK_FUNCTION_NAME);
 
     console.log(`[${FUNCTION_NAME}] Self-invoking: depth=${_relay_depth + 1}, remaining=${remaining}`);
 
-    // Fire and forget - self invoke
     chainNextBatch(supabaseUrl, FUNCTION_NAME, {
       workspace_id,
       job_id: job.id,
@@ -510,12 +607,10 @@ ${emailSummaries}`;
   } catch (error: any) {
     console.error(`[${FUNCTION_NAME}] Error:`, error.message);
 
-    // Update progress with error and release lock
     try {
       const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
       const body = await req.clone().json().catch(() => ({}));
       if (body.workspace_id) {
-        // Release lock on error
         await releaseLock(supabase, body.workspace_id, LOCK_FUNCTION_NAME);
         
         await supabase
@@ -528,7 +623,7 @@ ${emailSummaries}`;
           }, { onConflict: 'workspace_id' });
       }
     } catch (e) {
-      // Ignore error logging errors
+      // Ignore
     }
 
     return new Response(
