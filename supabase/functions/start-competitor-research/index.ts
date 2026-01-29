@@ -178,7 +178,9 @@ serve(async (req) => {
     // STEP 3: Trigger Apify Google Maps Scraper
     // =========================================
     
-    const webhookUrl = `${SUPABASE_URL}/functions/v1/handle-discovery-complete`;
+    // CRITICAL: Include apikey in the webhook URL so Apify can authenticate
+    const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') || Deno.env.get('SUPABASE_PUBLISHABLE_KEY');
+    const webhookUrl = `${SUPABASE_URL}/functions/v1/handle-discovery-complete?apikey=${SUPABASE_ANON_KEY}`;
     
     // Request more than needed to account for filtering (directories, social media, no-website)
     // Cap at 200 for Apify limits and cost control
@@ -200,7 +202,7 @@ serve(async (req) => {
     };
     
     console.log('[start-research] Requesting', crawlLimit, 'places to yield ~', maxCompetitors, 'after filtering');
-    
+    console.log('[start-research] Webhook URL:', webhookUrl.replace(SUPABASE_ANON_KEY || '', '***'));
     console.log('[start-research] Calling Apify with:', apifyInput);
     
     const apifyResponse = await fetch(

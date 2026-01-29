@@ -194,9 +194,10 @@ serve(async (req) => {
       })
     }
     
-    const webhookUrl = `${SUPABASE_URL}/functions/v1/handle-scrape-complete`
-    
-    // Prepare URLs for scraping (homepage only to save budget)
+    // CRITICAL: Include apikey in the webhook URL so Apify can authenticate
+    const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') || Deno.env.get('SUPABASE_PUBLISHABLE_KEY');
+    const webhookUrl = `${SUPABASE_URL}/functions/v1/handle-scrape-complete?apikey=${SUPABASE_ANON_KEY}`;
+    console.log('[handle-discovery-complete] Scrape webhook URL configured');
     const startUrls = validCompetitors.slice(0, 50).map(c => ({ url: c.url }))
     
     const scrapeInput = {
