@@ -5817,6 +5817,10 @@ export type Database = {
           threads_analyzed: number
         }[]
       }
+      bulk_update_email_classifications: {
+        Args: { p_updates: Json }
+        Returns: number
+      }
       decrypt_token: {
         Args: { encrypted_token: string; secret: string }
         Returns: string
