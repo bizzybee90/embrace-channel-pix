@@ -33,7 +33,7 @@ export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, on
     }
   }, []);
 
-  const startScraping = async () => {
+  const startScraping = async (opts?: { provider?: 'apify' | 'firecrawl' }) => {
     if (!businessContext.websiteUrl) return;
     
     setStatus('starting');
@@ -43,7 +43,8 @@ export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, on
       const { data, error: invokeError } = await supabase.functions.invoke('start-own-website-scrape', {
         body: {
           workspaceId,
-          websiteUrl: businessContext.websiteUrl
+          websiteUrl: businessContext.websiteUrl,
+          ...(opts?.provider ? { forceProvider: opts.provider } : {}),
         }
       });
 
@@ -64,10 +65,10 @@ export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, on
     }
   };
 
-  const handleRetry = () => {
+  const handleRetry = (opts?: { provider?: 'apify' | 'firecrawl' }) => {
     setError(null);
     setResults({ faqsExtracted: 0, pagesScraped: 0 });
-    startScraping();
+    startScraping(opts);
   };
 
   const handlePipelineComplete = (pipelineResults: { faqsExtracted: number; pagesScraped: number }) => {
@@ -172,7 +173,7 @@ export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, on
         <Button variant="outline" onClick={handleSkip} className="flex-1">
           Skip for now
         </Button>
-        <Button onClick={handleRetry} className="flex-1">
+        <Button onClick={() => handleRetry()} className="flex-1">
           Try Again
         </Button>
       </div>

@@ -22,7 +22,7 @@ interface WebsitePipelineProgressProps {
   websiteUrl: string;
   onComplete: (results: { faqsExtracted: number; pagesScraped: number }) => void;
   onBack: () => void;
-  onRetry: () => void;
+  onRetry: (opts?: { provider?: 'apify' | 'firecrawl' }) => void;
 }
 
 // Maps to scraping_jobs.status values
@@ -316,8 +316,8 @@ export function WebsitePipelineProgress({
     return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
   }, [elapsedSeconds]);
 
-  // Auto-resume: if we're "scraping" for a while with no pages reported yet,
-  // fall back to Firecrawl (connector) so the user isn't stuck forever.
+  // Auto fallback: if we're "scraping" for a while with no pages reported yet,
+  // restart the job using Firecrawl (connector) so the user isn't stuck.
   useEffect(() => {
     if (didAutoResume) return;
     if (stats.phase !== 'scraping') return;
@@ -329,11 +329,7 @@ export function WebsitePipelineProgress({
     if (elapsedSeconds < 180) return;
 
     setDidAutoResume(true);
-    supabase.functions.invoke('start-own-website-scrape', {
-      body: { workspaceId, websiteUrl, forceProvider: 'firecrawl' },
-    }).catch(() => {
-      // Best-effort; UI will keep polling.
-    });
+    onRetry({ provider: 'firecrawl' });
   }, [didAutoResume, elapsedSeconds, jobId, stats.apifyRunId, stats.pagesFound, stats.phase, workspaceId]);
 
   const handleContinue = () => {
@@ -489,7 +485,7 @@ export function WebsitePipelineProgress({
               <p className="text-xs text-muted-foreground mt-1">{stats.errorMessage}</p>
             </div>
           </div>
-          <Button onClick={onRetry} size="sm" variant="outline" className="mt-3 w-full gap-2">
+          <Button onClick={() => onRetry()} size="sm" variant="outline" className="mt-3 w-full gap-2">
             <RotateCcw className="h-4 w-4" />
             Retry
           </Button>
