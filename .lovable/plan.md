@@ -22,6 +22,28 @@ All three reliability layers are now in place and working:
 - Single active job enforcement per workspace
 - Heartbeat updates every 2 sub-batches to prevent false stall detection
 - Graceful degradation after 10 consecutive LLM failures → paused state with 30s retry
+- **NEW (2026-01-29 12:15):** Job validation on resume - invalidated jobs (failed/completed/ghost) are not resumed
+
+---
+
+## Bug Fix: UI Flickering (2026-01-29 12:15)
+
+**Root Cause:** Two classification jobs were running simultaneously, both updating `email_import_progress.emails_classified` with different counts. This caused the UI to flicker between values.
+
+**Fix Applied:**
+1. Killed orphan job `0906992c` that was still running despite being marked as ghost
+2. Added job validation on resume - if a job_id is passed but the job is `failed`, `completed`, or has `total_to_classify=0`, the classifier now looks for a valid active job instead of blindly resuming
+
+**Key Code Change in `email-classify-v2/index.ts`:**
+```typescript
+if (data.status === 'failed' || data.status === 'completed') {
+  console.warn(`Job ${job_id} was ${data.status} externally, looking for active job instead`);
+} else if (data.total_to_classify === 0) {
+  console.warn(`Job ${job_id} is a ghost job (total=0), looking for active job instead`);
+} else {
+  job = data as ClassifyJob;
+}
+```
 
 ---
 
@@ -31,6 +53,7 @@ All three reliability layers are now in place and working:
 - Processing ~400-500 emails per batch
 - Self-invoking every 50-60 seconds
 - Watchdog catches any stalls within 8 minutes
+- Only ONE job running per workspace (enforced)
 
 ---
 
@@ -39,7 +62,7 @@ All three reliability layers are now in place and working:
 | File | Changes |
 |------|---------|
 | `pipeline-watchdog/index.ts` | Complete rewrite with bulletproof logic |
-| `email-classify-v2/index.ts` | Ghost cleanup, single-job enforcement, heartbeat, graceful degradation |
+| `email-classify-v2/index.ts` | Ghost cleanup, single-job enforcement, heartbeat, graceful degradation, job validation on resume |
 
 ---
 
@@ -49,9 +72,10 @@ All three reliability layers are now in place and working:
 |----------|--------|-------|
 | Edge function dies silently | Stuck indefinitely | Resumed in ~8 minutes |
 | Ghost jobs (0 emails) | Resurrected forever | Auto-closed immediately |
-| Multiple jobs per workspace | Confusion/duplicates | Only ONE active |
+| Multiple jobs per workspace | Confusion/duplicates, UI flickers | Only ONE active |
 | Rate limiting | Sometimes stalls | Graceful backoff + relay |
 | Consecutive LLM errors | Silent death | Pauses + retries with 30s delay |
+| Job invalidated externally | Zombie resumes | Looks for valid job instead |
 
 ---
 

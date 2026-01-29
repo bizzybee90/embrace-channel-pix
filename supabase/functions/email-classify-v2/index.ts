@@ -232,7 +232,7 @@ serve(async (req) => {
     let job: ClassifyJob;
 
     if (job_id) {
-      // Resume existing job
+      // Resume existing job - but ONLY if it's still valid
       const { data, error } = await supabase
         .from('classification_jobs')
         .select('*')
@@ -241,12 +241,18 @@ serve(async (req) => {
 
       if (error || !data) {
         console.warn(`[${FUNCTION_NAME}] Job ${job_id} not found, looking for active job`);
+      } else if (data.status === 'failed' || data.status === 'completed') {
+        // Job was invalidated externally - don't resume it
+        console.warn(`[${FUNCTION_NAME}] Job ${job_id} was ${data.status} externally, looking for active job instead`);
+      } else if (data.total_to_classify === 0) {
+        // Ghost job - don't resume it
+        console.warn(`[${FUNCTION_NAME}] Job ${job_id} is a ghost job (total=0), looking for active job instead`);
       } else {
         job = data as ClassifyJob;
       }
     }
 
-    // If no job from job_id, check for existing active job with work
+    // If no valid job from job_id, check for existing active job with work
     if (!job!) {
       const { data: existingJob } = await supabase
         .from('classification_jobs')
