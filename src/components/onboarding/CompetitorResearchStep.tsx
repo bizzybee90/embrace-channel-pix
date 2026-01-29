@@ -66,13 +66,17 @@ export function CompetitorResearchStep({
 
   const draft = readDraft();
 
+  // Check if we have data from props or draft
+  const hasInitialNiche = !!(draft.nicheQuery || businessContext.businessType);
+  const hasInitialArea = !!(draft.serviceArea || businessContext.serviceArea);
+
   const [status, setStatus] = useState<Status>('idle');
   const [nicheQuery, setNicheQuery] = useState(draft.nicheQuery ?? businessContext.businessType ?? '');
   const [serviceArea, setServiceArea] = useState(draft.serviceArea ?? parseServiceArea(businessContext.serviceArea) ?? '');
   const [targetCount, setTargetCount] = useState(draft.targetCount ?? 100);
   const [jobId, setJobId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [isLoadingContext, setIsLoadingContext] = useState(false);
+  const [isLoadingContext, setIsLoadingContext] = useState(!hasInitialNiche);
 
   // Google Places autocomplete state
   const [serviceAreaSearch, setServiceAreaSearch] = useState('');
@@ -80,12 +84,15 @@ export function CompetitorResearchStep({
   const [placePredictions, setPlacePredictions] = useState<PlacePrediction[]>([]);
   const [isLoadingPlaces, setIsLoadingPlaces] = useState(false);
 
-  // Fetch from database if props are empty (happens after page refresh)
+  // Fetch from database if props and draft are empty (happens after page refresh)
   useEffect(() => {
+    // Skip if we already have data from props or draft
+    if (hasInitialNiche && hasInitialArea) {
+      setIsLoadingContext(false);
+      return;
+    }
+    
     const fetchBusinessContext = async () => {
-      // Only fetch if we don't have data from props or draft
-      if (nicheQuery || serviceArea) return;
-      
       setIsLoadingContext(true);
       try {
         const { data } = await supabase
@@ -95,10 +102,10 @@ export function CompetitorResearchStep({
           .maybeSingle();
 
         if (data) {
-          if (data.business_type && !nicheQuery) {
+          if (data.business_type && !hasInitialNiche) {
             setNicheQuery(data.business_type);
           }
-          if (data.service_area && !serviceArea) {
+          if (data.service_area && !hasInitialArea) {
             setServiceArea(parseServiceArea(data.service_area));
           }
         }
@@ -110,7 +117,7 @@ export function CompetitorResearchStep({
     };
 
     fetchBusinessContext();
-  }, [workspaceId]); // Only run on mount
+  }, [workspaceId, hasInitialNiche, hasInitialArea]);
 
   // Google Places search
   const searchPlaces = useCallback(async (input: string) => {
