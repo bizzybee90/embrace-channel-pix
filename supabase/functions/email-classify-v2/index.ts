@@ -20,6 +20,11 @@ const BASE_DELAY_MS = 2000;
 const MAX_DELAY_MS = 60000;
 const MAX_RELAY_DEPTH = 100; // Safety: max 200,000 emails (100 × 2000)
 
+// NOTE:
+// - v2 import pipeline writes into `email_import_queue` with statuses like: scanned → queued_for_fetch → fetched → processed.
+// - In this project, scanned rows already contain `body` + `has_body=true`, so classification should run against `scanned`.
+// - Avoid relying on `setTimeout` inside edge runtimes; do backoff by self-invoking with `_sleep_ms`.
+
 // Use Gemini 2.0 Flash for speed
 const GEMINI_API = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
@@ -82,10 +87,17 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const body = await req.json();
-    const { workspace_id, job_id, _relay_depth = 0 } = body;
+    const { workspace_id, job_id, _relay_depth = 0, _sleep_ms = 0 } = body;
 
     if (!workspace_id) {
       throw new Error('workspace_id is required');
+    }
+
+    // Optional backoff sleep used for self-invoked retries (e.g., rate limit handling)
+    if (typeof _sleep_ms === 'number' && _sleep_ms > 0) {
+      const ms = Math.min(Math.max(_sleep_ms, 0), 60000);
+      console.log(`[${FUNCTION_NAME}] Backoff sleep ${ms}ms before continuing`);
+      await sleep(ms);
     }
 
     // Safety check: prevent infinite loops
@@ -167,8 +179,10 @@ serve(async (req) => {
         .from('email_import_queue')
         .select('id, from_email, from_name, subject, body, direction')
         .eq('workspace_id', workspace_id)
-        .eq('status', 'pending')
-        .order('received_at', { ascending: false })
+        .eq('status', 'scanned')
+        .eq('has_body', true)
+        // Cursor uses id, so order by id for correctness
+        .order('id', { ascending: false })
         .limit(BATCH_SIZE);
 
       // Use cursor for efficient pagination
@@ -233,14 +247,13 @@ ${emailSummaries}`;
               await saveCheckpoint(supabase, job);
               await updateProgress(supabase, workspace_id, 'classifying', job.classified_count);
               
-              // Self-invoke after delay
-              setTimeout(() => {
-                chainNextBatch(supabaseUrl, FUNCTION_NAME, {
-                  workspace_id,
-                  job_id: job.id,
-                  _relay_depth: _relay_depth + 1,
-                }, supabaseServiceKey);
-              }, Math.min(rateLimitDelay, 5000));
+            // Self-invoke immediately; next run sleeps via `_sleep_ms`
+            chainNextBatch(supabaseUrl, FUNCTION_NAME, {
+              workspace_id,
+              job_id: job.id,
+              _relay_depth: _relay_depth + 1,
+              _sleep_ms: rateLimitDelay,
+            }, supabaseServiceKey);
               
               return createResponse({
                 success: true,
@@ -311,7 +324,9 @@ ${emailSummaries}`;
         const { error: updateError } = await supabase
           .from('email_import_queue')
           .update({
-            status: 'classified',
+            // Move the v2 pipeline forward: scanned → processed
+            status: 'processed',
+            processed_at: new Date().toISOString(),
           })
           .eq('id', email.id);
 
@@ -337,7 +352,7 @@ ${emailSummaries}`;
       .from('email_import_queue')
       .select('id', { count: 'exact', head: true })
       .eq('workspace_id', workspace_id)
-      .eq('status', 'pending');
+      .eq('status', 'scanned');
 
     const isComplete = !remaining || remaining === 0;
 

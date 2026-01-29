@@ -38,6 +38,28 @@ interface ImportJob {
   last_batch_at: string | null;
 }
 
+async function refreshQueueCounts(
+  supabase: SupabaseClient,
+  workspace_id: string,
+  job: ImportJob
+): Promise<void> {
+  const [{ count: sentCount }, { count: inboxCount }] = await Promise.all([
+    supabase
+      .from('email_import_queue')
+      .select('id', { count: 'exact', head: true })
+      .eq('workspace_id', workspace_id)
+      .eq('direction', 'outbound'),
+    supabase
+      .from('email_import_queue')
+      .select('id', { count: 'exact', head: true })
+      .eq('workspace_id', workspace_id)
+      .eq('direction', 'inbound'),
+  ]);
+
+  job.sent_imported = sentCount || 0;
+  job.inbox_imported = inboxCount || 0;
+}
+
 function folderToJobStatus(folder: 'SENT' | 'INBOX'): 'scanning_sent' | 'scanning_inbox' {
   return folder === 'SENT' ? 'scanning_sent' : 'scanning_inbox';
 }
@@ -205,6 +227,10 @@ serve(async (req) => {
 
     // Continue with current folder
     while (shouldContinueProcessing(startTime)) {
+      // IMPORTANT: use DB truth as the source of progress.
+      // Job counters can be inflated if we previously counted duplicates.
+      await refreshQueueCounts(supabase, workspace_id, job);
+
       const folder = job.current_folder;
       const imported = folder === 'SENT' ? job.sent_imported : job.inbox_imported;
       const pageToken = folder === 'SENT' ? job.sent_page_token : job.inbox_page_token;
@@ -360,21 +386,20 @@ serve(async (req) => {
         console.error(`[${FUNCTION_NAME}] Insert error:`, insertError.message);
       }
 
-			// IMPORTANT: Only count what the database actually accepted.
-			// Aurinko pages can contain duplicates (or previously scanned messages).
-			// Falling back to `messages.length` would inflate progress and can falsely appear "stuck" near completion.
+			// Track how many were newly inserted this run (best-effort for telemetry)
 			const savedCount = insertedData?.length ?? 0;
-      totalImportedThisRun += savedCount;
+			totalImportedThisRun += savedCount;
       batchesProcessed++;
 
-      // Update job state
+      // Always advance page token even if this page was all duplicates.
       if (folder === 'SENT') {
-        job.sent_imported += savedCount;
         job.sent_page_token = data.nextPageToken || null;
       } else {
-        job.inbox_imported += savedCount;
         job.inbox_page_token = data.nextPageToken || null;
       }
+
+      // Recompute accurate counts from DB after upsert (source of truth)
+      await refreshQueueCounts(supabase, workspace_id, job);
 
       // Save checkpoint every batch
       await saveCheckpoint(supabase, job, folderToJobStatus(job.current_folder));
