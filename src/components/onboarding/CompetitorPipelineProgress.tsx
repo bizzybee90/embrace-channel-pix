@@ -382,7 +382,24 @@ export function CompetitorPipelineProgress({
             </p>
           )}
           {stageStatuses.discover === 'in_progress' && (
-            <div className="space-y-2">
+            <div className="space-y-3">
+              {/* Always show progress bar with target count */}
+              <div className="space-y-1.5">
+                <Progress 
+                  value={Math.min((stats.sitesDiscovered / targetCount) * 100, 100)} 
+                  className="h-2" 
+                />
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground">
+                    {stats.sitesDiscovered} / {targetCount} competitors found
+                  </span>
+                  <span className="font-medium">
+                    {Math.min(Math.round((stats.sitesDiscovered / targetCount) * 100), 100)}%
+                  </span>
+                </div>
+              </div>
+              
+              {/* Status message with elapsed time */}
               <div className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
                 <div className="flex items-center gap-2">
                   <span className="relative flex h-2 w-2">
@@ -391,30 +408,21 @@ export function CompetitorPipelineProgress({
                   </span>
                   <span>
                     {stats.sitesDiscovered === 0 
-                      ? 'Searching Google Maps for businesses...' 
-                      : `Found ${stats.sitesDiscovered} businesses so far...`}
+                      ? 'Searching Google Maps...' 
+                      : `Finding more businesses...`}
                   </span>
                 </div>
                 <span className="text-xs font-mono tabular-nums">
                   {Math.floor(elapsedSeconds / 60)}:{(elapsedSeconds % 60).toString().padStart(2, '0')}
                 </span>
               </div>
-              {stats.sitesDiscovered === 0 && elapsedSeconds > 30 && (
+              
+              {/* Helpful tip after 30 seconds */}
+              {elapsedSeconds > 30 && (
                 <p className="text-xs text-muted-foreground bg-muted/50 rounded px-2 py-1.5">
                   💡 This step uses Google Maps to find real businesses. It typically takes 2-4 minutes to complete.
                   {isStale && ' The service may be busy - please wait a bit longer.'}
                 </p>
-              )}
-              {stats.sitesDiscovered > 0 && (
-                <div className="space-y-1.5">
-                  <Progress value={Math.min((stats.sitesDiscovered / targetCount) * 100, 100)} className="h-2" />
-                  <div className="flex justify-between text-xs">
-                    <span className="text-muted-foreground">
-                      {stats.sitesDiscovered} / {targetCount} competitors found
-                    </span>
-                    <span className="font-medium">{Math.min(Math.round((stats.sitesDiscovered / targetCount) * 100), 100)}%</span>
-                  </div>
-                </div>
               )}
             </div>
           )}
