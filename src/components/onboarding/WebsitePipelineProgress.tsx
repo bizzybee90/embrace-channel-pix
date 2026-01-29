@@ -30,6 +30,7 @@ type PipelinePhase = 'pending' | 'scraping' | 'processing' | 'completed' | 'fail
 
 interface PipelineStats {
   phase: PipelinePhase;
+  startedAt?: string | null;
   pagesFound: number;
   pagesScraped: number;
   faqsExtracted: number;
@@ -175,6 +176,7 @@ export function WebsitePipelineProgress({
 }: WebsitePipelineProgressProps) {
   const [stats, setStats] = useState<PipelineStats>({
     phase: 'pending',
+    startedAt: null,
     pagesFound: 0,
     pagesScraped: 0,
     faqsExtracted: 0,
@@ -195,6 +197,7 @@ export function WebsitePipelineProgress({
       if (data) {
         setStats({
           phase: data.status as PipelinePhase,
+          startedAt: (data.started_at as string) ?? null,
           pagesFound: data.total_pages_found || 0,
           pagesScraped: data.pages_processed || 0,
           faqsExtracted: data.faqs_found || 0,
@@ -286,6 +289,21 @@ export function WebsitePipelineProgress({
   const isError = stats.phase === 'failed';
   const isComplete = stats.phase === 'completed';
 
+  const getElapsedLabel = () => {
+    if (!stats.startedAt) return null;
+    const started = new Date(stats.startedAt).getTime();
+    if (Number.isNaN(started)) return null;
+    const seconds = Math.max(0, Math.floor((Date.now() - started) / 1000));
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    if (mins >= 60) {
+      const hours = Math.floor(mins / 60);
+      const remMins = mins % 60;
+      return `${hours}h ${remMins}m`;
+    }
+    return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+  };
+
   const handleContinue = () => {
     onComplete({
       faqsExtracted: stats.faqsExtracted,
@@ -303,6 +321,11 @@ export function WebsitePipelineProgress({
           <br />
           <span className="font-medium text-foreground">{websiteUrl}</span>
         </p>
+        {stats.phase === 'scraping' && stats.pagesFound === 0 && (
+          <p className="text-xs text-muted-foreground">
+            Crawler running{getElapsedLabel() ? ` (${getElapsedLabel()} elapsed)` : ''} — page counts update when the crawl completes.
+          </p>
+        )}
       </div>
 
       {/* Stage Cards */}
