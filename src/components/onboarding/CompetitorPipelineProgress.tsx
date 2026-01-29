@@ -352,15 +352,27 @@ export function CompetitorPipelineProgress({
             </p>
           )}
           {stageStatuses.discover === 'in_progress' && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
-              </span>
-              <span>
-                Searching for {nicheQuery} businesses...
-                {stats.sitesDiscovered > 0 && ` ${stats.sitesDiscovered} found`}
-              </span>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+                </span>
+                <span>
+                  Searching for {nicheQuery} businesses...
+                </span>
+              </div>
+              {stats.sitesDiscovered > 0 && (
+                <div className="space-y-1.5">
+                  <Progress value={Math.min((stats.sitesDiscovered / targetCount) * 100, 100)} className="h-2" />
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">
+                      {stats.sitesDiscovered} / {targetCount} competitors found
+                    </span>
+                    <span className="font-medium">{Math.min(Math.round((stats.sitesDiscovered / targetCount) * 100), 100)}%</span>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </StageCard>
