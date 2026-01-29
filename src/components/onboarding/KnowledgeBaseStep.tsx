@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, AlertCircle, CheckCircle2, RotateCcw, Globe, FileText } from 'lucide-react';
 import { WebsitePipelineProgress } from './WebsitePipelineProgress';
 
 interface KnowledgeBaseStepProps {
@@ -15,23 +15,77 @@ interface KnowledgeBaseStepProps {
   onBack: () => void;
 }
 
-type Status = 'idle' | 'starting' | 'running' | 'complete' | 'error';
+type Status = 'checking' | 'idle' | 'already_done' | 'starting' | 'running' | 'complete' | 'error';
+
+interface ExistingKnowledge {
+  faqCount: number;
+  pagesScraped: number;
+  scrapedAt: string | null;
+}
 
 export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, onBack }: KnowledgeBaseStepProps) {
-  const [status, setStatus] = useState<Status>('idle');
+  const [status, setStatus] = useState<Status>('checking');
   const [jobId, setJobId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState({ faqsExtracted: 0, pagesScraped: 0 });
+  const [existingKnowledge, setExistingKnowledge] = useState<ExistingKnowledge | null>(null);
 
-  // If no website URL, skip straight to complete
+  // Check if we already have website knowledge
   useEffect(() => {
-    if (!businessContext.websiteUrl) {
-      setStatus('complete');
-    } else {
-      // Auto-start scraping
-      startScraping();
-    }
-  }, []);
+    const checkExisting = async () => {
+      if (!businessContext.websiteUrl) {
+        setStatus('idle');
+        return;
+      }
+
+      try {
+        // Check for existing completed scraping job
+        const { data: job } = await supabase
+          .from('scraping_jobs')
+          .select('id, status, faqs_found, pages_processed, completed_at')
+          .eq('workspace_id', workspaceId)
+          .eq('status', 'completed')
+          .order('completed_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (job && job.faqs_found > 0) {
+          setExistingKnowledge({
+            faqCount: job.faqs_found,
+            pagesScraped: job.pages_processed || 0,
+            scrapedAt: job.completed_at,
+          });
+          setStatus('already_done');
+          return;
+        }
+
+        // Check for FAQs from website source
+        // @ts-ignore - Supabase types cause deep instantiation errors
+        const faqResult = await supabase.from('faq_database').select('id').eq('workspace_id', workspaceId).eq('source', 'website').limit(100);
+        const faqs = faqResult?.data as Array<{ id: string }> | null;
+
+        const faqCount = faqs?.length || 0;
+
+        if (faqCount > 0) {
+          setExistingKnowledge({
+            faqCount,
+            pagesScraped: 0,
+            scrapedAt: null,
+          });
+          setStatus('already_done');
+          return;
+        }
+
+        // No existing knowledge, show idle state
+        setStatus('idle');
+      } catch (err) {
+        console.error('Error checking existing knowledge:', err);
+        setStatus('idle');
+      }
+    };
+
+    checkExisting();
+  }, [workspaceId, businessContext.websiteUrl]);
 
   const startScraping = async (opts?: { provider?: 'apify' | 'firecrawl' }) => {
     if (!businessContext.websiteUrl) return;
@@ -86,6 +140,26 @@ export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, on
     });
   };
 
+  const handleContinueWithExisting = () => {
+    onComplete({
+      industryFaqs: 0,
+      websiteFaqs: existingKnowledge?.faqCount || 0
+    });
+  };
+
+  // Checking state
+  if (status === 'checking') {
+    return (
+      <div className="space-y-6">
+        <div className="text-center space-y-2">
+          <h2 className="text-xl font-semibold">Checking existing knowledge...</h2>
+          <p className="text-sm text-muted-foreground">
+            Just a moment
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   // Show pipeline progress when job is running
   if (status === 'running' && jobId && businessContext.websiteUrl) {
@@ -101,15 +175,34 @@ export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, on
     );
   }
 
-  // Complete state (no website URL provided)
-  if (status === 'complete') {
+  // Already done state - website knowledge exists
+  if (status === 'already_done' && existingKnowledge) {
     return (
       <div className="space-y-6">
         <div className="text-center space-y-2">
-          <h2 className="text-xl font-semibold">Ready to continue</h2>
+          <div className="w-16 h-16 bg-success/10 rounded-full flex items-center justify-center mx-auto">
+            <CheckCircle2 className="h-8 w-8 text-success" />
+          </div>
+          <h2 className="text-xl font-semibold">Website Knowledge Ready</h2>
           <p className="text-sm text-muted-foreground">
-            You can add FAQs manually in Settings → Knowledge Base later
+            We already have knowledge from your website
           </p>
+        </div>
+
+        <div className="bg-success/5 border border-success/20 rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Globe className="h-5 w-5 text-success" />
+              <div>
+                <p className="font-medium">{businessContext.websiteUrl}</p>
+                <p className="text-sm text-muted-foreground">
+                  {existingKnowledge.faqCount} FAQs extracted
+                  {existingKnowledge.pagesScraped > 0 && ` from ${existingKnowledge.pagesScraped} pages`}
+                </p>
+              </div>
+            </div>
+            <FileText className="h-5 w-5 text-muted-foreground" />
+          </div>
         </div>
 
         <div className="flex gap-3">
@@ -117,9 +210,80 @@ export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, on
             <ChevronLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
-          <Button onClick={() => onComplete({ industryFaqs: 0, websiteFaqs: 0 })} className="flex-1">
+          <Button 
+            variant="outline" 
+            onClick={() => {
+              setExistingKnowledge(null);
+              setStatus('idle');
+            }}
+            className="flex-1 gap-2"
+          >
+            <RotateCcw className="h-4 w-4" />
+            Re-scrape
+          </Button>
+          <Button onClick={handleContinueWithExisting} className="flex-1">
             Continue
             <ChevronRight className="h-4 w-4 ml-2" />
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Idle state - ready to start (no website URL or user chose to re-scrape)
+  if (status === 'idle') {
+    if (!businessContext.websiteUrl) {
+      return (
+        <div className="space-y-6">
+          <div className="text-center space-y-2">
+            <h2 className="text-xl font-semibold">Ready to continue</h2>
+            <p className="text-sm text-muted-foreground">
+              You can add FAQs manually in Settings → Knowledge Base later
+            </p>
+          </div>
+
+          <div className="flex gap-3">
+            <Button variant="outline" onClick={onBack} className="flex-1">
+              <ChevronLeft className="h-4 w-4 mr-2" />
+              Back
+            </Button>
+            <Button onClick={() => onComplete({ industryFaqs: 0, websiteFaqs: 0 })} className="flex-1">
+              Continue
+              <ChevronRight className="h-4 w-4 ml-2" />
+            </Button>
+          </div>
+        </div>
+      );
+    }
+
+    // Has website URL, show start button
+    return (
+      <div className="space-y-6">
+        <div className="text-center space-y-2">
+          <Globe className="h-12 w-12 text-primary mx-auto" />
+          <h2 className="text-xl font-semibold">Extract Website Knowledge</h2>
+          <p className="text-sm text-muted-foreground">
+            We'll scrape your website to extract FAQs, pricing, and services
+          </p>
+        </div>
+
+        <div className="bg-muted/30 border rounded-lg p-4">
+          <div className="flex items-center gap-3">
+            <Globe className="h-5 w-5 text-muted-foreground" />
+            <p className="font-medium">{businessContext.websiteUrl}</p>
+          </div>
+        </div>
+
+        <div className="flex gap-3">
+          <Button variant="outline" onClick={onBack} className="flex-1">
+            <ChevronLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
+          <Button variant="ghost" onClick={handleSkip} className="flex-1 text-muted-foreground">
+            Skip this step
+          </Button>
+          <Button onClick={() => startScraping()} className="flex-1">
+            Start Scraping
           </Button>
         </div>
       </div>
