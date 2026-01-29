@@ -245,6 +245,9 @@ verify_jwt = false
 [functions.handle-scrape-failed]
 verify_jwt = false
 
+[functions.resume-own-website-scrape]
+verify_jwt = false
+
 [functions.start-email-import]
 verify_jwt = false
 
