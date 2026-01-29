@@ -8,6 +8,11 @@ const corsHeaders = {
 
 const FUNCTION_NAME = 'start-own-website-scrape';
 
+// Edge runtime provides this globally; declare for TypeScript.
+declare const EdgeRuntime: { waitUntil: (promise: Promise<unknown>) => void };
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -208,6 +213,62 @@ serve(async (req) => {
     await supabase.from('scraping_jobs').update({
       apify_run_id: apifyData.data.id
     }).eq('id', job.id);
+
+    // =========================================
+    // STEP 5.5: Reliability watchdog
+    // If Apify webhooks fail to deliver, poll the run status and trigger
+    // processing once the dataset is ready.
+    // =========================================
+
+    EdgeRuntime.waitUntil((async () => {
+      const runId = apifyData.data.id as string;
+      const maxAttempts = 40; // ~20 minutes @ 30s
+
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        await sleep(30_000);
+
+        // If the job already moved on (webhook succeeded), stop polling
+        const { data: current } = await supabase
+          .from('scraping_jobs')
+          .select('status, apify_dataset_id')
+          .eq('id', job.id)
+          .maybeSingle();
+
+        if (!current) return;
+        if (current.status !== 'scraping') return;
+
+        const runResp = await fetch(
+          `https://api.apify.com/v2/actor-runs/${runId}?token=${APIFY_API_KEY}`
+        );
+        const runJson = await runResp.json().catch(() => ({}));
+        if (!runResp.ok) continue;
+
+        const status = runJson?.data?.status;
+        const datasetId = runJson?.data?.defaultDatasetId;
+
+        if (status === 'SUCCEEDED' && datasetId) {
+          console.log(`[${FUNCTION_NAME}] Watchdog triggering processing for job:`, job.id);
+          await supabase.functions.invoke('process-own-website-scrape', {
+            body: { jobId: job.id, workspaceId, datasetId },
+          });
+          return;
+        }
+
+        if (status === 'FAILED' || status === 'ABORTED' || status === 'TIMED-OUT') {
+          await supabase.from('scraping_jobs').update({
+            status: 'failed',
+            error_message: `Crawler ${status}`,
+          }).eq('id', job.id);
+          return;
+        }
+      }
+
+      // Timeout: mark as failed so UI can surface retry.
+      await supabase.from('scraping_jobs').update({
+        status: 'failed',
+        error_message: 'Crawler timed out (no completion signal received)',
+      }).eq('id', job.id);
+    })());
 
     // =========================================
     // DONE - Return immediately
