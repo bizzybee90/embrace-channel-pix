@@ -8,6 +8,9 @@ const corsHeaders = {
 
 const FUNCTION_NAME = 'process-own-website-scrape';
 
+// Edge runtime provides this globally; declare for TypeScript.
+declare const EdgeRuntime: { waitUntil: (promise: Promise<unknown>) => void };
+
 // Claude Tool Definition for structured FAQ extraction
 const FAQ_EXTRACTION_TOOL = {
   name: 'extract_faqs',
@@ -60,9 +63,14 @@ serve(async (req) => {
 
   try {
     const url = new URL(req.url);
-    const jobId = url.searchParams.get('jobId');
+    const urlJobId = url.searchParams.get('jobId');
     const payload = await req.json();
-    const { workspaceId, datasetId } = payload;
+    const { workspaceId, datasetId, jobId: bodyJobId, websiteUrl } = payload;
+    const jobId = urlJobId ?? bodyJobId;
+
+    if (!jobId) {
+      throw new Error('jobId is required');
+    }
 
     console.log(`[${FUNCTION_NAME}] Processing job:`, jobId);
 
@@ -78,7 +86,12 @@ serve(async (req) => {
 
     // Start background processing (don't block webhook response)
     // @ts-ignore - EdgeRuntime is available in Supabase Edge Functions
-    EdgeRuntime.waitUntil(processDataset(datasetId, jobId!, workspaceId));
+    if (datasetId === 'firecrawl') {
+      if (!websiteUrl) throw new Error('websiteUrl is required for firecrawl mode');
+      EdgeRuntime.waitUntil(processFirecrawl(websiteUrl, jobId, workspaceId));
+    } else {
+      EdgeRuntime.waitUntil(processDataset(datasetId, jobId, workspaceId));
+    }
 
     return new Response(JSON.stringify({ 
       success: true, 
@@ -257,6 +270,224 @@ async function processDataset(datasetId: string, jobId: string, workspaceId: str
     await supabase.from('scraping_jobs').update({
       status: 'failed',
       error_message: error.message
+    }).eq('id', jobId);
+  }
+}
+
+// =========================================
+// Firecrawl fallback processing
+// =========================================
+
+async function processFirecrawl(websiteUrl: string, jobId: string, workspaceId: string) {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+  const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const supabase = createClient(supabaseUrl, supabaseKey);
+
+  const FIRECRAWL_API_KEY = Deno.env.get('FIRECRAWL_API_KEY');
+  const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY')!;
+  const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY')!;
+
+  try {
+    // Normalize URL
+    let baseUrl = websiteUrl.trim();
+    if (!baseUrl.startsWith('http')) baseUrl = 'https://' + baseUrl;
+    baseUrl = baseUrl.replace(/\/$/, '');
+
+    if (!FIRECRAWL_API_KEY) {
+      throw new Error('Firecrawl connector not configured');
+    }
+
+    console.log(`[${FUNCTION_NAME}] Firecrawl fallback starting for:`, baseUrl);
+
+    // Map URLs
+    const mapResp = await fetch('https://api.firecrawl.dev/v1/map', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        url: baseUrl,
+        limit: 2000,
+        includeSubdomains: false,
+      }),
+    });
+
+    const mapJson = await mapResp.json().catch(() => ({}));
+    if (!mapResp.ok) {
+      throw new Error(mapJson?.error || `Firecrawl map failed: ${mapResp.status}`);
+    }
+
+    const links: string[] = mapJson?.links || mapJson?.data?.links || [];
+
+    // Prioritize “money pages” first, then cap.
+    const priorityPatterns = [
+      '/faq', '/faqs', '/pricing', '/prices', '/cost', '/services', '/service', '/about', '/contact', '/areas', '/coverage', '/booking', '/quote'
+    ];
+
+    const normalize = (u: string) => u.toLowerCase();
+    const unique = Array.from(new Set(links)).filter((u) => {
+      const n = normalize(u);
+      return n.startsWith(baseUrl.toLowerCase()) && !n.endsWith('.pdf');
+    });
+
+    const prioritized = [...unique].sort((a, b) => {
+      const na = normalize(a);
+      const nb = normalize(b);
+      const pa = priorityPatterns.findIndex((p) => na.includes(p));
+      const pb = priorityPatterns.findIndex((p) => nb.includes(p));
+      const ra = pa === -1 ? 999 : pa;
+      const rb = pb === -1 ? 999 : pb;
+      return ra - rb;
+    });
+
+    const maxPages = 30;
+    const targetUrls = prioritized.slice(0, maxPages);
+
+    await supabase.from('scraping_jobs').update({
+      total_pages_found: targetUrls.length,
+    }).eq('id', jobId);
+
+    // Scrape pages
+    const scraped: Array<{ url: string; markdown: string; title?: string }>
+      = [];
+
+    const scrapeOne = async (url: string) => {
+      const resp = await fetch('https://api.firecrawl.dev/v1/scrape', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          url,
+          formats: ['markdown'],
+          onlyMainContent: true,
+        }),
+      });
+      const json = await resp.json().catch(() => ({}));
+      if (!resp.ok) return null;
+      const data = json?.data ?? json;
+      const markdown = data?.markdown ?? '';
+      const title = data?.metadata?.title;
+      if (!markdown || markdown.length < 200) return null;
+      return { url, markdown, title };
+    };
+
+    const concurrency = 3;
+    for (let i = 0; i < targetUrls.length; i += concurrency) {
+      const batch = targetUrls.slice(i, i + concurrency);
+      const results = await Promise.all(batch.map(scrapeOne));
+      for (const r of results) {
+        if (r) scraped.push(r);
+      }
+      await supabase.rpc('increment_scraping_progress', {
+        p_job_id: jobId,
+        p_pages_processed: batch.length,
+        p_faqs_found: 0,
+      });
+    }
+
+    // Store pages as scraped_pages (same as Apify path)
+    const pageRecords = scraped.map((page) => {
+      const pageUrl = page.url?.toLowerCase() || '';
+      let pageType = 'other';
+      if (pageUrl.includes('/faq') || pageUrl.includes('/frequently')) pageType = 'faq';
+      else if (pageUrl.includes('/pricing') || pageUrl.includes('/prices') || pageUrl.includes('/cost')) pageType = 'pricing';
+      else if (pageUrl.includes('/service')) pageType = 'services';
+      else if (pageUrl.includes('/about')) pageType = 'about';
+      else if (pageUrl.includes('/contact')) pageType = 'contact';
+      else if (pageUrl.includes('/area') || pageUrl.includes('/coverage')) pageType = 'coverage';
+      else if (pageUrl.includes('/book') || pageUrl.includes('/quote')) pageType = 'booking';
+      else if (pageUrl === page.url?.replace(/\/$/, '') || pageUrl.endsWith('/index')) pageType = 'homepage';
+
+      return {
+        job_id: jobId,
+        workspace_id: workspaceId,
+        url: page.url,
+        title: page.title ?? null,
+        page_type: pageType,
+        content_markdown: page.markdown,
+        content_length: page.markdown.length,
+        status: 'pending',
+      };
+    });
+
+    if (pageRecords.length > 0) {
+      await supabase.from('scraped_pages').insert(pageRecords);
+    }
+
+    // Extract + store FAQs reusing existing helpers
+    const priorityOrder = ['faq', 'pricing', 'services', 'homepage', 'coverage', 'about', 'booking', 'contact', 'other'];
+    const sortedPages = [...pageRecords].sort((a, b) =>
+      priorityOrder.indexOf(a.page_type) - priorityOrder.indexOf(b.page_type)
+    );
+
+    const batchSize = 3;
+    let totalFaqsFound = 0;
+    let totalFaqsStored = 0;
+
+    for (let i = 0; i < sortedPages.length; i += batchSize) {
+      const batch = sortedPages.slice(i, i + batchSize);
+      const results = await Promise.all(batch.map(async (page) => {
+        try {
+          const faqs = await extractFaqsWithClaude(
+            ANTHROPIC_API_KEY,
+            page.content_markdown,
+            page.page_type,
+            page.url
+          );
+
+          const stored = await storeFaqsWithDedup(
+            supabase,
+            OPENAI_API_KEY,
+            faqs,
+            workspaceId,
+            page.url,
+            page.page_type
+          );
+
+          await supabase.from('scraped_pages')
+            .update({ status: 'processed', faqs_extracted: faqs.length })
+            .eq('job_id', jobId)
+            .eq('url', page.url);
+
+          return { extracted: faqs.length, stored };
+        } catch (e: any) {
+          await supabase.from('scraped_pages')
+            .update({ status: 'failed' })
+            .eq('job_id', jobId)
+            .eq('url', page.url);
+          return { extracted: 0, stored: 0 };
+        }
+      }));
+
+      const batchExtracted = results.reduce((sum, r) => sum + r.extracted, 0);
+      const batchStored = results.reduce((sum, r) => sum + r.stored, 0);
+      totalFaqsFound += batchExtracted;
+      totalFaqsStored += batchStored;
+
+      await supabase.rpc('increment_scraping_progress', {
+        p_job_id: jobId,
+        p_pages_processed: 0,
+        p_faqs_found: batchExtracted,
+      });
+
+      console.log(`[${FUNCTION_NAME}] Firecrawl extracted batch ${Math.floor(i / batchSize) + 1}, total FAQs: ${totalFaqsFound}`);
+    }
+
+    await supabase.from('scraping_jobs').update({
+      status: 'completed',
+      faqs_stored: totalFaqsStored,
+      completed_at: new Date().toISOString(),
+    }).eq('id', jobId);
+
+    console.log(`[${FUNCTION_NAME}] Firecrawl job completed. FAQs found: ${totalFaqsFound}, stored: ${totalFaqsStored}`);
+  } catch (error: any) {
+    console.error(`[${FUNCTION_NAME}] Firecrawl background processing error:`, error?.message ?? error);
+    await supabase.from('scraping_jobs').update({
+      status: 'failed',
+      error_message: error?.message ?? String(error),
     }).eq('id', jobId);
   }
 }

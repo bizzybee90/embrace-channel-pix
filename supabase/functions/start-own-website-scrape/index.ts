@@ -14,7 +14,7 @@ serve(async (req) => {
   }
 
   try {
-    const { workspaceId, websiteUrl } = await req.json();
+    const { workspaceId, websiteUrl, forceProvider } = await req.json();
     
     if (!workspaceId) throw new Error('workspaceId is required');
     if (!websiteUrl) throw new Error('websiteUrl is required');
@@ -22,6 +22,7 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const APIFY_API_KEY = Deno.env.get('APIFY_API_KEY');
+    const FIRECRAWL_API_KEY = Deno.env.get('FIRECRAWL_API_KEY');
 
     if (!APIFY_API_KEY) throw new Error('APIFY_API_KEY not configured');
 
@@ -43,13 +44,15 @@ serve(async (req) => {
     // STEP 2: Create job record
     // =========================================
     
+    const isFirecrawl = forceProvider === 'firecrawl';
+
     const { data: job, error: jobError } = await supabase
       .from('scraping_jobs')
       .insert({
         workspace_id: workspaceId,
         job_type: 'own_website',
         website_url: baseUrl,
-        status: 'scraping',
+        status: isFirecrawl ? 'processing' : 'scraping',
         started_at: new Date().toISOString()
       })
       .select()
@@ -60,7 +63,40 @@ serve(async (req) => {
     console.log(`[${FUNCTION_NAME}] Created job:`, job.id);
 
     // =========================================
-    // STEP 3: Build Apify configuration
+    // STEP 3: If forced to Firecrawl, kick processing immediately
+    // =========================================
+
+    if (isFirecrawl) {
+      if (!FIRECRAWL_API_KEY) {
+        throw new Error('Firecrawl connector not configured');
+      }
+
+      const invoke = await supabase.functions.invoke('process-own-website-scrape', {
+        body: {
+          jobId: job.id,
+          workspaceId,
+          datasetId: 'firecrawl',
+          websiteUrl: baseUrl,
+        },
+      });
+
+      if (invoke.error) {
+        throw new Error(`Failed to start Firecrawl processing: ${invoke.error.message}`);
+      }
+
+      return new Response(JSON.stringify({
+        success: true,
+        jobId: job.id,
+        status: 'processing',
+        provider: 'firecrawl',
+        message: 'Processing started using Firecrawl fallback.'
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // =========================================
+    // STEP 4: Build Apify configuration
     // =========================================
     
     // "Money Pages" - these are the pages we MUST capture
@@ -113,7 +149,7 @@ serve(async (req) => {
     console.log(`[${FUNCTION_NAME}] Webhook URL:`, webhookUrl);
 
     // =========================================
-    // STEP 4: Start Apify crawler
+    // STEP 5: Start Apify crawler
     // =========================================
     
     const apifyInput = {

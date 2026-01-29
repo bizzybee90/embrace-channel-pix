@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
@@ -31,6 +31,8 @@ type PipelinePhase = 'pending' | 'scraping' | 'processing' | 'completed' | 'fail
 interface PipelineStats {
   phase: PipelinePhase;
   startedAt?: string | null;
+  apifyRunId?: string | null;
+  apifyDatasetId?: string | null;
   pagesFound: number;
   pagesScraped: number;
   faqsExtracted: number;
@@ -177,11 +179,15 @@ export function WebsitePipelineProgress({
   const [stats, setStats] = useState<PipelineStats>({
     phase: 'pending',
     startedAt: null,
+    apifyRunId: null,
+    apifyDatasetId: null,
     pagesFound: 0,
     pagesScraped: 0,
     faqsExtracted: 0,
     errorMessage: null,
   });
+
+  const [didAutoResume, setDidAutoResume] = useState(false);
 
   // Subscribe to job updates via realtime - now using scraping_jobs table
   useEffect(() => {
@@ -198,6 +204,8 @@ export function WebsitePipelineProgress({
         setStats({
           phase: data.status as PipelinePhase,
           startedAt: (data.started_at as string) ?? null,
+          apifyRunId: (data.apify_run_id as string) ?? null,
+          apifyDatasetId: (data.apify_dataset_id as string) ?? null,
           pagesFound: data.total_pages_found || 0,
           pagesScraped: data.pages_processed || 0,
           faqsExtracted: data.faqs_found || 0,
@@ -289,20 +297,44 @@ export function WebsitePipelineProgress({
   const isError = stats.phase === 'failed';
   const isComplete = stats.phase === 'completed';
 
-  const getElapsedLabel = () => {
+  const elapsedSeconds = useMemo(() => {
     if (!stats.startedAt) return null;
     const started = new Date(stats.startedAt).getTime();
     if (Number.isNaN(started)) return null;
-    const seconds = Math.max(0, Math.floor((Date.now() - started) / 1000));
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
+    return Math.max(0, Math.floor((Date.now() - started) / 1000));
+  }, [stats.startedAt]);
+
+  const elapsedLabel = useMemo(() => {
+    if (elapsedSeconds == null) return null;
+    const mins = Math.floor(elapsedSeconds / 60);
+    const secs = elapsedSeconds % 60;
     if (mins >= 60) {
       const hours = Math.floor(mins / 60);
       const remMins = mins % 60;
       return `${hours}h ${remMins}m`;
     }
     return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
-  };
+  }, [elapsedSeconds]);
+
+  // Auto-resume: if we're "scraping" for a while with no pages reported yet,
+  // fall back to Firecrawl (connector) so the user isn't stuck forever.
+  useEffect(() => {
+    if (didAutoResume) return;
+    if (stats.phase !== 'scraping') return;
+    if (!stats.apifyRunId) return;
+    if (stats.pagesFound > 0) return;
+    if (elapsedSeconds == null) return;
+
+    // Wait 3 minutes before attempting an automatic fallback.
+    if (elapsedSeconds < 180) return;
+
+    setDidAutoResume(true);
+    supabase.functions.invoke('start-own-website-scrape', {
+      body: { workspaceId, websiteUrl, forceProvider: 'firecrawl' },
+    }).catch(() => {
+      // Best-effort; UI will keep polling.
+    });
+  }, [didAutoResume, elapsedSeconds, jobId, stats.apifyRunId, stats.pagesFound, stats.phase, workspaceId]);
 
   const handleContinue = () => {
     onComplete({
@@ -323,7 +355,7 @@ export function WebsitePipelineProgress({
         </p>
         {stats.phase === 'scraping' && stats.pagesFound === 0 && (
           <p className="text-xs text-muted-foreground">
-            Crawler running{getElapsedLabel() ? ` (${getElapsedLabel()} elapsed)` : ''} — page counts update when the crawl completes.
+            Crawler running{elapsedLabel ? ` (${elapsedLabel} elapsed)` : ''} — page counts update when the crawl completes.
           </p>
         )}
       </div>
