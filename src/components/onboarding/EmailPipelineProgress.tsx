@@ -219,11 +219,12 @@ export function EmailPipelineProgress({
       const classifiedCount = classifiedResult.count || 0;
       const totalCount = inboxCount + sentCount;
 
+      // Use REAL-TIME counts from queue as source of truth (progress table can be stale)
       setStats({
         phase: (progress?.current_phase as PipelinePhase) || 'importing',
-        emailsReceived: progress?.emails_received || totalCount,
-        emailsClassified: progress?.emails_classified || classifiedCount,
-        estimatedTotal: progress?.estimated_total_emails || totalCount,
+        emailsReceived: totalCount > 0 ? totalCount : (progress?.emails_received || 0),
+        emailsClassified: classifiedCount, // Always use real count, not stale progress value
+        estimatedTotal: totalCount > 0 ? totalCount : (progress?.estimated_total_emails || 0),
         inboxCount,
         sentCount,
         voiceProfileComplete: progress?.voice_profile_complete || false,
