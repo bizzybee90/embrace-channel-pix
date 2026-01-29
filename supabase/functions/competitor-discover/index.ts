@@ -249,7 +249,7 @@ serve(async (req) => {
               latitude: details.geometry?.location?.lat,
               longitude: details.geometry?.location?.lng,
               distance_miles: distanceMiles ? Math.round(distanceMiles * 10) / 10 : null,
-              status: 'discovered',
+              status: 'approved', // Set to 'approved' so scrape-worker picks them up
               is_valid: true,
               is_directory: false,
               discovery_source: 'google_places',
@@ -292,20 +292,34 @@ serve(async (req) => {
       }
     }
 
-    // Update job status
-    const nextStatus = sites.length > 0 ? 'discovered' : 'error';
+    // Update job status and auto-chain to scraping
+    const nextStatus = sites.length > 0 ? 'scraping' : 'error';
     await supabase
       .from('competitor_research_jobs')
       .update({
         status: nextStatus,
         sites_discovered: sites.length,
         sites_approved: sites.length,
+        sites_validated: sites.length, // Sites are pre-validated via Places API
         error_message: sites.length === 0 
           ? `No competitor websites found for "${industry}" near ${location}. Try different search terms or check your location settings.` 
           : null,
         heartbeat_at: new Date().toISOString()
       })
       .eq('id', currentJobId);
+
+    // Auto-chain: trigger scraping if we found sites
+    if (sites.length > 0) {
+      console.log(`[${FUNCTION_NAME}] Auto-chaining to scrape-worker...`);
+      supabase.functions.invoke('competitor-scrape-worker', {
+        body: { 
+          jobId: currentJobId, 
+          workspaceId, 
+          nicheQuery: industry, 
+          serviceArea: location 
+        }
+      }).catch(err => console.error(`[${FUNCTION_NAME}] Failed to chain scrape-worker:`, err));
+    }
 
     const duration = Date.now() - startTime;
     console.log(`[${FUNCTION_NAME}] Completed in ${duration}ms: ${sites.length} competitors`);

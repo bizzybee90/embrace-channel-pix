@@ -210,16 +210,20 @@ export function CompetitorPipelineProgress({
         .single();
 
       if (data) {
+        // Map faqs_generated to faqsExtracted (they're synonymous in our simplified flow)
+        const faqsTotal = data.faqs_generated || data.faqs_extracted || 0;
+        const faqsFinal = data.faqs_added || faqsTotal;
+        
         setStats({
           phase: data.status as PipelinePhase,
           sitesDiscovered: data.sites_discovered || 0,
           sitesValidated: data.sites_validated || data.sites_approved || 0,
           sitesScraped: data.sites_scraped || 0,
           pagesScraped: data.pages_scraped || 0,
-          faqsExtracted: data.faqs_extracted || data.faqs_generated || 0,
-          faqsAfterDedup: data.faqs_after_dedup || 0,
-          faqsRefined: data.faqs_refined || 0,
-          faqsAdded: data.faqs_added || data.faqs_refined || 0,
+          faqsExtracted: faqsTotal,
+          faqsAfterDedup: faqsFinal, // In simplified flow, this equals added
+          faqsRefined: faqsFinal,
+          faqsAdded: faqsFinal,
           currentSite: data.current_scraping_domain || null,
           errorMessage: data.error_message || null,
         });
