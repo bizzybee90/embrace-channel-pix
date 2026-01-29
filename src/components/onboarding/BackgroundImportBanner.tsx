@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Mail, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { Mail, CheckCircle2, AlertCircle, Loader2, Sparkles, Brain } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
@@ -13,53 +13,67 @@ interface ImportProgress {
   current_phase: string | null;
   emails_received: number | null;
   emails_classified: number | null;
-  conversations_found: number | null;
-  conversations_with_replies: number | null;
-  pairs_analyzed: number | null;
-  voice_profile_complete: boolean | null;
-  playbook_complete: boolean | null;
   last_error: string | null;
 }
 
+// Clear 3-stage progress mapping
+const PHASES = {
+  connecting: { label: 'Connecting to email...', stage: 1, icon: Mail },
+  importing: { label: 'Importing emails', stage: 1, icon: Mail },
+  classifying: { label: 'Classifying emails', stage: 2, icon: Sparkles },
+  learning: { label: 'Learning your voice', stage: 3, icon: Brain },
+  complete: { label: 'Import complete!', stage: 4, icon: CheckCircle2 },
+  error: { label: 'Import failed', stage: 0, icon: AlertCircle },
+} as const;
+
+function getPhaseConfig(phase: string | null) {
+  if (!phase) return PHASES.connecting;
+  return PHASES[phase as keyof typeof PHASES] || PHASES.connecting;
+}
+
 function getPhaseLabel(p: ImportProgress): string {
-  switch (p.current_phase) {
-    case 'importing':
-      return `Importing emails… ${(p.emails_received || 0).toLocaleString()} received`;
-    case 'classifying':
-      return `Classifying… ${(p.emails_classified || 0).toLocaleString()} / ${(p.emails_received || 0).toLocaleString()}`;
-    case 'analyzing':
-      return `Analyzing… ${(p.conversations_with_replies || 0).toLocaleString()} conversations with replies`;
-    case 'learning':
-      return `Learning your style… ${(p.pairs_analyzed || 0).toLocaleString()} pairs analyzed`;
-    case 'complete':
-      return 'Import complete!';
-    case 'error':
-      return p.last_error || 'Import failed';
-    default:
-      return 'Preparing…';
+  const phase = p.current_phase;
+  const config = getPhaseConfig(phase);
+  
+  if (phase === 'importing') {
+    const count = p.emails_received || 0;
+    return `${config.label}... ${count.toLocaleString()} received`;
   }
+  
+  if (phase === 'classifying') {
+    return `${config.label}... (one-time, ~30s)`;
+  }
+  
+  if (phase === 'learning') {
+    return `${config.label}...`;
+  }
+  
+  if (phase === 'error') {
+    return p.last_error || config.label;
+  }
+  
+  return config.label;
 }
 
 function getPercent(p: ImportProgress): number {
   const phase = p.current_phase;
-  if (!phase || phase === 'connecting') return 0;
+  if (!phase || phase === 'connecting') return 5;
   if (phase === 'complete') return 100;
   if (phase === 'error') return 0;
 
+  // Stage 1: Importing (0-60%)
   if (phase === 'importing') {
     const received = p.emails_received || 0;
-    // Lightweight estimate: 0-40% while importing.
-    return Math.min(40, Math.round((received / 500) * 40));
+    // Estimate based on typical import size (30k target)
+    return Math.min(60, 5 + Math.round((received / 30000) * 55));
   }
 
-  if (phase === 'classifying') {
-    const received = Math.max(p.emails_received || 0, 1);
-    const classified = p.emails_classified || 0;
-    return 40 + Math.round((classified / received) * 20);
-  }
+  // Stage 2: Classifying (60-85%)
+  if (phase === 'classifying') return 70;
 
-  if (phase === 'analyzing') return 65;
-  if (phase === 'learning') return 85;
+  // Stage 3: Learning (85-100%)
+  if (phase === 'learning') return 90;
+
   return 0;
 }
 
@@ -72,9 +86,7 @@ export function BackgroundImportBanner({ workspaceId, className }: BackgroundImp
     const fetchInitial = async () => {
       const { data } = await supabase
         .from('email_import_progress')
-        .select(
-          'current_phase, emails_received, emails_classified, conversations_found, conversations_with_replies, pairs_analyzed, voice_profile_complete, playbook_complete, last_error'
-        )
+        .select('current_phase, emails_received, emails_classified, last_error')
         .eq('workspace_id', workspaceId)
         .maybeSingle();
 
@@ -99,11 +111,15 @@ export function BackgroundImportBanner({ workspaceId, className }: BackgroundImp
     };
   }, [workspaceId]);
 
-  // Don’t show banner unless the new pipeline is running (or has a meaningful status).
+  // Don't show banner if no progress or idle
   if (!progress) return null;
   const phase = progress.current_phase;
   if (!phase || phase === 'idle') return null;
 
+  const config = getPhaseConfig(phase);
+  const Icon = config.icon;
+
+  // Complete state
   if (phase === 'complete') {
     return (
       <div
@@ -118,6 +134,7 @@ export function BackgroundImportBanner({ workspaceId, className }: BackgroundImp
     );
   }
 
+  // Error state
   if (phase === 'error') {
     return (
       <div
@@ -132,13 +149,23 @@ export function BackgroundImportBanner({ workspaceId, className }: BackgroundImp
     );
   }
 
+  // Active progress state
   const percent = getPercent(progress);
 
   return (
     <div className={cn('flex flex-col gap-2 px-4 py-3 rounded-lg bg-primary/5 border border-primary/20 text-sm', className)}>
+      {/* Stage indicators */}
+      <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+        <span className={cn(config.stage >= 1 ? 'text-primary font-medium' : '')}>Import</span>
+        <span>→</span>
+        <span className={cn(config.stage >= 2 ? 'text-primary font-medium' : '')}>Classify</span>
+        <span>→</span>
+        <span className={cn(config.stage >= 3 ? 'text-primary font-medium' : '')}>Learn</span>
+      </div>
+
       <div className="flex items-center gap-2">
         <div className="relative flex-shrink-0">
-          <Mail className="h-4 w-4 text-primary" />
+          <Icon className="h-4 w-4 text-primary" />
           <span className="absolute -top-0.5 -right-0.5 h-2 w-2 bg-primary rounded-full animate-pulse" />
         </div>
         <span className="font-medium text-foreground truncate">{getPhaseLabel(progress)}</span>
@@ -152,4 +179,3 @@ export function BackgroundImportBanner({ workspaceId, className }: BackgroundImp
     </div>
   );
 }
-
