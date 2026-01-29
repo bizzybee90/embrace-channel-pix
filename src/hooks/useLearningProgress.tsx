@@ -43,31 +43,33 @@ export function useLearningProgress(workspaceId: string | null) {
     const emailCount = data.emails_received || 0;
     const pairsAnalyzed = data.pairs_analyzed || 0;
     const voiceComplete = data.voice_profile_complete || false;
-    const playbookComplete = data.playbook_complete || false;
     const lastUpdatedAt = (data.updated_at ?? null) as string | null;
     const phase1Status = data.phase1_status || 'pending';
     const phase2Status = data.phase2_status || 'pending';
     
-    // Determine current phase based on actual completion flags
+    // Determine current phase based on backend phase statuses (more reliable than booleans)
     let phaseIndex = 0;
     let estimatedSeconds: number | null = null;
-    
-    if (voiceComplete && playbookComplete) {
-      // All done
+
+    const phase1Done = phase1Status === 'complete';
+    const phase1Running = phase1Status === 'running';
+    const phase2Done = phase2Status === 'complete';
+    const phase2Running = phase2Status === 'running';
+
+    if (phase1Done && phase2Done && voiceComplete) {
       phaseIndex = 3; // complete
       estimatedSeconds = 0;
-    } else if (voiceComplete) {
-      // Voice done, doing embeddings/playbook
+    } else if (phase1Done && (phase2Running || phase2Status === 'pending' || phase2Status === 'error')) {
+      // Memory bank phase
       phaseIndex = 2;
-      estimatedSeconds = Math.ceil(50 / RATES.embeddings);
-    } else if (emailCount >= 10) {
-      // We have enough emails for voice learning - it's either running or about to
-      // Show that voice DNA extraction is happening
+      // We intentionally avoid showing a fake ETA here; it's highly variable.
+      estimatedSeconds = null;
+    } else if (phase1Running || (emailCount >= 10 && data.current_phase === 'learning')) {
+      // Voice DNA extraction / pairing-to-profile phase
       phaseIndex = 1;
-      // Voice extraction with 500 emails takes ~60-90 seconds
       estimatedSeconds = 60;
-    } else if (data.current_phase === 'learning' || data.current_phase === 'importing') {
-      // Still importing/pairing emails
+    } else {
+      // Still importing/pairing
       phaseIndex = 0;
       estimatedSeconds = null;
     }
@@ -80,7 +82,7 @@ export function useLearningProgress(workspaceId: string | null) {
       emailsImported: emailCount,
       pairsAnalyzed,
       voiceProfileComplete: voiceComplete,
-      playbookComplete: playbookComplete,
+      playbookComplete: phase2Done,
       isComplete: phaseIndex === 3,
       lastUpdatedAt,
     };

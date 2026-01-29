@@ -38,9 +38,11 @@ export function LearningProgressDisplay({ workspaceId, emailsImported }: Learnin
     ? formatDistanceToNowStrict(new Date(lastUpdatedAt), { addSuffix: true })
     : null;
   
-  // Only show stale warning if we haven't completed AND no update for 5 minutes
+  // Only show stale warning if we haven't completed AND no update for 15 minutes.
+  // The backend now heartbeats periodically during Memory building, so this should
+  // only appear when work is genuinely paused/stuck.
   const isStale = !isComplete && lastUpdatedAt
-    ? Date.now() - new Date(lastUpdatedAt).getTime() > 5 * 60 * 1000
+    ? Date.now() - new Date(lastUpdatedAt).getTime() > 15 * 60 * 1000
     : false;
 
   const displayLabel = !isComplete && isStale ? 'Waiting for analysis to resume' : currentPhase.label;

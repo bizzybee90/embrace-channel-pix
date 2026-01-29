@@ -9,6 +9,156 @@ const corsHeaders = {
 const ANTHROPIC_API = 'https://api.anthropic.com/v1/messages'
 const OPENAI_API = 'https://api.openai.com/v1/embeddings'
 
+type QueueEmail = {
+  thread_id: string | null
+  direction: string | null
+  body: string | null
+  subject: string | null
+  received_at: string | null
+}
+
+type TrainingPair = {
+  customer_text: string
+  owner_text: string
+  response_hours: number | null
+}
+
+function hoursBetween(earlierIso: string | null, laterIso: string | null): number | null {
+  if (!earlierIso || !laterIso) return null
+  const earlier = new Date(earlierIso).getTime()
+  const later = new Date(laterIso).getTime()
+  if (!Number.isFinite(earlier) || !Number.isFinite(later)) return null
+  const hours = (later - earlier) / (1000 * 60 * 60)
+  return Number.isFinite(hours) ? Math.max(0, hours) : null
+}
+
+async function upsertProgress(
+  supabase: any,
+  workspace_id: string,
+  patch: Record<string, any>
+) {
+  // Best-effort progress heartbeat. Never throw from here.
+  try {
+    await supabase
+      .from('email_import_progress')
+      .upsert(
+        {
+          workspace_id,
+          current_phase: 'learning',
+          updated_at: new Date().toISOString(),
+          ...patch,
+        },
+        { onConflict: 'workspace_id' }
+      )
+  } catch (_e) {
+    // ignore
+  }
+}
+
+async function buildPairsFromEmailQueue(
+  supabase: any,
+  workspace_id: string
+): Promise<TrainingPair[]> {
+  // Strategy:
+  // 1) Pull recent outbound replies (business owner messages)
+  // 2) Pull inbound messages for the same threads
+  // 3) For each outbound, find the closest preceding inbound and form a pair
+
+  const { data: outbound, error: outboundError } = await supabase
+    .from('email_import_queue')
+    .select('thread_id,direction,body,subject,received_at')
+    .eq('workspace_id', workspace_id)
+    .eq('direction', 'outbound')
+    .eq('is_noise', false)
+    .not('body', 'is', null)
+    .order('received_at', { ascending: false })
+    .limit(250)
+
+  if (outboundError) {
+    console.error('[voice-learning] Error fetching outbound emails:', outboundError)
+    return []
+  }
+
+  const outboundRows = (outbound || []) as QueueEmail[]
+  const threadIds = Array.from(
+    new Set(outboundRows.map((e) => e.thread_id).filter(Boolean))
+  ) as string[]
+
+  if (threadIds.length === 0) return []
+
+  // IMPORTANT:
+  // We cannot reliably fetch "all inbound for these threads" in one query because
+  // PostgREST applies row limits; that can drop the *relevant* inbound message for
+  // a given outbound. Instead, for each outbound we fetch the single best inbound
+  // candidate (closest preceding inbound in the same thread).
+
+  const pairs: TrainingPair[] = []
+
+  // Only attempt pairing for the first 120 outbound messages; we stop once we have 100 pairs.
+  const outboundCandidates = outboundRows.slice(0, 120)
+
+  for (const out of outboundCandidates) {
+    if (!out.thread_id || !out.body) continue
+
+    // Prefer an inbound message that occurred before the outbound (true reply pairing).
+    // If none exists (common when the import has partial thread history), fall back to
+    // the closest inbound in the same thread so learning can still proceed.
+
+    let candidate: any = null
+
+    const { data: priorCandidate, error: candidateError } = await supabase
+      .from('email_import_queue')
+      .select('thread_id,body,received_at')
+      .eq('workspace_id', workspace_id)
+      .eq('direction', 'inbound')
+      .eq('is_noise', false)
+      .eq('thread_id', out.thread_id)
+      .not('body', 'is', null)
+      .lte('received_at', out.received_at)
+      .order('received_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (candidateError) {
+      console.error('[voice-learning] Error fetching inbound candidate:', candidateError)
+      continue
+    }
+
+    candidate = priorCandidate
+
+    if (!candidate?.body) {
+      const { data: fallbackCandidate, error: fallbackError } = await supabase
+        .from('email_import_queue')
+        .select('thread_id,body,received_at')
+        .eq('workspace_id', workspace_id)
+        .eq('direction', 'inbound')
+        .eq('is_noise', false)
+        .eq('thread_id', out.thread_id)
+        .not('body', 'is', null)
+        .order('received_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (fallbackError) {
+        console.error('[voice-learning] Error fetching inbound fallback:', fallbackError)
+      }
+      candidate = fallbackCandidate
+    }
+
+    if (!candidate?.body) continue
+
+    pairs.push({
+      customer_text: candidate.body,
+      owner_text: out.body,
+      response_hours: hoursBetween(candidate.received_at, out.received_at),
+    })
+
+    if (pairs.length >= 100) break
+  }
+
+  return pairs
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -36,6 +186,14 @@ serve(async (req) => {
 
     console.log('[voice-learning] Starting for workspace:', workspace_id)
 
+    await upsertProgress(supabase, workspace_id, {
+      phase1_status: 'running',
+      phase2_status: 'pending',
+      voice_profile_complete: false,
+      pairs_analyzed: 0,
+      last_error: null,
+    })
+
     // Check if we already have a recent profile (unless force refresh)
     if (!force_refresh) {
       const { data: existingProfile } = await supabase
@@ -60,23 +218,38 @@ serve(async (req) => {
     }
 
     // =========================================
-    // STEP 1: Fetch conversation pairs
+    // STEP 1: Build conversation pairs
     // =========================================
-    
-    const { data: pairs, error: pairsError } = await supabase
+
+    // Prefer the precomputed table if present, otherwise build from the imported email queue.
+    const { data: tablePairs, error: pairsError } = await supabase
       .from('training_pairs')
-      .select('*')
+      .select('customer_text,owner_text,response_hours')
       .eq('workspace_id', workspace_id)
       .limit(100)
-    
-    console.log('[voice-learning] Found pairs:', pairs?.length || 0)
-    
+
     if (pairsError) {
-      console.error('[voice-learning] Error fetching pairs:', pairsError)
+      console.error('[voice-learning] Error fetching training_pairs:', pairsError)
     }
-    
+
+    const pairs: TrainingPair[] = (tablePairs && tablePairs.length > 0)
+      ? (tablePairs as TrainingPair[])
+      : await buildPairsFromEmailQueue(supabase, workspace_id)
+
+    console.log('[voice-learning] Built pairs:', pairs?.length || 0)
+
+    await upsertProgress(supabase, workspace_id, {
+      pairs_analyzed: pairs?.length || 0,
+      phase1_status: 'running',
+    })
+
     if (!pairs || pairs.length < 5) {
       // Not enough data - return cold start indicator
+      await upsertProgress(supabase, workspace_id, {
+        phase1_status: 'blocked',
+        voice_profile_complete: false,
+        last_error: 'insufficient_data',
+      })
       return new Response(JSON.stringify({
         success: false,
         reason: 'insufficient_data',
@@ -204,6 +377,11 @@ Output ONLY valid JSON, nothing else.`
 
     console.log('[voice-learning] Profile extracted successfully')
 
+    await upsertProgress(supabase, workspace_id, {
+      phase1_status: 'complete',
+      phase2_status: 'running',
+    })
+
     // =========================================
     // STEP 4: Store voice profile
     // =========================================
@@ -292,6 +470,25 @@ Output ONLY valid JSON, nothing else.`
         
         if (!insertError) {
           storedCount++
+
+          // Heartbeat every 10 inserts so the UI never looks "frozen"
+          if (storedCount % 10 === 0) {
+            await upsertProgress(supabase, workspace_id, {
+              phase2_status: 'running',
+              // Keep this field in sync for the UI hook
+              voice_profile_complete: false,
+            })
+
+            // Also persist the partial count in voice_profiles when possible
+            try {
+              await supabase
+                .from('voice_profiles')
+                .update({ examples_stored: storedCount, updated_at: new Date().toISOString() })
+                .eq('workspace_id', workspace_id)
+            } catch (_e) {
+              // ignore
+            }
+          }
         }
       } catch (e) {
         console.error('[voice-learning] Failed to store example:', e)
@@ -305,6 +502,11 @@ Output ONLY valid JSON, nothing else.`
     await supabase.from('voice_profiles')
       .update({ examples_stored: storedCount })
       .eq('workspace_id', workspace_id)
+
+    await upsertProgress(supabase, workspace_id, {
+      phase2_status: 'complete',
+      voice_profile_complete: true,
+    })
 
     // =========================================
     // DONE
@@ -328,6 +530,26 @@ Output ONLY valid JSON, nothing else.`
 
   } catch (error: any) {
     console.error('[voice-learning] Error:', error)
+
+    // Best-effort error reporting for the UI
+    // (Do not block returning the error response)
+    try {
+      const { workspace_id } = await req.clone().json().catch(() => ({ workspace_id: null }))
+      if (workspace_id) {
+        const supabase = createClient(
+          Deno.env.get('SUPABASE_URL')!,
+          Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+        )
+        await upsertProgress(supabase, workspace_id, {
+          phase2_status: 'error',
+          voice_profile_complete: false,
+          last_error: error?.message || 'unknown_error',
+        })
+      }
+    } catch (_e) {
+      // ignore
+    }
+
     return new Response(JSON.stringify({
       success: false,
       error: error.message,
