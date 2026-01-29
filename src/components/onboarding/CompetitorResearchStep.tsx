@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Search, Loader2, ArrowRight, Sparkles, MapPin } from 'lucide-react';
+import { Search, Loader2, Sparkles, MapPin } from 'lucide-react';
 import { CompetitorPipelineProgress } from './CompetitorPipelineProgress';
 
 interface CompetitorResearchStepProps {
@@ -26,6 +26,110 @@ interface PlacePrediction {
 }
 
 type Status = 'idle' | 'starting' | 'running' | 'completed' | 'error';
+
+const BUSINESS_TYPES = [
+  // Cleaning Services
+  { value: 'window_cleaning', label: 'Window Cleaning' },
+  { value: 'carpet_cleaning', label: 'Carpet Cleaning' },
+  { value: 'pressure_washing', label: 'Pressure Washing' },
+  { value: 'general_cleaning', label: 'General Cleaning' },
+  { value: 'domestic_cleaning', label: 'Domestic Cleaning' },
+  { value: 'commercial_cleaning', label: 'Commercial Cleaning' },
+  { value: 'oven_cleaning', label: 'Oven Cleaning' },
+  { value: 'gutter_cleaning', label: 'Gutter Cleaning' },
+  { value: 'end_of_tenancy', label: 'End of Tenancy Cleaning' },
+  { value: 'upholstery_cleaning', label: 'Upholstery Cleaning' },
+  // Building & Construction
+  { value: 'builder', label: 'Builder' },
+  { value: 'bricklayer', label: 'Bricklayer' },
+  { value: 'carpenter', label: 'Carpenter' },
+  { value: 'joiner', label: 'Joiner' },
+  { value: 'plasterer', label: 'Plasterer' },
+  { value: 'tiler', label: 'Tiler' },
+  { value: 'flooring', label: 'Flooring' },
+  { value: 'roofer', label: 'Roofer' },
+  { value: 'scaffolding', label: 'Scaffolding' },
+  { value: 'driveway', label: 'Driveway Contractor' },
+  { value: 'fencing', label: 'Fencing' },
+  { value: 'decking', label: 'Decking' },
+  // Trades
+  { value: 'plumber', label: 'Plumber' },
+  { value: 'electrician', label: 'Electrician' },
+  { value: 'gas_engineer', label: 'Gas Engineer' },
+  { value: 'heating_engineer', label: 'Heating Engineer' },
+  { value: 'boiler_engineer', label: 'Boiler Engineer' },
+  { value: 'hvac', label: 'HVAC' },
+  { value: 'air_conditioning', label: 'Air Conditioning' },
+  { value: 'locksmith', label: 'Locksmith' },
+  { value: 'glazier', label: 'Glazier' },
+  // Decorating
+  { value: 'painter_decorator', label: 'Painter & Decorator' },
+  { value: 'interior_designer', label: 'Interior Designer' },
+  { value: 'kitchen_fitter', label: 'Kitchen Fitter' },
+  { value: 'bathroom_fitter', label: 'Bathroom Fitter' },
+  // Outdoor & Garden
+  { value: 'landscaping', label: 'Landscaping' },
+  { value: 'gardener', label: 'Gardener' },
+  { value: 'lawn_care', label: 'Lawn Care' },
+  { value: 'tree_surgeon', label: 'Tree Surgeon' },
+  { value: 'garden_maintenance', label: 'Garden Maintenance' },
+  // Automotive
+  { value: 'mobile_mechanic', label: 'Mobile Mechanic' },
+  { value: 'car_valeting', label: 'Car Valeting' },
+  { value: 'mobile_tyres', label: 'Mobile Tyres' },
+  { value: 'mot_garage', label: 'MOT Garage' },
+  // Pet Services
+  { value: 'dog_groomer', label: 'Dog Groomer' },
+  { value: 'pet_groomer', label: 'Pet Groomer' },
+  { value: 'dog_walker', label: 'Dog Walker' },
+  { value: 'pet_sitter', label: 'Pet Sitter' },
+  { value: 'dog_trainer', label: 'Dog Trainer' },
+  // Home Services
+  { value: 'handyman', label: 'Handyman' },
+  { value: 'property_maintenance', label: 'Property Maintenance' },
+  { value: 'pest_control', label: 'Pest Control' },
+  { value: 'removals', label: 'Removals' },
+  { value: 'man_and_van', label: 'Man & Van' },
+  { value: 'house_clearance', label: 'House Clearance' },
+  { value: 'skip_hire', label: 'Skip Hire' },
+  { value: 'waste_removal', label: 'Waste Removal' },
+  { value: 'chimney_sweep', label: 'Chimney Sweep' },
+  // Health & Beauty
+  { value: 'hairdresser', label: 'Hairdresser' },
+  { value: 'barber', label: 'Barber' },
+  { value: 'beauty_therapist', label: 'Beauty Therapist' },
+  { value: 'nail_technician', label: 'Nail Technician' },
+  { value: 'massage_therapist', label: 'Massage Therapist' },
+  { value: 'personal_trainer', label: 'Personal Trainer' },
+  // Events
+  { value: 'photographer', label: 'Photographer' },
+  { value: 'videographer', label: 'Videographer' },
+  { value: 'dj', label: 'DJ' },
+  { value: 'caterer', label: 'Caterer' },
+  { value: 'event_planner', label: 'Event Planner' },
+  { value: 'wedding_planner', label: 'Wedding Planner' },
+  { value: 'florist', label: 'Florist' },
+  // Professional Services
+  { value: 'accountant', label: 'Accountant' },
+  { value: 'bookkeeper', label: 'Bookkeeper' },
+  { value: 'estate_agent', label: 'Estate Agent' },
+  { value: 'letting_agent', label: 'Letting Agent' },
+  { value: 'surveyor', label: 'Surveyor' },
+  { value: 'driving_instructor', label: 'Driving Instructor' },
+  // IT & Tech
+  { value: 'it_support', label: 'IT Support' },
+  { value: 'computer_repair', label: 'Computer Repair' },
+  { value: 'web_developer', label: 'Web Developer' },
+  // Other
+  { value: 'tailor', label: 'Tailor' },
+  { value: 'appliance_repair', label: 'Appliance Repair' },
+  { value: 'dry_cleaner', label: 'Dry Cleaner' },
+  { value: 'courier', label: 'Courier' },
+  { value: 'taxi', label: 'Taxi' },
+  { value: 'childminder', label: 'Childminder' },
+  { value: 'care_worker', label: 'Care Worker' },
+  { value: 'other', label: 'Other' },
+];
 
 const targetCountOptions = [
   { value: 50, label: '50 competitors', description: 'Quick research (5-10 min)' },
@@ -78,11 +182,54 @@ export function CompetitorResearchStep({
   const [error, setError] = useState<string | null>(null);
   const [isLoadingContext, setIsLoadingContext] = useState(!hasInitialNiche);
 
+  // Niche/business type search state
+  const [nicheSearch, setNicheSearch] = useState('');
+  const [nicheFocused, setNicheFocused] = useState(false);
+
   // Google Places autocomplete state
   const [serviceAreaSearch, setServiceAreaSearch] = useState('');
   const [serviceAreaFocused, setServiceAreaFocused] = useState(false);
   const [placePredictions, setPlacePredictions] = useState<PlacePrediction[]>([]);
   const [isLoadingPlaces, setIsLoadingPlaces] = useState(false);
+
+  // Filter business types based on search with fuzzy matching
+  const filteredBusinessTypes = useMemo(() => {
+    if (!nicheSearch || nicheSearch.trim().length < 1) return [];
+    
+    const search = nicheSearch.toLowerCase().trim();
+    
+    const scored = BUSINESS_TYPES
+      .map(type => {
+        const label = type.label.toLowerCase();
+        const value = type.value.toLowerCase();
+        let score = 0;
+        
+        if (label === search || value === search) {
+          score = 100;
+        } else if (label.startsWith(search) || value.startsWith(search)) {
+          score = 80;
+        } else if (label.split(/[\s&]+/).some(word => word.startsWith(search)) || 
+                   value.split('_').some(word => word.startsWith(search))) {
+          score = 60;
+        } else if (label.includes(search) || value.includes(search)) {
+          score = 40;
+        }
+        
+        return { type, score };
+      })
+      .filter(item => item.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 8)
+      .map(item => item.type);
+    
+    return scored;
+  }, [nicheSearch]);
+
+  const handleSelectNiche = (label: string) => {
+    setNicheQuery(label);
+    setNicheSearch('');
+    setNicheFocused(false);
+  };
 
   // Fetch from database if props and draft are empty (happens after page refresh)
   useEffect(() => {
@@ -326,15 +473,47 @@ export function CompetitorResearchStep({
         <div className="space-y-2">
           <Label htmlFor="niche">Your Industry / Niche</Label>
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground z-10" />
             <Input
               id="niche"
-              value={nicheQuery}
-              onChange={(e) => setNicheQuery(e.target.value)}
-              placeholder="e.g., end of tenancy cleaning, plumbing, landscaping"
+              value={nicheFocused ? nicheSearch : nicheQuery}
+              onChange={(e) => {
+                setNicheSearch(e.target.value);
+                if (!nicheFocused) setNicheQuery(e.target.value);
+              }}
+              onFocus={() => {
+                setNicheFocused(true);
+                setNicheSearch('');
+              }}
+              onBlur={() => {
+                // Delay to allow click on dropdown
+                setTimeout(() => setNicheFocused(false), 200);
+              }}
+              placeholder="Start typing to search..."
               className="pl-10"
             />
+            {nicheFocused && filteredBusinessTypes.length > 0 && (
+              <div className="absolute z-50 w-full mt-1 bg-background border rounded-md shadow-lg max-h-48 overflow-auto">
+                {filteredBusinessTypes.map((type) => (
+                  <button
+                    key={type.value}
+                    type="button"
+                    className="w-full px-3 py-2 text-left text-sm hover:bg-accent flex items-center gap-2"
+                    onClick={() => handleSelectNiche(type.label)}
+                  >
+                    <Search className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                    {type.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
+          {nicheQuery && !nicheFocused && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Search className="h-3 w-3" />
+              <span>Selected: <strong className="text-foreground">{nicheQuery}</strong></span>
+            </div>
+          )}
           <p className="text-xs text-muted-foreground">
             Be specific: "end of tenancy cleaning" works better than just "cleaning"
           </p>
