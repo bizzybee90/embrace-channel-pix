@@ -11,6 +11,7 @@ import { AutomationLevelStep } from './AutomationLevelStep';
 import { EmailConnectionStep } from './EmailConnectionStep';
 import { CompetitorResearchStep } from './CompetitorResearchStep';
 import { BackgroundImportBanner } from './BackgroundImportBanner';
+import { AILearningReport } from './report/AILearningReport';
 import bizzybeelogo from '@/assets/bizzybee-logo.png';
 import { CheckCircle2, Mail, BookOpen } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -20,10 +21,10 @@ interface OnboardingWizardProps {
   onComplete: () => void;
 }
 
-type Step = 'welcome' | 'email' | 'business' | 'knowledge' | 'competitors' | 'senders' | 'triage' | 'automation' | 'complete';
+type Step = 'welcome' | 'email' | 'business' | 'knowledge' | 'competitors' | 'senders' | 'triage' | 'review_learning' | 'automation' | 'complete';
 
-// Simplified steps - review removed (users can access in Settings later)
-const STEPS: Step[] = ['welcome', 'email', 'business', 'knowledge', 'competitors', 'senders', 'triage', 'automation', 'complete'];
+// Added review_learning step after triage
+const STEPS: Step[] = ['welcome', 'email', 'business', 'knowledge', 'competitors', 'senders', 'triage', 'review_learning', 'automation', 'complete'];
 
 export function OnboardingWizard({ workspaceId, onComplete }: OnboardingWizardProps) {
   const storageKey = `bizzybee:onboarding:${workspaceId}`;
@@ -302,6 +303,13 @@ export function OnboardingWizard({ workspaceId, onComplete }: OnboardingWizardPr
             />
           )}
 
+          {currentStep === 'review_learning' && (
+            <AILearningReport
+              workspaceId={workspaceId}
+              onNext={handleNext}
+              onBack={handleBack}
+            />
+          )}
 
           {currentStep === 'automation' && (
             <AutomationLevelStep
