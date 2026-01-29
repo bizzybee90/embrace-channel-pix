@@ -328,8 +328,9 @@ serve(async (req) => {
     let subBatchIndex = 0;
 
     while (shouldContinueProcessing(startTime) && consecutiveFailures < MAX_CONSECUTIVE_FAILURES) {
-      // Fetch next batch
-      let query = supabase
+      // Fetch next batch - NO cursor pagination needed since we update status to 'processed'
+      // This ensures we pick up newly scanned emails that arrived after the job started
+      const { data: emails, error: fetchError } = await supabase
         .from('email_import_queue')
         .select('id, from_email, from_name, subject, body, direction')
         .eq('workspace_id', workspace_id)
@@ -337,12 +338,6 @@ serve(async (req) => {
         .eq('has_body', true)
         .order('id', { ascending: false })
         .limit(DB_BATCH_SIZE);
-
-      if (job.last_processed_id) {
-        query = query.lt('id', job.last_processed_id);
-      }
-
-      const { data: emails, error: fetchError } = await query;
 
       if (fetchError) throw fetchError;
 
@@ -501,8 +496,7 @@ ${emailSummaries}`;
         await refreshLock(supabase, workspace_id, LOCK_FUNCTION_NAME);
       }
 
-      // Update checkpoint
-      job.last_processed_id = emails[emails.length - 1].id;
+      // Update checkpoint (status-based, not cursor-based)
       await saveCheckpoint(supabase, job);
       await updateProgress(supabase, workspace_id, 'classifying', job.classified_count);
       batchesProcessed++;
