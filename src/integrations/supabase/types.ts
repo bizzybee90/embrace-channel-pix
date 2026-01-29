@@ -4113,6 +4113,38 @@ export type Database = {
           },
         ]
       }
+      pipeline_locks: {
+        Row: {
+          function_name: string
+          id: string
+          locked_at: string
+          locked_by: string | null
+          workspace_id: string
+        }
+        Insert: {
+          function_name: string
+          id?: string
+          locked_at?: string
+          locked_by?: string | null
+          workspace_id: string
+        }
+        Update: {
+          function_name?: string
+          id?: string
+          locked_at?: string
+          locked_by?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pipeline_locks_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       price_list: {
         Row: {
           affects_package: boolean | null
