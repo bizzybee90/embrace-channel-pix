@@ -180,10 +180,14 @@ serve(async (req) => {
     
     const webhookUrl = `${SUPABASE_URL}/functions/v1/handle-discovery-complete`;
     
+    // Request more than needed to account for filtering (directories, social media, no-website)
+    // Cap at 200 for Apify limits and cost control
+    const crawlLimit = Math.min(maxCompetitors * 2, 200);
+    
     const apifyInput = {
       searchStringsArray: [industry],
       locationQuery: `${location}, UK`,
-      maxCrawledPlacesPerSearch: Math.min(maxCompetitors + 20, 100),
+      maxCrawledPlacesPerSearch: crawlLimit,
       language: "en",
       countryCode: "gb",
       skipClosedPlaces: true,
@@ -194,6 +198,8 @@ serve(async (req) => {
         radiusKm: radiusKm
       }
     };
+    
+    console.log('[start-research] Requesting', crawlLimit, 'places to yield ~', maxCompetitors, 'after filtering');
     
     console.log('[start-research] Calling Apify with:', apifyInput);
     
