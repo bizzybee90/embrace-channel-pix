@@ -72,12 +72,45 @@ export function CompetitorResearchStep({
   const [targetCount, setTargetCount] = useState(draft.targetCount ?? 100);
   const [jobId, setJobId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isLoadingContext, setIsLoadingContext] = useState(false);
 
   // Google Places autocomplete state
   const [serviceAreaSearch, setServiceAreaSearch] = useState('');
   const [serviceAreaFocused, setServiceAreaFocused] = useState(false);
   const [placePredictions, setPlacePredictions] = useState<PlacePrediction[]>([]);
   const [isLoadingPlaces, setIsLoadingPlaces] = useState(false);
+
+  // Fetch from database if props are empty (happens after page refresh)
+  useEffect(() => {
+    const fetchBusinessContext = async () => {
+      // Only fetch if we don't have data from props or draft
+      if (nicheQuery || serviceArea) return;
+      
+      setIsLoadingContext(true);
+      try {
+        const { data } = await supabase
+          .from('business_context')
+          .select('business_type, service_area')
+          .eq('workspace_id', workspaceId)
+          .maybeSingle();
+
+        if (data) {
+          if (data.business_type && !nicheQuery) {
+            setNicheQuery(data.business_type);
+          }
+          if (data.service_area && !serviceArea) {
+            setServiceArea(parseServiceArea(data.service_area));
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching business context:', err);
+      } finally {
+        setIsLoadingContext(false);
+      }
+    };
+
+    fetchBusinessContext();
+  }, [workspaceId]); // Only run on mount
 
   // Google Places search
   const searchPlaces = useCallback(async (input: string) => {
