@@ -505,9 +505,14 @@ export function WebsitePipelineProgress({
 
       {/* Action Buttons */}
       <div className="space-y-3">
-        <Button onClick={handleContinue} className="w-full gap-2">
-          Continue <ArrowRight className="h-4 w-4" />
-        </Button>
+        <div className="flex gap-3">
+          <Button variant="outline" onClick={onBack} className="flex-1">
+            Back
+          </Button>
+          <Button onClick={handleContinue} className="flex-1 gap-2">
+            Continue <ArrowRight className="h-4 w-4" />
+          </Button>
+        </div>
         {!isComplete && (
           <p className="text-xs text-center text-muted-foreground">
             You can continue while this runs in the background
