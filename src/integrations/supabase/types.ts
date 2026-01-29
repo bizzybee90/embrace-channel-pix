@@ -2254,6 +2254,7 @@ export type Database = {
       email_import_queue: {
         Row: {
           body: string | null
+          body_clean: string | null
           body_html: string | null
           category: string | null
           classified_at: string | null
@@ -2281,6 +2282,7 @@ export type Database = {
         }
         Insert: {
           body?: string | null
+          body_clean?: string | null
           body_html?: string | null
           category?: string | null
           classified_at?: string | null
@@ -2308,6 +2310,7 @@ export type Database = {
         }
         Update: {
           body?: string | null
+          body_clean?: string | null
           body_html?: string | null
           category?: string | null
           classified_at?: string | null
