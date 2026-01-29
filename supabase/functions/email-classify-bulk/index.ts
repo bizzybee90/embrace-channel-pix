@@ -4,11 +4,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 /**
  * BULK EMAIL CLASSIFIER - Simplified Pipeline
  * 
- * Sends ALL unclassified emails to Gemini in ONE call using Lovable AI gateway.
- * Gemini 2.5 Flash has 1M token context window.
- * 30,000 emails × 250 chars = 7.5M chars = ~2M tokens. Fits easily.
- * 
- * On completion, triggers voice-learning to build the voice profile.
+ * Sends emails to Gemini in batches of 5000 (to handle Supabase row limits).
+ * Uses .range() to bypass 1000-row default limit.
+ * Self-invokes until all emails are classified, then triggers voice-learning.
  */
 
 const corsHeaders = {
@@ -18,6 +16,7 @@ const corsHeaders = {
 
 const LOVABLE_AI_GATEWAY = 'https://ai.gateway.lovable.dev/v1/chat/completions';
 const MODEL = 'google/gemini-2.5-flash'; // Fast, cheap, 1M token context
+const BATCH_SIZE = 5000; // Process 5000 emails per invocation (Supabase range limit)
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -25,7 +24,7 @@ serve(async (req) => {
   }
 
   try {
-    const { workspace_id } = await req.json();
+    const { workspace_id, _batch_number = 0 } = await req.json();
     
     if (!workspace_id) {
       return new Response(JSON.stringify({ error: 'workspace_id required' }), {
@@ -48,7 +47,7 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const startTime = Date.now();
 
-    console.log(`[email-classify-bulk] Starting for workspace ${workspace_id}`);
+    console.log(`[email-classify-bulk] Starting batch ${_batch_number} for workspace ${workspace_id}`);
 
     // Update progress to classifying phase
     await supabase
@@ -60,20 +59,30 @@ serve(async (req) => {
       }, { onConflict: 'workspace_id' });
 
     // ==========================================================================
-    // STEP 1: Fetch ALL unclassified emails in ONE query
+    // STEP 1: Fetch batch of unclassified emails using .range() to bypass 1000 limit
     // ==========================================================================
+    const rangeStart = 0; // Always start from 0 since we're filtering by category IS NULL
+    const rangeEnd = BATCH_SIZE - 1;
+    
     const { data: emails, error: fetchError } = await supabase
       .from('email_import_queue')
       .select('id, from_email, subject, body, direction')
       .eq('workspace_id', workspace_id)
       .is('category', null) // Not yet classified
       .order('id', { ascending: true })
-      .limit(50000); // Safety limit
+      .range(rangeStart, rangeEnd);
 
     if (fetchError) throw fetchError;
 
     if (!emails || emails.length === 0) {
-      console.log(`[email-classify-bulk] No emails to classify, triggering voice-learn`);
+      console.log(`[email-classify-bulk] No more emails to classify, triggering voice-learn`);
+      
+      // Get total classified count
+      const { count: totalClassified } = await supabase
+        .from('email_import_queue')
+        .select('id', { count: 'exact', head: true })
+        .eq('workspace_id', workspace_id)
+        .not('category', 'is', null);
       
       // Update progress and trigger voice learning
       await supabase
@@ -81,6 +90,7 @@ serve(async (req) => {
         .upsert({
           workspace_id,
           current_phase: 'learning',
+          emails_classified: totalClassified || 0,
           updated_at: new Date().toISOString(),
         }, { onConflict: 'workspace_id' });
 
@@ -89,19 +99,19 @@ serve(async (req) => {
 
       return new Response(JSON.stringify({ 
         success: true, 
-        status: 'no_work',
-        message: 'No emails to classify, triggered voice learning' 
+        status: 'complete',
+        total_classified: totalClassified,
+        message: 'All emails classified, triggered voice learning' 
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    console.log(`[email-classify-bulk] Found ${emails.length} emails to classify`);
+    console.log(`[email-classify-bulk] Found ${emails.length} emails to classify in batch ${_batch_number}`);
 
     // ==========================================================================
-    // STEP 2: Build ONE prompt with ALL emails
+    // STEP 2: Build prompt with batch of emails
     // ==========================================================================
-    // Format: index|direction|from|subject|snippet (compact to maximize emails per call)
     const emailLines = emails.map((e, i) => {
       const dir = e.direction === 'outbound' ? 'OUT' : 'IN';
       const subject = (e.subject || '(none)').substring(0, 100).replace(/[\n\r|]/g, ' ');
@@ -137,12 +147,11 @@ Return ONLY valid JSON. No markdown. No explanation. Just the array.
 EMAILS (${emails.length} total, format: index|direction|from|subject|snippet):
 ${emailLines}`;
 
-    // Calculate approximate token count
     const estimatedTokens = Math.ceil(prompt.length / 4);
     console.log(`[email-classify-bulk] Prompt size: ${prompt.length} chars, ~${estimatedTokens} tokens`);
 
     // ==========================================================================
-    // STEP 3: ONE Lovable AI Gateway call
+    // STEP 3: Call Lovable AI Gateway
     // ==========================================================================
     console.log(`[email-classify-bulk] Calling Lovable AI Gateway (${MODEL})...`);
     
@@ -156,7 +165,7 @@ ${emailLines}`;
         model: MODEL,
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.1,
-        max_tokens: 65536, // Max output for classifications
+        max_tokens: 65536,
       })
     });
 
@@ -190,75 +199,127 @@ ${emailLines}`;
     console.log(`[email-classify-bulk] Parsed ${classifications.length} classifications`);
 
     // ==========================================================================
-    // STEP 5: Bulk update all emails with category and requires_reply
+    // STEP 5: Bulk update emails - parallel updates for speed
     // ==========================================================================
     const classMap = new Map<number, { c: string; r: boolean }>();
     for (const cl of classifications) {
       classMap.set(cl.i, { c: cl.c, r: cl.r });
     }
 
-    // Batch update in chunks of 500 for database efficiency
-    const BATCH_SIZE = 500;
+    const now = new Date().toISOString();
     let updated = 0;
     let failed = 0;
-    const now = new Date().toISOString();
 
-    for (let i = 0; i < emails.length; i += BATCH_SIZE) {
-      const batch = emails.slice(i, i + BATCH_SIZE);
-      
-      // Build individual updates (Supabase upsert with specific columns)
-      const updates = batch.map((email, batchIndex) => {
-        const globalIndex = i + batchIndex;
-        const classification = classMap.get(globalIndex);
-        
-        return {
-          id: email.id,
+    // Build all update promises
+    const updatePromises = emails.map(async (email, index) => {
+      const classification = classMap.get(index);
+      const { error } = await supabase
+        .from('email_import_queue')
+        .update({
           category: classification?.c || 'unknown',
           requires_reply: classification?.r || false,
           classified_at: now,
           status: 'processed',
           processed_at: now,
-        };
-      });
+        })
+        .eq('id', email.id);
+      
+      return { success: !error, id: email.id };
+    });
 
-      // Use upsert for bulk update
-      const { error: updateError } = await supabase
-        .from('email_import_queue')
-        .upsert(updates, { onConflict: 'id' });
-
-      if (updateError) {
-        console.error(`[email-classify-bulk] Batch update error:`, updateError);
-        failed += batch.length;
-      } else {
-        updated += batch.length;
-      }
+    // Execute in batches of 50 to avoid overwhelming the DB
+    const PARALLEL_BATCH = 50;
+    for (let i = 0; i < updatePromises.length; i += PARALLEL_BATCH) {
+      const batch = updatePromises.slice(i, i + PARALLEL_BATCH);
+      const results = await Promise.all(batch);
+      updated += results.filter(r => r.success).length;
+      failed += results.filter(r => !r.success).length;
     }
 
+    console.log(`[email-classify-bulk] Updated ${updated} emails, ${failed} failed`);
+
     const elapsed = Date.now() - startTime;
-    console.log(`[email-classify-bulk] Complete: ${updated} emails classified in ${elapsed}ms (${failed} failed)`);
+    console.log(`[email-classify-bulk] Batch ${_batch_number} complete: ${updated} emails in ${elapsed}ms`);
 
     // ==========================================================================
-    // STEP 6: Update progress and trigger voice learning
+    // STEP 6: Check if more emails remain, self-invoke if needed
     // ==========================================================================
+    const { count: remaining } = await supabase
+      .from('email_import_queue')
+      .select('id', { count: 'exact', head: true })
+      .eq('workspace_id', workspace_id)
+      .is('category', null);
+
+    if (remaining && remaining > 0) {
+      console.log(`[email-classify-bulk] ${remaining} emails remaining, self-invoking batch ${_batch_number + 1}`);
+      
+      // Update progress with current count
+      const { count: totalClassified } = await supabase
+        .from('email_import_queue')
+        .select('id', { count: 'exact', head: true })
+        .eq('workspace_id', workspace_id)
+        .not('category', 'is', null);
+      
+      await supabase
+        .from('email_import_progress')
+        .upsert({
+          workspace_id,
+          current_phase: 'classifying',
+          emails_classified: totalClassified || 0,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'workspace_id' });
+      
+      // Self-invoke for next batch
+      fetch(`${supabaseUrl}/functions/v1/email-classify-bulk`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabaseServiceKey}`,
+        },
+        body: JSON.stringify({ 
+          workspace_id, 
+          _batch_number: _batch_number + 1 
+        }),
+      }).catch(e => console.error('[email-classify-bulk] Self-invoke failed:', e));
+
+      return new Response(JSON.stringify({
+        success: true,
+        status: 'continuing',
+        batch: _batch_number,
+        emails_classified: updated,
+        emails_remaining: remaining,
+        elapsed_ms: elapsed,
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // ==========================================================================
+    // STEP 7: All done - trigger voice learning
+    // ==========================================================================
+    const { count: finalCount } = await supabase
+      .from('email_import_queue')
+      .select('id', { count: 'exact', head: true })
+      .eq('workspace_id', workspace_id)
+      .not('category', 'is', null);
+
     await supabase
       .from('email_import_progress')
       .upsert({
         workspace_id,
         current_phase: 'learning',
-        emails_classified: updated,
+        emails_classified: finalCount || 0,
         updated_at: new Date().toISOString(),
       }, { onConflict: 'workspace_id' });
 
-    // Trigger voice learning
     await triggerVoiceLearning(supabaseUrl, supabaseServiceKey, workspace_id);
 
     return new Response(JSON.stringify({
       success: true,
-      emails_total: emails.length,
-      emails_classified: updated,
-      emails_failed: failed,
+      status: 'complete',
+      total_batches: _batch_number + 1,
+      emails_classified: finalCount,
       elapsed_ms: elapsed,
-      api_calls: 1, // THE KEY METRIC - just ONE call!
       chained_to: 'voice-learning',
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -267,7 +328,6 @@ ${emailLines}`;
   } catch (error) {
     console.error('[email-classify-bulk] Error:', error);
     
-    // Update progress with error
     try {
       const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
       const body = await req.clone().json().catch(() => ({}));
@@ -294,9 +354,6 @@ ${emailLines}`;
   }
 });
 
-// =============================================================================
-// Trigger voice learning after classification completes
-// =============================================================================
 async function triggerVoiceLearning(
   supabaseUrl: string,
   supabaseServiceKey: string,
