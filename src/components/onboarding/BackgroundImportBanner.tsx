@@ -119,7 +119,8 @@ export function BackgroundImportBanner({ workspaceId, className }: BackgroundImp
   // Also hide if learning is done (phase might be stale but data shows completion)
   const emailsReceived = progress.emails_received || 0;
   const emailsClassified = progress.emails_classified || 0;
-  if (emailsReceived > 0 && emailsClassified >= emailsReceived) return null;
+  // Hide if 99%+ classified (accounts for minor failures) OR if phase statuses indicate completion
+  if (emailsReceived > 0 && emailsClassified >= emailsReceived * 0.99) return null;
 
   const config = getPhaseConfig(phase);
   const Icon = config.icon;
