@@ -284,7 +284,8 @@ export function EmailPipelineProgress({
 
     // SMART DETECTION: Derive actual state from data, not just phase
     const importComplete = totalEmails > 0 && emailsReceived > 0;
-    const classifyComplete = emailsClassified >= emailsReceived && emailsReceived > 0;
+    // Consider classification complete if >= 99% classified (edge case: a few emails may error/skip)
+    const classifyComplete = emailsReceived > 0 && (emailsClassified >= emailsReceived || emailsClassified / emailsReceived >= 0.99);
 
     // All stages complete
     if (classifyComplete && voiceProfileComplete) {
