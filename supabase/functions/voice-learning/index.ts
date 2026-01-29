@@ -124,10 +124,10 @@ async function buildPairsFromEmailQueue(
   for (const tid of threadIds) {
     if (pairs.length >= 100) break
     
-    // Get the outbound message (owner's reply)
+    // Get the outbound message (owner's reply) - prefer body_clean if available
     const { data: outboundMsg } = await supabase
       .from('email_import_queue')
-      .select('body,received_at')
+      .select('body, body_clean, received_at')
       .eq('workspace_id', workspace_id)
       .eq('thread_id', tid)
       .eq('direction', 'outbound')
@@ -137,12 +137,14 @@ async function buildPairsFromEmailQueue(
       .limit(1)
       .maybeSingle()
     
-    if (!outboundMsg?.body) continue
+    // Use body_clean if available, otherwise fallback to body
+    const ownerText = outboundMsg?.body_clean || outboundMsg?.body
+    if (!ownerText) continue
     
-    // Get the inbound message that preceded it
+    // Get the inbound message that preceded it - prefer body_clean if available
     const { data: inboundMsg } = await supabase
       .from('email_import_queue')
-      .select('body,received_at')
+      .select('body, body_clean, received_at')
       .eq('workspace_id', workspace_id)
       .eq('thread_id', tid)
       .eq('direction', 'inbound')
@@ -154,13 +156,13 @@ async function buildPairsFromEmailQueue(
       .maybeSingle()
     
     // If no inbound before, try any inbound in thread (partial history case)
-    let customerText = inboundMsg?.body
+    let customerText = inboundMsg?.body_clean || inboundMsg?.body
     let customerReceivedAt = inboundMsg?.received_at
     
     if (!customerText) {
       const { data: fallbackInbound } = await supabase
         .from('email_import_queue')
-        .select('body,received_at')
+        .select('body, body_clean, received_at')
         .eq('workspace_id', workspace_id)
         .eq('thread_id', tid)
         .eq('direction', 'inbound')
@@ -171,13 +173,13 @@ async function buildPairsFromEmailQueue(
         .maybeSingle()
       
       if (!fallbackInbound?.body) continue
-      customerText = fallbackInbound.body
+      customerText = fallbackInbound.body_clean || fallbackInbound.body
       customerReceivedAt = fallbackInbound.received_at
     }
     
     pairs.push({
       customer_text: customerText,
-      owner_text: outboundMsg.body,
+      owner_text: ownerText,
       response_hours: hoursBetween(customerReceivedAt, outboundMsg.received_at),
     })
   }
@@ -245,6 +247,44 @@ serve(async (req) => {
     }
 
     // =========================================
+    // STEP 0: Ensure emails are parsed (body_clean populated)
+    // =========================================
+    
+    const { count: unparsedCount } = await supabase
+      .from('email_import_queue')
+      .select('id', { count: 'exact', head: true })
+      .eq('workspace_id', workspace_id)
+      .not('body', 'is', null)
+      .is('body_clean', null)
+      .limit(1)
+    
+    if (unparsedCount && unparsedCount > 0) {
+      console.log(`[voice-learning] Found ${unparsedCount} unparsed emails, calling parse-email-body first`)
+      
+      // Call the parsing function
+      const parseUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/parse-email-body`
+      try {
+        const parseResponse = await fetch(parseUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
+          },
+          body: JSON.stringify({ workspace_id, limit: 500 })
+        })
+        
+        if (parseResponse.ok) {
+          const parseResult = await parseResponse.json()
+          console.log(`[voice-learning] Parsed ${parseResult.parsed} emails`)
+        } else {
+          console.warn('[voice-learning] Email parsing failed, continuing with raw bodies')
+        }
+      } catch (parseError) {
+        console.warn('[voice-learning] Email parsing error:', parseError)
+      }
+    }
+
+    // =========================================
     // STEP 1: Build conversation pairs
     // =========================================
 
@@ -288,47 +328,20 @@ serve(async (req) => {
       })
     }
 
-    // Helper to extract ONLY the new message content, stripping all quoted email history
-    const extractNewContent = (text: string): string => {
-      if (!text) return text;
-      
-      // Split at common reply markers and take only the first part (the new content)
-      const splitPatterns = [
-        /\nOn [A-Z][a-z]{2},?\s+\d+\s+[A-Z][a-z]+\s+\d{4}.*?wrote:/is,  // Gmail: "On Mon, 24 Jun 2025... wrote:"
-        /\nFrom:.*?\nSent:/is,                                           // Outlook: "From: X\nSent: Y"
-        /\n-{3,}.*Original Message/i,                                    // "--- Original Message ---"
-        /\nFrom:.*?<[^>]+@[^>]+>/i,                                       // "From: Name <email@domain.com>"
-        /\n>+\s/,                                                          // Quoted lines starting with >
-      ];
-      
-      let result = text.trim();
-      
-      for (const pattern of splitPatterns) {
-        const match = result.match(pattern);
-        if (match && match.index !== undefined && match.index > 15) {
-          result = result.substring(0, match.index).trim();
-          break; // Stop at first match
-        }
-      }
-      
-      // Strip mobile signatures at the end (these often precede quotes)
-      result = result.replace(/\s*Sent from my (iPhone|iPad|Samsung|Galaxy|Android|Outlook).*$/is, '').trim();
-      
-      // If result is too short, use the original
-      return result.length > 10 ? result : text.slice(0, 200);
-    };
-
     // =========================================
     // STEP 2: Format pairs for Claude
     // =========================================
     
+    // The pairs already use body_clean where available (see buildPairsFromEmailQueue),
+    // so we just format them directly. Only apply fallback trimming for very long texts.
     const formattedPairs = pairs.map((p, i) => {
-      const cleanCustomer = extractNewContent(p.customer_text || '');
-      const cleanOwner = extractNewContent(p.owner_text || '');
+      // Trim to reasonable length for the prompt
+      const customerText = (p.customer_text || '').slice(0, 400).trim() || '[empty]';
+      const ownerText = (p.owner_text || '').slice(0, 400).trim() || '[empty]';
       return `--- EXCHANGE ${i + 1} ---
-INBOUND FROM CUSTOMER (someone contacting the business): ${cleanCustomer.slice(0, 300) || '[empty]'}
+INBOUND FROM CUSTOMER (someone contacting the business): ${customerText}
 ---
-OUTBOUND REPLY FROM BUSINESS OWNER (the person whose voice we're learning): ${cleanOwner.slice(0, 300) || '[empty]'}
+OUTBOUND REPLY FROM BUSINESS OWNER (the person whose voice we're learning): ${ownerText}
 ---
 RESPONSE TIME: ${p.response_hours?.toFixed(1) || 'unknown'} hours`;
     }).join('\n\n')
