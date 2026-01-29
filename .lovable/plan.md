@@ -1,177 +1,189 @@
 
-# Full-Visibility Pipeline UI + Bug Fixes
 
-## Two Parts to This Work
+# AI Learning Report: Build Trust Through Transparency
 
-### Part 1: Fix the Flickering Bug in Email Pipeline
+## The Problem
 
-The flickering between "importing" and "done" states is caused by two issues:
+Right now, after the pipeline completes, users are told "we learned from your emails" but shown zero proof. They must trust blindly that:
+- 22,633 emails were classified correctly
+- Their voice was captured accurately
+- The AI will respond appropriately
 
-1. **Database Inconsistency**: The `email_import_progress.current_phase` is stuck on `importing` even though classification is actively running (batch 24 of 24). The edge function updates it to `classifying`, but something else is overwriting it.
+This creates anxiety, not confidence. And you've discovered that the voice learning phase isn't actually completing properly, which means even less reason to trust it.
 
-2. **Row Limit Bug**: The `EmailPipelineProgress.tsx` fetches all emails from `email_import_queue` to calculate counts, but with 22,632 emails, it hits Supabase's 1000-row default limit. This causes:
-   - `inboxCount` to show ~1,000 instead of 15,000
-   - `sentCount` to show ~0 (because the 1000 limit is hit before reaching sent emails)
-   - The UI flickers between the limited counts and the proper `email_import_progress.emails_received` value
+## The Solution: Two-Part Fix
 
-**Fix:**
-```typescript
-// Instead of fetching all rows:
-const { data: queueItems } = await supabase
-  .from('email_import_queue')
-  .select('direction, category')
-  .eq('workspace_id', workspaceId);
+### Part 1: Fix Voice Learning Pipeline
 
-// Use COUNT queries with filters:
-const [inboxResult, sentResult, classifiedResult] = await Promise.all([
-  supabase.from('email_import_queue').select('id', { count: 'exact', head: true })
-    .eq('workspace_id', workspaceId).eq('direction', 'inbound'),
-  supabase.from('email_import_queue').select('id', { count: 'exact', head: true })
-    .eq('workspace_id', workspaceId).eq('direction', 'outbound'),
-  supabase.from('email_import_queue').select('id', { count: 'exact', head: true })
-    .eq('workspace_id', workspaceId).not('category', 'is', null),
-]);
-```
+Before we can show proof, we need to ensure the voice learning actually runs and stores data.
 
----
+Current state:
+- `voice_profile_complete: true` (claims complete)
+- `pairs_analyzed: 1` (only analysed 1 conversation pair)
+- `example_responses` table: **empty**
+- `voice_profiles` table: **no record exists**
 
-### Part 2: Create Unified Pipeline Progress Components
+The voice-learning edge function needs investigation - it's either not being triggered or failing silently.
 
-Replicate the stunning email pipeline UI pattern for both the website scraping and competitor research steps.
+### Part 2: Create AI Learning Report Step
 
-#### New Component: `WebsitePipelineProgress.tsx`
-
-Shows the 3-stage website scraping pipeline:
+Add a new onboarding step after the pipeline completes that shows users exactly what was learned, with the ability to correct mistakes.
 
 ```text
 ┌──────────────────────────────────────────────────────────────────────────┐
-│                    Your Website Knowledge                                │
+│                    What BizzyBee Learned About You                       │
 │                                                                          │
-│  We're extracting FAQs, pricing, and services from your website         │
-│  to give BizzyBee accurate answers about your business.                 │
+│  Review and adjust before we start responding to emails                  │
 │                                                                          │
 ├──────────────────────────────────────────────────────────────────────────┤
 │                                                                          │
-│  ┌────────────────────────────────────────────────────────────────────┐  │
-│  │  STAGE 1: Discover Pages                                   ✅ DONE │  │
-│  │  Found pages on your website                                       │  │
-│  │  └─ 12 pages discovered                                           │  │
-│  └────────────────────────────────────────────────────────────────────┘  │
+│  ╔════════════════════════════════════════════════════════════════════╗  │
+│  ║  EMAIL CLASSIFICATION BREAKDOWN                                    ║  │
+│  ╠════════════════════════════════════════════════════════════════════╣  │
+│  ║                                                                    ║  │
+│  ║  Your inbox contains:                                              ║  │
+│  ║                                                                    ║  │
+│  ║  ████████████████████░░░░░░  Quote Requests     1,438 (6.4%)      ║  │
+│  ║  ██████████████████░░░░░░░░  Booking Requests   1,291 (5.7%)      ║  │
+│  ║  ████████████░░░░░░░░░░░░░░  General Inquiries  1,020 (4.5%)      ║  │
+│  ║  ████████░░░░░░░░░░░░░░░░░░  Complaints           759 (3.4%)      ║  │
+│  ║  ███████████████████████████ Notifications      9,338 (41.3%)     ║  │
+│  ║  ██████████████████████░░░░  Follow-ups         5,487 (24.2%)     ║  │
+│  ║  ██████████░░░░░░░░░░░░░░░░  Spam               2,713 (12.0%)     ║  │
+│  ║                                                                    ║  │
+│  ║  [Show sample emails from each category]                           ║  │
+│  ╚════════════════════════════════════════════════════════════════════╝  │
 │                                                                          │
-│  ┌────────────────────────────────────────────────────────────────────┐  │
-│  │  STAGE 2: Scrape Content                         ⏳ IN PROGRESS    │  │
-│  │  Reading and downloading page content                              │  │
-│  │  [████████████░░░░░░░░░] 8 / 12 pages   67%                       │  │
-│  └────────────────────────────────────────────────────────────────────┘  │
+│  ╔════════════════════════════════════════════════════════════════════╗  │
+│  ║  YOUR VOICE DNA                                           [Edit]   ║  │
+│  ╠════════════════════════════════════════════════════════════════════╣  │
+│  ║                                                                    ║  │
+│  ║  Tone:         Friendly, Professional, Helpful                     ║  │
+│  ║  Formality:    ████████░░ 8/10 (Business formal)                  ║  │
+│  ║  Greeting:     "Hi [Name]," or "Hey there,"                       ║  │
+│  ║  Sign-off:     "Thanks, Michael"                                   ║  │
+│  ║                                                                    ║  │
+│  ║  Your style:                                                       ║  │
+│  ║  • Short, direct responses (avg 47 words)                         ║  │
+│  ║  • Uses "Thanks" frequently                                        ║  │
+│  ║  • Rarely uses emojis                                              ║  │
+│  ║  • Prefers bullet points for lists                                 ║  │
+│  ║                                                                    ║  │
+│  ╚════════════════════════════════════════════════════════════════════╝  │
 │                                                                          │
-│  ┌────────────────────────────────────────────────────────────────────┐  │
-│  │  STAGE 3: Extract Knowledge                            ○ PENDING   │  │
-│  │  AI extracts FAQs, pricing, and business facts                     │  │
-│  │  Coming next... (~30 seconds)                                      │  │
-│  └────────────────────────────────────────────────────────────────────┘  │
+│  ╔════════════════════════════════════════════════════════════════════╗  │
+│  ║  RESPONSE PLAYBOOK (3 examples)                           [Edit]   ║  │
+│  ╠════════════════════════════════════════════════════════════════════╣  │
+│  ║                                                                    ║  │
+│  ║  QUOTE REQUEST                                                     ║  │
+│  ║  ──────────────────────────────────────────────────────────────    ║  │
+│  ║  Customer: "What's your cost to clean windows on a 3 bed semi?"   ║  │
+│  ║                                                                    ║  │
+│  ║  You typically reply:                                              ║  │
+│  ║  "Hi [Name], thanks for getting in touch! For a 3 bed semi,       ║  │
+│  ║   windows are usually around £XX. Could you let me know your      ║  │
+│  ║   postcode so I can give you an exact quote? Thanks, Michael"     ║  │
+│  ║                                                                    ║  │
+│  ║  ────────────────────────────────────────────────────────────────  ║  │
+│  ║                                                                    ║  │
+│  ║  COMPLAINT                                                         ║  │
+│  ║  ──────────────────────────────────────────────────────────────    ║  │
+│  ║  Customer: "You missed some windows on the back of the house"     ║  │
+│  ║                                                                    ║  │
+│  ║  You typically reply:                                              ║  │
+│  ║  "Hi [Name], I'm really sorry to hear that. Could you let me      ║  │
+│  ║   know exactly which windows were missed? I'll get someone out    ║  │
+│  ║   to sort it ASAP. Thanks, Michael"                               ║  │
+│  ║                                                                    ║  │
+│  ╚════════════════════════════════════════════════════════════════════╝  │
 │                                                                          │
-│  ○────────────●────────────○                                            │
-│  Discover   Scrape      Extract    Done!                                │
+│  ╔════════════════════════════════════════════════════════════════════╗  │
+│  ║  CONFIDENCE ASSESSMENT                                             ║  │
+│  ╠════════════════════════════════════════════════════════════════════╣  │
+│  ║                                                                    ║  │
+│  ║  ✅ Strong confidence:                                             ║  │
+│  ║     • Quote requests - 127 examples found                          ║  │
+│  ║     • Booking confirmations - 89 examples found                    ║  │
+│  ║                                                                    ║  │
+│  ║  ⚠️ Lower confidence (will ask for review):                        ║  │
+│  ║     • Complaints - only 12 examples found                          ║  │
+│  ║     • Refund requests - 3 examples found                           ║  │
+│  ║                                                                    ║  │
+│  ╚════════════════════════════════════════════════════════════════════╝  │
+│                                                                          │
+│  [Download Report as PDF]                [Looks Good - Continue →]      │
 │                                                                          │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Data source:** `website_scrape_jobs` table with realtime subscription
-
-**Stages:**
-| Stage | Status Field Values | Description |
-|-------|---------------------|-------------|
-| Discover | `pending`, `mapping` | Finding pages on website |
-| Scrape | `scraping` | Downloading page content |
-| Extract | `extracting` | AI extraction of FAQs |
-| Complete | `completed` | All done |
-
-#### New Component: `CompetitorPipelineProgress.tsx`
-
-Shows the 5-stage competitor research pipeline:
-
-```text
-┌──────────────────────────────────────────────────────────────────────────┐
-│                    Competitor Research                                   │
-│                                                                          │
-│  Learning from your competitors to build a comprehensive                 │
-│  knowledge base for your industry.                                       │
-│                                                                          │
-├──────────────────────────────────────────────────────────────────────────┤
-│                                                                          │
-│  ┌────────────────────────────────────────────────────────────────────┐  │
-│  │  STAGE 1: Discover Competitors                              ✅ DONE │  │
-│  │  Finding businesses in your area                                   │  │
-│  │  └─ 87 competitors found                                          │  │
-│  └────────────────────────────────────────────────────────────────────┘  │
-│                                                                          │
-│  ┌────────────────────────────────────────────────────────────────────┐  │
-│  │  STAGE 2: Validate Websites                                 ✅ DONE │  │
-│  │  Checking which businesses have useful websites                    │  │
-│  │  └─ 52 valid websites confirmed                                   │  │
-│  └────────────────────────────────────────────────────────────────────┘  │
-│                                                                          │
-│  ┌────────────────────────────────────────────────────────────────────┐  │
-│  │  STAGE 3: Scrape Websites                        ⏳ IN PROGRESS    │  │
-│  │  Reading FAQ and service pages                                     │  │
-│  │  [████████░░░░░░░░░░░░] 18 / 52 sites   35%                       │  │
-│  │  Currently: cleaningservicesluton.co.uk                           │  │
-│  └────────────────────────────────────────────────────────────────────┘  │
-│                                                                          │
-│  ┌────────────────────────────────────────────────────────────────────┐  │
-│  │  STAGE 4: Extract & Dedupe FAQs                        ○ PENDING   │  │
-│  │  AI extracts and removes duplicate FAQs                            │  │
-│  └────────────────────────────────────────────────────────────────────┘  │
-│                                                                          │
-│  ┌────────────────────────────────────────────────────────────────────┐  │
-│  │  STAGE 5: Refine for Your Business                     ○ PENDING   │  │
-│  │  Adapts competitor FAQs to match your services                     │  │
-│  └────────────────────────────────────────────────────────────────────┘  │
-│                                                                          │
-└──────────────────────────────────────────────────────────────────────────┘
-```
-
-**Data source:** `competitor_research_jobs` table with polling (already set up)
-
-**Stages:**
-| Stage | Status Field Values | Description |
-|-------|---------------------|-------------|
-| Discover | `queued`, `discovering` | Finding local competitors |
-| Validate | `validating` | Checking website validity |
-| Scrape | `scraping` | Downloading competitor pages |
-| Extract | `extracting`, `deduplicating` | AI extraction + dedup |
-| Refine | `refining`, `embedding` | Personalise for your business |
-| Complete | `completed` | All done |
-
 ---
 
-## Files to Create/Modify
+## Technical Implementation
+
+### Files to Create/Modify
 
 | File | Action | Purpose |
 |------|--------|---------|
-| `src/components/onboarding/EmailPipelineProgress.tsx` | **Modify** | Fix 1000-row limit bug by using COUNT queries |
-| `src/components/onboarding/WebsitePipelineProgress.tsx` | **Create** | New full-visibility component for website scraping |
-| `src/components/onboarding/CompetitorPipelineProgress.tsx` | **Create** | New full-visibility component for competitor research |
-| `src/components/onboarding/KnowledgeBaseStep.tsx` | **Modify** | Use new WebsitePipelineProgress when job is running |
-| `src/components/onboarding/CompetitorResearchStep.tsx` | **Modify** | Use new CompetitorPipelineProgress when job is running |
+| `src/components/onboarding/AILearningReport.tsx` | **Create** | New comprehensive report component |
+| `src/components/onboarding/ClassificationBreakdown.tsx` | **Create** | Shows category distribution with samples |
+| `src/components/onboarding/VoiceDNASummary.tsx` | **Create** | Shows extracted voice characteristics |
+| `src/components/onboarding/ResponsePlaybook.tsx` | **Create** | Shows example conversation pairs |
+| `src/components/onboarding/ConfidenceAssessment.tsx` | **Create** | Shows what AI is confident about |
+| `src/components/onboarding/OnboardingWizard.tsx` | **Modify** | Add new step after email import completes |
+| `supabase/functions/voice-learning/index.ts` | **Debug** | Fix why it's not completing properly |
+
+### Data Sources
+
+| Section | Table | Query |
+|---------|-------|-------|
+| Classification Breakdown | `email_import_queue` | `GROUP BY category` with sample emails |
+| Voice DNA | `voice_profiles` | Voice characteristics and style |
+| Response Playbook | `example_responses` | RAG examples with embeddings |
+| Confidence Assessment | `example_responses` | `GROUP BY category` count |
+
+### PDF Generation (Optional Enhancement)
+
+For the downloadable PDF, we could:
+1. Use a client-side library like `react-pdf` to generate
+2. Or create an edge function that uses a service like Puppeteer/Chromium to render the report
+
+The in-app version should come first - the PDF is a "nice to have" for users who want to share with their team or keep records.
 
 ---
 
-## Shared StageCard Component
+## Immediate Priority: Fix Voice Learning
 
-Both new components will reuse the existing `StageCard` pattern from `EmailPipelineProgress.tsx`. This keeps the UI consistent across all pipeline views:
+Before building the report UI, we need to fix the voice learning pipeline. The current state shows:
 
-- Same visual styling (border colours, icons, badges)
-- Same status indicators (Pending, In Progress, Done, Error)
-- Same progress bar styling
-- Same action buttons layout
+```
+pairs_analyzed: 1
+voice_profile_complete: true (lie!)
+example_responses: 0 records
+voice_profiles: no record
+```
+
+This needs debugging - the function is either:
+1. Not being triggered after classification completes
+2. Failing silently without proper error logging
+3. Completing too early due to a logic bug
+
+I would recommend investigating the `voice-learning` edge function to understand why it's not processing the 7,631 sent emails to extract response patterns.
 
 ---
 
-## User Experience After Implementation
+## Expected Outcome
 
-1. **Email Step**: User sees all 3 stages (Import → Classify → Learn) with real counts that don't flicker
-2. **Website Step**: After entering URL, shows all 3 stages (Discover → Scrape → Extract) with live progress
-3. **Competitor Step**: After starting research, shows all 5 stages with current site being scraped
+After implementation:
 
-All three pipelines share the same visual language, making the onboarding feel cohesive and professional. Users always know exactly what's happening, what's coming next, and can continue at any time.
+1. **Users see proof** - Every classification, every voice trait, every response pattern is visible
+2. **Users can correct** - If something looks wrong, they can fix it before going live
+3. **Users build trust** - "I can see exactly what the AI learned from MY emails"
+4. **Reduced churn** - Confidence leads to continued usage
+5. **Premium positioning** - This level of transparency is rare in AI products
+
+The goal is that when a user finishes this step, they think:
+
+> "Wow, it actually understood how I communicate. This isn't some generic AI - it learned from MY emails."
+
+That's the moment they become a paying customer for life.
+
