@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { withApifyAdHocWebhooks } from "../_shared/apifyWebhooks.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -204,29 +205,31 @@ serve(async (req) => {
     console.log('[start-research] Requesting', crawlLimit, 'places to yield ~', maxCompetitors, 'after filtering');
     console.log('[start-research] Webhook URL:', webhookUrl.replace(SUPABASE_ANON_KEY || '', '***'));
     console.log('[start-research] Calling Apify with:', apifyInput);
-    
-    const apifyResponse = await fetch(
-      `https://api.apify.com/v2/acts/compass~crawler-google-places/runs?token=${APIFY_API_KEY}`,
+
+    // Apify ad-hoc webhooks must be passed via the `webhooks` URL parameter.
+    const webhookDefs = [
       {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...apifyInput,
-          webhooks: [
-            {
-              eventTypes: ['ACTOR.RUN.SUCCEEDED'],
-              requestUrl: webhookUrl,
-              payloadTemplate: JSON.stringify({
-                jobId: job.id,
-                workspaceId,
-                runId: '{{runId}}',
-                datasetId: '{{defaultDatasetId}}'
-              })
-            }
-          ]
-        })
-      }
+        eventTypes: ['ACTOR.RUN.SUCCEEDED'],
+        requestUrl: webhookUrl,
+        payloadTemplate: JSON.stringify({
+          jobId: job.id,
+          workspaceId,
+          runId: '{{runId}}',
+          datasetId: '{{defaultDatasetId}}',
+        }),
+      },
+    ];
+
+    const apifyRunUrl = withApifyAdHocWebhooks(
+      `https://api.apify.com/v2/acts/compass~crawler-google-places/runs?token=${APIFY_API_KEY}`,
+      webhookDefs,
     );
+    
+    const apifyResponse = await fetch(apifyRunUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(apifyInput),
+    });
     
     if (!apifyResponse.ok) {
       const errorText = await apifyResponse.text();
