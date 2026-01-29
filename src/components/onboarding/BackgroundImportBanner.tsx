@@ -111,10 +111,15 @@ export function BackgroundImportBanner({ workspaceId, className }: BackgroundImp
     };
   }, [workspaceId]);
 
-  // Don't show banner if no progress or idle
+  // Don't show banner if no progress, idle, or already complete
   if (!progress) return null;
   const phase = progress.current_phase;
-  if (!phase || phase === 'idle') return null;
+  if (!phase || phase === 'idle' || phase === 'complete') return null;
+  
+  // Also hide if learning is done (phase might be stale but data shows completion)
+  const emailsReceived = progress.emails_received || 0;
+  const emailsClassified = progress.emails_classified || 0;
+  if (emailsReceived > 0 && emailsClassified >= emailsReceived) return null;
 
   const config = getPhaseConfig(phase);
   const Icon = config.icon;
