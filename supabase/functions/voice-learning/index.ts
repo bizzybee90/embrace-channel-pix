@@ -288,30 +288,71 @@ serve(async (req) => {
       })
     }
 
+    // Helper to extract ONLY the new message content, stripping all quoted email history
+    const extractNewContent = (text: string): string => {
+      if (!text) return text;
+      
+      // Split at common reply markers and take only the first part (the new content)
+      const splitPatterns = [
+        /\nOn [A-Z][a-z]{2},?\s+\d+\s+[A-Z][a-z]+\s+\d{4}.*?wrote:/is,  // Gmail: "On Mon, 24 Jun 2025... wrote:"
+        /\nFrom:.*?\nSent:/is,                                           // Outlook: "From: X\nSent: Y"
+        /\n-{3,}.*Original Message/i,                                    // "--- Original Message ---"
+        /\nFrom:.*?<[^>]+@[^>]+>/i,                                       // "From: Name <email@domain.com>"
+        /\n>+\s/,                                                          // Quoted lines starting with >
+      ];
+      
+      let result = text.trim();
+      
+      for (const pattern of splitPatterns) {
+        const match = result.match(pattern);
+        if (match && match.index !== undefined && match.index > 15) {
+          result = result.substring(0, match.index).trim();
+          break; // Stop at first match
+        }
+      }
+      
+      // Strip mobile signatures at the end (these often precede quotes)
+      result = result.replace(/\s*Sent from my (iPhone|iPad|Samsung|Galaxy|Android|Outlook).*$/is, '').trim();
+      
+      // If result is too short, use the original
+      return result.length > 10 ? result : text.slice(0, 200);
+    };
+
     // =========================================
     // STEP 2: Format pairs for Claude
     // =========================================
     
-    const formattedPairs = pairs.map((p, i) => 
-      `--- EXCHANGE ${i + 1} ---
-CUSTOMER: ${p.customer_text?.slice(0, 500) || '[empty]'}
-OWNER REPLIED: ${p.owner_text?.slice(0, 500) || '[empty]'}
-RESPONSE TIME: ${p.response_hours?.toFixed(1) || 'unknown'} hours`
-    ).join('\n\n')
+    const formattedPairs = pairs.map((p, i) => {
+      const cleanCustomer = extractNewContent(p.customer_text || '');
+      const cleanOwner = extractNewContent(p.owner_text || '');
+      return `--- EXCHANGE ${i + 1} ---
+INBOUND FROM CUSTOMER (someone contacting the business): ${cleanCustomer.slice(0, 300) || '[empty]'}
+---
+OUTBOUND REPLY FROM BUSINESS OWNER (the person whose voice we're learning): ${cleanOwner.slice(0, 300) || '[empty]'}
+---
+RESPONSE TIME: ${p.response_hours?.toFixed(1) || 'unknown'} hours`;
+    }).join('\n\n')
 
     // =========================================
     // STEP 3: Extract voice profile (ONE Claude call)
     // =========================================
     
-    const extractionPrompt = `You are a Forensic Linguist analyzing a business owner's email archive. Your goal is to extract a "Digital Clone" profile.
+    const extractionPrompt = `You are a Forensic Linguist analyzing a business owner's email archive. Your goal is to extract a "Digital Clone" profile that captures how THE BUSINESS OWNER writes.
 
-Here are ${pairs.length} recent email exchanges:
+CRITICAL CONTEXT:
+- The business is a window cleaning company
+- "INBOUND FROM CUSTOMER" = emails sent BY customers TO the business (asking about prices, scheduling, cancelling, etc.)
+- "OUTBOUND REPLY FROM BUSINESS OWNER" = emails sent BY the business owner TO customers (the voice we're learning)
+
+Here are ${pairs.length} email exchanges. In each exchange:
+1. First is what the CUSTOMER wrote (inbound)
+2. Second is how the BUSINESS OWNER replied (outbound - THIS is the voice we're learning)
 
 <data>
 ${formattedPairs}
 </data>
 
-Analyze these to produce a JSON object with this EXACT schema:
+Analyze the BUSINESS OWNER'S OUTBOUND REPLIES to produce a JSON object with this EXACT schema:
 
 {
   "voice_dna": {
@@ -323,7 +364,7 @@ Analyze these to produce a JSON object with this EXACT schema:
       {"phrase": "Cheers", "frequency": 0.5},
       {"phrase": "Thanks", "frequency": 0.3}
     ],
-    "tics": ["uses & instead of and", "lowercase thanks", "short paragraphs"],
+    "tics": ["uses & instead of and", "lowercase thanks", "short paragraphs", "uses exclamation marks often"],
     "tone_keywords": ["friendly", "direct", "helpful"],
     "formatting_rules": ["Never uses bullet points", "Keeps responses under 100 words"],
     "avg_response_length": 85,
@@ -355,12 +396,21 @@ Analyze these to produce a JSON object with this EXACT schema:
   "summary": "A brief 2-3 sentence summary of how this person communicates"
 }
 
+CRITICAL RULES FOR golden_example:
+1. "customer" = what the CUSTOMER wrote (the INBOUND message that triggered the reply)
+2. "owner" = how the BUSINESS OWNER replied (the OUTBOUND response)
+3. DO NOT confuse these - if a message says "We no longer require window cleaning", that's a CUSTOMER cancelling, not the business owner
+4. The owner NEVER tells customers they don't need window cleaning - the owner IS the window cleaner!
+5. If a message asks "When will you come?" or similar scheduling questions, that's a CUSTOMER asking, not the owner
+
 IMPORTANT:
-- Extract REAL phrases from the data, don't invent generic ones
+IMPORTANT:
+- Extract REAL phrases from the OUTBOUND replies only
+- golden_examples must correctly identify which text is customer (inbound) and which is owner (outbound)
 - Frequencies should roughly match what you observe
-- golden_examples should be VERBATIM from the data (or very close)
 - Include ALL categories you find (quote, booking, complaint, general inquiry, etc.)
 - The summary should capture the overall communication style
+- "tics" are WRITING STYLE quirks only (capitalization, punctuation, abbreviations) - NOT business topics like "mentions postcode"
 
 Output ONLY valid JSON, nothing else.`
 
