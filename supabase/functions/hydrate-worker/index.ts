@@ -37,15 +37,14 @@ serve(async (req) => {
     let totalHydrated = 0
 
     for (const job of jobs) {
-      // Get access token
-      const { data: creds } = await supabase
-        .from('workspace_credentials')
-        .select('access_token')
-        .eq('workspace_id', job.workspace_id)
-        .eq('provider', 'aurinko')
-        .single()
+      // Get access token securely via RPC (uses encrypted storage)
+      const { data: accessToken, error: tokenError } = await supabase
+        .rpc('get_decrypted_access_token', { p_workspace_id: job.workspace_id });
       
-      if (!creds?.access_token) continue
+      if (tokenError || !accessToken) {
+        console.log(`[hydrate-worker] No access token for workspace ${job.workspace_id}:`, tokenError);
+        continue;
+      }
 
       // Get batch of scanned emails (with row locking)
       const { data: emails } = await supabase.rpc('get_emails_to_hydrate', {
@@ -90,7 +89,7 @@ serve(async (req) => {
             try {
               const response = await fetch(
                 `${AURINKO_API_URL}/email/messages/${email.aurinko_id}`,
-                { headers: { 'Authorization': `Bearer ${creds.access_token}` } }
+                { headers: { 'Authorization': `Bearer ${accessToken}` } }
               )
               
               if (!response.ok) {

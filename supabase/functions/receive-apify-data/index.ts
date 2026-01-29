@@ -192,6 +192,19 @@ Deno.serve(async (req) => {
       ? payload.customers 
       : [payload as unknown as ApifyCustomer];
 
+    // Payload size validation - prevent DoS attacks
+    const MAX_CUSTOMERS_PER_REQUEST = 1000;
+    if (customers.length > MAX_CUSTOMERS_PER_REQUEST) {
+      console.warn(`Rejected oversized payload: ${customers.length} customers (max ${MAX_CUSTOMERS_PER_REQUEST})`);
+      return new Response(JSON.stringify({ 
+        error: 'Payload too large',
+        message: `Maximum ${MAX_CUSTOMERS_PER_REQUEST} customers per request`
+      }), {
+        status: 413,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
     if (customers.length === 0 || !customers[0].customer_id) {
       return new Response(JSON.stringify({ 
         error: 'Bad Request',
@@ -265,15 +278,25 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Log webhook request WITH workspace_id (required by RLS)
+    // Enhanced audit logging with metadata
+    const clientIP = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 
+                     req.headers.get('x-real-ip') ||
+                     'unknown';
+    
     await supabase
       .from('webhook_logs')
       .insert({
-        workspace_id: workspace.id, // CRITICAL: Always include workspace_id
+        workspace_id: workspace.id,
         direction: 'inbound',
         webhook_url: req.url,
-        payload: payload,
+        payload: { customer_count: customers.length }, // Don't log full payload for privacy
         status_code: 200,
+        response_payload: { inserted, updated, errors: errors.length },
+        metadata: {
+          client_ip: clientIP,
+          auth_method: isHmacValid ? 'hmac' : 'shared_secret',
+          user_agent: req.headers.get('user-agent')?.substring(0, 200),
+        }
       });
 
     const response = {
