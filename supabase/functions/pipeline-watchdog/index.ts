@@ -88,8 +88,37 @@ serve(async (req) => {
     }
 
     // -------------------------------------------------------------------------
-    // 3. Check for stalled classification phase
+    // 3. Check for stalled classification jobs (direct table check)
+    // This catches cases where phase hasn't been updated to 'classifying' yet
     // -------------------------------------------------------------------------
+    const { data: stalledClassifyJobs, error: classifyJobError } = await supabase
+      .from('classification_jobs')
+      .select('id, workspace_id, status, classified_count, total_to_classify, updated_at')
+      .eq('status', 'in_progress')
+      .lt('updated_at', staleThreshold);
+
+    if (classifyJobError) {
+      console.error(`[${FUNCTION_NAME}] Classification jobs query error:`, classifyJobError.message);
+    }
+
+    for (const job of stalledClassifyJobs || []) {
+      console.warn(`[${FUNCTION_NAME}] RESURRECTING stalled classification job ${job.id} for workspace ${job.workspace_id}`);
+      
+      await triggerFunction(supabaseUrl, 'email-classify-v2', {
+        workspace_id: job.workspace_id,
+        job_id: job.id,
+        _relay_depth: 0,
+      }, supabaseServiceKey);
+
+      resurrections.push({
+        workspace_id: job.workspace_id,
+        function_name: 'email-classify-v2',
+        reason: `Classification job stalled at ${job.classified_count || 0}/${job.total_to_classify || 0}`,
+        resurrected_at: now.toISOString(),
+      });
+    }
+
+    // Also check email_import_progress for 'classifying' phase (legacy fallback)
     const { data: stalledClassifyProgress, error: classifyError } = await supabase
       .from('email_import_progress')
       .select('workspace_id, current_phase, updated_at, emails_received, emails_classified')
@@ -101,7 +130,12 @@ serve(async (req) => {
     }
 
     for (const p of stalledClassifyProgress || []) {
-      console.warn(`[${FUNCTION_NAME}] RESURRECTING stalled classification for workspace ${p.workspace_id}`);
+      // Skip if we already resurrected via job table
+      if (resurrections.some(r => r.workspace_id === p.workspace_id && r.function_name === 'email-classify-v2')) {
+        continue;
+      }
+      
+      console.warn(`[${FUNCTION_NAME}] RESURRECTING stalled classification progress for workspace ${p.workspace_id}`);
       
       await triggerFunction(supabaseUrl, 'email-classify-v2', {
         workspace_id: p.workspace_id,
@@ -111,7 +145,7 @@ serve(async (req) => {
       resurrections.push({
         workspace_id: p.workspace_id,
         function_name: 'email-classify-v2',
-        reason: `Classification stalled at ${p.emails_classified || 0}/${p.emails_received || 0}`,
+        reason: `Classification phase stalled at ${p.emails_classified || 0}/${p.emails_received || 0}`,
         resurrected_at: now.toISOString(),
       });
     }
@@ -163,7 +197,8 @@ serve(async (req) => {
         success: true,
         checked_at: now.toISOString(),
         stalled_imports: stalledImportJobs?.length || 0,
-        stalled_classify: stalledClassifyProgress?.length || 0,
+        stalled_classify_jobs: stalledClassifyJobs?.length || 0,
+        stalled_classify_progress: stalledClassifyProgress?.length || 0,
         stalled_learning: stalledLearningProgress?.length || 0,
         resurrected: resurrections.length,
         locks_cleaned: deletedLocks?.length || 0,
