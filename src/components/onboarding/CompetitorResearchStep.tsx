@@ -152,45 +152,33 @@ export function CompetitorResearchStep({
     setError(null);
 
     try {
-      // Create the job record
-      const { data: job, error: jobError } = await supabase
-        .from('competitor_research_jobs')
-        .insert({
-          workspace_id: workspaceId,
-          niche_query: nicheQuery,
-          service_area: serviceArea || null,
-          target_count: targetCount,
-          industry: nicheQuery,
-          location: serviceArea,
-          status: 'queued',
-        })
-        .select()
-        .single();
-
-      if (jobError) throw jobError;
-
-      setJobId(job.id);
-      setStatus('running');
-
-      // Start the discovery process
-      const { error: invokeError } = await supabase.functions.invoke('competitor-discover', {
+      // Use the Apify-based discovery which creates its own job
+      // and returns 50-100+ competitors via Google Maps Scraper
+      const { data, error: invokeError } = await supabase.functions.invoke('start-competitor-research', {
         body: {
-          jobId: job.id,
           workspaceId,
-          nicheQuery,
-          serviceArea,
-          targetCount,
+          industry: nicheQuery,
+          location: serviceArea || 'UK',
+          radiusMiles: 25,
+          maxCompetitors: targetCount,
         }
       });
 
       if (invokeError) throw invokeError;
+      
+      if (!data?.success || !data?.jobId) {
+        throw new Error(data?.error || 'Failed to start research');
+      }
 
+      // Use the job ID created by start-competitor-research
+      setJobId(data.jobId);
+      setStatus('running');
       toast.success('Competitor research started!');
 
     } catch (err) {
       console.error('Failed to start research:', err);
       setStatus('error');
-      setError('Failed to start competitor research');
+      setError(err instanceof Error ? err.message : 'Failed to start competitor research');
       toast.error('Failed to start research');
     }
   };

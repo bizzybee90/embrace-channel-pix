@@ -125,19 +125,48 @@ serve(async (req) => {
 
     // =========================================
     // STEP 4: Store competitors in database
+    // Use UPSERT with correct conflict column (workspace_id, url)
+    // This allows sites to be "adopted" by new jobs
     // =========================================
     
+    let insertedCount = 0;
+    let updatedCount = 0;
+    
     if (validCompetitors.length > 0) {
-      const { error: insertError } = await supabase
-        .from('competitor_sites')
-        .upsert(validCompetitors, { 
-          onConflict: 'job_id,domain',
-          ignoreDuplicates: true 
-        })
-      
-      if (insertError) {
-        console.error('[handle-discovery-complete] Insert error:', insertError)
+      // Process each competitor individually to handle upsert correctly
+      for (const comp of validCompetitors) {
+        // Check if site already exists
+        const { data: existing } = await supabase
+          .from('competitor_sites')
+          .select('id, job_id')
+          .eq('workspace_id', workspaceId)
+          .eq('url', comp.url)
+          .maybeSingle()
+        
+        if (existing) {
+          // Update existing site to link to current job
+          const { error: updateError } = await supabase
+            .from('competitor_sites')
+            .update({
+              job_id: jobId,
+              status: 'approved',
+              scrape_status: 'pending',
+              discovered_at: new Date().toISOString()
+            })
+            .eq('id', existing.id)
+          
+          if (!updateError) updatedCount++
+        } else {
+          // Insert new site
+          const { error: insertError } = await supabase
+            .from('competitor_sites')
+            .insert(comp)
+          
+          if (!insertError) insertedCount++
+        }
       }
+      
+      console.log('[handle-discovery-complete] Inserted:', insertedCount, 'Updated:', updatedCount)
     }
 
     // Update job counts
