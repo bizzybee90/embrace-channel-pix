@@ -3,11 +3,10 @@ import { Button } from '@/components/ui/button';
 import { CardTitle, CardDescription } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Mail, CheckCircle2, Loader2, ArrowRight, AlertCircle, RotateCcw } from 'lucide-react';
+import { Mail, CheckCircle2, Loader2 } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { Progress } from '@/components/ui/progress';
-import { LearningProgressDisplay } from '@/components/email/LearningProgressDisplay';
+import { EmailPipelineProgress } from './EmailPipelineProgress';
 
 interface EmailConnectionStepProps {
   workspaceId: string;
@@ -407,14 +406,7 @@ export function EmailConnectionStep({
     );
   }
 
-  // Calculate progress percentage
-  const progressPercent = progress?.emails_total 
-    ? Math.round((progress.emails_imported / progress.emails_total) * 100)
-    : 0;
-
-  const isImporting = progress?.status === 'importing' || progress?.status === 'classifying' || progress?.status === 'learning';
-  const isComplete = progress?.status === 'complete';
-  const isError = progress?.status === 'error';
+  // These are used in the conditional rendering below
 
   return (
     <div className="space-y-6">
@@ -426,148 +418,61 @@ export function EmailConnectionStep({
       </div>
 
       {!connectedEmail && !isConnecting && (
-        <div className="flex items-start gap-3 p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800 text-sm">
+        <div className="flex items-start gap-3 p-3 bg-accent/50 dark:bg-accent/30 rounded-lg border border-border text-sm">
           <div className="shrink-0 mt-0.5">
-            <svg className="h-4 w-4 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="h-4 w-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
-          <div className="text-blue-800 dark:text-blue-200">
+          <div className="text-foreground">
             <span className="font-medium">Heads up:</span> A secure login window will open in a popup or new tab.
           </div>
         </div>
       )}
 
       {connectedEmail ? (
-        <div className="space-y-6">
-          {/* Connected status */}
-          <div className="flex items-center justify-between gap-3 p-4 bg-success/10 rounded-lg border border-success/30">
-            <div className="flex items-center gap-3">
-              <CheckCircle2 className="h-6 w-6 text-success" />
-              <div>
-                <p className="font-medium text-foreground">Email Connected!</p>
-                <p className="text-sm text-muted-foreground">{connectedEmail}</p>
+        importStarted || (progress && progress.status !== 'idle') ? (
+          // Full pipeline progress view
+          <EmailPipelineProgress
+            workspaceId={workspaceId}
+            connectedEmail={connectedEmail}
+            onNext={onNext}
+            onBack={onBack}
+            onRetry={handleRetry}
+          />
+        ) : (
+          // Connected but not started yet - show start button
+          <div className="space-y-6">
+            {/* Connected status */}
+            <div className="flex items-center justify-between gap-3 p-4 bg-success/10 rounded-lg border border-success/30">
+              <div className="flex items-center gap-3">
+                <CheckCircle2 className="h-6 w-6 text-success" />
+                <div>
+                  <p className="font-medium text-foreground">Email Connected!</p>
+                  <p className="text-sm text-muted-foreground">{connectedEmail}</p>
+                </div>
               </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs text-muted-foreground hover:text-destructive"
+                onClick={handleDisconnect}
+              >
+                Disconnect
+              </Button>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-xs text-muted-foreground hover:text-destructive"
-              onClick={handleDisconnect}
-            >
-              Disconnect
-            </Button>
-          </div>
 
-          {/* Start Import button - show when not started or status is idle */}
-          {!importStarted && (!progress || progress.status === 'idle') && (
+            {/* Start Import */}
             <div className="space-y-4">
               <Button onClick={startImport} className="w-full gap-2">
                 Start Learning from Emails
-                <ArrowRight className="h-4 w-4" />
               </Button>
               <Button variant="outline" onClick={onNext} className="w-full">
                 Skip for Now
               </Button>
             </div>
-          )}
-
-          {/* Import Progress */}
-          {isImporting && progress && (
-            <div className="space-y-4 p-4 bg-muted/50 rounded-lg border">
-              <div className="flex items-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                <span className="font-medium text-sm">
-                  {progress.status === 'importing' && `Importing emails... ${progress.emails_imported.toLocaleString()}`}
-                  {progress.status === 'classifying' && `Classifying... ${progress.emails_classified.toLocaleString()}`}
-                  {progress.status === 'learning' && `Analyzing ${progress.emails_imported.toLocaleString()} emails...`}
-                </span>
-              </div>
-
-              {/* Show progress bar for importing/classifying */}
-              {progress.status !== 'learning' && progressPercent > 0 && (
-                <div className="space-y-1">
-                  <Progress value={progressPercent} className="h-2" />
-                  <p className="text-xs text-center text-muted-foreground">
-                    {progressPercent}% complete
-                  </p>
-                </div>
-              )}
-
-              {/* Learning phase shows detailed progress with phases + time estimate */}
-              {progress.status === 'learning' && (
-                <LearningProgressDisplay 
-                  workspaceId={workspaceId}
-                  emailsImported={progress.emails_imported}
-                />
-              )}
-
-              {progress.status !== 'learning' && (
-                <>
-                  <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-                    <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                    </span>
-                    <span>Actively importing</span>
-                  </div>
-                  <p className="text-xs text-center text-muted-foreground">
-                    You can continue while we import in the background.
-                  </p>
-                </>
-              )}
-            </div>
-          )}
-
-          {/* Error state */}
-          {isError && progress && (
-            <div className="space-y-4 p-4 bg-destructive/10 rounded-lg border border-destructive/30">
-              <div className="flex items-center gap-2 text-destructive">
-                <AlertCircle className="h-5 w-5" />
-                <span className="font-medium">Import encountered an error</span>
-              </div>
-              {progress.error_message && (
-                <p className="text-sm text-muted-foreground">{progress.error_message}</p>
-              )}
-              <Button onClick={handleRetry} className="w-full gap-2">
-                <RotateCcw className="h-4 w-4" />
-                Retry Import
-              </Button>
-            </div>
-          )}
-
-          {/* Complete state */}
-          {isComplete && progress && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-center gap-2 p-3 bg-success/5 rounded-lg border border-success/20 text-success text-sm">
-                <CheckCircle2 className="h-4 w-4" />
-                <span>Import complete!</span>
-              </div>
-              <div className="grid grid-cols-2 gap-2 text-center text-xs">
-                <div className="bg-muted/30 rounded p-2">
-                  <div className="font-semibold text-foreground">{progress.emails_imported.toLocaleString()}</div>
-                  <div className="text-muted-foreground">Emails imported</div>
-                </div>
-                <div className="bg-muted/30 rounded p-2">
-                  <div className="font-semibold text-foreground">{progress.emails_classified.toLocaleString()}</div>
-                  <div className="text-muted-foreground">Emails classified</div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Navigation buttons */}
-          {(isImporting || isComplete || isError) && (
-            <div className="flex gap-3">
-              <Button variant="outline" onClick={onBack} className="flex-1">
-                Back
-              </Button>
-              <Button onClick={onNext} className="flex-1 gap-2">
-                Continue <ArrowRight className="h-4 w-4" />
-              </Button>
-            </div>
-          )}
-        </div>
+          </div>
+        )
       ) : (
         <div className="space-y-6">
           {/* Import Mode Selection */}
