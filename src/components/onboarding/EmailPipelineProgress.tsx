@@ -189,8 +189,8 @@ export function EmailPipelineProgress({
     if (!workspaceId) return;
 
     const fetchStats = async () => {
-      // Fetch from multiple sources in parallel
-      const [progressResult, queueCountsResult] = await Promise.all([
+      // Fetch progress record and use COUNT queries to avoid 1000-row limit
+      const [progressResult, inboxResult, sentResult, classifiedResult] = await Promise.all([
         supabase
           .from('email_import_progress')
           .select('*')
@@ -198,18 +198,26 @@ export function EmailPipelineProgress({
           .maybeSingle(),
         supabase
           .from('email_import_queue')
-          .select('direction, category')
-          .eq('workspace_id', workspaceId),
+          .select('*', { count: 'exact', head: true })
+          .eq('workspace_id', workspaceId)
+          .eq('direction', 'inbound'),
+        supabase
+          .from('email_import_queue')
+          .select('*', { count: 'exact', head: true })
+          .eq('workspace_id', workspaceId)
+          .eq('direction', 'outbound'),
+        supabase
+          .from('email_import_queue')
+          .select('*', { count: 'exact', head: true })
+          .eq('workspace_id', workspaceId)
+          .not('category', 'is', null),
       ]);
 
       const progress = progressResult.data;
-      const queueItems = queueCountsResult.data || [];
-
-      // Calculate counts from queue
-      const inboxCount = queueItems.filter((e) => e.direction === 'inbound').length;
-      const sentCount = queueItems.filter((e) => e.direction === 'outbound').length;
-      const classifiedCount = queueItems.filter((e) => e.category !== null).length;
-      const totalCount = queueItems.length;
+      const inboxCount = inboxResult.count || 0;
+      const sentCount = sentResult.count || 0;
+      const classifiedCount = classifiedResult.count || 0;
+      const totalCount = inboxCount + sentCount;
 
       setStats({
         phase: (progress?.current_phase as PipelinePhase) || 'importing',
