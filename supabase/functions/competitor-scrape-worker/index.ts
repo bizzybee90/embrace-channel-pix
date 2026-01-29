@@ -186,10 +186,10 @@ serve(async (req) => {
       }
     }
 
-    // Update job progress
+    // Update job progress with heartbeat
     const { data: jobData } = await supabase
       .from('competitor_research_jobs')
-      .select('sites_scraped')
+      .select('sites_scraped, faqs_extracted')
       .eq('id', jobId)
       .single();
 
@@ -197,7 +197,8 @@ serve(async (req) => {
 
     await supabase.from('competitor_research_jobs').update({
       sites_scraped: newScrapedTotal,
-      current_scraping_domain: null, // Clear current site after batch
+      current_scraping_domain: null,
+      heartbeat_at: new Date().toISOString(),
     }).eq('id', jobId);
 
     // Check if there are more sites to scrape
@@ -214,17 +215,35 @@ serve(async (req) => {
         body: { jobId, workspaceId, nicheQuery, serviceArea }
       }).catch(err => console.error('Failed to schedule next batch:', err));
     } else {
-      // All done - FAQs were generated per-site, now do final summary
-      console.log('All sites scraped, completing job');
+      // All done - wait for per-site FAQ jobs to complete, then mark done
+      console.log('All sites scraped, finalizing job...');
       
-      // Wait a bit for per-site FAQ generation to complete
-      await new Promise(r => setTimeout(r, 3000));
+      // Give per-site FAQ generation time to complete
+      await new Promise(r => setTimeout(r, 5000));
+      
+      // Get final counts
+      const { data: finalJob } = await supabase
+        .from('competitor_research_jobs')
+        .select('faqs_generated, faqs_added')
+        .eq('id', jobId)
+        .single();
+
+      // Count FAQs actually added to faq_database
+      const { count: totalFaqs } = await supabase
+        .from('faq_database')
+        .select('*', { count: 'exact', head: true })
+        .eq('workspace_id', workspaceId)
+        .eq('generation_source', 'competitor_research');
       
       await supabase.from('competitor_research_jobs').update({
         status: 'completed',
         completed_at: new Date().toISOString(),
         current_scraping_domain: null,
+        faqs_extracted: finalJob?.faqs_generated || 0,
+        faqs_added: totalFaqs || finalJob?.faqs_added || 0,
       }).eq('id', jobId);
+      
+      console.log(`Job completed: ${newScrapedTotal} sites, ${totalFaqs} FAQs added`);
     }
 
     return new Response(JSON.stringify({
