@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { withApifyAdHocWebhooks } from '../_shared/apifyWebhooks.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -210,28 +211,30 @@ serve(async (req) => {
       clickElementsCssSelector: null
     }
     
-    const scrapeResponse = await fetch(
-      `https://api.apify.com/v2/acts/apify~website-content-crawler/runs?token=${APIFY_API_KEY}`,
+    // Apify ad-hoc webhooks must be passed via the `webhooks` URL parameter.
+    const webhookDefs = [
       {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...scrapeInput,
-          webhooks: [
-            {
-              eventTypes: ['ACTOR.RUN.SUCCEEDED'],
-              requestUrl: webhookUrl,
-              payloadTemplate: JSON.stringify({
-                jobId,
-                workspaceId,
-                runId: '{{runId}}',
-                datasetId: '{{defaultDatasetId}}'
-              })
-            }
-          ]
-        })
-      }
+        eventTypes: ['ACTOR.RUN.SUCCEEDED'],
+        requestUrl: webhookUrl,
+        payloadTemplate: JSON.stringify({
+          jobId,
+          workspaceId,
+          runId: '{{runId}}',
+          datasetId: '{{defaultDatasetId}}',
+        }),
+      },
+    ]
+
+    const apifyRunUrl = withApifyAdHocWebhooks(
+      `https://api.apify.com/v2/acts/apify~website-content-crawler/runs?token=${APIFY_API_KEY}`,
+      webhookDefs,
     )
+
+    const scrapeResponse = await fetch(apifyRunUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(scrapeInput),
+    })
     
     if (!scrapeResponse.ok) {
       const errorText = await scrapeResponse.text()
