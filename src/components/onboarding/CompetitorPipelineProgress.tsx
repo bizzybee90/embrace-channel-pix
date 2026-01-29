@@ -174,6 +174,11 @@ function ProgressLine({ currentStage }: { currentStage: number }) {
   );
 }
 
+// Maximum time to wait in discovering phase before showing timeout warning (8 minutes)
+const DISCOVERY_TIMEOUT_MS = 8 * 60 * 1000;
+// Time after which we consider a job stale if no heartbeat (5 minutes)
+const STALE_THRESHOLD_MS = 5 * 60 * 1000;
+
 export function CompetitorPipelineProgress({
   workspaceId,
   jobId,
@@ -198,6 +203,18 @@ export function CompetitorPipelineProgress({
     errorMessage: null,
   });
 
+  const [startTime] = useState<number>(Date.now());
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [isStale, setIsStale] = useState(false);
+
+  // Update elapsed time every second
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - startTime) / 1000));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [startTime]);
+
   // Poll for job progress
   useEffect(() => {
     if (!jobId) return;
@@ -210,12 +227,23 @@ export function CompetitorPipelineProgress({
         .single();
 
       if (data) {
+        // Check if job is stale (no heartbeat in STALE_THRESHOLD_MS)
+        const heartbeatTime = data.heartbeat_at ? new Date(data.heartbeat_at).getTime() : 0;
+        const isJobStale = Date.now() - heartbeatTime > STALE_THRESHOLD_MS;
+        setIsStale(isJobStale);
+
+        // Check for discovery timeout
+        const isDiscoveryTimeout = 
+          (data.status === 'discovering' || data.status === 'queued' || data.status === 'geocoding') &&
+          Date.now() - startTime > DISCOVERY_TIMEOUT_MS &&
+          data.sites_discovered === 0;
+
         // Map faqs_generated to faqsExtracted (they're synonymous in our simplified flow)
         const faqsTotal = data.faqs_generated || data.faqs_extracted || 0;
         const faqsFinal = data.faqs_added || faqsTotal;
         
         setStats({
-          phase: data.status as PipelinePhase,
+          phase: isDiscoveryTimeout ? 'error' : (data.status as PipelinePhase),
           sitesDiscovered: data.sites_discovered || 0,
           sitesValidated: data.sites_validated || data.sites_approved || 0,
           sitesScraped: data.sites_scraped || 0,
@@ -225,7 +253,9 @@ export function CompetitorPipelineProgress({
           faqsRefined: faqsFinal,
           faqsAdded: faqsFinal,
           currentSite: data.current_scraping_domain || null,
-          errorMessage: data.error_message || null,
+          errorMessage: isDiscoveryTimeout 
+            ? 'Discovery is taking longer than expected. The external service may be busy. Try again or skip for now.'
+            : (data.error_message || null),
         });
       }
     };
@@ -234,7 +264,7 @@ export function CompetitorPipelineProgress({
     const interval = setInterval(fetchStats, 3000);
 
     return () => clearInterval(interval);
-  }, [jobId]);
+  }, [jobId, startTime]);
 
   // Derive stage statuses from phase
   const getStageStatuses = (): { 
@@ -353,15 +383,28 @@ export function CompetitorPipelineProgress({
           )}
           {stageStatuses.discover === 'in_progress' && (
             <div className="space-y-2">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
-                </span>
-                <span>
-                  Searching for {nicheQuery} businesses...
+              <div className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
+                <div className="flex items-center gap-2">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+                  </span>
+                  <span>
+                    {stats.sitesDiscovered === 0 
+                      ? 'Searching Google Maps for businesses...' 
+                      : `Found ${stats.sitesDiscovered} businesses so far...`}
+                  </span>
+                </div>
+                <span className="text-xs font-mono tabular-nums">
+                  {Math.floor(elapsedSeconds / 60)}:{(elapsedSeconds % 60).toString().padStart(2, '0')}
                 </span>
               </div>
+              {stats.sitesDiscovered === 0 && elapsedSeconds > 30 && (
+                <p className="text-xs text-muted-foreground bg-muted/50 rounded px-2 py-1.5">
+                  💡 This step uses Google Maps to find real businesses. It typically takes 2-4 minutes to complete.
+                  {isStale && ' The service may be busy - please wait a bit longer.'}
+                </p>
+              )}
               {stats.sitesDiscovered > 0 && (
                 <div className="space-y-1.5">
                   <Progress value={Math.min((stats.sitesDiscovered / targetCount) * 100, 100)} className="h-2" />
