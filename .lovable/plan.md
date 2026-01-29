@@ -1,189 +1,112 @@
 
 
-# AI Learning Report: Build Trust Through Transparency
+# Fix Website Scraping Pipeline - Table Mismatch
 
-## The Problem
+## Problem Summary
 
-Right now, after the pipeline completes, users are told "we learned from your emails" but shown zero proof. They must trust blindly that:
-- 22,633 emails were classified correctly
-- Their voice was captured accurately
-- The AI will respond appropriately
+The website knowledge extraction pipeline is frozen because the UI reads from a different table than the one the backend writes to:
+- Backend writes to: `scraping_jobs`
+- UI reads from: `website_scrape_jobs`
 
-This creates anxiety, not confidence. And you've discovered that the voice learning phase isn't actually completing properly, which means even less reason to trust it.
+This is a critical data flow disconnect that prevents any progress from being displayed.
 
-## The Solution: Two-Part Fix
+---
 
-### Part 1: Fix Voice Learning Pipeline
+## Solution
 
-Before we can show proof, we need to ensure the voice learning actually runs and stores data.
+Unify the pipeline to use the existing `scraping_jobs` table consistently across all components.
 
-Current state:
-- `voice_profile_complete: true` (claims complete)
-- `pairs_analyzed: 1` (only analysed 1 conversation pair)
-- `example_responses` table: **empty**
-- `voice_profiles` table: **no record exists**
+---
 
-The voice-learning edge function needs investigation - it's either not being triggered or failing silently.
+## Implementation Steps
 
-### Part 2: Create AI Learning Report Step
+### 1. Update WebsitePipelineProgress Component
 
-Add a new onboarding step after the pipeline completes that shows users exactly what was learned, with the ability to correct mistakes.
+Modify `src/components/onboarding/WebsitePipelineProgress.tsx` to read from `scraping_jobs` instead of `website_scrape_jobs`:
+
+- Change the Supabase query from `.from('website_scrape_jobs')` to `.from('scraping_jobs')`
+- Map the column names correctly (e.g., `total_pages_found` instead of `pages_found`)
+- Update the realtime subscription to listen to `scraping_jobs`
+
+### 2. Update Phase Mapping Logic
+
+The `scraping_jobs` table uses these statuses:
+- `scraping` (Apify crawler running)
+- `processing` (extracting FAQs)
+- `completed`
+- `failed`
+
+Map these to the UI phases:
+- `scraping` → Stage 1 "Discover Pages" (in progress)
+- `processing` → Stage 3 "Extract Knowledge" (in progress)
+- `completed` → All stages done
+- `failed` → Show error
+
+### 3. Derive Stage Status from Data
+
+Since the current schema doesn't track scraping vs. extraction separately, derive status from:
+- `total_pages_found > 0` → Discovery done
+- `pages_processed > 0` → Scraping in progress/done
+- `faqs_found > 0` → Extraction in progress
+- `status === 'completed'` → All done
+
+---
+
+## Technical Details
 
 ```text
-┌──────────────────────────────────────────────────────────────────────────┐
-│                    What BizzyBee Learned About You                       │
-│                                                                          │
-│  Review and adjust before we start responding to emails                  │
-│                                                                          │
-├──────────────────────────────────────────────────────────────────────────┤
-│                                                                          │
-│  ╔════════════════════════════════════════════════════════════════════╗  │
-│  ║  EMAIL CLASSIFICATION BREAKDOWN                                    ║  │
-│  ╠════════════════════════════════════════════════════════════════════╣  │
-│  ║                                                                    ║  │
-│  ║  Your inbox contains:                                              ║  │
-│  ║                                                                    ║  │
-│  ║  ████████████████████░░░░░░  Quote Requests     1,438 (6.4%)      ║  │
-│  ║  ██████████████████░░░░░░░░  Booking Requests   1,291 (5.7%)      ║  │
-│  ║  ████████████░░░░░░░░░░░░░░  General Inquiries  1,020 (4.5%)      ║  │
-│  ║  ████████░░░░░░░░░░░░░░░░░░  Complaints           759 (3.4%)      ║  │
-│  ║  ███████████████████████████ Notifications      9,338 (41.3%)     ║  │
-│  ║  ██████████████████████░░░░  Follow-ups         5,487 (24.2%)     ║  │
-│  ║  ██████████░░░░░░░░░░░░░░░░  Spam               2,713 (12.0%)     ║  │
-│  ║                                                                    ║  │
-│  ║  [Show sample emails from each category]                           ║  │
-│  ╚════════════════════════════════════════════════════════════════════╝  │
-│                                                                          │
-│  ╔════════════════════════════════════════════════════════════════════╗  │
-│  ║  YOUR VOICE DNA                                           [Edit]   ║  │
-│  ╠════════════════════════════════════════════════════════════════════╣  │
-│  ║                                                                    ║  │
-│  ║  Tone:         Friendly, Professional, Helpful                     ║  │
-│  ║  Formality:    ████████░░ 8/10 (Business formal)                  ║  │
-│  ║  Greeting:     "Hi [Name]," or "Hey there,"                       ║  │
-│  ║  Sign-off:     "Thanks, Michael"                                   ║  │
-│  ║                                                                    ║  │
-│  ║  Your style:                                                       ║  │
-│  ║  • Short, direct responses (avg 47 words)                         ║  │
-│  ║  • Uses "Thanks" frequently                                        ║  │
-│  ║  • Rarely uses emojis                                              ║  │
-│  ║  • Prefers bullet points for lists                                 ║  │
-│  ║                                                                    ║  │
-│  ╚════════════════════════════════════════════════════════════════════╝  │
-│                                                                          │
-│  ╔════════════════════════════════════════════════════════════════════╗  │
-│  ║  RESPONSE PLAYBOOK (3 examples)                           [Edit]   ║  │
-│  ╠════════════════════════════════════════════════════════════════════╣  │
-│  ║                                                                    ║  │
-│  ║  QUOTE REQUEST                                                     ║  │
-│  ║  ──────────────────────────────────────────────────────────────    ║  │
-│  ║  Customer: "What's your cost to clean windows on a 3 bed semi?"   ║  │
-│  ║                                                                    ║  │
-│  ║  You typically reply:                                              ║  │
-│  ║  "Hi [Name], thanks for getting in touch! For a 3 bed semi,       ║  │
-│  ║   windows are usually around £XX. Could you let me know your      ║  │
-│  ║   postcode so I can give you an exact quote? Thanks, Michael"     ║  │
-│  ║                                                                    ║  │
-│  ║  ────────────────────────────────────────────────────────────────  ║  │
-│  ║                                                                    ║  │
-│  ║  COMPLAINT                                                         ║  │
-│  ║  ──────────────────────────────────────────────────────────────    ║  │
-│  ║  Customer: "You missed some windows on the back of the house"     ║  │
-│  ║                                                                    ║  │
-│  ║  You typically reply:                                              ║  │
-│  ║  "Hi [Name], I'm really sorry to hear that. Could you let me      ║  │
-│  ║   know exactly which windows were missed? I'll get someone out    ║  │
-│  ║   to sort it ASAP. Thanks, Michael"                               ║  │
-│  ║                                                                    ║  │
-│  ╚════════════════════════════════════════════════════════════════════╝  │
-│                                                                          │
-│  ╔════════════════════════════════════════════════════════════════════╗  │
-│  ║  CONFIDENCE ASSESSMENT                                             ║  │
-│  ╠════════════════════════════════════════════════════════════════════╣  │
-│  ║                                                                    ║  │
-│  ║  ✅ Strong confidence:                                             ║  │
-│  ║     • Quote requests - 127 examples found                          ║  │
-│  ║     • Booking confirmations - 89 examples found                    ║  │
-│  ║                                                                    ║  │
-│  ║  ⚠️ Lower confidence (will ask for review):                        ║  │
-│  ║     • Complaints - only 12 examples found                          ║  │
-│  ║     • Refund requests - 3 examples found                           ║  │
-│  ║                                                                    ║  │
-│  ╚════════════════════════════════════════════════════════════════════╝  │
-│                                                                          │
-│  [Download Report as PDF]                [Looks Good - Continue →]      │
-│                                                                          │
-└──────────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────┐         ┌─────────────────────────┐
+│  start-own-website-     │         │  process-own-website-   │
+│  scrape                 │────────▶│  scrape (webhook)       │
+│                         │  Apify  │                         │
+│  Creates job in         │  calls  │  Updates job in         │
+│  scraping_jobs          │         │  scraping_jobs          │
+└─────────────────────────┘         └─────────────────────────┘
+           │                                    │
+           │ Both write to same table           │
+           ▼                                    ▼
+     ┌───────────────────────────────────────────────┐
+     │            scraping_jobs table                │
+     │  - status: scraping → processing → completed  │
+     │  - total_pages_found                          │
+     │  - pages_processed                            │
+     │  - faqs_found                                 │
+     └───────────────────────────────────────────────┘
+                          │
+                          │ UI reads from same table
+                          ▼
+     ┌───────────────────────────────────────────────┐
+     │        WebsitePipelineProgress.tsx            │
+     │  - Subscribe to scraping_jobs realtime        │
+     │  - Derive stage status from data              │
+     └───────────────────────────────────────────────┘
 ```
+
+### Column Mapping
+
+| UI Field | scraping_jobs Column |
+|----------|---------------------|
+| phase | status |
+| pagesFound | total_pages_found |
+| pagesScraped | pages_processed |
+| faqsExtracted | faqs_found |
+| errorMessage | error_message |
 
 ---
 
-## Technical Implementation
+## Files to Modify
 
-### Files to Create/Modify
-
-| File | Action | Purpose |
-|------|--------|---------|
-| `src/components/onboarding/AILearningReport.tsx` | **Create** | New comprehensive report component |
-| `src/components/onboarding/ClassificationBreakdown.tsx` | **Create** | Shows category distribution with samples |
-| `src/components/onboarding/VoiceDNASummary.tsx` | **Create** | Shows extracted voice characteristics |
-| `src/components/onboarding/ResponsePlaybook.tsx` | **Create** | Shows example conversation pairs |
-| `src/components/onboarding/ConfidenceAssessment.tsx` | **Create** | Shows what AI is confident about |
-| `src/components/onboarding/OnboardingWizard.tsx` | **Modify** | Add new step after email import completes |
-| `supabase/functions/voice-learning/index.ts` | **Debug** | Fix why it's not completing properly |
-
-### Data Sources
-
-| Section | Table | Query |
-|---------|-------|-------|
-| Classification Breakdown | `email_import_queue` | `GROUP BY category` with sample emails |
-| Voice DNA | `voice_profiles` | Voice characteristics and style |
-| Response Playbook | `example_responses` | RAG examples with embeddings |
-| Confidence Assessment | `example_responses` | `GROUP BY category` count |
-
-### PDF Generation (Optional Enhancement)
-
-For the downloadable PDF, we could:
-1. Use a client-side library like `react-pdf` to generate
-2. Or create an edge function that uses a service like Puppeteer/Chromium to render the report
-
-The in-app version should come first - the PDF is a "nice to have" for users who want to share with their team or keep records.
+1. **src/components/onboarding/WebsitePipelineProgress.tsx**
+   - Change table reference from `website_scrape_jobs` to `scraping_jobs`
+   - Update column names in the query and state mapping
+   - Update realtime subscription channel
 
 ---
 
-## Immediate Priority: Fix Voice Learning
-
-Before building the report UI, we need to fix the voice learning pipeline. The current state shows:
-
-```
-pairs_analyzed: 1
-voice_profile_complete: true (lie!)
-example_responses: 0 records
-voice_profiles: no record
-```
-
-This needs debugging - the function is either:
-1. Not being triggered after classification completes
-2. Failing silently without proper error logging
-3. Completing too early due to a logic bug
-
-I would recommend investigating the `voice-learning` edge function to understand why it's not processing the 7,631 sent emails to extract response patterns.
-
----
-
-## Expected Outcome
+## Verification
 
 After implementation:
-
-1. **Users see proof** - Every classification, every voice trait, every response pattern is visible
-2. **Users can correct** - If something looks wrong, they can fix it before going live
-3. **Users build trust** - "I can see exactly what the AI learned from MY emails"
-4. **Reduced churn** - Confidence leads to continued usage
-5. **Premium positioning** - This level of transparency is rare in AI products
-
-The goal is that when a user finishes this step, they think:
-
-> "Wow, it actually understood how I communicate. This isn't some generic AI - it learned from MY emails."
-
-That's the moment they become a paying customer for life.
+1. Refresh the onboarding page
+2. The "Discover Pages" stage should either show progress or complete (based on current Apify run status)
+3. If Apify has finished, the webhook should trigger and extraction will begin
 
