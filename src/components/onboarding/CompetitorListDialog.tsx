@@ -21,7 +21,8 @@ import {
   Star,
   Building2,
   Trash2,
-  Sparkles
+  Sparkles,
+  RotateCcw
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -33,6 +34,7 @@ type CompetitorRow = {
   rating: number | null;
   reviews_count: number | null;
   discovery_source: string | null;
+  scrape_status: string | null;
 };
 
 type SearchSuggestion = {
@@ -73,7 +75,7 @@ export function CompetitorListDialog({
       setIsLoading(true);
       const { data, error } = await supabase
         .from("competitor_sites")
-        .select("id,business_name,url,domain,rating,reviews_count,discovery_source")
+        .select("id,business_name,url,domain,rating,reviews_count,discovery_source,scrape_status")
         .eq("job_id", jobId)
         .order("rating", { ascending: false, nullsFirst: false })
         .limit(200);
@@ -268,13 +270,42 @@ export function CompetitorListDialog({
       // Reload data
       const { data } = await supabase
         .from("competitor_sites")
-        .select("id,business_name,url,domain,rating,reviews_count,discovery_source")
+        .select("id,business_name,url,domain,rating,reviews_count,discovery_source,scrape_status")
         .eq("job_id", jobId)
         .order("rating", { ascending: false, nullsFirst: false })
         .limit(200);
       if (data) setRows(data as CompetitorRow[]);
     } else {
       toast.success('Competitor removed');
+    }
+  };
+
+  const handleRescrape = async (competitorId: string, e: MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    // Optimistic update
+    setRows(prev => prev.map(r => 
+      r.id === competitorId ? { ...r, scrape_status: 'pending' } : r
+    ));
+
+    const { error } = await supabase
+      .from('competitor_sites')
+      .update({ scrape_status: 'pending', scraped_at: null, pages_scraped: 0 })
+      .eq('id', competitorId);
+
+    if (error) {
+      toast.error('Failed to queue rescrape');
+      // Reload data
+      const { data } = await supabase
+        .from("competitor_sites")
+        .select("id,business_name,url,domain,rating,reviews_count,discovery_source,scrape_status")
+        .eq("job_id", jobId)
+        .order("rating", { ascending: false, nullsFirst: false })
+        .limit(200);
+      if (data) setRows(data as CompetitorRow[]);
+    } else {
+      toast.success('Queued for rescrape');
     }
   };
 
@@ -438,15 +469,33 @@ export function CompetitorListDialog({
                       </div>
                     </div>
 
-                    {r.rating != null && (
-                      <Badge variant="secondary" className="shrink-0 tabular-nums">
-                        <Star className="h-3.5 w-3.5 mr-1 fill-primary text-primary" />
-                        {r.rating.toFixed(1)}
-                        {r.reviews_count != null ? ` (${r.reviews_count})` : ""}
-                      </Badge>
-                    )}
+                    {/* Status badges */}
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {r.scrape_status === 'done' && (
+                        <Badge variant="secondary" className="text-xs bg-success/10 text-success border-success/30">
+                          Scraped
+                        </Badge>
+                      )}
+                      {r.scrape_status === 'pending' && (
+                        <Badge variant="secondary" className="text-xs">
+                          Pending
+                        </Badge>
+                      )}
+                      {r.scrape_status === 'error' && (
+                        <Badge variant="destructive" className="text-xs">
+                          Error
+                        </Badge>
+                      )}
+                      {r.rating != null && (
+                        <Badge variant="secondary" className="shrink-0 tabular-nums">
+                          <Star className="h-3.5 w-3.5 mr-1 fill-primary text-primary" />
+                          {r.rating.toFixed(1)}
+                          {r.reviews_count != null ? ` (${r.reviews_count})` : ""}
+                        </Badge>
+                      )}
+                    </div>
 
-                    <div className="flex items-center gap-1 shrink-0">
+                    <div className="flex items-center gap-0.5 shrink-0">
                       <Button
                         type="button"
                         variant="ghost"
@@ -465,18 +514,29 @@ export function CompetitorListDialog({
                         </a>
                       </Button>
 
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                      onClick={(e) => handleRemoveCompetitor(r.id, e)}
-                      aria-label="Remove competitor"
-                      title="Remove"
-                      disabled={!workspaceId}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={(e) => handleRescrape(r.id, e)}
+                        aria-label="Rescrape"
+                        title="Rescrape"
+                      >
+                        <RotateCcw className="h-4 w-4 text-muted-foreground" />
+                      </Button>
+
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={(e) => handleRemoveCompetitor(r.id, e)}
+                        aria-label="Remove competitor"
+                        title="Remove"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
                 ))}
