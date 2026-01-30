@@ -14,9 +14,43 @@ serve(async (req) => {
 
   try {
     const payload = await req.json()
-    const { jobId, workspaceId, runId, datasetId } = payload
+
+    // Apify webhook payloads can arrive in different shapes depending on whether
+    // a payloadTemplate is used and whether interpolation is enabled.
+    // Be defensive and support both:
+    // - { jobId, workspaceId, runId, datasetId }
+    // - { resource: { id, defaultDatasetId, ... }, ... }
+    const jobId = payload?.jobId
+    const workspaceId = payload?.workspaceId
+
+    const rawRunId = payload?.runId
+    const rawDatasetId = payload?.datasetId
+
+    const resourceRunId = payload?.resource?.id
+    const resourceDatasetId = payload?.resource?.defaultDatasetId
+
+    const runId = (typeof rawRunId === 'string' && !rawRunId.includes('{{'))
+      ? rawRunId
+      : (typeof resourceRunId === 'string' ? resourceRunId : undefined)
+
+    const datasetId = (typeof rawDatasetId === 'string' && !rawDatasetId.includes('{{'))
+      ? rawDatasetId
+      : (typeof resourceDatasetId === 'string' ? resourceDatasetId : undefined)
     
-    console.log('[handle-discovery-complete] Received webhook:', { jobId, workspaceId, datasetId })
+    console.log('[handle-discovery-complete] Received webhook:', {
+      jobId,
+      workspaceId,
+      datasetId: datasetId ?? rawDatasetId,
+      runId: runId ?? rawRunId,
+    })
+
+    if (!jobId || !workspaceId) {
+      throw new Error('Missing required webhook fields: jobId/workspaceId')
+    }
+
+    if (!datasetId) {
+      throw new Error('Missing datasetId from Apify webhook (no interpolation + no resource.defaultDatasetId)')
+    }
     
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
@@ -217,6 +251,7 @@ serve(async (req) => {
       {
         eventTypes: ['ACTOR.RUN.SUCCEEDED'],
         requestUrl: webhookUrl,
+        shouldInterpolateStrings: true,
         payloadTemplate: JSON.stringify({
           jobId,
           workspaceId,
