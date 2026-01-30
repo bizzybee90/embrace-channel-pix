@@ -657,6 +657,17 @@ export function CompetitorPipelineProgress({
             Continue <ArrowRight className="h-4 w-4" />
           </Button>
         </div>
+        
+        {/* Restart Research button */}
+        <Button 
+          variant="ghost" 
+          onClick={onRetry} 
+          className="w-full gap-2 text-muted-foreground hover:text-foreground"
+        >
+          <RotateCcw className="h-4 w-4" />
+          Restart Competitor Research
+        </Button>
+        
         {!isComplete && (
           <p className="text-xs text-center text-muted-foreground">
             You can continue while this runs in the background (~{estimateTime()})
