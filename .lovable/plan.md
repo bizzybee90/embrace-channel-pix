@@ -1,9 +1,22 @@
 
 # Competitor Research Pipeline: Production-Grade Async Review Architecture
 
-## Executive Summary
+## ✅ IMPLEMENTED - January 30, 2026
 
-This plan transforms the competitor research pipeline from a fragile "fire and hope" approach into a robust, async webhook-driven architecture with a **user review step**. The key innovation is pausing after discovery to let users approve/reject competitors and add manual URLs before expensive scraping begins.
+This plan transformed the competitor research pipeline from a fragile "fire and hope" approach into a robust, async webhook-driven architecture with a **user review step**. The key innovation is pausing after discovery to let users approve/reject competitors and add manual URLs before expensive scraping begins.
+
+### Implementation Summary
+
+**Database:** Added `is_selected`, `location_data` columns + 30 new blocklist domains + `review_ready` status
+
+**Backend:**
+- `handle-discovery-complete` - Now stops at `review_ready`, removed `.slice(0,50)` limit, fixed `sites_validated` field
+- `competitor-scrape-start` - New function with deep crawl config (maxCrawlDepth: 2, Playwright Chrome)
+
+**Frontend:**
+- `CompetitorReviewScreen.tsx` - New review UI with checkboxes, manual URL entry, cost estimate
+- `CompetitorPipelineProgress.tsx` - Shows review screen when `review_ready`
+- `CompetitorResearchStep.tsx` - Resumes `review_ready` jobs
 
 ---
 

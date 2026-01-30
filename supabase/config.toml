@@ -259,3 +259,6 @@ verify_jwt = false
 
 [functions.process-worker]
 verify_jwt = false
+
+[functions.competitor-scrape-start]
+verify_jwt = false

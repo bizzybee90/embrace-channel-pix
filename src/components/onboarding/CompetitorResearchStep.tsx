@@ -203,6 +203,7 @@ export function CompetitorResearchStep({
         'geocoding',
         'discovering',
         'filtering',
+        'review_ready', // NEW - resume review state
         'scraping',
         'extracting',
         'deduplicating',

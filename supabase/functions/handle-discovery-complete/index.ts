@@ -1,6 +1,5 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { withApifyAdHocWebhooks } from '../_shared/apifyWebhooks.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -17,9 +16,6 @@ serve(async (req) => {
 
     // Apify webhook payloads can arrive in different shapes depending on whether
     // a payloadTemplate is used and whether interpolation is enabled.
-    // Be defensive and support both:
-    // - { jobId, workspaceId, runId, datasetId }
-    // - { resource: { id, defaultDatasetId, ... }, ... }
     const jobId = payload?.jobId
     const workspaceId = payload?.workspaceId
 
@@ -58,13 +54,12 @@ serve(async (req) => {
     )
     
     const APIFY_API_KEY = Deno.env.get('APIFY_API_KEY')
-    const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 
     if (!APIFY_API_KEY) {
       throw new Error('APIFY_API_KEY not configured')
     }
 
-    // Update job status
+    // Update job status to filtering
     await supabase.from('competitor_research_jobs').update({
       status: 'filtering',
       heartbeat_at: new Date().toISOString()
@@ -138,6 +133,16 @@ serve(async (req) => {
         continue
       }
       
+      // Build location_data for user review
+      const locationData = {
+        address: place.address,
+        phone: place.phone,
+        rating: place.totalScore,
+        reviewsCount: place.reviewsCount,
+        openingHours: place.openingHours,
+        placeId: place.placeId,
+      }
+      
       validCompetitors.push({
         job_id: jobId,
         workspace_id: workspaceId,
@@ -152,20 +157,21 @@ serve(async (req) => {
         is_directory: false,
         discovery_source: 'google_places',
         status: 'approved',
-        scrape_status: 'pending'
+        scrape_status: 'pending',
+        is_selected: true, // Default to selected for review
+        location_data: locationData,
       })
     }
 
     console.log('[handle-discovery-complete] Valid competitors:', validCompetitors.length, 'Filtered:', filteredOut.length)
 
     // =========================================
-    // STEP 4: Store competitors in database
+    // STEP 4: Store ALL competitors in database (no slice limit!)
     // Use UPSERT with correct conflict column (workspace_id, url)
-    // This allows sites to be "adopted" by new jobs
     // =========================================
     
-    let insertedCount = 0;
-    let updatedCount = 0;
+    let insertedCount = 0
+    let updatedCount = 0
     
     if (validCompetitors.length > 0) {
       // Process each competitor individually to handle upsert correctly
@@ -186,6 +192,8 @@ serve(async (req) => {
               job_id: jobId,
               status: 'approved',
               scrape_status: 'pending',
+              is_selected: true,
+              location_data: comp.location_data,
               discovered_at: new Date().toISOString()
             })
             .eq('id', existing.id)
@@ -204,11 +212,17 @@ serve(async (req) => {
       console.log('[handle-discovery-complete] Inserted:', insertedCount, 'Updated:', updatedCount)
     }
 
-    // Update job counts
+    // =========================================
+    // STEP 5: Update job to REVIEW_READY status
+    // DO NOT auto-start scraping - wait for user review!
+    // =========================================
+    
     await supabase.from('competitor_research_jobs').update({
       sites_discovered: places.length,
       sites_filtered: validCompetitors.length,
-      status: validCompetitors.length > 0 ? 'scraping' : 'completed',
+      sites_validated: validCompetitors.length, // Fix UI field mismatch
+      sites_approved: validCompetitors.length, // Also set this for completeness
+      status: validCompetitors.length > 0 ? 'review_ready' : 'completed',
       heartbeat_at: new Date().toISOString(),
       ...(validCompetitors.length === 0 ? {
         completed_at: new Date().toISOString(),
@@ -216,82 +230,15 @@ serve(async (req) => {
       } : {})
     }).eq('id', jobId)
 
-    // =========================================
-    // STEP 5: Trigger website scraping
-    // =========================================
-    
-    if (validCompetitors.length === 0) {
-      return new Response(JSON.stringify({ 
-        success: true, 
-        message: 'No valid competitors found' 
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
-    }
-    
-    // CRITICAL: Include apikey in the webhook URL so Apify can authenticate
-    const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') || Deno.env.get('SUPABASE_PUBLISHABLE_KEY');
-    const webhookUrl = `${SUPABASE_URL}/functions/v1/handle-scrape-complete?apikey=${SUPABASE_ANON_KEY}`;
-    console.log('[handle-discovery-complete] Scrape webhook URL configured');
-    const startUrls = validCompetitors.slice(0, 50).map(c => ({ url: c.url }))
-    
-    const scrapeInput = {
-      startUrls,
-      maxCrawlDepth: 0,  // Homepage only - CRITICAL for budget
-      maxCrawlPages: validCompetitors.length,
-      saveHtml: false,
-      saveMarkdown: true,
-      removeCookieWarnings: true,
-      // Omit clickElementsCssSelector entirely - Apify requires string if present
-    }
-    
-    // Apify ad-hoc webhooks must be passed via the `webhooks` URL parameter.
-    // Apify uses {{resource.*}} for interpolation in webhook payload templates.
-    const webhookDefs = [
-      {
-        eventTypes: ['ACTOR.RUN.SUCCEEDED'],
-        requestUrl: webhookUrl,
-        shouldInterpolateStrings: true,
-        payloadTemplate: JSON.stringify({
-          jobId,
-          workspaceId,
-          runId: '{{resource.id}}',
-          datasetId: '{{resource.defaultDatasetId}}',
-        }),
-      },
-    ]
-
-    const apifyRunUrl = withApifyAdHocWebhooks(
-      `https://api.apify.com/v2/acts/apify~website-content-crawler/runs?token=${APIFY_API_KEY}`,
-      webhookDefs,
-    )
-
-    const scrapeResponse = await fetch(apifyRunUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(scrapeInput),
-    })
-    
-    if (!scrapeResponse.ok) {
-      const errorText = await scrapeResponse.text()
-      console.error('[handle-discovery-complete] Scrape API error:', errorText)
-      throw new Error(`Apify scrape API error: ${errorText}`)
-    }
-    
-    const scrapeData = await scrapeResponse.json()
-    console.log('[handle-discovery-complete] Scrape started:', scrapeData.data?.id)
-
-    // Update job with scrape run ID
-    await supabase.from('competitor_research_jobs').update({
-      scrape_run_id: scrapeData.data.id
-    }).eq('id', jobId)
+    console.log('[handle-discovery-complete] Job updated to review_ready - waiting for user confirmation')
 
     return new Response(JSON.stringify({
       success: true,
       placesFound: places.length,
       validCompetitors: validCompetitors.length,
       filteredOut: filteredOut.length,
-      scrapingStarted: true
+      status: 'review_ready',
+      message: 'Discovery complete. Waiting for user to review and confirm competitors before scraping.'
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
