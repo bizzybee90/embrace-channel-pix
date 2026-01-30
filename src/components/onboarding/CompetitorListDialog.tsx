@@ -19,7 +19,8 @@ import {
   Plus, 
   Globe, 
   Star,
-  Building2
+  Building2,
+  Trash2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -144,6 +145,34 @@ export function CompetitorListDialog({
     }
   };
 
+  const handleRemoveCompetitor = async (competitorId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    // Optimistic update
+    setRows(prev => prev.filter(r => r.id !== competitorId));
+
+    const { error } = await supabase
+      .from('competitor_sites')
+      .delete()
+      .eq('id', competitorId);
+
+    if (error) {
+      // Refetch on error
+      toast.error('Failed to remove competitor');
+      // Reload data
+      const { data } = await supabase
+        .from("competitor_sites")
+        .select("id,business_name,url,domain,rating,reviews_count,discovery_source")
+        .eq("job_id", jobId)
+        .order("rating", { ascending: false, nullsFirst: false })
+        .limit(200);
+      if (data) setRows(data as CompetitorRow[]);
+    } else {
+      toast.success('Competitor removed');
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -220,11 +249,8 @@ export function CompetitorListDialog({
             <ScrollArea className="h-[380px] rounded-lg border border-border bg-muted/20">
               <div className="p-2 space-y-1">
                 {filtered.map((r) => (
-                  <a
+                  <div
                     key={r.id}
-                    href={r.url}
-                    target="_blank"
-                    rel="noreferrer"
                     className="flex items-center gap-3 p-3 rounded-lg border border-transparent hover:border-border hover:bg-muted/50 transition-all group overflow-hidden"
                   >
                     <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
@@ -259,8 +285,26 @@ export function CompetitorListDialog({
                       </div>
                     )}
                     
-                    <ExternalLink className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
-                  </a>
+                    <a
+                      href={r.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="p-1.5 rounded hover:bg-muted shrink-0"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                    </a>
+                    
+                    {workspaceId && (
+                      <button
+                        onClick={(e) => handleRemoveCompetitor(r.id, e)}
+                        className="p-1.5 rounded hover:bg-destructive/10 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Remove competitor"
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </button>
+                    )}
+                  </div>
                 ))}
 
                 {filtered.length === 0 && (
