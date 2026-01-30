@@ -447,48 +447,52 @@ export function CompetitorListDialog({
         </div>
       ) : (
         <ScrollArea className="h-[340px] rounded-lg border border-border bg-muted/20">
-          <div className="p-2 space-y-1">
+           {/* Add right padding so action icons don't sit under the scroll bar */}
+           <div className="p-2 pr-10 space-y-1">
             {filtered.map((r) => (
               <div
                 key={r.id}
-                className="flex items-center gap-3 p-3 rounded-lg border border-transparent hover:border-border hover:bg-muted/50 transition-all"
+                 className="flex items-center justify-between gap-3 p-3 rounded-lg border border-transparent hover:border-border hover:bg-muted/50 transition-all"
               >
-                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                  <Globe className="h-5 w-5 text-primary" />
-                </div>
-                
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-foreground truncate">
-                      {r.business_name ?? r.domain}
-                    </span>
-                    {r.discovery_source === 'manual' && (
-                      <Badge variant="outline" className="text-xs shrink-0">
-                        Manual
-                      </Badge>
-                    )}
-                    {r.discovery_source === 'search' && (
-                      <Badge variant="outline" className="text-xs shrink-0 border-primary/30 text-primary">
-                        Search
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="text-xs text-muted-foreground truncate">
-                    {r.domain}
-                  </div>
-                </div>
+                 {/* Left content */}
+                 <div className="flex items-center gap-3 min-w-0 flex-1">
+                   <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                     <Globe className="h-5 w-5 text-primary" />
+                   </div>
 
-                {/* Status badges */}
-                {r.rating != null && (
-                  <Badge variant="secondary" className="shrink-0 tabular-nums">
-                    <Star className="h-3.5 w-3.5 mr-1 fill-primary text-primary" />
-                    {r.rating.toFixed(1)}
-                    {r.reviews_count != null ? ` (${r.reviews_count})` : ""}
-                  </Badge>
-                )}
+                   <div className="min-w-0 flex-1">
+                     <div className="flex items-center gap-2 min-w-0">
+                       <span className="font-medium text-foreground truncate">
+                         {r.business_name ?? r.domain}
+                       </span>
+                       {r.discovery_source === 'manual' && (
+                         <Badge variant="outline" className="text-xs shrink-0">
+                           Manual
+                         </Badge>
+                       )}
+                       {r.discovery_source === 'search' && (
+                         <Badge variant="outline" className="text-xs shrink-0 border-primary/30 text-primary">
+                           Search
+                         </Badge>
+                       )}
+                     </div>
+                     <div className="text-xs text-muted-foreground truncate">
+                       {r.domain}
+                     </div>
+                   </div>
 
-                {/* Action buttons - Always visible on desktop */}
-                <div className="flex items-center gap-1 shrink-0 ml-auto">
+                   {/* Status badge (kept left so right actions always have space) */}
+                   {r.rating != null && (
+                     <Badge variant="secondary" className="shrink-0 tabular-nums">
+                       <Star className="h-3.5 w-3.5 mr-1 fill-primary text-primary" />
+                       {r.rating.toFixed(1)}
+                       {r.reviews_count != null ? ` (${r.reviews_count})` : ""}
+                     </Badge>
+                   )}
+                 </div>
+
+                 {/* Right actions: fixed column so they can't be pushed off-screen */}
+                 <div className="flex items-center gap-1 shrink-0 flex-none">
                   <Button
                     type="button"
                     variant="ghost"
