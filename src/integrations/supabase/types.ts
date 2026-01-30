@@ -844,10 +844,12 @@ export type Database = {
           has_pricing_page: boolean | null
           id: string
           is_directory: boolean | null
+          is_selected: boolean | null
           is_valid: boolean | null
           job_id: string
           last_error: string | null
           latitude: number | null
+          location_data: Json | null
           longitude: number | null
           pages_scraped: number | null
           phone: string | null
@@ -890,10 +892,12 @@ export type Database = {
           has_pricing_page?: boolean | null
           id?: string
           is_directory?: boolean | null
+          is_selected?: boolean | null
           is_valid?: boolean | null
           job_id: string
           last_error?: string | null
           latitude?: number | null
+          location_data?: Json | null
           longitude?: number | null
           pages_scraped?: number | null
           phone?: string | null
@@ -936,10 +940,12 @@ export type Database = {
           has_pricing_page?: boolean | null
           id?: string
           is_directory?: boolean | null
+          is_selected?: boolean | null
           is_valid?: boolean | null
           job_id?: string
           last_error?: string | null
           latitude?: number | null
+          location_data?: Json | null
           longitude?: number | null
           pages_scraped?: number | null
           phone?: string | null

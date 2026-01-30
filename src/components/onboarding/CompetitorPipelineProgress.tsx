@@ -14,10 +14,12 @@ import {
   Sparkles,
   Search,
   Filter,
-  Wand2
+  Wand2,
+  Users
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CompetitorListDialog } from '@/components/onboarding/CompetitorListDialog';
+import { CompetitorReviewScreen } from '@/components/onboarding/CompetitorReviewScreen';
 
 interface CompetitorPipelineProgressProps {
   workspaceId: string;
@@ -30,7 +32,7 @@ interface CompetitorPipelineProgressProps {
   onRetry: () => void;
 }
 
-type PipelinePhase = 'queued' | 'discovering' | 'validating' | 'scraping' | 'extracting' | 'deduplicating' | 'refining' | 'embedding' | 'completed' | 'error';
+type PipelinePhase = 'queued' | 'discovering' | 'filtering' | 'review_ready' | 'validating' | 'scraping' | 'extracting' | 'deduplicating' | 'refining' | 'embedding' | 'completed' | 'error';
 
 interface PipelineStats {
   phase: PipelinePhase;
@@ -297,7 +299,11 @@ export function CompetitorPipelineProgress({
     switch (phase) {
       case 'queued':
       case 'discovering':
+      case 'filtering':
         return { discover: 'in_progress', validate: 'pending', scrape: 'pending', extract: 'pending', refine: 'pending' };
+      case 'review_ready':
+        // Discovery done, waiting for user review before scraping
+        return { discover: 'done', validate: 'done', scrape: 'pending', extract: 'pending', refine: 'pending' };
       case 'validating':
         return { discover: 'done', validate: 'in_progress', scrape: 'pending', extract: 'pending', refine: 'pending' };
       case 'scraping':
@@ -342,6 +348,7 @@ export function CompetitorPipelineProgress({
 
   const isError = stats.phase === 'error';
   const isComplete = stats.phase === 'completed';
+  const isReviewReady = stats.phase === 'review_ready';
 
   const handleContinue = () => {
     onComplete({
@@ -349,6 +356,28 @@ export function CompetitorPipelineProgress({
       faqsGenerated: stats.faqsAdded,
     });
   };
+
+  // Handle review confirmation - continue polling after user confirms
+  const handleReviewConfirm = (selectedCount: number) => {
+    // The competitor-scrape-start function was called, job status will change to 'scraping'
+    // The polling will automatically pick up the new status
+    console.log('[CompetitorPipelineProgress] Review confirmed, waiting for scraping to start...');
+  };
+
+  // Show review screen when in review_ready state
+  if (isReviewReady) {
+    return (
+      <CompetitorReviewScreen
+        workspaceId={workspaceId}
+        jobId={jobId}
+        nicheQuery={nicheQuery}
+        serviceArea={serviceArea}
+        onConfirm={handleReviewConfirm}
+        onBack={onBack}
+        onSkip={() => onComplete({ sitesScraped: 0, faqsGenerated: 0 })}
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">
