@@ -242,7 +242,7 @@ serve(async (req) => {
       saveHtml: false,
       saveMarkdown: true,
       removeCookieWarnings: true,
-      clickElementsCssSelector: null
+      // Omit clickElementsCssSelector entirely - Apify requires string if present
     }
     
     // Apify ad-hoc webhooks must be passed via the `webhooks` URL parameter.
