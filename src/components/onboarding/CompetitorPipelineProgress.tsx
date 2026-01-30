@@ -409,7 +409,7 @@ export function CompetitorPipelineProgress({
           {stageStatuses.discover === 'done' && stats.sitesDiscovered > 0 && (
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <p className="text-sm text-success">✓ {stats.sitesDiscovered} competitors found</p>
-              <CompetitorListDialog jobId={jobId} />
+              <CompetitorListDialog jobId={jobId} workspaceId={workspaceId} />
             </div>
           )}
           {stageStatuses.discover === 'in_progress' && (
