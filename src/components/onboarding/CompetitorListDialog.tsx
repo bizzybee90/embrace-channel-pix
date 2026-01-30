@@ -316,7 +316,7 @@ export function CompetitorListDialog({
                     onChange={(e) => setSearchInput(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleAddManualUrl()}
                     onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
-                    onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                    onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
                     placeholder="Search or add URL (e.g., window cleaning bicester)"
                     className="pl-10 bg-background border-border"
                     disabled={isAddingUrl}
@@ -337,33 +337,45 @@ export function CompetitorListDialog({
                 </Button>
               </div>
 
-              {/* Search suggestions dropdown */}
-              {showSuggestions && suggestions.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-1 z-50 bg-popover border border-border rounded-lg shadow-lg overflow-hidden">
-                  <div className="p-1 max-h-[200px] overflow-auto">
+              {/* Search suggestions (inline panel to avoid overlaying the list) */}
+              {showSuggestions && (isSearching || suggestions.length > 0) && (
+                <div className="mt-2 rounded-lg border border-border bg-popover overflow-hidden">
+                  <div className="px-3 py-2 text-xs font-medium text-muted-foreground border-b border-border">
+                    Suggestions
+                  </div>
+                  <div className="max-h-[200px] overflow-auto p-1">
                     {isSearching && (
                       <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
                         <Loader2 className="h-4 w-4 animate-spin" />
-                        Searching...
+                        Searching…
+                      </div>
+                    )}
+                    {!isSearching && suggestions.length === 0 && (
+                      <div className="px-3 py-3 text-sm text-muted-foreground">
+                        No suggestions yet—try a broader query.
                       </div>
                     )}
                     {suggestions.map((s) => (
-                      <button
+                      <div
                         key={s.url}
-                        onClick={() => handleAddFromSuggestion(s)}
-                        className="w-full flex items-center gap-3 px-3 py-2 text-left rounded hover:bg-muted transition-colors"
+                        className="flex items-center gap-3 px-3 py-2 rounded hover:bg-muted transition-colors"
                       >
                         <Globe className="h-4 w-4 text-muted-foreground shrink-0" />
                         <div className="flex-1 min-w-0">
-                          <div className="font-medium text-sm text-foreground truncate">
-                            {s.title}
-                          </div>
-                          <div className="text-xs text-muted-foreground truncate">
-                            {s.domain}
-                          </div>
+                          <div className="font-medium text-sm text-foreground truncate">{s.title}</div>
+                          <div className="text-xs text-muted-foreground truncate">{s.domain}</div>
                         </div>
-                        <Plus className="h-4 w-4 text-primary shrink-0" />
-                      </button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => handleAddFromSuggestion(s)}
+                          aria-label={`Add ${s.domain}`}
+                        >
+                          <Plus className="h-4 w-4 text-primary" />
+                        </Button>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -453,16 +465,18 @@ export function CompetitorListDialog({
                         </a>
                       </Button>
 
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                        onClick={(e) => handleRemoveCompetitor(r.id, e)}
-                        aria-label="Remove competitor"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={(e) => handleRemoveCompetitor(r.id, e)}
+                      aria-label="Remove competitor"
+                      title="Remove"
+                      disabled={!workspaceId}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                     </div>
                   </div>
                 ))}
