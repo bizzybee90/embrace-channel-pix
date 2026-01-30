@@ -412,151 +412,131 @@ export function CompetitorListDialog({
                 </div>
               )}
 
-              {isSearching && !showSuggestions && (
-                <div className="absolute right-12 top-1/2 -translate-y-1/2">
-                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                </div>
-              )}
+          {isSearching && !showSuggestions && (
+            <div className="absolute right-12 top-1/2 -translate-y-1/2">
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
             </div>
           )}
+        </div>
+      )}
 
-          {/* Filter existing list */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Filter list..."
-              className="pl-10 bg-background border-border"
-            />
-          </div>
+      {/* Section header for existing competitors */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Search className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm font-medium text-foreground">Your Competitors</span>
+        </div>
+        <span className="text-xs text-muted-foreground">{rows.length} total</span>
+      </div>
 
-          {isLoading ? (
-            <div className="flex flex-col items-center justify-center gap-3 py-12">
-              <Loader2 className="h-6 w-6 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">Loading competitors…</p>
-            </div>
-          ) : (
-            <ScrollArea className="h-[380px] rounded-lg border border-border bg-muted/20">
-              <div className="p-2 space-y-1">
-                {filtered.map((r) => (
-                  <div
-                    key={r.id}
-                    className="flex items-center gap-3 p-3 rounded-lg border border-transparent hover:border-border hover:bg-muted/50 transition-all overflow-hidden"
-                  >
-                    <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                      <Globe className="h-5 w-5 text-primary" />
-                    </div>
-                    
-                    <div className="flex-1 min-w-0 overflow-hidden">
-                      <div className="flex items-center gap-2 overflow-hidden">
-                        <span className="font-medium text-foreground truncate block">
-                          {r.business_name ?? r.domain}
-                        </span>
-                        {r.discovery_source === 'manual' && (
-                          <Badge variant="outline" className="text-xs shrink-0">
-                            Manual
-                          </Badge>
-                        )}
-                        {r.discovery_source === 'search' && (
-                          <Badge variant="outline" className="text-xs shrink-0 border-primary/30 text-primary">
-                            Search
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="text-xs text-muted-foreground truncate">
-                        {r.domain}
-                      </div>
-                    </div>
+      {/* Filter existing list */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Filter your competitors..."
+          className="pl-10 bg-background border-border"
+        />
+      </div>
 
-                    {/* Status badges */}
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {r.scrape_status === 'done' && (
-                        <Badge variant="secondary" className="text-xs bg-success/10 text-success border-success/30">
-                          Scraped
-                        </Badge>
-                      )}
-                      {r.scrape_status === 'pending' && (
-                        <Badge variant="secondary" className="text-xs">
-                          Pending
-                        </Badge>
-                      )}
-                      {r.scrape_status === 'error' && (
-                        <Badge variant="destructive" className="text-xs">
-                          Error
-                        </Badge>
-                      )}
-                      {r.rating != null && (
-                        <Badge variant="secondary" className="shrink-0 tabular-nums">
-                          <Star className="h-3.5 w-3.5 mr-1 fill-primary text-primary" />
-                          {r.rating.toFixed(1)}
-                          {r.reviews_count != null ? ` (${r.reviews_count})` : ""}
-                        </Badge>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-0.5 shrink-0">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        asChild
-                        className="h-8 w-8"
-                      >
-                        <a
-                          href={r.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          aria-label="Open website"
-                        >
-                          <ExternalLink className="h-4 w-4 text-muted-foreground" />
-                        </a>
-                      </Button>
-
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={(e) => handleRescrape(r.id, e)}
-                        aria-label="Rescrape"
-                        title="Rescrape"
-                      >
-                        <RotateCcw className="h-4 w-4 text-muted-foreground" />
-                      </Button>
-
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                        onClick={(e) => handleRemoveCompetitor(r.id, e)}
-                        aria-label="Remove competitor"
-                        title="Remove"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-
-                {filtered.length === 0 && (
-                  <div className="flex flex-col items-center justify-center py-12 text-center">
-                    <Building2 className="h-10 w-10 text-muted-foreground/50 mb-3" />
-                    <p className="text-sm text-muted-foreground">
-                      {query ? 'No competitors match your search' : 'No competitors found yet'}
-                    </p>
-                    {workspaceId && !query && (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Add one manually using the field above
-                      </p>
+      {isLoading ? (
+        <div className="flex flex-col items-center justify-center gap-3 py-12">
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Loading competitors…</p>
+        </div>
+      ) : (
+        <ScrollArea className="h-[340px] rounded-lg border border-border bg-muted/20">
+          <div className="p-2 space-y-1">
+            {filtered.map((r) => (
+              <div
+                key={r.id}
+                className="flex items-center gap-3 p-3 rounded-lg border border-transparent hover:border-border hover:bg-muted/50 transition-all"
+              >
+                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                  <Globe className="h-5 w-5 text-primary" />
+                </div>
+                
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-foreground truncate">
+                      {r.business_name ?? r.domain}
+                    </span>
+                    {r.discovery_source === 'manual' && (
+                      <Badge variant="outline" className="text-xs shrink-0">
+                        Manual
+                      </Badge>
+                    )}
+                    {r.discovery_source === 'search' && (
+                      <Badge variant="outline" className="text-xs shrink-0 border-primary/30 text-primary">
+                        Search
+                      </Badge>
                     )}
                   </div>
+                  <div className="text-xs text-muted-foreground truncate">
+                    {r.domain}
+                  </div>
+                </div>
+
+                {/* Status badges */}
+                {r.rating != null && (
+                  <Badge variant="secondary" className="shrink-0 tabular-nums">
+                    <Star className="h-3.5 w-3.5 mr-1 fill-primary text-primary" />
+                    {r.rating.toFixed(1)}
+                    {r.reviews_count != null ? ` (${r.reviews_count})` : ""}
+                  </Badge>
+                )}
+
+                {/* Action buttons - ALWAYS visible */}
+                <div className="flex items-center gap-1 shrink-0 ml-auto">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    asChild
+                    className="h-8 w-8"
+                  >
+                    <a
+                      href={r.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      title="Open website"
+                    >
+                      <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                    </a>
+                  </Button>
+
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                    onClick={(e) => handleRemoveCompetitor(r.id, e)}
+                    title="Delete competitor"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+
+            {filtered.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <Building2 className="h-10 w-10 text-muted-foreground/50 mb-3" />
+                <p className="text-sm text-muted-foreground">
+                  {query ? 'No competitors match your search' : 'No competitors found yet'}
+                </p>
+                {workspaceId && !query && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Use the search above to add competitors
+                  </p>
                 )}
               </div>
-            </ScrollArea>
-          )}
+            )}
+          </div>
+        </ScrollArea>
+      )}
         </div>
       </DialogContent>
     </Dialog>
