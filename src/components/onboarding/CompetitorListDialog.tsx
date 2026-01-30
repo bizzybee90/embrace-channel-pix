@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type MouseEvent } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog,
@@ -145,9 +145,12 @@ export function CompetitorListDialog({
     }
   };
 
-  const handleRemoveCompetitor = async (competitorId: string, e: React.MouseEvent) => {
+  const handleRemoveCompetitor = async (competitorId: string, e: MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+
+    const ok = window.confirm("Remove this competitor from the list?");
+    if (!ok) return;
 
     // Optimistic update
     setRows(prev => prev.filter(r => r.id !== competitorId));
@@ -251,7 +254,7 @@ export function CompetitorListDialog({
                 {filtered.map((r) => (
                   <div
                     key={r.id}
-                    className="flex items-center gap-3 p-3 rounded-lg border border-transparent hover:border-border hover:bg-muted/50 transition-all group overflow-hidden"
+                    className="flex items-center gap-3 p-3 rounded-lg border border-transparent hover:border-border hover:bg-muted/50 transition-all overflow-hidden"
                   >
                     <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                       <Globe className="h-5 w-5 text-primary" />
@@ -274,36 +277,45 @@ export function CompetitorListDialog({
                     </div>
 
                     {r.rating != null && (
-                      <div className="flex items-center gap-1 text-sm shrink-0">
-                        <Star className="h-3.5 w-3.5 fill-amber-500 text-amber-500" />
-                        <span className="font-medium text-foreground">{r.rating.toFixed(1)}</span>
-                        {r.reviews_count != null && (
-                          <span className="text-muted-foreground text-xs">
-                            ({r.reviews_count})
-                          </span>
-                        )}
-                      </div>
+                      <Badge variant="secondary" className="shrink-0 tabular-nums">
+                        <Star className="h-3.5 w-3.5 mr-1" />
+                        {r.rating.toFixed(1)}
+                        {r.reviews_count != null ? ` (${r.reviews_count})` : ""}
+                      </Badge>
                     )}
-                    
-                    <a
-                      href={r.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="p-1.5 rounded hover:bg-muted shrink-0"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <ExternalLink className="h-4 w-4 text-muted-foreground" />
-                    </a>
-                    
-                    {workspaceId && (
-                      <button
-                        onClick={(e) => handleRemoveCompetitor(r.id, e)}
-                        className="p-1.5 rounded hover:bg-destructive/10 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                        title="Remove competitor"
+
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        asChild
+                        className="h-8 w-8"
                       >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </button>
-                    )}
+                        <a
+                          href={r.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          aria-label="Open website"
+                        >
+                          <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                        </a>
+                      </Button>
+
+                      {workspaceId && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={(e) => handleRemoveCompetitor(r.id, e)}
+                          aria-label="Remove competitor"
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 ))}
 
