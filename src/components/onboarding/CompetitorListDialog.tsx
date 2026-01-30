@@ -487,7 +487,7 @@ export function CompetitorListDialog({
                   </Badge>
                 )}
 
-                {/* Action buttons - ALWAYS visible */}
+                {/* Action buttons - Always visible on desktop */}
                 <div className="flex items-center gap-1 shrink-0 ml-auto">
                   <Button
                     type="button"
