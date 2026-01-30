@@ -17,6 +17,7 @@ import {
   Wand2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { CompetitorListDialog } from '@/components/onboarding/CompetitorListDialog';
 
 interface CompetitorPipelineProgressProps {
   workspaceId: string;
@@ -377,9 +378,10 @@ export function CompetitorPipelineProgress({
           icon={Search}
         >
           {stageStatuses.discover === 'done' && stats.sitesDiscovered > 0 && (
-            <p className="text-sm text-success">
-              ✓ {stats.sitesDiscovered} competitors found
-            </p>
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <p className="text-sm text-success">✓ {stats.sitesDiscovered} competitors found</p>
+              <CompetitorListDialog jobId={jobId} />
+            </div>
           )}
           {stageStatuses.discover === 'in_progress' && (
             <div className="space-y-3">
