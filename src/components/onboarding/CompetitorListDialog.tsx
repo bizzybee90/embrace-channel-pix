@@ -316,6 +316,7 @@ export function CompetitorListDialog({
                     onChange={(e) => setSearchInput(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleAddManualUrl()}
                     onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+                    onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
                     placeholder="Search or add URL (e.g., window cleaning bicester)"
                     className="pl-10 bg-background border-border"
                     disabled={isAddingUrl}
@@ -339,7 +340,7 @@ export function CompetitorListDialog({
               {/* Search suggestions dropdown */}
               {showSuggestions && suggestions.length > 0 && (
                 <div className="absolute top-full left-0 right-0 mt-1 z-50 bg-popover border border-border rounded-lg shadow-lg overflow-hidden">
-                  <div className="p-1 max-h-[240px] overflow-auto">
+                  <div className="p-1 max-h-[200px] overflow-auto">
                     {isSearching && (
                       <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
                         <Loader2 className="h-4 w-4 animate-spin" />
@@ -414,6 +415,11 @@ export function CompetitorListDialog({
                             Manual
                           </Badge>
                         )}
+                        {r.discovery_source === 'search' && (
+                          <Badge variant="outline" className="text-xs shrink-0 border-primary/30 text-primary">
+                            Search
+                          </Badge>
+                        )}
                       </div>
                       <div className="text-xs text-muted-foreground truncate">
                         {r.domain}
@@ -422,7 +428,7 @@ export function CompetitorListDialog({
 
                     {r.rating != null && (
                       <Badge variant="secondary" className="shrink-0 tabular-nums">
-                        <Star className="h-3.5 w-3.5 mr-1" />
+                        <Star className="h-3.5 w-3.5 mr-1 fill-primary text-primary" />
                         {r.rating.toFixed(1)}
                         {r.reviews_count != null ? ` (${r.reviews_count})` : ""}
                       </Badge>
@@ -447,18 +453,16 @@ export function CompetitorListDialog({
                         </a>
                       </Button>
 
-                      {workspaceId && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={(e) => handleRemoveCompetitor(r.id, e)}
-                          aria-label="Remove competitor"
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      )}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={(e) => handleRemoveCompetitor(r.id, e)}
+                        aria-label="Remove competitor"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
                 ))}
