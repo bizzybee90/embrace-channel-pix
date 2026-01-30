@@ -207,6 +207,8 @@ serve(async (req) => {
     console.log('[start-research] Calling Apify with:', apifyInput);
 
     // Apify ad-hoc webhooks must be passed via the `webhooks` URL parameter.
+    // Apify uses {{resource.*}} for interpolation in webhook payload templates.
+    // If we send '{{defaultDatasetId}}' literally, our handler will try to fetch a non-existent dataset and fail.
     const webhookDefs = [
       {
         eventTypes: ['ACTOR.RUN.SUCCEEDED'],
@@ -214,8 +216,8 @@ serve(async (req) => {
         payloadTemplate: JSON.stringify({
           jobId: job.id,
           workspaceId,
-          runId: '{{runId}}',
-          datasetId: '{{defaultDatasetId}}',
+          runId: '{{resource.id}}',
+          datasetId: '{{resource.defaultDatasetId}}',
         }),
       },
     ];

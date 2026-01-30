@@ -212,6 +212,7 @@ serve(async (req) => {
     }
     
     // Apify ad-hoc webhooks must be passed via the `webhooks` URL parameter.
+    // Apify uses {{resource.*}} for interpolation in webhook payload templates.
     const webhookDefs = [
       {
         eventTypes: ['ACTOR.RUN.SUCCEEDED'],
@@ -219,8 +220,8 @@ serve(async (req) => {
         payloadTemplate: JSON.stringify({
           jobId,
           workspaceId,
-          runId: '{{runId}}',
-          datasetId: '{{defaultDatasetId}}',
+          runId: '{{resource.id}}',
+          datasetId: '{{resource.defaultDatasetId}}',
         }),
       },
     ]
