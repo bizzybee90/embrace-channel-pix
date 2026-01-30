@@ -213,6 +213,8 @@ serve(async (req) => {
       {
         eventTypes: ['ACTOR.RUN.SUCCEEDED'],
         requestUrl: webhookUrl,
+        // Ensure Apify interpolates "{{resource.*}}" placeholders inside strings.
+        shouldInterpolateStrings: true,
         payloadTemplate: JSON.stringify({
           jobId: job.id,
           workspaceId,
