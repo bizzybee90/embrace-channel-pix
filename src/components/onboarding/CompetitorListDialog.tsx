@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type MouseEvent } from "react";
+import { useEffect, useMemo, useState, useCallback, type MouseEvent } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog,
@@ -20,7 +20,8 @@ import {
   Globe, 
   Star,
   Building2,
-  Trash2
+  Trash2,
+  Sparkles
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -34,14 +35,23 @@ type CompetitorRow = {
   discovery_source: string | null;
 };
 
+type SearchSuggestion = {
+  url: string;
+  domain: string;
+  title: string;
+  description?: string;
+};
+
 export function CompetitorListDialog({
   jobId,
   workspaceId,
+  serviceArea,
   disabled,
   className,
 }: {
   jobId: string;
   workspaceId?: string;
+  serviceArea?: string;
   disabled?: boolean;
   className?: string;
 }) {
@@ -49,7 +59,10 @@ export function CompetitorListDialog({
   const [isLoading, setIsLoading] = useState(false);
   const [rows, setRows] = useState<CompetitorRow[]>([]);
   const [query, setQuery] = useState("");
-  const [manualUrl, setManualUrl] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [isAddingUrl, setIsAddingUrl] = useState(false);
 
   useEffect(() => {
@@ -92,10 +105,97 @@ export function CompetitorListDialog({
     });
   }, [query, rows]);
 
-  const handleAddManualUrl = async () => {
-    if (!manualUrl.trim() || !workspaceId) return;
+  // Debounced search for suggestions
+  const searchForSuggestions = useCallback(async (searchQuery: string) => {
+    if (searchQuery.trim().length < 3) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
 
-    let cleanUrl = manualUrl.trim();
+    setIsSearching(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('competitor-search-suggest', {
+        body: { query: searchQuery, location: serviceArea }
+      });
+
+      if (error) throw error;
+
+      // Filter out already-added domains
+      const existingDomains = new Set(rows.map(r => r.domain.toLowerCase()));
+      const filtered = (data?.suggestions || []).filter(
+        (s: SearchSuggestion) => !existingDomains.has(s.domain.toLowerCase())
+      );
+
+      setSuggestions(filtered);
+      setShowSuggestions(filtered.length > 0);
+    } catch (err) {
+      console.error('Search error:', err);
+      setSuggestions([]);
+    } finally {
+      setIsSearching(false);
+    }
+  }, [serviceArea, rows]);
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchInput.trim().length >= 3) {
+        searchForSuggestions(searchInput);
+      } else {
+        setSuggestions([]);
+        setShowSuggestions(false);
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchInput, searchForSuggestions]);
+
+  const handleAddFromSuggestion = async (suggestion: SearchSuggestion) => {
+    if (!workspaceId) return;
+
+    // Check if already exists
+    if (rows.some(r => r.domain.toLowerCase() === suggestion.domain.toLowerCase())) {
+      toast.error('This website is already in the list');
+      return;
+    }
+
+    setIsAddingUrl(true);
+    try {
+      const { data, error } = await supabase
+        .from('competitor_sites')
+        .insert({
+          job_id: jobId,
+          workspace_id: workspaceId,
+          business_name: suggestion.title || suggestion.domain,
+          url: suggestion.url,
+          domain: suggestion.domain,
+          discovery_source: 'search',
+          status: 'approved',
+          scrape_status: 'pending',
+          is_selected: true,
+        })
+        .select('id,business_name,url,domain,rating,reviews_count,discovery_source')
+        .single();
+
+      if (error) throw error;
+
+      setRows(prev => [data as CompetitorRow, ...prev]);
+      setSearchInput('');
+      setSuggestions([]);
+      setShowSuggestions(false);
+      toast.success(`Added ${suggestion.domain}`);
+    } catch (err) {
+      console.error('Error adding competitor:', err);
+      toast.error('Failed to add competitor');
+    } finally {
+      setIsAddingUrl(false);
+    }
+  };
+
+  const handleAddManualUrl = async () => {
+    if (!searchInput.trim() || !workspaceId) return;
+
+    let cleanUrl = searchInput.trim();
     if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
       cleanUrl = 'https://' + cleanUrl;
     }
@@ -135,7 +235,9 @@ export function CompetitorListDialog({
       if (error) throw error;
 
       setRows(prev => [data as CompetitorRow, ...prev]);
-      setManualUrl('');
+      setSearchInput('');
+      setSuggestions([]);
+      setShowSuggestions(false);
       toast.success('Competitor added successfully');
     } catch (err) {
       console.error('Error adding URL:', err);
@@ -203,42 +305,84 @@ export function CompetitorListDialog({
         </DialogHeader>
 
         <div className="space-y-4 overflow-hidden">
-          {/* Add manual URL section */}
+          {/* Search to add competitors */}
           {workspaceId && (
-            <div className="flex gap-2">
-              <div className="relative flex-1 min-w-0">
-                <Globe className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  value={manualUrl}
-                  onChange={(e) => setManualUrl(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleAddManualUrl()}
-                  placeholder="Add competitor URL (e.g., example.com)"
-                  className="pl-10 bg-background border-border"
-                  disabled={isAddingUrl}
-                />
+            <div className="relative">
+              <div className="flex gap-2">
+                <div className="relative flex-1 min-w-0">
+                  <Sparkles className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary" />
+                  <Input
+                    value={searchInput}
+                    onChange={(e) => setSearchInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleAddManualUrl()}
+                    onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+                    placeholder="Search or add URL (e.g., window cleaning bicester)"
+                    className="pl-10 bg-background border-border"
+                    disabled={isAddingUrl}
+                  />
+                </div>
+                <Button
+                  onClick={handleAddManualUrl}
+                  disabled={!searchInput.trim() || isAddingUrl}
+                  size="icon"
+                  className="shrink-0"
+                  title="Add as URL"
+                >
+                  {isAddingUrl ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Plus className="h-4 w-4" />
+                  )}
+                </Button>
               </div>
-              <Button
-                onClick={handleAddManualUrl}
-                disabled={!manualUrl.trim() || isAddingUrl}
-                size="icon"
-                className="shrink-0"
-              >
-                {isAddingUrl ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Plus className="h-4 w-4" />
-                )}
-              </Button>
+
+              {/* Search suggestions dropdown */}
+              {showSuggestions && suggestions.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-1 z-50 bg-popover border border-border rounded-lg shadow-lg overflow-hidden">
+                  <div className="p-1 max-h-[240px] overflow-auto">
+                    {isSearching && (
+                      <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Searching...
+                      </div>
+                    )}
+                    {suggestions.map((s) => (
+                      <button
+                        key={s.url}
+                        onClick={() => handleAddFromSuggestion(s)}
+                        className="w-full flex items-center gap-3 px-3 py-2 text-left rounded hover:bg-muted transition-colors"
+                      >
+                        <Globe className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-sm text-foreground truncate">
+                            {s.title}
+                          </div>
+                          <div className="text-xs text-muted-foreground truncate">
+                            {s.domain}
+                          </div>
+                        </div>
+                        <Plus className="h-4 w-4 text-primary shrink-0" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {isSearching && !showSuggestions && (
+                <div className="absolute right-12 top-1/2 -translate-y-1/2">
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                </div>
+              )}
             </div>
           )}
 
-          {/* Search */}
+          {/* Filter existing list */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search by name or domain..."
+              placeholder="Filter list..."
               className="pl-10 bg-background border-border"
             />
           </div>
