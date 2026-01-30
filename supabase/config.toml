@@ -70,6 +70,9 @@ verify_jwt = false
 [functions.nuclear-reset]
 verify_jwt = false
 
+[functions.competitor-search-suggest]
+verify_jwt = false
+
 # =============================================================================
 # WEBHOOK/SYSTEM FUNCTIONS - No JWT, but require alternate auth (HMAC/secret)
 # =============================================================================
