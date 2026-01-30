@@ -182,6 +182,43 @@ export function CompetitorResearchStep({
   const [error, setError] = useState<string | null>(null);
   const [isLoadingContext, setIsLoadingContext] = useState(!hasInitialNiche);
 
+  // Resume the latest in-progress job after refresh so the UI doesn't look "paused".
+  useEffect(() => {
+    if (status !== 'idle' || jobId) return;
+
+    const resume = async () => {
+      const { data, error } = await supabase
+        .from('competitor_research_jobs')
+        .select('id,status')
+        .eq('workspace_id', workspaceId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error || !data?.id) return;
+
+      // Only resume if the job is still active.
+      const activeStatuses = new Set([
+        'queued',
+        'geocoding',
+        'discovering',
+        'filtering',
+        'scraping',
+        'extracting',
+        'deduplicating',
+        'refining',
+        'embedding',
+      ]);
+
+      if (activeStatuses.has(String(data.status))) {
+        setJobId(data.id);
+        setStatus('running');
+      }
+    };
+
+    resume();
+  }, [workspaceId, status, jobId]);
+
   // Niche/business type search state
   const [nicheSearch, setNicheSearch] = useState('');
   const [nicheFocused, setNicheFocused] = useState(false);
