@@ -159,7 +159,7 @@ export function CompetitorListDialog({
         </Button>
       </DialogTrigger>
 
-      <DialogContent className="max-w-2xl bg-background border-border">
+      <DialogContent className="max-w-2xl bg-background border-border overflow-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-foreground">
             <Building2 className="h-5 w-5 text-primary" />
@@ -170,11 +170,11 @@ export function CompetitorListDialog({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-4 overflow-hidden">
           {/* Add manual URL section */}
           {workspaceId && (
             <div className="flex gap-2">
-              <div className="relative flex-1">
+              <div className="relative flex-1 min-w-0">
                 <Globe className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   value={manualUrl}
@@ -225,15 +225,15 @@ export function CompetitorListDialog({
                     href={r.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="flex items-center gap-3 p-3 rounded-lg border border-transparent hover:border-border hover:bg-muted/50 transition-all group"
+                    className="flex items-center gap-3 p-3 rounded-lg border border-transparent hover:border-border hover:bg-muted/50 transition-all group overflow-hidden"
                   >
                     <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                       <Globe className="h-5 w-5 text-primary" />
                     </div>
                     
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-foreground truncate">
+                    <div className="flex-1 min-w-0 overflow-hidden">
+                      <div className="flex items-center gap-2 overflow-hidden">
+                        <span className="font-medium text-foreground truncate block">
                           {r.business_name ?? r.domain}
                         </span>
                         {r.discovery_source === 'manual' && (
@@ -247,20 +247,19 @@ export function CompetitorListDialog({
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
-                      {r.rating != null && (
-                        <div className="flex items-center gap-1 text-sm">
-                          <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-                          <span className="font-medium text-foreground">{r.rating.toFixed(1)}</span>
-                          {r.reviews_count != null && (
-                            <span className="text-muted-foreground text-xs">
-                              ({r.reviews_count})
-                            </span>
-                          )}
-                        </div>
-                      )}
-                      <ExternalLink className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </div>
+                    {r.rating != null && (
+                      <div className="flex items-center gap-1 text-sm shrink-0">
+                        <Star className="h-3.5 w-3.5 fill-amber-500 text-amber-500" />
+                        <span className="font-medium text-foreground">{r.rating.toFixed(1)}</span>
+                        {r.reviews_count != null && (
+                          <span className="text-muted-foreground text-xs">
+                            ({r.reviews_count})
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    
+                    <ExternalLink className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
                   </a>
                 ))}
 
