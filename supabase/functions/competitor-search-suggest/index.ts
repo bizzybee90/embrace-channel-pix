@@ -17,7 +17,7 @@ serve(async (req) => {
   }
 
   try {
-    const { query, location } = await req.json();
+    const { query, location, niche } = await req.json();
     
     if (!query || query.trim().length < 3) {
       return new Response(JSON.stringify({ suggestions: [] }), {
@@ -30,10 +30,15 @@ serve(async (req) => {
       throw new Error("FIRECRAWL_API_KEY is not configured");
     }
 
-    // Build search query with location context
-    const searchQuery = location 
-      ? `${query} ${location} UK business website`
-      : `${query} UK business website`;
+    // Build smarter search query with niche and location context
+    let searchQuery = query;
+    if (niche) {
+      searchQuery += ` ${niche}`;
+    }
+    if (location) {
+      searchQuery += ` ${location}`;
+    }
+    searchQuery += ' UK';
 
     console.log("Searching for:", searchQuery);
 

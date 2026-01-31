@@ -48,12 +48,14 @@ export function CompetitorListDialog({
   jobId,
   workspaceId,
   serviceArea,
+  nicheQuery,
   disabled,
   className,
 }: {
   jobId: string;
   workspaceId?: string;
   serviceArea?: string;
+  nicheQuery?: string;
   disabled?: boolean;
   className?: string;
 }) {
@@ -138,7 +140,7 @@ export function CompetitorListDialog({
     setIsSearching(true);
     try {
       const { data, error } = await supabase.functions.invoke('competitor-search-suggest', {
-        body: { query: searchQuery, location: serviceArea }
+        body: { query: searchQuery, location: serviceArea, niche: nicheQuery }
       });
 
       if (error) throw error;
@@ -157,7 +159,7 @@ export function CompetitorListDialog({
     } finally {
       setIsSearching(false);
     }
-  }, [serviceArea, rows]);
+  }, [serviceArea, nicheQuery, rows]);
 
   // Smart debounced search with domain detection
   useEffect(() => {
