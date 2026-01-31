@@ -53,6 +53,20 @@ serve(async (req) => {
     // STEP 2: Store scraped content
     // =========================================
     
+    // Get all competitor sites for this job to match domains
+    const { data: jobSites } = await supabase
+      .from('competitor_sites')
+      .select('id, domain')
+      .eq('job_id', jobId)
+    
+    const domainToSiteId = new Map<string, string>()
+    if (jobSites) {
+      for (const site of jobSites) {
+        domainToSiteId.set(site.domain.toLowerCase(), site.id)
+      }
+    }
+    console.log('[handle-scrape-complete] Domain mapping:', domainToSiteId.size, 'sites')
+
     const pageInserts = scrapedPages.map((page: any) => {
       let domain = ''
       try {
@@ -61,26 +75,51 @@ serve(async (req) => {
         domain = page.url
       }
       
+      // Find matching site_id for this page
+      const siteId = domainToSiteId.get(domain) || null
+      
+      // Determine page type based on URL patterns
+      let pageType = 'general'
+      const urlLower = page.url.toLowerCase()
+      if (urlLower.includes('faq') || urlLower.includes('frequently')) pageType = 'faq'
+      else if (urlLower.includes('pricing') || urlLower.includes('price') || urlLower.includes('cost')) pageType = 'pricing'
+      else if (urlLower.includes('service') || urlLower.includes('what-we-do')) pageType = 'services'
+      else if (urlLower.includes('about')) pageType = 'about'
+      else if (urlLower.includes('contact')) pageType = 'contact'
+      
       return {
-        job_id: jobId,
+        site_id: siteId,
         workspace_id: workspaceId,
         url: page.url,
         title: page.metadata?.title || page.title,
         content: page.markdown || page.text,
         word_count: (page.markdown || page.text || '').split(/\s+/).length,
+        page_type: pageType,
         scraped_at: new Date().toISOString(),
         faqs_extracted: false
       }
-    })
+    }).filter((p: any) => p.site_id !== null) // Only insert pages we can link to a site
+    
+    console.log('[handle-scrape-complete] Pages with valid site_id:', pageInserts.length, 'of', scrapedPages.length)
     
     if (pageInserts.length > 0) {
-      const { error: insertError } = await supabase
-        .from('competitor_pages')
-        .insert(pageInserts)
-      
-      if (insertError) {
-        console.error('[handle-scrape-complete] Insert error:', insertError)
+      // Insert in batches to avoid payload size limits
+      const BATCH_SIZE = 50
+      let insertedCount = 0
+      for (let i = 0; i < pageInserts.length; i += BATCH_SIZE) {
+        const batch = pageInserts.slice(i, i + BATCH_SIZE)
+        const { error: insertError, data: inserted } = await supabase
+          .from('competitor_pages')
+          .insert(batch)
+          .select('id')
+        
+        if (insertError) {
+          console.error('[handle-scrape-complete] Insert error batch', i, ':', insertError)
+        } else {
+          insertedCount += inserted?.length || 0
+        }
       }
+      console.log('[handle-scrape-complete] Total pages inserted:', insertedCount)
     }
 
     // Update job

@@ -126,6 +126,7 @@ serve(async (req) => {
     await supabase.from('competitor_research_jobs').update({
       status: 'scraping',
       sites_approved: selectedSites.length,
+      sites_validated: selectedSites.length, // Track validated = user-confirmed selection
       heartbeat_at: new Date().toISOString()
     }).eq('id', jobId)
 

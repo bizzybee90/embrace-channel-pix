@@ -67,8 +67,32 @@ serve(async (req) => {
       .limit(BATCH_SIZE);
 
     if (!pages || pages.length === 0) {
-      // No more pages - move to deduplication
-      console.log('[extract-faqs] No more pages, moving to deduplication');
+      // No more pages - check if this is a real "done" or a problem
+      const { count: totalPagesCount } = await supabase
+        .from('competitor_pages')
+        .select('*, site:competitor_sites!inner(job_id)', { count: 'exact', head: true })
+        .eq('site.job_id', jobId);
+      
+      if (totalPagesCount === 0) {
+        // No pages exist at all - something went wrong with scraping
+        console.error('[extract-faqs] ZERO pages found for job - scraping webhook may have failed');
+        await supabase.from('competitor_research_jobs').update({
+          status: 'failed',
+          error_message: 'No scraped pages found. The scraping webhook may have failed. Use "Recover Job" to retry.',
+        }).eq('id', jobId);
+        
+        return new Response(JSON.stringify({ 
+          success: false, 
+          error: 'No pages to extract - scraping may have failed',
+          hint: 'Use the Recover Job button to manually fetch Apify results'
+        }), {
+          status: 200, // Don't error, just report the issue
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+      
+      // Pages exist but all processed - move to deduplication
+      console.log('[extract-faqs] All pages processed, moving to deduplication');
       await supabase.from('competitor_research_jobs').update({
         status: 'deduplicating',
       }).eq('id', jobId);
