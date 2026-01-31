@@ -19,6 +19,74 @@ function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: numbe
   return R * c;
 }
 
+// Common exclusions that apply to most service businesses
+// These are clearly unrelated to the typical local service business
+const GENERIC_EXCLUSIONS = [
+  'car wash', 'hand car wash', 'valeting', 'valet',
+  'roofing', 'roofer', 'roof repair',
+  'windscreen', 'auto glass', 'car glass', 'windshield',
+  'estate agent', 'letting agent', 'property',
+  'accountant', 'solicitor', 'lawyer', 'legal',
+  'driving school', 'driving instructor',
+  'taxi', 'cab', 'minicab',
+  'takeaway', 'restaurant', 'cafe', 'pub',
+  'hairdresser', 'barber', 'beauty salon',
+  'dentist', 'optician', 'pharmacy',
+  'petrol', 'fuel', 'garage',
+];
+
+// Generate relevance score based on business name matching the niche query
+function scoreRelevance(
+  businessName: string,
+  nicheQuery: string,
+  location: string,
+  address: string | null
+): { score: number; reason: string } {
+  const name = businessName.toLowerCase();
+  const niche = nicheQuery.toLowerCase();
+  const addr = (address || '').toLowerCase();
+  
+  // Extract meaningful words from the niche query (skip short words like "and", "the")
+  const nicheWords = niche.split(/\s+/).filter(word => word.length > 3);
+  
+  // Check if business name contains any niche keyword
+  const matchesNiche = nicheWords.some(word => name.includes(word));
+  
+  // Check for obviously wrong categories
+  const isExcluded = GENERIC_EXCLUSIONS.some(excl => name.includes(excl));
+  
+  // Check if address contains target location (case-insensitive)
+  const locationLower = location.toLowerCase();
+  const inTargetArea = addr.includes(locationLower) || 
+    // Also check for UK postcode pattern for the location
+    (locationLower.length >= 2 && addr.includes(locationLower.substring(0, 2).toUpperCase()));
+  
+  // Scoring logic:
+  // - Excluded businesses get 0 (marked as Weak)
+  // - Matches niche + in target area = 100 (best match)
+  // - Matches niche only = 80
+  // - In target area only = 60 (local business, may need manual check)
+  // - Neither = 40 (needs manual review)
+  
+  if (isExcluded) {
+    return { score: 0, reason: 'Weak: Unrelated' };
+  }
+  
+  if (matchesNiche && inTargetArea) {
+    return { score: 100, reason: nicheQuery };
+  }
+  
+  if (matchesNiche) {
+    return { score: 80, reason: nicheQuery };
+  }
+  
+  if (inTargetArea) {
+    return { score: 60, reason: 'Local business' };
+  }
+  
+  return { score: 40, reason: 'Manual check' };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -72,17 +140,19 @@ serve(async (req) => {
       throw new Error('APIFY_API_KEY not configured')
     }
 
-    // Fetch job to get geocoded coordinates for distance calculation
+    // Fetch job to get geocoded coordinates and niche query for relevance scoring
     const { data: jobData } = await supabase
       .from('competitor_research_jobs')
-      .select('geocoded_lat, geocoded_lng')
+      .select('geocoded_lat, geocoded_lng, niche_query, location')
       .eq('id', jobId)
       .single();
     
     const jobLat = jobData?.geocoded_lat;
     const jobLng = jobData?.geocoded_lng;
+    const nicheQuery = jobData?.niche_query || '';
+    const targetLocation = jobData?.location || '';
     
-    console.log('[handle-discovery-complete] Job coordinates:', { jobLat, jobLng });
+    console.log('[handle-discovery-complete] Job data:', { jobLat, jobLng, nicheQuery, targetLocation });
 
     // Update job status to filtering
     await supabase.from('competitor_research_jobs').update({
@@ -165,6 +235,10 @@ serve(async (req) => {
         distanceMiles = Math.round(distanceMiles * 10) / 10; // Round to 1 decimal place
       }
       
+      // Calculate relevance score based on niche match and location
+      const businessName = place.title || place.name || '';
+      const relevance = scoreRelevance(businessName, nicheQuery, targetLocation, place.address);
+      
       // Build location_data for user review
       const locationData = {
         address: place.address,
@@ -180,7 +254,7 @@ serve(async (req) => {
       validCompetitors.push({
         job_id: jobId,
         workspace_id: workspaceId,
-        business_name: place.title || place.name,
+        business_name: businessName,
         url: websiteUrl,
         domain: hostname,
         place_id: place.placeId,
@@ -195,17 +269,30 @@ serve(async (req) => {
         discovery_source: 'google_places',
         status: 'approved',
         scrape_status: 'pending',
-        is_selected: true, // Default to selected for review
+        is_selected: relevance.score >= 40, // Only select if not weak match
         location_data: locationData,
+        match_reason: relevance.reason,
+        relevance_score: relevance.score, // Used for sorting only
       })
     }
 
-    // Sort by distance (closest first) before inserting
-    validCompetitors.sort((a, b) => (a.distance_miles ?? 999) - (b.distance_miles ?? 999));
+    // Sort by: (1) relevance score descending, (2) distance ascending
+    // This puts the best matches first, with closest ones within each tier
+    validCompetitors.sort((a, b) => {
+      // First by relevance score (higher is better)
+      if (a.relevance_score !== b.relevance_score) {
+        return (b.relevance_score ?? 0) - (a.relevance_score ?? 0);
+      }
+      // Then by distance (closer is better)
+      return (a.distance_miles ?? 999) - (b.distance_miles ?? 999);
+    });
     
     console.log('[handle-discovery-complete] Valid competitors:', validCompetitors.length, 'Filtered:', filteredOut.length);
     if (validCompetitors.length > 0) {
-      console.log('[handle-discovery-complete] Closest competitor:', validCompetitors[0].business_name, 'at', validCompetitors[0].distance_miles, 'miles');
+      console.log('[handle-discovery-complete] Top competitor:', validCompetitors[0].business_name, 
+        'score:', validCompetitors[0].relevance_score, 
+        'reason:', validCompetitors[0].match_reason,
+        'at', validCompetitors[0].distance_miles, 'miles');
     }
 
     // =========================================
@@ -219,12 +306,15 @@ serve(async (req) => {
     if (validCompetitors.length > 0) {
       // Process each competitor individually to handle upsert correctly
       for (const comp of validCompetitors) {
+        // Remove relevance_score before inserting (not a DB column)
+        const { relevance_score, ...compData } = comp;
+        
         // Check if site already exists
         const { data: existing } = await supabase
           .from('competitor_sites')
           .select('id, job_id')
           .eq('workspace_id', workspaceId)
-          .eq('url', comp.url)
+          .eq('url', compData.url)
           .maybeSingle()
         
         if (existing) {
@@ -235,8 +325,9 @@ serve(async (req) => {
               job_id: jobId,
               status: 'approved',
               scrape_status: 'pending',
-              is_selected: true,
-              location_data: comp.location_data,
+              is_selected: compData.is_selected,
+              location_data: compData.location_data,
+              match_reason: compData.match_reason,
               discovered_at: new Date().toISOString()
             })
             .eq('id', existing.id)
@@ -246,7 +337,7 @@ serve(async (req) => {
           // Insert new site
           const { error: insertError } = await supabase
             .from('competitor_sites')
-            .insert(comp)
+            .insert(compData)
           
           if (!insertError) insertedCount++
         }
