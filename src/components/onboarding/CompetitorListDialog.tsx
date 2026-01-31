@@ -446,9 +446,8 @@ export function CompetitorListDialog({
           <p className="text-sm text-muted-foreground">Loading competitors…</p>
         </div>
       ) : (
-        <ScrollArea className="h-[340px] rounded-lg border border-border bg-muted/20">
-           {/* Add right padding so action icons don't sit under the scroll bar */}
-           <div className="p-2 pr-10 space-y-1">
+        <div className="h-[340px] rounded-lg border border-border bg-muted/20 overflow-y-auto">
+          <div className="p-2 space-y-1">
             {filtered.map((r) => (
               <div
                 key={r.id}
@@ -539,7 +538,7 @@ export function CompetitorListDialog({
               </div>
             )}
           </div>
-        </ScrollArea>
+        </div>
       )}
         </div>
       </DialogContent>
