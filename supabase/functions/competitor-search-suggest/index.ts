@@ -42,7 +42,7 @@ serve(async (req) => {
 
     console.log("Searching for:", searchQuery);
 
-    // Use Firecrawl's search endpoint
+    // Use Firecrawl's search endpoint - no scraping for speed
     const response = await fetch("https://api.firecrawl.dev/v1/search", {
       method: "POST",
       headers: {
@@ -51,10 +51,8 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         query: searchQuery,
-        limit: 10,
-        scrapeOptions: {
-          formats: ["markdown"],
-        },
+        limit: 8,
+        // No scrapeOptions = faster search-only mode
       }),
     });
 
