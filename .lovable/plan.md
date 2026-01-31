@@ -1,142 +1,171 @@
 
-# Fix: Distance-Based Competitor Sorting
+# Fix: Dynamic Industry-Aware Competitor Filtering
 
-## The Problem
+## Overview
 
-Your competitor list shows Bedford businesses instead of Luton ones because:
+Make the competitor discovery and filtering work for **any business type** the user searches for, not just window cleaning. The system will dynamically generate relevant keywords based on the user's industry input.
 
-1. **Apify returns results in Google's ranking order** - not by distance
-2. **Google prioritizes ratings/reviews** over proximity in its search results
-3. **We never calculate or sort by distance** even though we have coordinates
+## How It Works
 
-From the database, there are literally **zero businesses with "Luton" in their address** despite Luton being the target location.
+### Dynamic Keyword Generation
 
-## The Solution
+Instead of hardcoded lists, we'll use AI to generate industry-specific keywords on-the-fly:
 
-We need a **two-part fix**:
+```text
+User searches: "Plumber Luton"
+→ Exact matches: plumber, plumbing, heating engineer
+→ Related services: boiler repair, gas engineer, bathroom fitter
+→ Exclusions: electrician, builder, roofer, locksmith
+```
 
-### Part 1: Calculate Distance During Discovery
+```text
+User searches: "Dog Grooming Manchester"
+→ Exact matches: dog grooming, pet grooming, dog salon
+→ Related services: pet spa, mobile dog grooming, dog wash
+→ Exclusions: dog walking, pet sitting, vet, kennels
+```
 
-When the Apify webhook returns results, we need to:
-- Extract each business's lat/lng from the `location` field
-- Calculate distance from job's geocoded center using Haversine formula
-- Store distance in `competitor_sites.distance_miles`
-
-### Part 2: Sort by Distance + Show in UI
-
-- Sort results by distance (closest first) before inserting
-- Display distance in the review UI
-- Limit to the closest N competitors that meet the target count
+This approach means ANY industry the user enters will get intelligent filtering without needing to maintain hardcoded keyword lists.
 
 ## Technical Changes
 
 ### File 1: `supabase/functions/handle-discovery-complete/index.ts`
 
-Add distance calculation using job's geocoded coordinates:
+Add dynamic relevance scoring using the job's `niche_query`:
 
 ```text
-Current flow:
-1. Fetch places from Apify
-2. Filter out directories/social media  
-3. Insert to database (unsorted)
-
-New flow:
-1. Fetch places from Apify
-2. Filter out directories/social media
-3. For each place with location.lat/lng:
-   - Calculate distance from job's geocoded_lat/lng
-   - Store in distance_miles field
-4. Sort by distance (closest first)
-5. Insert to database in sorted order
+Changes:
+1. Fetch job's niche_query alongside coordinates
+2. Generate keywords dynamically from the niche
+3. Score each result based on business name matching
+4. Add match_reason field to each competitor
+5. Sort by: (1) address contains location, (2) relevance score, (3) distance
 ```
 
-Key code addition:
-```
-// Haversine formula for distance calculation
-function haversineDistance(lat1, lng1, lat2, lng2) {
-  const R = 3959; // Earth radius in miles
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLng = (lng2 - lng1) * Math.PI / 180;
-  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-            Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) *
-            Math.sin(dLng/2) * Math.sin(dLng/2);
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+Key logic:
+```typescript
+// Generate keywords from the user's niche query
+function generateKeywords(niche: string) {
+  const nicheWords = niche.toLowerCase().split(/\s+/);
+  const exactKeywords = nicheWords; // "window", "cleaning"
+  
+  // Common exclusions that apply to most service businesses
+  const genericExclusions = [
+    'car wash', 'hand car wash', 'valeting',
+    'roofing', 'roofer', 'solar panel',
+    'windscreen', 'auto glass', 'car glass',
+    'estate agent', 'letting agent',
+    'accountant', 'solicitor', 'lawyer'
+  ];
+  
+  return { exactKeywords, genericExclusions };
 }
 
-// For each place, calculate distance from center
-const jobLat = job.geocoded_lat;
-const jobLng = job.geocoded_lng;
-
-for (const place of places) {
-  if (place.location?.lat && place.location?.lng) {
-    distance_miles = haversineDistance(jobLat, jobLng, place.location.lat, place.location.lng);
-  }
+// Score each business based on relevance
+function scoreRelevance(businessName: string, niche: string, location: string) {
+  const name = businessName.toLowerCase();
+  const nicheWords = niche.toLowerCase().split(/\s+/);
+  
+  // Check if business name contains niche keywords
+  const matchesNiche = nicheWords.some(word => 
+    word.length > 3 && name.includes(word)
+  );
+  
+  // Check for obviously wrong categories
+  const isExcluded = genericExclusions.some(excl => name.includes(excl));
+  
+  // Check if address contains target location
+  const inTargetArea = address?.toLowerCase().includes(location.toLowerCase());
+  
+  if (isExcluded) return { score: 0, reason: 'Weak: Unrelated' };
+  if (matchesNiche && inTargetArea) return { score: 100, reason: niche };
+  if (matchesNiche) return { score: 80, reason: niche };
+  if (inTargetArea) return { score: 60, reason: 'Local business' };
+  return { score: 40, reason: 'Manual check' };
 }
-
-// Sort by distance before inserting
-validCompetitors.sort((a, b) => (a.distance_miles || 999) - (b.distance_miles || 999));
 ```
 
-### File 2: Add `distance_miles` Column
+### File 2: `supabase/functions/start-competitor-research/index.ts`
 
-Database migration to add the column if not present:
+Include location in search terms for any industry:
+
+```text
+Current:
+searchStringsArray: [industry]
+
+New:
+searchStringsArray: [
+  `${industry} ${location}`,          // "Plumber Luton"
+  `${industry} services ${location}`, // "Plumber services Luton"  
+  `${industry} near ${location}`,     // "Plumber near Luton"
+]
+```
+
+### File 3: Database Migration
+
+Add `match_reason` column to store why each competitor was included:
+
 ```sql
 ALTER TABLE competitor_sites 
-ADD COLUMN IF NOT EXISTS distance_miles DECIMAL(5,1);
+ADD COLUMN IF NOT EXISTS match_reason TEXT;
 ```
 
-### File 3: `src/components/onboarding/CompetitorReviewScreen.tsx`
+### File 4: `src/components/onboarding/CompetitorReviewScreen.tsx`
 
-Update the competitor row display to:
-- Show distance badge ("2.3 mi")
-- Sort by distance by default
-- Add action buttons (External Link, Delete) that were missing
+Display match reason badge with appropriate styling:
 
 ```text
-<div className="flex items-center gap-3 p-3">
-  <Checkbox ... />
-  <div className="flex-1">
-    <span>{business_name}</span>
-    {distance_miles && (
-      <Badge variant="outline">{distance_miles} mi</Badge>
-    )}
-    <span className="text-muted-foreground">{domain}</span>
-  </div>
-  <div className="flex gap-1">
-    <Button variant="ghost" size="icon" asChild>
-      <a href={url} target="_blank"><ExternalLink /></a>
-    </Button>
-    <Button variant="ghost" size="icon" onClick={handleDelete}>
-      <X />
-    </Button>
-  </div>
-</div>
+Badge colors:
+- Green (default): Exact industry match (e.g., "Window Cleaning")
+- Blue (secondary): Related service (e.g., "Related: Gutter Cleaning")
+- Amber (outline): Weak match (e.g., "Weak: Check manually")
+- Gray: "Manual check" or "Local business"
 ```
 
-### File 4: `supabase/functions/start-competitor-research/index.ts`
+## Sorting Priority (Any Industry)
 
-Increase the request count to get more results before distance filtering:
-```
-// Request 3x target to account for:
-// - ~40% filtering loss (no website, directories, social)
-// - Distance-based trimming (some might be too far)
-const crawlLimit = Math.min(maxCompetitors * 3, 300);
-```
+Results will be sorted in this order:
 
-## Expected Outcome
+1. **In target area + matches industry** (score 100)
+   - Address contains "Luton" AND name contains "window" or "cleaning"
+   
+2. **Matches industry** (score 80)
+   - Name contains niche keywords but may be nearby town
+   
+3. **In target area** (score 60)
+   - Address in Luton but business name unclear
+   
+4. **Other** (score 40)
+   - Nearby businesses that need manual review
 
-After these changes:
-1. A search for "Window Cleaning in Luton" will show Luton businesses first
-2. Bedford businesses will still appear but further down the list
-3. Users can see how far each competitor is from their target area
-4. The "0 valid websites" display bug will be fixed
-5. Delete and external link buttons will be restored
+5. **Excluded** (score 0)
+   - Obviously unrelated (car wash, roofing, etc.) - filtered out or marked "Weak"
+
+## Example Results
+
+**User searches: "Accountant Leeds"**
+
+| Business | Match Reason | Distance |
+|----------|--------------|----------|
+| Smith & Co Accountants | Accountant ✓ | 0.5 mi |
+| Leeds Accounting Services | Accountant ✓ | 1.2 mi |
+| Bradford Tax Advisors | Related: Tax | 8.4 mi |
+| Yorkshire Business Services | Manual check | 3.1 mi |
+| ~~Leeds Roofing Co~~ | ~~Weak: Unrelated~~ | - |
 
 ## Files to Modify
 
 | File | Change |
 |------|--------|
-| `supabase/functions/handle-discovery-complete/index.ts` | Add distance calculation and sorting |
-| `supabase/functions/start-competitor-research/index.ts` | Increase crawl limit to 3x |
-| `src/components/onboarding/CompetitorReviewScreen.tsx` | Add distance display, delete/link buttons |
-| Database migration | Add `distance_miles` column |
+| `supabase/functions/start-competitor-research/index.ts` | Include location in search terms (already done in previous plan) |
+| `supabase/functions/handle-discovery-complete/index.ts` | Add dynamic relevance scoring using job's niche_query |
+| `src/components/onboarding/CompetitorReviewScreen.tsx` | Display match_reason badge with color coding |
+| Database migration | Add `match_reason` column to competitor_sites |
+
+## Expected Outcome
+
+1. Works for **any business type** - plumbers, accountants, dog groomers, etc.
+2. Luton/local businesses appear first (address-based priority)
+3. Irrelevant businesses (car wash, roofing) marked as "Weak" or filtered out
+4. Each competitor shows why it was included
+5. No hardcoded industry lists - fully dynamic based on user input
