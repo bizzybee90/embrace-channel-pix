@@ -212,7 +212,7 @@ export function CompetitorListDialog({
           scrape_status: 'pending',
           is_selected: true,
         })
-        .select('id,business_name,url,domain,rating,reviews_count,discovery_source')
+        .select('id,business_name,url,domain,rating,reviews_count,discovery_source,scrape_status')
         .single();
 
       if (error) throw error;
@@ -267,7 +267,7 @@ export function CompetitorListDialog({
           scrape_status: 'pending',
           is_selected: true,
         })
-        .select('id,business_name,url,domain,rating,reviews_count,discovery_source')
+        .select('id,business_name,url,domain,rating,reviews_count,discovery_source,scrape_status')
         .single();
 
       if (error) throw error;
