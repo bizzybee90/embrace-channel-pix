@@ -435,6 +435,7 @@ export function CompetitorPipelineProgress({
         onConfirm={handleReviewConfirm}
         onBack={onBack}
         onSkip={() => onComplete({ sitesScraped: 0, faqsGenerated: 0 })}
+        onRestart={onRestartNow}
       />
     );
   }
