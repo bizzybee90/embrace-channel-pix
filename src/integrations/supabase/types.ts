@@ -851,6 +851,7 @@ export type Database = {
           latitude: number | null
           location_data: Json | null
           longitude: number | null
+          match_reason: string | null
           pages_scraped: number | null
           phone: string | null
           place_id: string | null
@@ -899,6 +900,7 @@ export type Database = {
           latitude?: number | null
           location_data?: Json | null
           longitude?: number | null
+          match_reason?: string | null
           pages_scraped?: number | null
           phone?: string | null
           place_id?: string | null
@@ -947,6 +949,7 @@ export type Database = {
           latitude?: number | null
           location_data?: Json | null
           longitude?: number | null
+          match_reason?: string | null
           pages_scraped?: number | null
           phone?: string | null
           place_id?: string | null

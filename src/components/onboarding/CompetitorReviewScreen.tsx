@@ -45,6 +45,7 @@ interface Competitor {
   discovery_source: string | null;
   location_data: any;
   distance_miles: number | null;
+  match_reason: string | null;
 }
 
 interface CompetitorReviewScreenProps {
@@ -89,7 +90,7 @@ export function CompetitorReviewScreen({
       try {
         const { data, error } = await supabase
           .from('competitor_sites')
-          .select('id, business_name, domain, url, rating, reviews_count, is_selected, discovery_source, location_data, distance_miles')
+          .select('id, business_name, domain, url, rating, reviews_count, is_selected, discovery_source, location_data, distance_miles, match_reason')
           .eq('job_id', jobId)
           .order('distance_miles', { ascending: true, nullsFirst: false });
 
@@ -359,6 +360,24 @@ export function CompetitorReviewScreen({
                     {competitor.discovery_source === 'manual' && (
                       <Badge variant="secondary" className="text-xs">
                         Manual
+                      </Badge>
+                    )}
+                    {competitor.match_reason && (
+                      <Badge 
+                        variant={
+                          competitor.match_reason.startsWith('Weak') ? 'outline' :
+                          competitor.match_reason === 'Local business' ? 'secondary' :
+                          competitor.match_reason === 'Manual check' ? 'outline' :
+                          'default'
+                        }
+                        className={cn(
+                          'text-xs',
+                          competitor.match_reason.startsWith('Weak') && 'text-amber-600 border-amber-300 bg-amber-50',
+                          competitor.match_reason === 'Local business' && 'text-blue-600 border-blue-300 bg-blue-50',
+                          competitor.match_reason === 'Manual check' && 'text-muted-foreground'
+                        )}
+                      >
+                        {competitor.match_reason}
                       </Badge>
                     )}
                     {isSuspiciousDomain(competitor.domain) && (

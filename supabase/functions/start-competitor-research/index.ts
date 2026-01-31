@@ -187,8 +187,14 @@ serve(async (req) => {
     // and distance-based trimming (some results may be too far). Cap at 300.
     const crawlLimit = Math.min(maxCompetitors * 3, 300);
     
+    // Include location in search terms to force Google to prioritize local results
+    // This ensures "Window Cleaning Luton" finds Luton businesses, not just nearby ones
     const apifyInput = {
-      searchStringsArray: [industry],
+      searchStringsArray: [
+        `${industry} ${location}`,            // "Window Cleaning Luton"
+        `${industry} services ${location}`,   // "Window Cleaning services Luton"
+        `${industry} near ${location}`,       // "Window Cleaning near Luton"
+      ],
       locationQuery: `${location}, UK`,
       maxCrawledPlacesPerSearch: crawlLimit,
       language: "en",
