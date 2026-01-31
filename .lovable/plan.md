@@ -1,121 +1,142 @@
 
-# Competitor Research Pipeline: Complete Fix
+# Fix: Distance-Based Competitor Sorting
 
-## Problems Identified
+## The Problem
 
-### Problem 1: "0 Valid Websites"
-The UI shows `sites_validated: 0` because:
-- The pipeline uses **Apify deep scraping** (not the Firecrawl-based `competitor-scrape-worker`)
-- When Apify webhook fires, `handle-scrape-complete` stores pages in `competitor_pages` table
-- But it updates `competitor_sites.scrape_status` to `'completed'` without properly tracking "validated" count
-- The job shows `sites_validated: 0` even though 59 sites were scraped
+Your competitor list shows Bedford businesses instead of Luton ones because:
 
-**Root cause**: The `sites_validated` column is never being set correctly. The pipeline skips a proper validation step.
+1. **Apify returns results in Google's ranking order** - not by distance
+2. **Google prioritizes ratings/reviews** over proximity in its search results
+3. **We never calculate or sort by distance** even though we have coordinates
 
-### Problem 2: Stage 4 Stuck "In Progress" for Days
-The job `e22e8b39-5c4f-4569-95cc-2252aa44e2f7` shows:
-- Status: `extracting` (stuck since Jan 30)
-- 59 sites completed scraping, 48 pages scraped
-- Only 1 page exists in `competitor_pages` table (from a different old job)
-- **The Apify webhook likely never fired** or failed silently
+From the database, there are literally **zero businesses with "Luton" in their address** despite Luton being the target location.
 
-**Root cause**: `handle-scrape-complete` was never called (no logs found), OR the scraped data wasn't stored in `competitor_pages`. Without pages in that table, `extract-competitor-faqs` finds 0 pages and exits immediately.
+## The Solution
 
-### Problem 3: Scraping Only Gets Homepages
-Looking at the scraped data:
-- `pages_scraped: 0` for all completed sites
-- Content is stored directly in `competitor_sites.content_extracted` (max 5000 chars)
-- This is from the OLD `competitor-scrape-worker` function using Firecrawl
+We need a **two-part fix**:
 
-But the NEW pipeline uses Apify with `maxCrawlDepth: 2` and should scrape 8 pages per site. The confusion is that **two different scraping paths exist**:
-1. **Apify path** (used by `competitor-scrape-start`) → stores in `competitor_pages` → uses `extract-competitor-faqs`
-2. **Firecrawl path** (used by `competitor-scrape-worker`) → stores in `competitor_sites.content_extracted` → uses `competitor-faq-per-site`
+### Part 1: Calculate Distance During Discovery
 
-### Problem 4: Runaway Costs
-The extraction function keeps self-invoking when it finds 0 pages, then exits silently. The job stays in `extracting` status forever. Meanwhile, the UI keeps polling, and any manual retries might spin up duplicate processes.
+When the Apify webhook returns results, we need to:
+- Extract each business's lat/lng from the `location` field
+- Calculate distance from job's geocoded center using Haversine formula
+- Store distance in `competitor_sites.distance_miles`
 
----
+### Part 2: Sort by Distance + Show in UI
 
-## Solution: Unified Pipeline with Recovery
-
-### Phase 1: Fix the Current Stalled Job
-
-1. **Add a "Recover Stalled Job" button** that:
-   - Checks if Apify run completed (using `scrape_run_id`)
-   - Manually fetches dataset if webhook failed
-   - Re-triggers extraction if pages exist
-   - Marks job as `failed` with clear error if unrecoverable
-
-2. **Fix the status tracking** to correctly show:
-   - `sites_validated` = count of sites that were selected for scraping
-   - `sites_scraped` = count of sites with successful content
-
-### Phase 2: Consolidate on Single Pipeline
-
-Choose ONE scraping approach (recommend **Apify** for reliability):
-- Remove or deprecate `competitor-scrape-worker` (Firecrawl path)
-- Ensure `handle-scrape-complete` properly stores all pages
-- Add fallback polling if webhook doesn't arrive within 10 minutes
-
-### Phase 3: Add Pipeline Watchdog Integration
-
-Extend the existing `pipeline-watchdog` to:
-- Detect jobs stuck in `extracting` for >15 minutes with 0 FAQs extracted
-- Check Apify run status directly
-- Either recover the data or mark job as failed
-
----
+- Sort results by distance (closest first) before inserting
+- Display distance in the review UI
+- Limit to the closest N competitors that meet the target count
 
 ## Technical Changes
 
-### File 1: `src/components/onboarding/CompetitorReviewScreen.tsx`
-- Update status text to show "Valid Websites: X of Y selected" (not 0)
-- Use `sites_approved` count instead of `sites_validated`
+### File 1: `supabase/functions/handle-discovery-complete/index.ts`
 
-### File 2: `supabase/functions/competitor-scrape-start/index.ts`
-- Set `sites_validated = selectedSites.length` when starting scrape (they've been validated by user selection)
+Add distance calculation using job's geocoded coordinates:
 
-### File 3: `supabase/functions/handle-scrape-complete/index.ts`
-- Add logging to confirm webhook received
-- Ensure ALL scraped pages get inserted (current code looks correct but may have issues with large datasets)
-- Add error handling for Apify dataset fetch failures
+```text
+Current flow:
+1. Fetch places from Apify
+2. Filter out directories/social media  
+3. Insert to database (unsorted)
 
-### File 4: `supabase/functions/extract-competitor-faqs/index.ts`
-- **Critical fix**: When 0 pages found, check if this is a bug vs expected
-- If `job.pages_scraped > 0` but `competitor_pages` count is 0 → something went wrong → mark job as `error`
-- Prevent infinite self-invocation on empty data
+New flow:
+1. Fetch places from Apify
+2. Filter out directories/social media
+3. For each place with location.lat/lng:
+   - Calculate distance from job's geocoded_lat/lng
+   - Store in distance_miles field
+4. Sort by distance (closest first)
+5. Insert to database in sorted order
+```
 
-### File 5: NEW `supabase/functions/recover-competitor-job/index.ts`
-- Manual recovery function that:
-  1. Fetches Apify run status using `scrape_run_id`
-  2. If succeeded, fetches dataset and stores pages
-  3. Triggers extraction
-  4. If failed, marks job with error message
+Key code addition:
+```
+// Haversine formula for distance calculation
+function haversineDistance(lat1, lng1, lat2, lng2) {
+  const R = 3959; // Earth radius in miles
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) *
+            Math.sin(dLng/2) * Math.sin(dLng/2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
 
-### File 6: `src/components/onboarding/CompetitorPipelineProgress.tsx`
-- Show "Recover" button when job is stalled (>15 min in extracting with 0 FAQs)
-- Use `sites_approved` for "validated" display
-- Add elapsed timer for Stage 4 extraction like Stage 1 has
+// For each place, calculate distance from center
+const jobLat = job.geocoded_lat;
+const jobLng = job.geocoded_lng;
 
----
+for (const place of places) {
+  if (place.location?.lat && place.location?.lng) {
+    distance_miles = haversineDistance(jobLat, jobLng, place.location.lat, place.location.lng);
+  }
+}
 
-## Summary of Fixes
+// Sort by distance before inserting
+validCompetitors.sort((a, b) => (a.distance_miles || 999) - (b.distance_miles || 999));
+```
 
-| Issue | Root Cause | Fix |
-|-------|------------|-----|
-| 0 valid websites | `sites_validated` never set | Set it in `competitor-scrape-start` |
-| Stage 4 stuck | Webhook never fired or pages not stored | Add recovery function + watchdog |
-| Only homepage scraped | Confusion - actually uses Apify depth 2 | Data just wasn't retrieved properly |
-| Runaway costs | Extraction self-invokes on empty data | Add early exit + error status |
+### File 2: Add `distance_miles` Column
 
----
+Database migration to add the column if not present:
+```sql
+ALTER TABLE competitor_sites 
+ADD COLUMN IF NOT EXISTS distance_miles DECIMAL(5,1);
+```
 
-## Files to Create/Modify
+### File 3: `src/components/onboarding/CompetitorReviewScreen.tsx`
 
-| File | Action |
+Update the competitor row display to:
+- Show distance badge ("2.3 mi")
+- Sort by distance by default
+- Add action buttons (External Link, Delete) that were missing
+
+```text
+<div className="flex items-center gap-3 p-3">
+  <Checkbox ... />
+  <div className="flex-1">
+    <span>{business_name}</span>
+    {distance_miles && (
+      <Badge variant="outline">{distance_miles} mi</Badge>
+    )}
+    <span className="text-muted-foreground">{domain}</span>
+  </div>
+  <div className="flex gap-1">
+    <Button variant="ghost" size="icon" asChild>
+      <a href={url} target="_blank"><ExternalLink /></a>
+    </Button>
+    <Button variant="ghost" size="icon" onClick={handleDelete}>
+      <X />
+    </Button>
+  </div>
+</div>
+```
+
+### File 4: `supabase/functions/start-competitor-research/index.ts`
+
+Increase the request count to get more results before distance filtering:
+```
+// Request 3x target to account for:
+// - ~40% filtering loss (no website, directories, social)
+// - Distance-based trimming (some might be too far)
+const crawlLimit = Math.min(maxCompetitors * 3, 300);
+```
+
+## Expected Outcome
+
+After these changes:
+1. A search for "Window Cleaning in Luton" will show Luton businesses first
+2. Bedford businesses will still appear but further down the list
+3. Users can see how far each competitor is from their target area
+4. The "0 valid websites" display bug will be fixed
+5. Delete and external link buttons will be restored
+
+## Files to Modify
+
+| File | Change |
 |------|--------|
-| `supabase/functions/competitor-scrape-start/index.ts` | Modify - set `sites_validated` |
-| `supabase/functions/handle-scrape-complete/index.ts` | Modify - add logging, fix domain matching |
-| `supabase/functions/extract-competitor-faqs/index.ts` | Modify - add empty page guard |
-| `supabase/functions/recover-competitor-job/index.ts` | Create - manual recovery function |
-| `src/components/onboarding/CompetitorPipelineProgress.tsx` | Modify - add recovery UI, fix validated display |
+| `supabase/functions/handle-discovery-complete/index.ts` | Add distance calculation and sorting |
+| `supabase/functions/start-competitor-research/index.ts` | Increase crawl limit to 3x |
+| `src/components/onboarding/CompetitorReviewScreen.tsx` | Add distance display, delete/link buttons |
+| Database migration | Add `distance_miles` column |
