@@ -66,6 +66,26 @@ export function CompetitorListDialog({
   const [isSearching, setIsSearching] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isAddingUrl, setIsAddingUrl] = useState(false);
+  const [directDomainOption, setDirectDomainOption] = useState<string | null>(null);
+
+  // Detect if input looks like a domain (contains "." with no spaces)
+  const isDomainLike = (input: string): boolean => {
+    const trimmed = input.trim().toLowerCase();
+    return trimmed.includes('.') && !trimmed.includes(' ') && trimmed.length > 2;
+  };
+
+  // Extract clean domain from input
+  const extractDomain = (input: string): string => {
+    let clean = input.trim().toLowerCase();
+    if (!clean.startsWith('http://') && !clean.startsWith('https://')) {
+      clean = 'https://' + clean;
+    }
+    try {
+      return new URL(clean).hostname.replace(/^www\./, '');
+    } catch {
+      return input.trim().replace(/^(https?:\/\/)?(www\.)?/i, '').split('/')[0];
+    }
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -139,16 +159,30 @@ export function CompetitorListDialog({
     }
   }, [serviceArea, rows]);
 
-  // Debounce search input
+  // Smart debounced search with domain detection
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (searchInput.trim().length >= 3) {
-        searchForSuggestions(searchInput);
+      const trimmed = searchInput.trim();
+      
+      // Mode 1: Domain detected — show instant add option (no API call)
+      if (isDomainLike(trimmed)) {
+        const domain = extractDomain(trimmed);
+        setDirectDomainOption(domain);
+        setSuggestions([]);
+        setShowSuggestions(false);
+        return;
+      }
+      
+      // Mode 2: Keyword search — need 5+ chars before searching
+      setDirectDomainOption(null);
+      if (trimmed.length >= 5) {
+        searchForSuggestions(trimmed);
       } else {
         setSuggestions([]);
         setShowSuggestions(false);
       }
-    }, 400);
+    }, 800); // Longer debounce to wait for meaningful input
+    
     return () => clearTimeout(timer);
   }, [searchInput, searchForSuggestions]);
 
@@ -347,8 +381,8 @@ export function CompetitorListDialog({
                     onChange={(e) => setSearchInput(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleAddManualUrl()}
                     onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
-                    onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
-                    placeholder="Search or add URL (e.g., window cleaning bicester)"
+                    onBlur={() => setTimeout(() => { setShowSuggestions(false); }, 150)}
+                    placeholder="Paste a URL or search by business name..."
                     className="pl-10 bg-background border-border"
                     disabled={isAddingUrl}
                   />
@@ -368,8 +402,33 @@ export function CompetitorListDialog({
                 </Button>
               </div>
 
+              {/* Direct domain detection — instant add option */}
+              {directDomainOption && !showSuggestions && (
+                <div className="mt-2 rounded-lg border border-primary/30 bg-primary/5 p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Globe className="h-5 w-5 text-primary shrink-0" />
+                      <span className="font-medium text-foreground truncate">{directDomainOption}</span>
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={handleAddManualUrl}
+                      disabled={isAddingUrl}
+                      className="shrink-0"
+                    >
+                      {isAddingUrl ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                      ) : (
+                        <Plus className="h-4 w-4 mr-1" />
+                      )}
+                      Add Website
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               {/* Search suggestions (inline panel to avoid overlaying the list) */}
-              {showSuggestions && (isSearching || suggestions.length > 0) && (
+              {showSuggestions && !directDomainOption && (isSearching || suggestions.length > 0) && (
                 <div className="mt-2 rounded-lg border border-border bg-popover overflow-hidden">
                   <div className="px-3 py-2 text-xs font-medium text-muted-foreground border-b border-border">
                     Suggestions
