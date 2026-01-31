@@ -6,6 +6,17 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { 
   Search, 
   Plus, 
@@ -18,7 +29,8 @@ import {
   Sparkles,
   ExternalLink,
   X,
-  MapPin
+  MapPin,
+  RotateCcw
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -43,6 +55,7 @@ interface CompetitorReviewScreenProps {
   onConfirm: (selectedCount: number) => void;
   onBack: () => void;
   onSkip: () => void;
+  onRestart?: () => void;
 }
 
 // Known directories that might slip through - show warning badge
@@ -60,6 +73,7 @@ export function CompetitorReviewScreen({
   onConfirm,
   onBack,
   onSkip,
+  onRestart,
 }: CompetitorReviewScreenProps) {
   const [competitors, setCompetitors] = useState<Competitor[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -437,14 +451,60 @@ export function CompetitorReviewScreen({
           </span>
         </div>
 
-        <div className="flex gap-3">
-          <Button variant="outline" onClick={onBack} className="flex-1">
+        <div className="flex gap-2 flex-wrap">
+          <Button variant="outline" onClick={onBack}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
+          
+          {onRestart && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline">
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  Redo
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Restart Competitor Research?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Choose how you'd like to redo the competitor discovery:
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <div className="space-y-3 py-4">
+                  <Button 
+                    className="w-full justify-start" 
+                    variant="outline"
+                    onClick={() => {
+                      onRestart();
+                    }}
+                  >
+                    <RotateCcw className="h-4 w-4 mr-2" />
+                    Restart & run discovery
+                    <span className="ml-auto text-xs text-muted-foreground">Fresh search</span>
+                  </Button>
+                  <Button 
+                    className="w-full justify-start" 
+                    variant="outline"
+                    onClick={onBack}
+                  >
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Back to setup
+                    <span className="ml-auto text-xs text-muted-foreground">Change niche/area</span>
+                  </Button>
+                </div>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+          
           <Button variant="ghost" onClick={onSkip}>
             Skip
           </Button>
+          
           <Button 
             onClick={handleConfirm} 
             disabled={selectedCount === 0 || isSubmitting}
