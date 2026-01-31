@@ -644,25 +644,27 @@ export function CompetitorPipelineProgress({
               
               {/* Show recovery button if stalled */}
               {isExtractionStalled && (
-                <div className="p-2 bg-warning/10 border border-warning/30 rounded-lg">
-                  <p className="text-xs text-warning-foreground mb-2">
-                    Extraction seems stalled. The scraping webhook may have failed.
-                  </p>
+                <div className="mt-3 p-3 bg-muted/50 border border-border rounded-lg space-y-2">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="h-4 w-4 text-warning mt-0.5 shrink-0" />
+                    <p className="text-xs text-muted-foreground">
+                      This stage seems stuck. The webhook may not have delivered the scraped data.
+                    </p>
+                  </div>
                   <Button
                     size="sm"
-                    variant="outline"
                     onClick={handleRecoverJob}
                     disabled={isRecovering}
                     className="w-full gap-2"
                   >
                     {isRecovering ? (
                       <>
-                        <Loader2 className="h-3 w-3 animate-spin" />
+                        <Loader2 className="h-4 w-4 animate-spin" />
                         Recovering...
                       </>
                     ) : (
                       <>
-                        <RefreshCw className="h-3 w-3" />
+                        <RefreshCw className="h-4 w-4" />
                         Recover Stalled Job
                       </>
                     )}
