@@ -7,6 +7,7 @@ const corsHeaders = {
 }
 
 const FUNCTION_NAME = 'refine-competitor-faqs'
+const MAX_ITERATIONS = 100; // Max 2000 FAQs total (20 per batch)
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -14,9 +15,41 @@ serve(async (req) => {
   }
 
   try {
-    const { jobId, workspaceId } = await req.json()
+    const { jobId, workspaceId, iteration = 0 } = await req.json()
     
-    console.log(`[${FUNCTION_NAME}] Starting refinement for job:`, jobId)
+    console.log(`[${FUNCTION_NAME}] Starting refinement (iteration ${iteration}):`, jobId)
+
+    // =========================================
+    // GUARD 1: Max iterations check
+    // =========================================
+    if (iteration >= MAX_ITERATIONS) {
+      console.log(`[${FUNCTION_NAME}] Max iterations reached, completing job`);
+      
+      const supabase = createClient(
+        Deno.env.get('SUPABASE_URL')!,
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+      );
+
+      // Mark remaining FAQs as skipped
+      await supabase.from('competitor_faqs_raw')
+        .update({ is_refined: true, skipped_reason: 'max_iterations_reached' })
+        .eq('job_id', jobId)
+        .eq('is_refined', false);
+
+      // Complete the job
+      await supabase.from('competitor_research_jobs').update({
+        status: 'completed',
+        completed_at: new Date().toISOString()
+      }).eq('id', jobId);
+
+      return new Response(JSON.stringify({
+        success: true,
+        message: 'Max iterations reached, job completed',
+        stopped: true
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
     
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
@@ -27,6 +60,26 @@ serve(async (req) => {
     
     if (!GOOGLE_API_KEY) {
       throw new Error('GOOGLE_API_KEY not configured')
+    }
+
+    // =========================================
+    // GUARD 2: Check job status before proceeding
+    // =========================================
+    const { data: jobCheck } = await supabase
+      .from('competitor_research_jobs')
+      .select('status')
+      .eq('id', jobId)
+      .single();
+
+    if (!jobCheck || ['completed', 'cancelled', 'failed', 'error'].includes(jobCheck.status)) {
+      console.log(`[${FUNCTION_NAME}] Job not active (${jobCheck?.status}), stopping`);
+      return new Response(JSON.stringify({
+        success: true,
+        message: `Job is ${jobCheck?.status || 'not found'}`,
+        stopped: true
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
 
     // =========================================
@@ -170,14 +223,15 @@ Return ONLY a valid JSON array with the same number of items in the same order:
           .eq('id', faq.id)
       }
       
-      // Continue with remaining
-      await supabase.functions.invoke('refine-competitor-faqs', {
-        body: { jobId, workspaceId }
-      })
+      // Continue with remaining (with iteration counter)
+      supabase.functions.invoke('refine-competitor-faqs', {
+        body: { jobId, workspaceId, iteration: iteration + 1 }
+      }).catch(err => console.error(`[${FUNCTION_NAME}] Self-invoke error:`, err));
       
       return new Response(JSON.stringify({
         success: false,
-        error: 'Refinement failed, skipping batch'
+        error: 'Refinement failed, skipping batch',
+        iteration
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
@@ -231,7 +285,7 @@ Return ONLY a valid JSON array with the same number of items in the same order:
       }
     }
     
-    // Mark any remaining originals as refined
+    // Mark any remaining originals as refined (to prevent infinite loop)
     for (let i = refinedFaqs.length; i < rawFaqs.length; i++) {
       await supabase.from('competitor_faqs_raw')
         .update({ is_refined: true, skipped_reason: 'not_in_response' })
@@ -248,12 +302,12 @@ Return ONLY a valid JSON array with the same number of items in the same order:
       .eq('is_refined', false)
     
     if (count && count > 0) {
-      // More FAQs - trigger self again
-      console.log(`[${FUNCTION_NAME}] ${count} FAQs remaining, continuing...`)
+      // More FAQs - trigger self again WITH iteration counter
+      console.log(`[${FUNCTION_NAME}] ${count} FAQs remaining (iteration ${iteration + 1})...`)
       
-      await supabase.functions.invoke('refine-competitor-faqs', {
-        body: { jobId, workspaceId }
-      })
+      supabase.functions.invoke('refine-competitor-faqs', {
+        body: { jobId, workspaceId, iteration: iteration + 1 }
+      }).catch(err => console.error(`[${FUNCTION_NAME}] Self-invoke error:`, err));
     } else {
       // All done - mark job complete
       console.log(`[${FUNCTION_NAME}] All done, completing job`)
@@ -278,7 +332,8 @@ Return ONLY a valid JSON array with the same number of items in the same order:
     return new Response(JSON.stringify({
       success: true,
       faqsRefined: storedCount,
-      remainingFaqs: count || 0
+      remainingFaqs: count || 0,
+      iteration
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })

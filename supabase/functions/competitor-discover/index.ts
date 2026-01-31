@@ -154,6 +154,27 @@ serve(async (req) => {
       if (jobError) throw jobError;
       currentJobId = job.id;
     } else {
+      // =========================================
+      // GUARD: Check job status before proceeding
+      // =========================================
+      const { data: existingJob } = await supabase
+        .from('competitor_research_jobs')
+        .select('status')
+        .eq('id', currentJobId)
+        .single();
+
+      if (existingJob && ['completed', 'cancelled', 'failed', 'error'].includes(existingJob.status)) {
+        console.log(`[${FUNCTION_NAME}] Job already ${existingJob.status}, stopping`);
+        return new Response(JSON.stringify({
+          success: false,
+          error: `Job is already ${existingJob.status}`,
+          job_id: currentJobId
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
       await supabase
         .from('competitor_research_jobs')
         .update({ 
@@ -307,9 +328,11 @@ serve(async (req) => {
               latitude: details.geometry?.location?.lat,
               longitude: details.geometry?.location?.lng,
               distance_miles: distanceMiles ? Math.round(distanceMiles * 10) / 10 : null,
-              status: 'approved', // Set to 'approved' so scrape-worker picks them up
+              status: 'approved',
+              scrape_status: 'pending',  // Ensure this is set for worker pickup
               is_valid: true,
               is_directory: false,
+              is_selected: true,
               discovery_source: 'google_places',
               discovered_at: new Date().toISOString()
             });
@@ -350,15 +373,16 @@ serve(async (req) => {
       }
     }
 
-    // Update job status and auto-chain to scraping
-    const nextStatus = sites.length > 0 ? 'scraping' : 'error';
+    // Update job status - DO NOT auto-chain to scraping
+    // Let the UI trigger scraping when user confirms
+    const nextStatus = sites.length > 0 ? 'review_ready' : 'error';
     await supabase
       .from('competitor_research_jobs')
       .update({
         status: nextStatus,
         sites_discovered: sites.length,
         sites_approved: sites.length,
-        sites_validated: sites.length, // Sites are pre-validated via Places API
+        sites_validated: sites.length,
         error_message: sites.length === 0 
           ? `No competitor websites found for "${industry}" near ${location}. Try different search terms or check your location settings.` 
           : null,
@@ -366,18 +390,8 @@ serve(async (req) => {
       })
       .eq('id', currentJobId);
 
-    // Auto-chain: trigger scraping if we found sites
-    if (sites.length > 0) {
-      console.log(`[${FUNCTION_NAME}] Auto-chaining to scrape-worker...`);
-      supabase.functions.invoke('competitor-scrape-worker', {
-        body: { 
-          jobId: currentJobId, 
-          workspaceId, 
-          nicheQuery: industry, 
-          serviceArea: location 
-        }
-      }).catch(err => console.error(`[${FUNCTION_NAME}] Failed to chain scrape-worker:`, err));
-    }
+    // REMOVED: Auto-chain to scrape-worker
+    // The UI should trigger competitor-scrape-start when user confirms
 
     const duration = Date.now() - startTime;
     console.log(`[${FUNCTION_NAME}] Completed in ${duration}ms: ${sites.length} competitors`);
@@ -396,7 +410,11 @@ serve(async (req) => {
       })),
       location: { lat: centerLat, lng: centerLng, name: location },
       radius_miles: radiusMiles,
-      duration_ms: duration
+      duration_ms: duration,
+      status: nextStatus,
+      message: sites.length > 0 
+        ? 'Discovery complete. Review competitors before starting scrape.'
+        : 'No competitors found'
     }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
