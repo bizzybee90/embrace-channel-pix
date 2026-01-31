@@ -321,8 +321,8 @@ export function CompetitorReviewScreen({
       </div>
 
       {/* Competitor list */}
-      <ScrollArea className="h-[320px] rounded-md border">
-        <div className="p-2 space-y-1">
+      <div className="h-[320px] rounded-md border overflow-y-auto">
+        <div className="p-2 pr-4 space-y-1">
           {filteredCompetitors.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               {searchQuery ? 'No competitors match your search' : 'No competitors found'}
@@ -385,8 +385,8 @@ export function CompetitorReviewScreen({
                   </div>
                 </div>
 
-                {/* Action buttons */}
-                <div className="flex items-center gap-1 shrink-0">
+                {/* Action buttons - always visible */}
+                <div className="flex items-center gap-1 flex-shrink-0">
                   <Button
                     variant="ghost"
                     size="icon"
@@ -410,7 +410,7 @@ export function CompetitorReviewScreen({
             ))
           )}
         </div>
-      </ScrollArea>
+      </div>
 
       {/* Add manual URL */}
       <div className="border rounded-lg p-3 bg-muted/30">
