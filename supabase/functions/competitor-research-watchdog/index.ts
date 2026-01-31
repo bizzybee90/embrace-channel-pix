@@ -6,9 +6,12 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Jobs are considered stale if no heartbeat in 5 minutes
-const STALE_THRESHOLD_MS = 5 * 60 * 1000;
-const MAX_RETRIES = 3;
+// Jobs are considered stale if no heartbeat in 10 minutes (increased from 5)
+const STALE_THRESHOLD_MS = 10 * 60 * 1000;
+const MAX_RETRIES = 2; // Reduced from 3 to prevent excessive restarts
+
+// Terminal statuses that should NEVER be restarted
+const TERMINAL_STATUSES = ['completed', 'cancelled', 'failed', 'error', 'review_ready'];
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
@@ -24,10 +27,11 @@ serve(async (req) => {
     const staleThreshold = new Date(Date.now() - STALE_THRESHOLD_MS).toISOString();
 
     // Find stale jobs (active but no heartbeat)
+    // CRITICAL: Only query NON-TERMINAL statuses
     const { data: staleJobs, error } = await supabase
       .from('competitor_research_jobs')
       .select('*')
-      .in('status', ['discovering', 'validating', 'scraping', 'extracting', 'deduplicating', 'refining', 'embedding'])
+      .in('status', ['discovering', 'validating', 'scraping', 'extracting', 'deduplicating', 'refining', 'embedding', 'generating'])
       .lt('heartbeat_at', staleThreshold);
 
     if (error) {
@@ -41,15 +45,29 @@ serve(async (req) => {
 
     let restarted = 0;
     let failed = 0;
+    let skipped = 0;
 
     for (const job of staleJobs || []) {
-      const retryCount = (job.retry_count || 0) + 1;
+      // Double-check status (in case it changed between query and processing)
+      const { data: currentJob } = await supabase
+        .from('competitor_research_jobs')
+        .select('status, retry_count')
+        .eq('id', job.id)
+        .single();
+
+      if (!currentJob || TERMINAL_STATUSES.includes(currentJob.status)) {
+        console.log(`[research-watchdog] Job ${job.id} already ${currentJob?.status}, skipping`);
+        skipped++;
+        continue;
+      }
+
+      const retryCount = (currentJob.retry_count || 0) + 1;
 
       if (retryCount > MAX_RETRIES) {
-        // Mark as failed
+        // Mark as failed - do NOT restart again
         await supabase.from('competitor_research_jobs').update({
           status: 'error',
-          error_message: `Job stalled after ${MAX_RETRIES} retries`,
+          error_message: `Job stalled after ${MAX_RETRIES} retries. Check logs for details.`,
         }).eq('id', job.id);
         
         failed++;
@@ -58,47 +76,52 @@ serve(async (req) => {
       }
 
       // Determine which function to restart based on status
-      let functionToCall: string;
+      let functionToCall: string | null = null;
       switch (job.status) {
-        case 'queued':
         case 'discovering':
           functionToCall = 'competitor-discover';
           break;
         case 'scraping':
-          functionToCall = 'competitor-scrape';
+          functionToCall = 'competitor-scrape-worker';
           break;
         case 'extracting':
-          functionToCall = 'competitor-extract-faqs';
+          functionToCall = 'extract-competitor-faqs';
           break;
         case 'deduplicating':
           functionToCall = 'competitor-dedupe-faqs';
           break;
         case 'refining':
-          functionToCall = 'competitor-refine-faqs';
+          functionToCall = 'refine-competitor-faqs';
           break;
         default:
           // Unknown or terminal status - skip
           console.log(`[research-watchdog] Skipping job ${job.id} with status ${job.status}`);
+          skipped++;
           continue;
       }
 
-      // Update retry count and heartbeat
+      // Update retry count and heartbeat BEFORE restarting
       await supabase.from('competitor_research_jobs').update({
         retry_count: retryCount,
         heartbeat_at: new Date().toISOString(),
       }).eq('id', job.id);
 
       // Restart the function
-      console.log(`[research-watchdog] Restarting ${functionToCall} for job ${job.id}`);
+      console.log(`[research-watchdog] Restarting ${functionToCall} for job ${job.id} (retry ${retryCount})`);
       
-      await supabase.functions.invoke(functionToCall, {
-        body: { 
-          jobId: job.id, 
-          workspaceId: job.workspace_id 
-        }
-      });
-
-      restarted++;
+      try {
+        await supabase.functions.invoke(functionToCall, {
+          body: { 
+            jobId: job.id, 
+            workspaceId: job.workspace_id,
+            iteration: 0  // Reset iteration counter on restart
+          }
+        });
+        restarted++;
+      } catch (invokeError) {
+        console.error(`[research-watchdog] Failed to invoke ${functionToCall}:`, invokeError);
+        // Don't count as restarted if invoke failed
+      }
     }
 
     return new Response(JSON.stringify({
@@ -106,6 +129,7 @@ serve(async (req) => {
       checked: staleJobs?.length || 0,
       restarted,
       failed,
+      skipped,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });

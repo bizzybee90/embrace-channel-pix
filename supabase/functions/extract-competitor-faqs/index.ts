@@ -7,6 +7,7 @@ const corsHeaders = {
 }
 
 const FUNCTION_NAME = 'extract-competitor-faqs'
+const MAX_ITERATIONS = 50; // Max 500 pages total (10 per batch)
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -14,9 +15,23 @@ serve(async (req) => {
   }
 
   try {
-    const { jobId, workspaceId } = await req.json()
+    const { jobId, workspaceId, iteration = 0 } = await req.json()
     
-    console.log(`[${FUNCTION_NAME}] Starting extraction for job:`, jobId)
+    console.log(`[${FUNCTION_NAME}] Starting extraction (iteration ${iteration}):`, jobId)
+
+    // =========================================
+    // GUARD 1: Max iterations check
+    // =========================================
+    if (iteration >= MAX_ITERATIONS) {
+      console.log(`[${FUNCTION_NAME}] Max iterations reached, stopping`);
+      return new Response(JSON.stringify({
+        success: true,
+        message: 'Max iterations reached',
+        stopped: true
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
     
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
@@ -27,6 +42,26 @@ serve(async (req) => {
     
     if (!GOOGLE_API_KEY) {
       throw new Error('GOOGLE_API_KEY not configured')
+    }
+
+    // =========================================
+    // GUARD 2: Check job status before proceeding
+    // =========================================
+    const { data: job } = await supabase
+      .from('competitor_research_jobs')
+      .select('status')
+      .eq('id', jobId)
+      .single();
+
+    if (!job || ['completed', 'cancelled', 'failed', 'error'].includes(job.status)) {
+      console.log(`[${FUNCTION_NAME}] Job not active (${job?.status}), stopping`);
+      return new Response(JSON.stringify({
+        success: true,
+        message: `Job is ${job?.status || 'not found'}`,
+        stopped: true
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
 
     // =========================================
@@ -54,10 +89,10 @@ serve(async (req) => {
         heartbeat_at: new Date().toISOString()
       }).eq('id', jobId)
       
-      // Trigger refinement
-      await supabase.functions.invoke('refine-competitor-faqs', {
-        body: { jobId, workspaceId }
-      })
+      // Trigger refinement (without await to not block)
+      supabase.functions.invoke('refine-competitor-faqs', {
+        body: { jobId, workspaceId, iteration: 0 }
+      }).catch(err => console.error(`[${FUNCTION_NAME}] Refinement invoke error:`, err));
       
       return new Response(JSON.stringify({ 
         success: true, 
@@ -120,6 +155,7 @@ If no FAQs can be extracted, return an empty array: []`
         if (!response.ok) {
           const errorText = await response.text()
           console.error(`[${FUNCTION_NAME}] Gemini error for ${page.url}:`, errorText)
+          // Mark as processed to avoid infinite retry
           await supabase.from('competitor_pages')
             .update({ faqs_extracted: true, faq_count: 0 })
             .eq('id', page.id)
@@ -179,12 +215,14 @@ If no FAQs can be extracted, return an empty array: []`
           }
         }
         
+        // Mark page as processed (ALWAYS, even if no FAQs found)
         await supabase.from('competitor_pages')
           .update({ faqs_extracted: true, faq_count: faqs.length })
           .eq('id', page.id)
           
       } catch (e) {
         console.error(`[${FUNCTION_NAME}] Error for page ${page.url}:`, e)
+        // Mark as processed to avoid infinite retry
         await supabase.from('competitor_pages')
           .update({ faqs_extracted: true, faq_count: 0 })
           .eq('id', page.id)
@@ -216,12 +254,12 @@ If no FAQs can be extracted, return an empty array: []`
       .eq('faqs_extracted', false)
     
     if (count && count > 0) {
-      // More pages - trigger self again
-      console.log(`[${FUNCTION_NAME}] ${count} pages remaining, continuing...`)
+      // More pages - trigger self again WITH iteration counter
+      console.log(`[${FUNCTION_NAME}] ${count} pages remaining, continuing (iteration ${iteration + 1})...`)
       
-      await supabase.functions.invoke('extract-competitor-faqs', {
-        body: { jobId, workspaceId }
-      })
+      supabase.functions.invoke('extract-competitor-faqs', {
+        body: { jobId, workspaceId, iteration: iteration + 1 }
+      }).catch(err => console.error(`[${FUNCTION_NAME}] Self-invoke error:`, err));
     } else {
       // Done - trigger refinement
       console.log(`[${FUNCTION_NAME}] All pages done, triggering refinement`)
@@ -231,16 +269,17 @@ If no FAQs can be extracted, return an empty array: []`
         heartbeat_at: new Date().toISOString()
       }).eq('id', jobId)
       
-      await supabase.functions.invoke('refine-competitor-faqs', {
-        body: { jobId, workspaceId }
-      })
+      supabase.functions.invoke('refine-competitor-faqs', {
+        body: { jobId, workspaceId, iteration: 0 }
+      }).catch(err => console.error(`[${FUNCTION_NAME}] Refinement invoke error:`, err));
     }
 
     return new Response(JSON.stringify({
       success: true,
       pagesProcessed: pages.length,
       faqsExtracted: totalFaqsExtracted,
-      remainingPages: count || 0
+      remainingPages: count || 0,
+      iteration
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })

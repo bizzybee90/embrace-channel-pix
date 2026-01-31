@@ -9,6 +9,7 @@ const corsHeaders = {
 // Scrape up to 10 sites per invocation to stay within timeout limits
 const SITES_PER_BATCH = 10;
 const MAX_PAGES_PER_SITE = 5;
+const MAX_ITERATIONS = 20; // Prevent infinite loops - max 200 sites total
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -16,8 +17,22 @@ serve(async (req) => {
   }
 
   try {
-    const { jobId, workspaceId, nicheQuery, serviceArea } = await req.json();
-    console.log('Competitor scrape worker started:', { jobId });
+    const { jobId, workspaceId, nicheQuery, serviceArea, iteration = 0 } = await req.json();
+    console.log('[scrape-worker] Starting:', { jobId, iteration });
+
+    // =========================================
+    // GUARD 1: Max iterations check
+    // =========================================
+    if (iteration >= MAX_ITERATIONS) {
+      console.log('[scrape-worker] Max iterations reached, stopping');
+      return new Response(JSON.stringify({ 
+        success: true, 
+        message: 'Max iterations reached',
+        stopped: true 
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
 
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -32,33 +47,75 @@ serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Get pending sites to scrape
+    // =========================================
+    // GUARD 2: Check job status before processing
+    // =========================================
+    const { data: job } = await supabase
+      .from('competitor_research_jobs')
+      .select('status')
+      .eq('id', jobId)
+      .single();
+
+    if (!job || ['completed', 'cancelled', 'failed', 'error'].includes(job.status)) {
+      console.log('[scrape-worker] Job not active, stopping:', job?.status);
+      return new Response(JSON.stringify({ 
+        success: true, 
+        message: `Job is ${job?.status || 'not found'}`,
+        stopped: true 
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // =========================================
+    // GUARD 3: Get ONLY pending sites (not already scraped)
+    // Use scrape_status = 'pending' to avoid re-processing
+    // =========================================
     const { data: pendingSites, error: sitesError } = await supabase
       .from('competitor_sites')
       .select('*')
       .eq('job_id', jobId)
       .eq('status', 'approved')
+      .eq('scrape_status', 'pending')  // CRITICAL: Only pending sites
       .limit(SITES_PER_BATCH);
 
     if (sitesError || !pendingSites || pendingSites.length === 0) {
-      console.log('No more sites to scrape');
+      console.log('[scrape-worker] No pending sites');
       
-      // Check if all sites are done
-      const { count } = await supabase
+      // Check if ALL sites are done (no pending left)
+      const { count: stillPending } = await supabase
         .from('competitor_sites')
         .select('*', { count: 'exact', head: true })
         .eq('job_id', jobId)
-        .eq('status', 'approved');
+        .eq('status', 'approved')
+        .eq('scrape_status', 'pending');
 
-      if (count === 0) {
-        // All sites scraped, trigger FAQ generation
+      if (stillPending === 0) {
+        // All sites scraped, trigger FAQ generation (ONLY ONCE)
+        console.log('[scrape-worker] All sites done, completing job');
+        
+        // Get final counts
+        const { data: finalJob } = await supabase
+          .from('competitor_research_jobs')
+          .select('faqs_generated, faqs_added')
+          .eq('id', jobId)
+          .single();
+
+        const { count: totalFaqs } = await supabase
+          .from('faq_database')
+          .select('*', { count: 'exact', head: true })
+          .eq('workspace_id', workspaceId)
+          .eq('generation_source', 'competitor_research');
+        
         await supabase.from('competitor_research_jobs').update({
-          status: 'generating',
+          status: 'completed',
+          completed_at: new Date().toISOString(),
+          current_scraping_domain: null,
+          faqs_extracted: finalJob?.faqs_generated || 0,
+          faqs_added: totalFaqs || finalJob?.faqs_added || 0,
         }).eq('id', jobId);
-
-        supabase.functions.invoke('competitor-faq-generate', {
-          body: { jobId, workspaceId }
-        }).catch(err => console.error('Failed to start FAQ generation:', err));
+        
+        console.log('[scrape-worker] Job marked completed');
       }
 
       return new Response(JSON.stringify({ success: true, message: 'No pending sites' }), {
@@ -66,18 +123,25 @@ serve(async (req) => {
       });
     }
 
-    console.log(`Scraping ${pendingSites.length} sites`);
+    console.log(`[scrape-worker] Scraping ${pendingSites.length} sites (iteration ${iteration})`);
 
     let scrapedCount = 0;
-    let totalContent = '';
 
     for (const site of pendingSites) {
       try {
-        console.log('Scraping:', site.domain);
+        console.log('[scrape-worker] Scraping:', site.domain);
+
+        // =========================================
+        // GUARD 4: Mark as 'scraping' FIRST to prevent re-pickup
+        // =========================================
+        await supabase.from('competitor_sites')
+          .update({ scrape_status: 'scraping' })
+          .eq('id', site.id);
 
         // Update current scraping domain for UI feedback
         await supabase.from('competitor_research_jobs').update({
           current_scraping_domain: site.domain,
+          heartbeat_at: new Date().toISOString()
         }).eq('id', jobId);
 
         // First, map the site to get key URLs
@@ -111,7 +175,7 @@ serve(async (req) => {
           urlsToScrape = [...new Set([site.url, ...priorityUrls, ...otherUrls])].slice(0, MAX_PAGES_PER_SITE);
         }
 
-        console.log(`Mapped ${urlsToScrape.length} URLs for ${site.domain}`);
+        console.log(`[scrape-worker] Mapped ${urlsToScrape.length} URLs for ${site.domain}`);
 
         // Scrape each URL
         let siteContent = '';
@@ -146,24 +210,28 @@ serve(async (req) => {
             await new Promise(r => setTimeout(r, 300));
 
           } catch (pageError) {
-            console.error('Page scrape error:', url, pageError);
+            console.error('[scrape-worker] Page scrape error:', url, pageError);
           }
         }
 
-        // Update site record
+        // =========================================
+        // CRITICAL: Update site to 'scraped' or 'error' status
+        // This prevents the site from being picked up again
+        // =========================================
+        const finalStatus = siteContent.length > 100 ? 'scraped' : 'error';
+        
         await supabase.from('competitor_sites').update({
-          status: siteContent.length > 100 ? 'scraped' : 'error',
+          scrape_status: finalStatus,
           pages_scraped: pagesScraped,
-          content_extracted: siteContent.substring(0, 50000), // Limit stored content
+          content_extracted: siteContent.substring(0, 50000),
           scraped_at: new Date().toISOString(),
         }).eq('id', site.id);
 
         if (siteContent.length > 100) {
           scrapedCount++;
-          totalContent += `\n\n=== COMPETITOR: ${site.domain} ===\n${siteContent}`;
-
-          // Generate FAQs immediately for this site (don't await - fire and forget)
-          console.log(`Triggering FAQ generation for ${site.domain}`);
+          
+          // Generate FAQs for this site (fire and forget, but track)
+          console.log(`[scrape-worker] Triggering FAQ generation for ${site.domain}`);
           supabase.functions.invoke('competitor-faq-per-site', {
             body: { 
               siteId: site.id, 
@@ -172,21 +240,23 @@ serve(async (req) => {
               nicheQuery: nicheQuery || '',
               serviceArea: serviceArea || '',
             }
-          }).catch(err => console.error('Per-site FAQ error:', site.domain, err));
+          }).catch(err => console.error('[scrape-worker] Per-site FAQ error:', site.domain, err));
         }
 
         // Delay between sites
         await new Promise(r => setTimeout(r, 500));
 
       } catch (siteError) {
-        console.error('Site scrape error:', site.domain, siteError);
+        console.error('[scrape-worker] Site scrape error:', site.domain, siteError);
+        // Mark as error to prevent infinite retry
         await supabase.from('competitor_sites').update({
-          status: 'error',
+          scrape_status: 'error',
+          last_error: String(siteError)
         }).eq('id', site.id);
       }
     }
 
-    // Update job progress with heartbeat
+    // Update job progress
     const { data: jobData } = await supabase
       .from('competitor_research_jobs')
       .select('sites_scraped, faqs_extracted')
@@ -201,34 +271,32 @@ serve(async (req) => {
       heartbeat_at: new Date().toISOString(),
     }).eq('id', jobId);
 
-    // Check if there are more sites to scrape
+    // Check if there are more pending sites
     const { count: remainingCount } = await supabase
       .from('competitor_sites')
       .select('*', { count: 'exact', head: true })
       .eq('job_id', jobId)
-      .eq('status', 'approved');
+      .eq('status', 'approved')
+      .eq('scrape_status', 'pending');  // Only count PENDING
 
     if (remainingCount && remainingCount > 0) {
-      // Schedule next batch
-      console.log(`${remainingCount} sites remaining, scheduling next batch`);
+      // Schedule next batch WITH iteration counter
+      console.log(`[scrape-worker] ${remainingCount} sites remaining, scheduling batch ${iteration + 1}`);
       supabase.functions.invoke('competitor-scrape-worker', {
-        body: { jobId, workspaceId, nicheQuery, serviceArea }
-      }).catch(err => console.error('Failed to schedule next batch:', err));
+        body: { jobId, workspaceId, nicheQuery, serviceArea, iteration: iteration + 1 }
+      }).catch(err => console.error('[scrape-worker] Failed to schedule next batch:', err));
     } else {
-      // All done - wait for per-site FAQ jobs to complete, then mark done
-      console.log('All sites scraped, finalizing job...');
+      // All done - wait briefly for per-site FAQ jobs, then mark complete
+      console.log('[scrape-worker] All sites scraped, finalizing job...');
       
-      // Give per-site FAQ generation time to complete
-      await new Promise(r => setTimeout(r, 5000));
+      await new Promise(r => setTimeout(r, 3000));
       
-      // Get final counts
       const { data: finalJob } = await supabase
         .from('competitor_research_jobs')
         .select('faqs_generated, faqs_added')
         .eq('id', jobId)
         .single();
 
-      // Count FAQs actually added to faq_database
       const { count: totalFaqs } = await supabase
         .from('faq_database')
         .select('*', { count: 'exact', head: true })
@@ -243,19 +311,20 @@ serve(async (req) => {
         faqs_added: totalFaqs || finalJob?.faqs_added || 0,
       }).eq('id', jobId);
       
-      console.log(`Job completed: ${newScrapedTotal} sites, ${totalFaqs} FAQs added`);
+      console.log(`[scrape-worker] Job completed: ${newScrapedTotal} sites, ${totalFaqs} FAQs`);
     }
 
     return new Response(JSON.stringify({
       success: true,
       scrapedCount,
       remainingCount: remainingCount || 0,
+      iteration,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
 
   } catch (error) {
-    console.error('Scrape worker error:', error);
+    console.error('[scrape-worker] Error:', error);
     return new Response(JSON.stringify({ error: String(error) }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
