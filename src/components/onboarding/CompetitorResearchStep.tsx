@@ -367,7 +367,7 @@ export function CompetitorResearchStep({
     } catch { /* ignore */ }
   }, [draftKey, nicheQuery, serviceArea, targetCount, status]);
 
-  const handleStart = async () => {
+  const startResearch = useCallback(async () => {
     if (!nicheQuery.trim()) {
       toast.error('Please enter your industry/niche');
       return;
@@ -390,7 +390,7 @@ export function CompetitorResearchStep({
       });
 
       if (invokeError) throw invokeError;
-      
+
       if (!data?.success || !data?.jobId) {
         throw new Error(data?.error || 'Failed to start research');
       }
@@ -406,7 +406,9 @@ export function CompetitorResearchStep({
       setError(err instanceof Error ? err.message : 'Failed to start competitor research');
       toast.error('Failed to start research');
     }
-  };
+  }, [nicheQuery, serviceArea, targetCount, workspaceId]);
+
+  const handleStart = startResearch;
 
   const handleSkip = () => {
     onComplete({ sitesScraped: 0, faqsGenerated: 0 });
@@ -422,6 +424,13 @@ export function CompetitorResearchStep({
     setStatus('idle');
   };
 
+  const handleRestartNow = () => {
+    // Non-destructive: keeps old job data, but creates a new discovery job immediately.
+    setError(null);
+    setJobId(null);
+    startResearch();
+  };
+
   // Show pipeline progress when job is running
   if (status === 'running' && jobId) {
     return (
@@ -434,6 +443,7 @@ export function CompetitorResearchStep({
         onComplete={handlePipelineComplete}
         onBack={onBack}
         onRetry={handleRetry}
+        onRestartNow={handleRestartNow}
       />
     );
   }

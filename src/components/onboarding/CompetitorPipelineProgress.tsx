@@ -2,6 +2,17 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { 
   CheckCircle2, 
   Loader2, 
@@ -32,6 +43,7 @@ interface CompetitorPipelineProgressProps {
   onComplete: (results: { sitesScraped: number; faqsGenerated: number }) => void;
   onBack: () => void;
   onRetry: () => void;
+  onRestartNow?: () => void;
 }
 
 type PipelinePhase = 'queued' | 'discovering' | 'filtering' | 'review_ready' | 'validating' | 'scraping' | 'extracting' | 'deduplicating' | 'refining' | 'embedding' | 'completed' | 'failed' | 'error';
@@ -195,6 +207,7 @@ export function CompetitorPipelineProgress({
   onComplete,
   onBack,
   onRetry,
+  onRestartNow,
 }: CompetitorPipelineProgressProps) {
   const [stats, setStats] = useState<PipelineStats>({
     phase: 'queued',
@@ -366,12 +379,14 @@ export function CompetitorPipelineProgress({
   const isComplete = stats.phase === 'completed';
   const isReviewReady = stats.phase === 'review_ready';
   
-  // Check if extraction is stalled (>15 min with 0 FAQs)
-  const isExtractionStalled = 
+  // Check if extraction is stalled.
+  // Two paths:
+  // 1) "Local" timer: user has been on this screen > 15 min
+  // 2) "Global" stale heartbeat: job has been stuck previously (e.g. days)
+  const isExtractionStalled =
     (stats.phase === 'extracting' || stats.phase === 'deduplicating') &&
-    extractionStartTime &&
-    Date.now() - extractionStartTime > EXTRACTION_STALL_MS &&
-    stats.faqsExtracted === 0;
+    stats.faqsExtracted === 0 &&
+    ((extractionStartTime && Date.now() - extractionStartTime > EXTRACTION_STALL_MS) || isStale);
 
   // Handle job recovery
   const handleRecoverJob = async () => {
@@ -770,14 +785,40 @@ export function CompetitorPipelineProgress({
         </div>
         
         {/* Restart Research button */}
-        <Button 
-          variant="ghost" 
-          onClick={onRetry} 
-          className="w-full gap-2 text-muted-foreground hover:text-foreground"
-        >
-          <RotateCcw className="h-4 w-4" />
-          Restart Competitor Research
-        </Button>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button
+              variant="ghost"
+              className="w-full gap-2 text-muted-foreground hover:text-foreground"
+            >
+              <RotateCcw className="h-4 w-4" />
+              Restart Competitor Research
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Restart competitor research?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Choose whether to rerun discovery immediately (recommended if the current job is stuck) or go back to
+                the setup screen.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <Button variant="outline" onClick={onRetry} className="gap-2">
+                Back to setup
+              </Button>
+              <AlertDialogAction
+                onClick={() => {
+                  if (onRestartNow) onRestartNow();
+                  else onRetry();
+                }}
+              >
+                Restart & run discovery
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
         
         {!isComplete && (
           <p className="text-xs text-center text-muted-foreground">
