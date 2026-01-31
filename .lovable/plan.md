@@ -1,129 +1,167 @@
 
-
-# Smarter Competitor Search: Wait for Meaningful Input
+# Niche-Aware Competitor Search
 
 ## The Problem
-Currently the search triggers after just **3 characters** with a short 400ms delay. This means:
-- Typing "lov" immediately triggers a web search → random irrelevant results
-- Every keystroke pause fires an expensive API call
-- Results don't match what you're actually looking for
+When you search for "crose" (looking for `crose.cleaning`), the search returns irrelevant results like "A.T. Cross UK", "Roche UK", and "Silvertoad" because:
 
-## The Solution: Two-Mode Input Detection
+1. The search query becomes: `"crose UK business website"`
+2. It has **no idea** you're in the **cleaning** industry
+3. So it matches "crose" against any UK business
 
-### Mode 1: Direct Domain Entry (Instant)
-If you're typing something that looks like a domain (contains `.` with no spaces):
-- **No API call at all** — validate locally
-- Show an instant "Add this website" button
-- Example: typing `lovable.dev` → immediate option to add it
+## The Solution: Pass the Niche to Search
 
-### Mode 2: Keyword Discovery (Patient)
-If you're searching by keyword (like "window cleaning oxford"):
-- **Wait for 5+ characters** (not 3)
-- **Longer debounce: 800ms** (not 400ms)
-- **Require a pause** before searching — shows "Keep typing..." while you type
-- Only fire the search when input looks complete
+The parent component (`CompetitorPipelineProgress`) already knows your niche (e.g., "Window Cleaning") via the `nicheQuery` prop. We just need to:
 
----
+1. **Pass the niche** from `CompetitorPipelineProgress` → `CompetitorListDialog`
+2. **Include the niche in the search API call** from the dialog
+3. **Append the niche to the search query** in the backend
 
-## How It Will Work
-
-```text
-User types: "lovable.dev"
- └─> Detected as domain (has "." and no spaces)
- └─> Instant "Add lovable.dev" option appears
- └─> NO Firecrawl API call
-
-User types: "window cleaning oxford"
- └─> Detected as keyword search
- └─> After 5 chars + 800ms pause → search triggers
- └─> Results appear
-```
+This way, searching "crose" becomes: `"crose window cleaning UK business website"` — which is far more likely to return `crose.cleaning`.
 
 ---
 
 ## Technical Changes
 
-### 1. Add Domain Detection (Frontend)
+### 1. Update `CompetitorListDialog` Props
 
-New helper to detect if input looks like a domain:
-```typescript
-const isDomainLike = (input: string): boolean => {
-  const trimmed = input.trim().toLowerCase();
-  // Contains a dot, no spaces, looks like URL/domain
-  return trimmed.includes('.') && !trimmed.includes(' ');
-};
-```
+Add a new `nicheQuery` prop to the component.
 
-### 2. Update Search Thresholds
-
-| Setting | Current | New |
-|---------|---------|-----|
-| Minimum characters for keyword search | 3 | 5 |
-| Debounce delay | 400ms | 800ms |
-| Domain detection | None | Instant (no API) |
-
-### 3. Updated Search Logic
+**File:** `src/components/onboarding/CompetitorListDialog.tsx`
 
 ```typescript
-useEffect(() => {
-  // Clear any pending timer
-  const timer = setTimeout(() => {
-    const trimmed = searchInput.trim();
-    
-    // Mode 1: Domain detected — show instant add option
-    if (isDomainLike(trimmed)) {
-      setDirectDomainOption(extractDomain(trimmed));
-      setSuggestions([]);
-      setShowSuggestions(false);
-      return;
-    }
-    
-    // Mode 2: Keyword search — need 5+ chars
-    setDirectDomainOption(null);
-    if (trimmed.length >= 5) {
-      searchForSuggestions(trimmed);
-    } else {
-      setSuggestions([]);
-      setShowSuggestions(false);
-    }
-  }, 800); // Longer debounce
-  
-  return () => clearTimeout(timer);
-}, [searchInput]);
+// Current props
+export function CompetitorListDialog({
+  jobId,
+  workspaceId,
+  serviceArea,
+  disabled,
+  className,
+}: {
+  jobId: string;
+  workspaceId?: string;
+  serviceArea?: string;  // ← location
+  disabled?: boolean;
+  className?: string;
+}) {
+
+// Updated props
+export function CompetitorListDialog({
+  jobId,
+  workspaceId,
+  serviceArea,
+  nicheQuery,  // ← ADD THIS
+  disabled,
+  className,
+}: {
+  jobId: string;
+  workspaceId?: string;
+  serviceArea?: string;
+  nicheQuery?: string;  // ← ADD THIS (e.g., "Window Cleaning")
+  disabled?: boolean;
+  className?: string;
+}) {
 ```
 
-### 4. New UI State: Direct Domain Option
+### 2. Include Niche in API Call
 
-When a domain is detected, show a prominent single-action card:
+Update the `searchForSuggestions` function to pass `niche` to the backend.
 
-```text
-┌──────────────────────────────────────────────────┐
-│  🌐 lovable.dev                    [Add Website] │
-└──────────────────────────────────────────────────┘
+**File:** `src/components/onboarding/CompetitorListDialog.tsx`
+
+```typescript
+// Current API call
+const { data, error } = await supabase.functions.invoke('competitor-search-suggest', {
+  body: { query: searchQuery, location: serviceArea }
+});
+
+// Updated API call
+const { data, error } = await supabase.functions.invoke('competitor-search-suggest', {
+  body: { 
+    query: searchQuery, 
+    location: serviceArea,
+    niche: nicheQuery  // ← ADD THIS
+  }
+});
 ```
 
-### 5. Updated Placeholder Text
+### 3. Update Backend to Use Niche
 
-**Current:** `"Search or add URL (e.g., window cleaning bicester)"`
+Modify the edge function to include the niche in the search query.
 
-**New:** `"Paste a URL or search by business name..."`
+**File:** `supabase/functions/competitor-search-suggest/index.ts`
+
+```typescript
+// Current query building
+const { query, location } = await req.json();
+const searchQuery = location 
+  ? `${query} ${location} UK business website`
+  : `${query} UK business website`;
+
+// Updated query building
+const { query, location, niche } = await req.json();
+
+// Build smarter search query with niche context
+let searchQuery = query;
+if (niche) {
+  searchQuery += ` ${niche}`;
+}
+if (location) {
+  searchQuery += ` ${location}`;
+}
+searchQuery += ' UK';
+
+// Result: "crose Window Cleaning Luton UK"
+```
+
+### 4. Pass Niche from Parent Component
+
+Update the call site in `CompetitorPipelineProgress`.
+
+**File:** `src/components/onboarding/CompetitorPipelineProgress.tsx`
+
+```typescript
+// Current call (line ~412)
+<CompetitorListDialog 
+  jobId={jobId} 
+  workspaceId={workspaceId} 
+  serviceArea={serviceArea} 
+/>
+
+// Updated call
+<CompetitorListDialog 
+  jobId={jobId} 
+  workspaceId={workspaceId} 
+  serviceArea={serviceArea}
+  nicheQuery={nicheQuery}  // ← ADD THIS
+/>
+```
+
+---
+
+## Expected Result
+
+| Search Input | Current Query | New Query |
+|--------------|---------------|-----------|
+| `crose` | `crose UK business website` | `crose Window Cleaning Luton UK` |
+| `premium` | `premium UK business website` | `premium Window Cleaning Luton UK` |
+| `sparkle` | `sparkle UK business website` | `sparkle Window Cleaning Luton UK` |
+
+This should dramatically improve search relevance by anchoring results to your specific industry.
 
 ---
 
 ## Files to Change
 
-| File | Changes |
-|------|---------|
-| `src/components/onboarding/CompetitorListDialog.tsx` | Add `isDomainLike()`, new state for direct domain, update debounce to 800ms, increase min chars to 5, add direct-add UI |
-| `supabase/functions/competitor-search-suggest/index.ts` | No changes needed (backend stays the same) |
+| File | Change |
+|------|--------|
+| `src/components/onboarding/CompetitorListDialog.tsx` | Add `nicheQuery` prop, pass to API call |
+| `src/components/onboarding/CompetitorPipelineProgress.tsx` | Pass `nicheQuery` to dialog |
+| `supabase/functions/competitor-search-suggest/index.ts` | Include niche in search query |
 
 ---
 
-## Benefits
+## Summary
 
-1. **No more random suggestions** — domain entry bypasses search entirely
-2. **Fewer API calls** — 5 char minimum + longer debounce = fewer Firecrawl calls
-3. **Faster for known domains** — instant add with no waiting
-4. **Clearer UX** — users understand whether they're searching or adding
-5. **Cost savings** — significantly reduced Firecrawl API usage
-
+- **Root cause:** Search doesn't know what industry you're in
+- **Fix:** Pass the niche (e.g., "Window Cleaning") through the entire chain
+- **Benefit:** Searching "crose" will find cleaning businesses named Crose, not pen companies
