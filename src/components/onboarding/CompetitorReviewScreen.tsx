@@ -14,9 +14,11 @@ import {
   Star, 
   AlertTriangle,
   CheckCircle2,
-  XCircle,
   ArrowLeft,
-  Sparkles
+  Sparkles,
+  ExternalLink,
+  X,
+  MapPin
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -30,6 +32,7 @@ interface Competitor {
   is_selected: boolean;
   discovery_source: string | null;
   location_data: any;
+  distance_miles: number | null;
 }
 
 interface CompetitorReviewScreenProps {
@@ -72,9 +75,9 @@ export function CompetitorReviewScreen({
       try {
         const { data, error } = await supabase
           .from('competitor_sites')
-          .select('id, business_name, domain, url, rating, reviews_count, is_selected, discovery_source, location_data')
+          .select('id, business_name, domain, url, rating, reviews_count, is_selected, discovery_source, location_data, distance_miles')
           .eq('job_id', jobId)
-          .order('rating', { ascending: false, nullsFirst: false });
+          .order('distance_miles', { ascending: true, nullsFirst: false });
 
         if (error) throw error;
         setCompetitors(data || []);
@@ -146,8 +149,24 @@ export function CompetitorReviewScreen({
       .in('id', ids);
 
     if (error) {
-      // Refetch on error
+      // Revert on error
       toast.error('Failed to update selections');
+    }
+  };
+
+  // Delete a competitor
+  const handleDeleteCompetitor = async (competitorId: string) => {
+    // Optimistic update
+    setCompetitors(prev => prev.filter(c => c.id !== competitorId));
+
+    const { error } = await supabase
+      .from('competitor_sites')
+      .delete()
+      .eq('id', competitorId);
+
+    if (error) {
+      // Refetch on error
+      toast.error('Failed to delete competitor');
     }
   };
 
@@ -317,6 +336,12 @@ export function CompetitorReviewScreen({
                     <span className="font-medium text-foreground truncate">
                       {competitor.business_name || competitor.domain}
                     </span>
+                    {competitor.distance_miles != null && (
+                      <Badge variant="outline" className="text-xs">
+                        <MapPin className="h-3 w-3 mr-1" />
+                        {competitor.distance_miles} mi
+                      </Badge>
+                    )}
                     {competitor.discovery_source === 'manual' && (
                       <Badge variant="secondary" className="text-xs">
                         Manual
@@ -344,6 +369,28 @@ export function CompetitorReviewScreen({
                       </span>
                     )}
                   </div>
+                </div>
+
+                {/* Action buttons */}
+                <div className="flex items-center gap-1 shrink-0">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    asChild
+                  >
+                    <a href={competitor.url} target="_blank" rel="noopener noreferrer">
+                      <ExternalLink className="h-4 w-4" />
+                    </a>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                    onClick={() => handleDeleteCompetitor(competitor.id)}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
             ))

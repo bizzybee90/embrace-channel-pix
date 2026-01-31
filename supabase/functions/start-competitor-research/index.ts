@@ -183,9 +183,9 @@ serve(async (req) => {
     const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') || Deno.env.get('SUPABASE_PUBLISHABLE_KEY');
     const webhookUrl = `${SUPABASE_URL}/functions/v1/handle-discovery-complete?apikey=${SUPABASE_ANON_KEY}`;
     
-    // Request more than needed to account for filtering (directories, social media, no-website)
-    // Cap at 200 for Apify limits and cost control
-    const crawlLimit = Math.min(maxCompetitors * 2, 200);
+    // Request 3x more than needed to account for filtering (directories, social media, no-website)
+    // and distance-based trimming (some results may be too far). Cap at 300.
+    const crawlLimit = Math.min(maxCompetitors * 3, 300);
     
     const apifyInput = {
       searchStringsArray: [industry],

@@ -6,6 +6,19 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Haversine formula for calculating distance between two lat/lng points (in miles)
+function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 3959; // Earth radius in miles
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -58,6 +71,18 @@ serve(async (req) => {
     if (!APIFY_API_KEY) {
       throw new Error('APIFY_API_KEY not configured')
     }
+
+    // Fetch job to get geocoded coordinates for distance calculation
+    const { data: jobData } = await supabase
+      .from('competitor_research_jobs')
+      .select('geocoded_lat, geocoded_lng')
+      .eq('id', jobId)
+      .single();
+    
+    const jobLat = jobData?.geocoded_lat;
+    const jobLng = jobData?.geocoded_lng;
+    
+    console.log('[handle-discovery-complete] Job coordinates:', { jobLat, jobLng });
 
     // Update job status to filtering
     await supabase.from('competitor_research_jobs').update({
@@ -133,6 +158,13 @@ serve(async (req) => {
         continue
       }
       
+      // Calculate distance from job's geocoded center if we have coordinates
+      let distanceMiles: number | null = null;
+      if (jobLat && jobLng && place.location?.lat && place.location?.lng) {
+        distanceMiles = haversineDistance(jobLat, jobLng, place.location.lat, place.location.lng);
+        distanceMiles = Math.round(distanceMiles * 10) / 10; // Round to 1 decimal place
+      }
+      
       // Build location_data for user review
       const locationData = {
         address: place.address,
@@ -141,6 +173,8 @@ serve(async (req) => {
         reviewsCount: place.reviewsCount,
         openingHours: place.openingHours,
         placeId: place.placeId,
+        lat: place.location?.lat,
+        lng: place.location?.lng,
       }
       
       validCompetitors.push({
@@ -154,6 +188,9 @@ serve(async (req) => {
         address: place.address,
         rating: place.totalScore,
         reviews_count: place.reviewsCount,
+        latitude: place.location?.lat,
+        longitude: place.location?.lng,
+        distance_miles: distanceMiles,
         is_directory: false,
         discovery_source: 'google_places',
         status: 'approved',
@@ -163,7 +200,13 @@ serve(async (req) => {
       })
     }
 
-    console.log('[handle-discovery-complete] Valid competitors:', validCompetitors.length, 'Filtered:', filteredOut.length)
+    // Sort by distance (closest first) before inserting
+    validCompetitors.sort((a, b) => (a.distance_miles ?? 999) - (b.distance_miles ?? 999));
+    
+    console.log('[handle-discovery-complete] Valid competitors:', validCompetitors.length, 'Filtered:', filteredOut.length);
+    if (validCompetitors.length > 0) {
+      console.log('[handle-discovery-complete] Closest competitor:', validCompetitors[0].business_name, 'at', validCompetitors[0].distance_miles, 'miles');
+    }
 
     // =========================================
     // STEP 4: Store ALL competitors in database (no slice limit!)
