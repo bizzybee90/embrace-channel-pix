@@ -15,9 +15,11 @@ import {
   Search,
   Filter,
   Wand2,
-  Users
+  Users,
+  RefreshCw
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 import { CompetitorListDialog } from '@/components/onboarding/CompetitorListDialog';
 import { CompetitorReviewScreen } from '@/components/onboarding/CompetitorReviewScreen';
 
@@ -32,7 +34,7 @@ interface CompetitorPipelineProgressProps {
   onRetry: () => void;
 }
 
-type PipelinePhase = 'queued' | 'discovering' | 'filtering' | 'review_ready' | 'validating' | 'scraping' | 'extracting' | 'deduplicating' | 'refining' | 'embedding' | 'completed' | 'error';
+type PipelinePhase = 'queued' | 'discovering' | 'filtering' | 'review_ready' | 'validating' | 'scraping' | 'extracting' | 'deduplicating' | 'refining' | 'embedding' | 'completed' | 'failed' | 'error';
 
 interface PipelineStats {
   phase: PipelinePhase;
@@ -181,6 +183,8 @@ function ProgressLine({ currentStage }: { currentStage: number }) {
 const DISCOVERY_TIMEOUT_MS = 8 * 60 * 1000;
 // Time after which we consider a job stale if no heartbeat (5 minutes)
 const STALE_THRESHOLD_MS = 5 * 60 * 1000;
+// Time after which extraction stage is considered stalled (15 minutes)
+const EXTRACTION_STALL_MS = 15 * 60 * 1000;
 
 export function CompetitorPipelineProgress({
   workspaceId,
@@ -209,6 +213,8 @@ export function CompetitorPipelineProgress({
   const [startTime] = useState<number>(Date.now());
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [isStale, setIsStale] = useState(false);
+  const [extractionStartTime, setExtractionStartTime] = useState<number | null>(null);
+  const [isRecovering, setIsRecovering] = useState(false);
 
   // Update elapsed time every second
   useEffect(() => {
@@ -245,10 +251,20 @@ export function CompetitorPipelineProgress({
         const faqsTotal = data.faqs_generated || data.faqs_extracted || 0;
         const faqsFinal = data.faqs_added || faqsTotal;
         
+        // Track extraction start time
+        if ((data.status === 'extracting' || data.status === 'deduplicating') && !extractionStartTime) {
+          setExtractionStartTime(Date.now());
+        } else if (data.status !== 'extracting' && data.status !== 'deduplicating') {
+          setExtractionStartTime(null);
+        }
+        
+        // Use sites_approved for validated count (this is what we actually track)
+        const validatedCount = data.sites_approved || data.sites_validated || 0;
+        
         setStats({
           phase: isDiscoveryTimeout ? 'error' : (data.status as PipelinePhase),
           sitesDiscovered: data.sites_discovered || 0,
-          sitesValidated: data.sites_validated || data.sites_approved || 0,
+          sitesValidated: validatedCount,
           sitesScraped: data.sites_scraped || 0,
           pagesScraped: data.pages_scraped || 0,
           faqsExtracted: faqsTotal,
@@ -346,9 +362,38 @@ export function CompetitorPipelineProgress({
     return '30-45 min';
   };
 
-  const isError = stats.phase === 'error';
+  const isError = stats.phase === 'error' || stats.phase === 'failed';
   const isComplete = stats.phase === 'completed';
   const isReviewReady = stats.phase === 'review_ready';
+  
+  // Check if extraction is stalled (>15 min with 0 FAQs)
+  const isExtractionStalled = 
+    (stats.phase === 'extracting' || stats.phase === 'deduplicating') &&
+    extractionStartTime &&
+    Date.now() - extractionStartTime > EXTRACTION_STALL_MS &&
+    stats.faqsExtracted === 0;
+
+  // Handle job recovery
+  const handleRecoverJob = async () => {
+    setIsRecovering(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('recover-competitor-job', {
+        body: { jobId, workspaceId }
+      });
+      
+      if (error) {
+        toast.error('Recovery failed', { description: error.message });
+      } else if (data?.success) {
+        toast.success('Recovery started', { description: data.message });
+      } else {
+        toast.error('Recovery failed', { description: data?.error || 'Unknown error' });
+      }
+    } catch (err) {
+      toast.error('Recovery failed', { description: String(err) });
+    } finally {
+      setIsRecovering(false);
+    }
+  };
 
   const handleContinue = () => {
     onComplete({
@@ -560,15 +605,81 @@ export function CompetitorPipelineProgress({
             </p>
           )}
           {stageStatuses.extract === 'in_progress' && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
-              </span>
-              <span>
-                {stats.faqsExtracted > 0 ? `${stats.faqsExtracted} FAQs extracted` : 'Processing content...'}
-                {stats.faqsAfterDedup > 0 && ` → ${stats.faqsAfterDedup} after dedup`}
-              </span>
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+                </span>
+                <span>
+                  {stats.faqsExtracted > 0 ? `${stats.faqsExtracted} FAQs extracted` : 'Processing content...'}
+                  {stats.faqsAfterDedup > 0 && ` → ${stats.faqsAfterDedup} after dedup`}
+                </span>
+              </div>
+              
+              {/* Show elapsed time for extraction */}
+              {extractionStartTime && (
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>Elapsed:</span>
+                  <span className="font-mono tabular-nums">
+                    {Math.floor((Date.now() - extractionStartTime) / 60000)}:{((Math.floor((Date.now() - extractionStartTime) / 1000)) % 60).toString().padStart(2, '0')}
+                  </span>
+                </div>
+              )}
+              
+              {/* Show recovery button if stalled */}
+              {isExtractionStalled && (
+                <div className="p-2 bg-warning/10 border border-warning/30 rounded-lg">
+                  <p className="text-xs text-warning-foreground mb-2">
+                    Extraction seems stalled. The scraping webhook may have failed.
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleRecoverJob}
+                    disabled={isRecovering}
+                    className="w-full gap-2"
+                  >
+                    {isRecovering ? (
+                      <>
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Recovering...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="h-3 w-3" />
+                        Recover Stalled Job
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+          {stageStatuses.extract === 'error' && (
+            <div className="space-y-2">
+              <p className="text-sm text-destructive">
+                {stats.errorMessage || 'Extraction failed'}
+              </p>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleRecoverJob}
+                disabled={isRecovering}
+                className="gap-2"
+              >
+                {isRecovering ? (
+                  <>
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Recovering...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-3 w-3" />
+                    Recover Job
+                  </>
+                )}
+              </Button>
             </div>
           )}
           {stageStatuses.extract === 'done' && (
