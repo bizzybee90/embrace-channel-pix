@@ -1107,6 +1107,16 @@ async function handleHybridPlacesWebhook(payload: any) {
         ];
     
     console.log('[hybrid-places-webhook] Using search queries:', queries);
+
+    // Persist the exact SERP queries used for transparency in the UI (Review Competitors)
+    // NOTE: this does not affect discovery logic; it only stores metadata for display/debugging.
+    await supabase
+      .from('competitor_research_jobs')
+      .update({
+        search_queries: queries,
+        heartbeat_at: new Date().toISOString(),
+      })
+      .eq('id', jobId);
     
     const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') || Deno.env.get('SUPABASE_PUBLISHABLE_KEY');
     const serpWebhookUrl = `${SUPABASE_URL}/functions/v1/competitor-webhooks?apikey=${SUPABASE_ANON_KEY}`;
