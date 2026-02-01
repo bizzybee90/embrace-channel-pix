@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,7 +28,8 @@ import {
   Filter,
   Wand2,
   Users,
-  RefreshCw
+  RefreshCw,
+  Eye
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -40,6 +42,7 @@ interface CompetitorPipelineProgressProps {
   nicheQuery: string;
   serviceArea: string;
   targetCount: number;
+  searchQueries?: string[];
   onComplete: (results: { sitesScraped: number; faqsGenerated: number }) => void;
   onBack: () => void;
   onRetry: () => void;
@@ -204,6 +207,7 @@ export function CompetitorPipelineProgress({
   nicheQuery,
   serviceArea,
   targetCount,
+  searchQueries,
   onComplete,
   onBack,
   onRetry,
@@ -228,6 +232,30 @@ export function CompetitorPipelineProgress({
   const [isStale, setIsStale] = useState(false);
   const [extractionStartTime, setExtractionStartTime] = useState<number | null>(null);
   const [isRecovering, setIsRecovering] = useState(false);
+  
+  // Fetch search queries from DB for resumed jobs
+  const [storedSearchQueries, setStoredSearchQueries] = useState<string[]>([]);
+  
+  useEffect(() => {
+    const fetchJobQueries = async () => {
+      const { data } = await supabase
+        .from('competitor_research_jobs')
+        .select('search_queries')
+        .eq('id', jobId)
+        .maybeSingle();
+      
+      if (data?.search_queries && Array.isArray(data.search_queries)) {
+        setStoredSearchQueries(data.search_queries as string[]);
+      }
+    };
+    
+    fetchJobQueries();
+  }, [jobId]);
+  
+  // Merge: prefer passed queries, fall back to stored from DB
+  const displayQueries = searchQueries?.length 
+    ? searchQueries 
+    : storedSearchQueries;
 
   // Update elapsed time every second
   useEffect(() => {
@@ -509,6 +537,29 @@ export function CompetitorPipelineProgress({
                   {Math.floor(elapsedSeconds / 60)}:{(elapsedSeconds % 60).toString().padStart(2, '0')}
                 </span>
               </div>
+              
+              {/* Search terms being used */}
+              {displayQueries.length > 0 && (
+                <div className="p-3 bg-muted/30 rounded-lg border border-border/50">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Eye className="h-3.5 w-3.5 text-primary" />
+                    <span className="text-xs font-medium text-foreground">
+                      Search terms being used
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {displayQueries.map((query) => (
+                      <Badge 
+                        key={query} 
+                        variant="secondary" 
+                        className="font-mono text-xs"
+                      >
+                        {query}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
               
               {/* Helpful tip after 30 seconds */}
               {elapsedSeconds > 30 && (
