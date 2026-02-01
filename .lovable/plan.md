@@ -1,236 +1,215 @@
 
-# Hybrid Competitor Discovery: Google Places + SERP
+# Show Exact Search Queries Before Discovery
 
 ## Problem Summary
 
-The current SERP-only discovery is failing because:
-1. **No UK-specific targeting** - Missing `proxyConfiguration` and `locationUule` parameters
-2. **Low result count** - Only 6 results returned when 50+ expected
-3. **Location accuracy** - Businesses from wrong cities still appearing
+You've identified a critical transparency issue: the user enters "Window Cleaning" + "Luton" but has **no visibility into the actual search queries** being executed. If the system is searching for something different (e.g., just "window cleaning" without location anchoring), the results won't match what you'd see on Google.
 
-## Solution: Hybrid Places + SERP Discovery
+Currently, the search queries are generated **hidden inside the backend** (lines 1098-1104 of `competitor-webhooks.ts`):
 
-Combines the **precision of Google Places** (verified locations with coordinates) with the **local SEO relevance of SERP** (businesses actively targeting that search term).
+```typescript
+const queries = [
+  `${industry} ${location}`,           // "Window Cleaning Luton"
+  `${industry} near ${location}`,      // "Window Cleaning near Luton"
+  `best ${industry} ${location}`,      // "best Window Cleaning Luton"
+  `local ${industry} ${location}`,     // "local Window Cleaning Luton"
+  `${industry} services ${location}`,  // "Window Cleaning services Luton"
+];
+```
 
-### Architecture Overview
+The user never sees these queries and can't verify they match real Google searches.
+
+---
+
+## Proposed Solution: Search Query Preview Step
+
+Add a **"Preview Search Terms"** section **before** starting discovery, allowing the user to:
+1. See exactly what searches will be run
+2. Edit or add their own search terms
+3. Verify these match what they'd type into Google
+
+### User Flow
 
 ```text
-User enters: "Window Cleaning" + "Luton"
-                    ↓
-┌─────────────────────────────────────────────────────┐
-│         PHASE 1: Google Places Discovery            │
-│   (75% of target count - verified businesses)       │
-│                                                      │
-│   • Precise radius filtering (Haversine formula)   │
-│   • Verified business data (phone, address, rating)│
-│   • Coordinates for distance calculation            │
-│   • Uses compass/crawler-google-places              │
-└─────────────────────────────────────────────────────┘
-                    ↓
-┌─────────────────────────────────────────────────────┐
-│         PHASE 2: SERP Discovery (Deduplicated)      │
-│   (25% of target count - SEO-strong competitors)    │
-│                                                      │
-│   • UK proxies (apifyProxyCountry: 'GB')           │
-│   • UULE location encoding for precise targeting   │
-│   • Filters out directories (40+ blocked domains)  │
-│   • Skip domains already found in Phase 1          │
-│   • Uses apify/google-search-scraper               │
-└─────────────────────────────────────────────────────┘
-                    ↓
-┌─────────────────────────────────────────────────────┐
-│         PHASE 3: Quality Scoring & Ranking          │
-│                                                      │
-│   Quality Score (0-30 points):                      │
-│   • Distance: 0-10 pts (closer = higher)           │
-│   • Rating: 0-10 pts (4.5+ = 10 pts)               │
-│   • Reviews: 0-5 pts (100+ = 5 pts)                │
-│   • Domain TLD: 0-5 pts (.co.uk = 5 pts)           │
-│                                                      │
-│   Priority Tiers:                                   │
-│   • High (25-30 pts): Scrape 15 pages              │
-│   • Medium (15-24 pts): Scrape 5 pages             │
-│   • Low (0-14 pts): Scrape 2 pages                 │
-└─────────────────────────────────────────────────────┘
+CURRENT FLOW:
+┌─────────────────────────────┐
+│ Industry: [Window Cleaning] │
+│ Location: [Luton]          │
+│           [Start Research] │
+└─────────────────────────────┘
+          ↓
+    (Hidden search queries)
+          ↓
+    Review competitors
+
+PROPOSED FLOW:
+┌─────────────────────────────────────────┐
+│ Industry: [Window Cleaning]             │
+│ Location: [Luton]                       │
+│                                         │
+│ ┌─ Search Terms Preview ──────────────┐ │
+│ │                                     │ │
+│ │ We'll search Google for:            │ │
+│ │                                     │ │
+│ │ ☑ window cleaning luton             │ │
+│ │ ☑ window cleaner luton              │ │
+│ │ ☑ window cleaning near luton        │ │
+│ │ ☑ best window cleaning luton        │ │
+│ │ ☐ luton window cleaning services    │ │
+│ │                                     │ │
+│ │ [+ Add custom search term]          │ │
+│ │                                     │ │
+│ │ Tip: Use exact terms you'd search   │ │
+│ │ for on Google to find competitors   │ │
+│ └─────────────────────────────────────┘ │
+│                                         │
+│            [Start Research]             │
+└─────────────────────────────────────────┘
 ```
 
 ---
 
 ## Technical Implementation
 
-### 1. New Edge Function: `competitor-hybrid-discovery`
+### 1. Update Frontend: `CompetitorResearchStep.tsx`
 
-**Key Features:**
-- Triggers Google Places scraper first (Phase 1)
-- Webhook saves Places results and triggers SERP scraper (Phase 2)
-- Final webhook merges and scores all results (Phase 3)
+Add a **"Search Terms Preview"** section that:
+- Auto-generates default queries from industry + location
+- Allows toggling queries on/off
+- Allows adding custom search terms
+- Passes selected queries to the backend
 
-**UULE Generation for Location Precision:**
+**New state:**
 ```typescript
-// UULE codes anchor Google search to a specific location
-function generateUULE(location: string): string {
-  const encoded = btoa(unescape(encodeURIComponent(location)));
-  return `w+CAIQICI${encoded}`;
-}
-```
+const [searchQueries, setSearchQueries] = useState<{query: string; enabled: boolean}[]>([]);
 
-**UK Proxy Configuration:**
-```typescript
-const apifyInput = {
-  queries: [...],
-  countryCode: "gb",
-  languageCode: "en",
-  locationUule: generateUULE("Luton, Bedfordshire, UK"),
-  proxyConfiguration: {
-    useApifyProxy: true,
-    apifyProxyCountry: "GB"  // Routes through UK IPs
+// Auto-generate when industry/location changes
+useEffect(() => {
+  if (nicheQuery && serviceArea) {
+    const industry = nicheQuery.toLowerCase();
+    const location = serviceArea.toLowerCase();
+    
+    setSearchQueries([
+      { query: `${industry} ${location}`, enabled: true },
+      { query: `${industry.replace('cleaning', 'cleaner')} ${location}`, enabled: true },
+      { query: `${industry} near ${location}`, enabled: true },
+      { query: `best ${industry} ${location}`, enabled: true },
+      { query: `local ${industry} ${location}`, enabled: false },
+      { query: `${location} ${industry} services`, enabled: false },
+    ]);
   }
-};
+}, [nicheQuery, serviceArea]);
 ```
 
-### 2. Quality Scoring Algorithm
+**New UI section:**
+```tsx
+{searchQueries.length > 0 && (
+  <div className="space-y-2 p-4 bg-muted/50 rounded-lg">
+    <Label className="text-sm font-medium">
+      Google Search Terms
+    </Label>
+    <p className="text-xs text-muted-foreground">
+      Select the searches that will find your competitors
+    </p>
+    
+    <div className="space-y-2 mt-3">
+      {searchQueries.map((sq, idx) => (
+        <div key={idx} className="flex items-center gap-2">
+          <Checkbox
+            checked={sq.enabled}
+            onCheckedChange={(checked) => toggleQuery(idx, checked)}
+          />
+          <span className="text-sm font-mono bg-background px-2 py-1 rounded">
+            {sq.query}
+          </span>
+        </div>
+      ))}
+    </div>
+    
+    {/* Add custom query */}
+    <div className="flex gap-2 mt-3">
+      <Input
+        placeholder="Add custom search term..."
+        value={customQuery}
+        onChange={(e) => setCustomQuery(e.target.value)}
+      />
+      <Button variant="outline" size="sm" onClick={addCustomQuery}>
+        <Plus className="h-4 w-4" />
+      </Button>
+    </div>
+  </div>
+)}
+```
+
+### 2. Update Backend: `competitor-hybrid-discovery`
+
+Accept custom search queries from the frontend:
 
 ```typescript
-function calculateQualityScore(competitor: Competitor): number {
-  let score = 0;
-  
-  // Distance (closer = better) - 0 to 10 points
-  if (competitor.distance_miles !== null) {
-    if (competitor.distance_miles <= 5) score += 10;
-    else if (competitor.distance_miles <= 10) score += 8;
-    else if (competitor.distance_miles <= 20) score += 5;
-    else if (competitor.distance_miles <= 30) score += 2;
-  }
-  
-  // Google Rating - 0 to 10 points
-  const rating = competitor.rating || 0;
-  if (rating >= 4.5) score += 10;
-  else if (rating >= 4.0) score += 7;
-  else if (rating >= 3.5) score += 4;
-  else if (rating >= 3.0) score += 2;
-  
-  // Review Count - 0 to 5 points
-  const reviews = competitor.reviews_count || 0;
-  if (reviews >= 100) score += 5;
-  else if (reviews >= 50) score += 4;
-  else if (reviews >= 20) score += 2;
-  else if (reviews >= 5) score += 1;
-  
-  // Domain TLD - 0 to 5 points
-  const domain = competitor.domain || '';
-  if (domain.endsWith('.co.uk')) score += 5;
-  else if (domain.endsWith('.uk')) score += 4;
-  else if (domain.endsWith('.com')) score += 2;
-  
-  return score;
-}
-
-function assignPriorityTier(score: number): 'high' | 'medium' | 'low' {
-  if (score >= 25) return 'high';
-  if (score >= 15) return 'medium';
-  return 'low';
-}
+const { 
+  workspaceId, 
+  industry, 
+  location, 
+  radiusMiles = 20,
+  maxCompetitors = 50,
+  customQueries = []  // NEW: User-provided search terms
+} = await req.json();
 ```
 
-### 3. Database Schema Updates
+### 3. Update Webhook: `competitor-webhooks.ts`
 
-**New columns for `competitor_sites`:**
+Use user-provided queries instead of auto-generating:
+
+```typescript
+// Use custom queries if provided, otherwise generate defaults
+const queries = customQueries?.length > 0 
+  ? customQueries 
+  : [
+      `${industry} ${location}`,
+      `${industry} near ${location}`,
+      `best ${industry} ${location}`,
+    ];
+```
+
+### 4. Store Queries in Job Record
+
+Save the actual queries used for debugging/transparency:
+
 ```sql
-ALTER TABLE competitor_sites ADD COLUMN IF NOT EXISTS quality_score INTEGER DEFAULT 0;
-ALTER TABLE competitor_sites ADD COLUMN IF NOT EXISTS priority_tier TEXT DEFAULT 'medium';
-ALTER TABLE competitor_sites ADD COLUMN IF NOT EXISTS is_places_verified BOOLEAN DEFAULT FALSE;
-ALTER TABLE competitor_sites ADD COLUMN IF NOT EXISTS google_place_id TEXT;
-ALTER TABLE competitor_sites ADD COLUMN IF NOT EXISTS serp_position INTEGER;
-ALTER TABLE competitor_sites ADD COLUMN IF NOT EXISTS search_query_used TEXT;
-
--- Indexes for efficient querying
-CREATE INDEX IF NOT EXISTS idx_competitor_sites_quality 
-  ON competitor_sites(job_id, quality_score DESC);
-CREATE INDEX IF NOT EXISTS idx_competitor_sites_priority 
-  ON competitor_sites(job_id, priority_tier);
+ALTER TABLE competitor_research_jobs 
+ADD COLUMN IF NOT EXISTS search_queries_used JSONB;
 ```
 
-**Market Intelligence View:**
-```sql
-CREATE OR REPLACE VIEW competitor_market_intelligence AS
-SELECT 
-  job_id,
-  COUNT(*) as total_competitors,
-  COUNT(*) FILTER (WHERE is_places_verified = TRUE) as verified_count,
-  COUNT(*) FILTER (WHERE discovery_source = 'google_places') as from_places,
-  COUNT(*) FILTER (WHERE discovery_source = 'google_serp') as from_serp,
-  AVG(distance_miles) FILTER (WHERE distance_miles IS NOT NULL) as avg_distance,
-  AVG(rating) FILTER (WHERE rating IS NOT NULL) as avg_rating,
-  AVG(reviews_count) FILTER (WHERE reviews_count IS NOT NULL) as avg_reviews,
-  COUNT(*) FILTER (WHERE priority_tier = 'high') as high_priority,
-  COUNT(*) FILTER (WHERE priority_tier = 'medium') as medium_priority,
-  COUNT(*) FILTER (WHERE priority_tier = 'low') as low_priority
-FROM competitor_sites
-WHERE is_selected = TRUE
-GROUP BY job_id;
-```
+---
 
-### 4. Updated Webhook Handler
+## Files to Modify
 
-**Three-phase webhook processing:**
-
-1. **`places_discovery`**: Saves Places results, triggers SERP discovery
-2. **`serp_discovery`**: Saves SERP results, deduplicates against Places
-3. **`scoring_complete`**: Calculates quality scores and assigns priority tiers
-
-### 5. Frontend Updates
-
-**CompetitorResearchStep.tsx changes:**
-- Call `competitor-hybrid-discovery` instead of `competitor-serp-discovery`
-- Display source breakdown (Places vs SERP count)
-- Show quality scores and priority tiers in review screen
+| File | Changes |
+|------|---------|
+| `src/components/onboarding/CompetitorResearchStep.tsx` | Add search query preview UI |
+| `supabase/functions/competitor-hybrid-discovery/index.ts` | Accept `customQueries` parameter |
+| `supabase/functions/competitor-webhooks/index.ts` | Use custom queries in SERP phase |
+| Database migration | Add `search_queries_used` column |
 
 ---
 
-## Files to Create/Modify
+## Expected Outcome
 
-| File | Action | Description |
-|------|--------|-------------|
-| `supabase/functions/competitor-hybrid-discovery/index.ts` | **CREATE** | New unified discovery function |
-| `supabase/functions/_shared/uule-generator.ts` | **CREATE** | UULE code generation for UK cities |
-| `supabase/functions/_shared/quality-scorer.ts` | **CREATE** | Quality scoring algorithm |
-| `supabase/functions/competitor-webhooks/index.ts` | **UPDATE** | Add hybrid webhook handlers |
-| `supabase/config.toml` | **UPDATE** | Register new function |
-| `src/components/onboarding/CompetitorResearchStep.tsx` | **UPDATE** | Use hybrid discovery |
-| Database migration | **CREATE** | Add quality_score, priority_tier columns |
+After this change:
+1. User enters "Window Cleaning" + "Luton"
+2. **Sees exact search terms** that will be used: "window cleaning luton", "window cleaner luton", etc.
+3. Can **edit or add** their preferred terms
+4. Clicks "Start Research"
+5. Results will **exactly match** what those Google searches return
+6. In Review screen, can see which queries found which competitors
 
 ---
 
-## Expected Results
+## Alternative: "Test This Search" Button
 
-| Metric | Before (SERP-only) | After (Hybrid) |
-|--------|-------------------|----------------|
-| Results found | 6 | 75-100 |
-| Verified businesses | 0% | ~75% |
-| With coordinates | 0% | ~75% |
-| Location accuracy | ~30% | ~90% |
-| Has phone/address | 0% | ~75% |
-| Directory contamination | Medium | Very Low |
+For even more transparency, add a "Preview Results" button that:
+1. Runs a quick Firecrawl search (3-5 results)
+2. Shows a preview of what the search term finds
+3. Helps user verify the term before committing to full discovery
 
----
-
-## Cost Estimate Per Job (100 competitors)
-
-| Component | Cost |
-|-----------|------|
-| Google Places Scraper (75 places) | ~$1.50 |
-| Google SERP Scraper (25 queries) | ~$0.05 |
-| Website Content Crawler (tiered) | ~$0.50 |
-| **Total** | **~$2.05** |
-
----
-
-## Implementation Order
-
-1. Create database migration for new columns
-2. Create shared utilities (UULE generator, quality scorer)
-3. Create `competitor-hybrid-discovery` edge function
-4. Update `competitor-webhooks` with hybrid handlers
-5. Update frontend to use new discovery function
-6. Deploy and test with "Window Cleaning" + "Luton"
-
+This would add ~$0.02 per preview but gives complete confidence in the search terms.
