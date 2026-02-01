@@ -8,7 +8,6 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -30,7 +29,9 @@ import {
   ExternalLink,
   X,
   MapPin,
-  RotateCcw
+  RotateCcw,
+  ChevronDown,
+  XCircle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -46,6 +47,8 @@ interface Competitor {
   location_data: any;
   distance_miles: number | null;
   match_reason: string | null;
+  validation_status: string | null;
+  relevance_score: number | null;
 }
 
 interface CompetitorReviewScreenProps {
@@ -53,6 +56,7 @@ interface CompetitorReviewScreenProps {
   jobId: string;
   nicheQuery: string;
   serviceArea: string;
+  targetCount: number;
   onConfirm: (selectedCount: number) => void;
   onBack: () => void;
   onSkip: () => void;
@@ -66,11 +70,14 @@ const SUSPICIOUS_DOMAINS = [
   'freeindex', 'gumtree', 'scoot', 'findatrade', 'hotfrog'
 ];
 
+const ITEMS_PER_PAGE = 50;
+
 export function CompetitorReviewScreen({
   workspaceId,
   jobId,
   nicheQuery,
   serviceArea,
+  targetCount,
   onConfirm,
   onBack,
   onSkip,
@@ -82,6 +89,7 @@ export function CompetitorReviewScreen({
   const [searchQuery, setSearchQuery] = useState('');
   const [manualUrl, setManualUrl] = useState('');
   const [isAddingUrl, setIsAddingUrl] = useState(false);
+  const [displayLimit, setDisplayLimit] = useState(ITEMS_PER_PAGE);
 
   // Fetch competitors for this job
   useEffect(() => {
@@ -90,8 +98,9 @@ export function CompetitorReviewScreen({
       try {
         const { data, error } = await supabase
           .from('competitor_sites')
-          .select('id, business_name, domain, url, rating, reviews_count, is_selected, discovery_source, location_data, distance_miles, match_reason')
+          .select('id, business_name, domain, url, rating, reviews_count, is_selected, discovery_source, location_data, distance_miles, match_reason, validation_status, relevance_score')
           .eq('job_id', jobId)
+          .order('relevance_score', { ascending: false, nullsFirst: false })
           .order('distance_miles', { ascending: true, nullsFirst: false });
 
         if (error) throw error;
@@ -117,19 +126,59 @@ export function CompetitorReviewScreen({
     );
   }, [competitors, searchQuery]);
 
+  // Paginated display
+  const displayedCompetitors = useMemo(() => {
+    return filteredCompetitors.slice(0, displayLimit);
+  }, [filteredCompetitors, displayLimit]);
+
+  const hasMore = filteredCompetitors.length > displayLimit;
+  const remainingCount = filteredCompetitors.length - displayLimit;
+
   // Calculate selected count
   const selectedCount = useMemo(() => 
     competitors.filter(c => c.is_selected).length,
     [competitors]
   );
 
+  // Check if at limit
+  const isAtLimit = selectedCount >= targetCount;
+
   // Check if domain looks suspicious
   const isSuspiciousDomain = (domain: string): boolean => {
     return SUSPICIOUS_DOMAINS.some(sus => domain.toLowerCase().includes(sus));
   };
 
+  // Get validation badge
+  const getValidationBadge = (status: string | null) => {
+    if (status === 'valid') {
+      return (
+        <Badge variant="outline" className="text-xs text-success border-success/30 bg-success/10">
+          <CheckCircle2 className="h-3 w-3 mr-1" />
+          Valid
+        </Badge>
+      );
+    }
+    if (status === 'invalid' || status === 'timeout') {
+      return (
+        <Badge variant="outline" className="text-xs text-destructive border-destructive/30 bg-destructive/10">
+          <XCircle className="h-3 w-3 mr-1" />
+          Unreachable
+        </Badge>
+      );
+    }
+    return null; // pending - no badge
+  };
+
   // Toggle individual competitor selection
   const handleToggleSelection = async (competitorId: string, newValue: boolean) => {
+    // Check limit when trying to select
+    if (newValue && isAtLimit) {
+      toast.error(`Limit reached (${targetCount} competitors)`, {
+        description: 'Deselect one to add another'
+      });
+      return;
+    }
+
     // Optimistic update
     setCompetitors(prev => 
       prev.map(c => c.id === competitorId ? { ...c, is_selected: newValue } : c)
@@ -150,22 +199,53 @@ export function CompetitorReviewScreen({
     }
   };
 
-  // Select all / Deselect all
-  const handleSelectAll = async (select: boolean) => {
-    const ids = competitors.map(c => c.id);
+  // Select all (up to limit)
+  const handleSelectAll = async () => {
+    // Only select up to targetCount
+    const toSelect = competitors
+      .filter(c => !c.is_selected)
+      .slice(0, targetCount - selectedCount);
+    
+    if (toSelect.length === 0) {
+      toast.info('Already at maximum selection');
+      return;
+    }
+
+    const ids = toSelect.map(c => c.id);
     
     // Optimistic update
-    setCompetitors(prev => prev.map(c => ({ ...c, is_selected: select })));
+    setCompetitors(prev => prev.map(c => 
+      ids.includes(c.id) ? { ...c, is_selected: true } : c
+    ));
 
     // Persist to database
     const { error } = await supabase
       .from('competitor_sites')
-      .update({ is_selected: select })
+      .update({ is_selected: true })
       .in('id', ids);
 
     if (error) {
-      // Revert on error
       toast.error('Failed to update selections');
+    } else {
+      toast.success(`Selected ${toSelect.length} competitors`);
+    }
+  };
+
+  // Clear all selections
+  const handleClearAll = async () => {
+    const ids = competitors.filter(c => c.is_selected).map(c => c.id);
+    
+    // Optimistic update
+    setCompetitors(prev => prev.map(c => ({ ...c, is_selected: false })));
+
+    // Persist to database
+    const { error } = await supabase
+      .from('competitor_sites')
+      .update({ is_selected: false })
+      .in('id', ids);
+
+    if (error) {
+      toast.error('Failed to clear selections');
     }
   };
 
@@ -180,7 +260,6 @@ export function CompetitorReviewScreen({
       .eq('id', competitorId);
 
     if (error) {
-      // Refetch on error
       toast.error('Failed to delete competitor');
     }
   };
@@ -188,6 +267,14 @@ export function CompetitorReviewScreen({
   // Add manual URL
   const handleAddManualUrl = async () => {
     if (!manualUrl.trim()) return;
+
+    // Check limit
+    if (isAtLimit) {
+      toast.error(`Limit reached (${targetCount} competitors)`, {
+        description: 'Deselect one to add another'
+      });
+      return;
+    }
 
     let cleanUrl = manualUrl.trim();
     if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
@@ -222,13 +309,15 @@ export function CompetitorReviewScreen({
           status: 'approved',
           scrape_status: 'pending',
           is_selected: true,
+          validation_status: 'pending',
+          relevance_score: 100, // Manual entries get highest priority
         })
         .select()
         .single();
 
       if (error) throw error;
 
-      setCompetitors(prev => [...prev, data as Competitor]);
+      setCompetitors(prev => [data as Competitor, ...prev]);
       setManualUrl('');
       toast.success('Competitor added');
     } catch (err) {
@@ -249,7 +338,7 @@ export function CompetitorReviewScreen({
     setIsSubmitting(true);
     try {
       const { data, error } = await supabase.functions.invoke('competitor-scrape-start', {
-        body: { jobId, workspaceId }
+        body: { jobId, workspaceId, targetCount }
       });
 
       if (error) throw error;
@@ -258,7 +347,7 @@ export function CompetitorReviewScreen({
         throw new Error(data?.error || 'Failed to start scraping');
       }
 
-      toast.success(`Deep analysis started for ${selectedCount} websites`);
+      toast.success(`Deep analysis started for ${data.sitesCount} websites`);
       onConfirm(selectedCount);
     } catch (err) {
       console.error('Error starting scrape:', err);
@@ -268,11 +357,22 @@ export function CompetitorReviewScreen({
     }
   };
 
+  // Show more items
+  const handleShowMore = () => {
+    setDisplayLimit(prev => prev + ITEMS_PER_PAGE);
+  };
+
   // Estimate cost based on selected count
   const estimatedCost = useMemo(() => {
-    const costPerSite = 0.10; // ~$0.10 per site with deep crawl
+    const costPerSite = 0.10;
     return (selectedCount * costPerSite).toFixed(2);
   }, [selectedCount]);
+
+  // Count invalid sites
+  const invalidCount = useMemo(() => 
+    competitors.filter(c => c.is_selected && (c.validation_status === 'invalid' || c.validation_status === 'timeout')).length,
+    [competitors]
+  );
 
   if (isLoading) {
     return (
@@ -289,8 +389,9 @@ export function CompetitorReviewScreen({
       <div className="text-center space-y-1">
         <h2 className="text-xl font-semibold text-foreground">Review Competitors</h2>
         <p className="text-sm text-muted-foreground">
-          We found <span className="font-medium text-foreground">{competitors.length}</span> businesses.
-          Uncheck any that aren't relevant competitors.
+          <span className="font-medium text-foreground">{selectedCount}</span> of <span className="font-medium text-foreground">{targetCount}</span> selected
+          <span className="mx-2">•</span>
+          <span className="text-muted-foreground">{competitors.length} found in your area</span>
         </p>
       </div>
 
@@ -308,125 +409,161 @@ export function CompetitorReviewScreen({
         <Button
           variant="outline"
           size="sm"
-          onClick={() => handleSelectAll(true)}
+          onClick={handleSelectAll}
+          disabled={isAtLimit}
         >
           Select All
         </Button>
         <Button
           variant="outline"
           size="sm"
-          onClick={() => handleSelectAll(false)}
+          onClick={handleClearAll}
         >
           Clear
         </Button>
       </div>
 
+      {/* Selection limit warning */}
+      {isAtLimit && (
+        <div className="flex items-center gap-2 p-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-sm">
+          <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+          <span>Selection limit reached ({targetCount}). Deselect competitors to add more.</span>
+        </div>
+      )}
+
+      {/* Invalid sites warning */}
+      {invalidCount > 0 && (
+        <div className="flex items-center gap-2 p-2 rounded-lg bg-muted border text-sm text-muted-foreground">
+          <XCircle className="h-4 w-4 flex-shrink-0" />
+          <span>{invalidCount} selected site{invalidCount > 1 ? 's' : ''} could not be reached — they'll be replaced automatically</span>
+        </div>
+      )}
+
       {/* Competitor list */}
       <div className="h-[320px] rounded-md border overflow-y-auto">
         <div className="p-2 pr-4 space-y-1">
-          {filteredCompetitors.length === 0 ? (
+          {displayedCompetitors.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               {searchQuery ? 'No competitors match your search' : 'No competitors found'}
             </div>
           ) : (
-            filteredCompetitors.map((competitor) => (
-              <div
-                key={competitor.id}
-                className={cn(
-                  'flex items-center gap-3 p-3 rounded-lg border transition-colors',
-                  competitor.is_selected 
-                    ? 'bg-primary/5 border-primary/20' 
-                    : 'bg-muted/30 border-transparent opacity-60'
-                )}
-              >
-                <Checkbox
-                  checked={competitor.is_selected}
-                  onCheckedChange={(checked) => 
-                    handleToggleSelection(competitor.id, checked === true)
-                  }
-                />
-                
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-medium text-foreground truncate">
-                      {competitor.business_name || competitor.domain}
-                    </span>
-                    {competitor.distance_miles != null && (
-                      <Badge variant="outline" className="text-xs">
-                        <MapPin className="h-3 w-3 mr-1" />
-                        {competitor.distance_miles} mi
-                      </Badge>
-                    )}
-                    {competitor.discovery_source === 'manual' && (
-                      <Badge variant="secondary" className="text-xs">
-                        Manual
-                      </Badge>
-                    )}
-                    {competitor.match_reason && (
-                      <Badge 
-                        variant={
-                          competitor.match_reason.startsWith('Weak') ? 'outline' :
-                          competitor.match_reason === 'Local business' ? 'secondary' :
-                          competitor.match_reason === 'Manual check' ? 'outline' :
-                          'default'
-                        }
-                        className={cn(
-                          'text-xs',
-                          competitor.match_reason.startsWith('Weak') && 'text-amber-600 border-amber-300 bg-amber-50',
-                          competitor.match_reason === 'Local business' && 'text-blue-600 border-blue-300 bg-blue-50',
-                          competitor.match_reason === 'Manual check' && 'text-muted-foreground'
-                        )}
-                      >
-                        {competitor.match_reason}
-                      </Badge>
-                    )}
-                    {isSuspiciousDomain(competitor.domain) && (
-                      <Badge variant="outline" className="text-xs text-amber-600 border-amber-300">
-                        <AlertTriangle className="h-3 w-3 mr-1" />
-                        May be directory
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-3 text-sm text-muted-foreground mt-0.5">
-                    <span className="flex items-center gap-1">
-                      <Globe className="h-3 w-3" />
-                      {competitor.domain}
-                    </span>
-                    {competitor.rating && (
-                      <span className="flex items-center gap-1">
-                        <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                        {competitor.rating.toFixed(1)}
-                        {competitor.reviews_count && (
-                          <span className="text-xs">({competitor.reviews_count})</span>
-                        )}
+            <>
+              {displayedCompetitors.map((competitor) => (
+                <div
+                  key={competitor.id}
+                  className={cn(
+                    'flex items-center gap-3 p-3 rounded-lg border transition-colors',
+                    competitor.is_selected 
+                      ? 'bg-primary/5 border-primary/20' 
+                      : 'bg-muted/30 border-transparent opacity-60'
+                  )}
+                >
+                  <Checkbox
+                    checked={competitor.is_selected}
+                    onCheckedChange={(checked) => 
+                      handleToggleSelection(competitor.id, checked === true)
+                    }
+                    disabled={!competitor.is_selected && isAtLimit}
+                  />
+                  
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium text-foreground truncate">
+                        {competitor.business_name || competitor.domain}
                       </span>
-                    )}
+                      {competitor.distance_miles != null && (
+                        <Badge variant="outline" className="text-xs">
+                          <MapPin className="h-3 w-3 mr-1" />
+                          {competitor.distance_miles} mi
+                        </Badge>
+                      )}
+                      {competitor.discovery_source === 'manual' && (
+                        <Badge variant="secondary" className="text-xs">
+                          Manual
+                        </Badge>
+                      )}
+                      {getValidationBadge(competitor.validation_status)}
+                      {competitor.match_reason && !competitor.match_reason.startsWith('Weak') && (
+                        <Badge 
+                          variant={
+                            competitor.match_reason === 'Local business' ? 'secondary' :
+                            competitor.match_reason === 'Manual check' ? 'outline' :
+                            'default'
+                          }
+                          className={cn(
+                            'text-xs',
+                            competitor.match_reason === 'Local business' && 'text-blue-600 border-blue-300 bg-blue-50',
+                            competitor.match_reason === 'Manual check' && 'text-muted-foreground'
+                          )}
+                        >
+                          {competitor.match_reason}
+                        </Badge>
+                      )}
+                      {competitor.match_reason?.startsWith('Weak') && (
+                        <Badge variant="outline" className="text-xs text-amber-600 border-amber-300 bg-amber-50">
+                          {competitor.match_reason}
+                        </Badge>
+                      )}
+                      {isSuspiciousDomain(competitor.domain) && (
+                        <Badge variant="outline" className="text-xs text-amber-600 border-amber-300">
+                          <AlertTriangle className="h-3 w-3 mr-1" />
+                          May be directory
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3 text-sm text-muted-foreground mt-0.5">
+                      <span className="flex items-center gap-1">
+                        <Globe className="h-3 w-3" />
+                        {competitor.domain}
+                      </span>
+                      {competitor.rating && (
+                        <span className="flex items-center gap-1">
+                          <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                          {competitor.rating.toFixed(1)}
+                          {competitor.reviews_count && (
+                            <span className="text-xs">({competitor.reviews_count})</span>
+                          )}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Action buttons - always visible */}
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      asChild
+                    >
+                      <a href={competitor.url} target="_blank" rel="noopener noreferrer">
+                        <ExternalLink className="h-4 w-4" />
+                      </a>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                      onClick={() => handleDeleteCompetitor(competitor.id)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
-
-                {/* Action buttons - always visible */}
-                <div className="flex items-center gap-1 flex-shrink-0">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    asChild
-                  >
-                    <a href={competitor.url} target="_blank" rel="noopener noreferrer">
-                      <ExternalLink className="h-4 w-4" />
-                    </a>
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                    onClick={() => handleDeleteCompetitor(competitor.id)}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            ))
+              ))}
+              
+              {/* Show more button */}
+              {hasMore && (
+                <Button
+                  variant="ghost"
+                  className="w-full mt-2"
+                  onClick={handleShowMore}
+                >
+                  <ChevronDown className="h-4 w-4 mr-2" />
+                  Show {Math.min(remainingCount, ITEMS_PER_PAGE)} more competitors
+                </Button>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -440,11 +577,11 @@ export function CompetitorReviewScreen({
             value={manualUrl}
             onChange={(e) => setManualUrl(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleAddManualUrl()}
-            disabled={isAddingUrl}
+            disabled={isAddingUrl || isAtLimit}
           />
           <Button
             onClick={handleAddManualUrl}
-            disabled={!manualUrl.trim() || isAddingUrl}
+            disabled={!manualUrl.trim() || isAddingUrl || isAtLimit}
             size="icon"
           >
             {isAddingUrl ? (
@@ -462,7 +599,7 @@ export function CompetitorReviewScreen({
           <div className="flex items-center gap-2">
             <CheckCircle2 className="h-4 w-4 text-success" />
             <span>
-              <span className="font-medium">{selectedCount}</span> competitors selected
+              <span className="font-medium">{selectedCount}</span> of <span className="font-medium">{targetCount}</span> competitors selected
             </span>
           </div>
           <span className="text-muted-foreground">
@@ -537,7 +674,7 @@ export function CompetitorReviewScreen({
             ) : (
               <>
                 <Sparkles className="h-4 w-4 mr-2" />
-                Confirm & Start Analysis
+                Confirm & Start Analysis ({selectedCount}/{targetCount})
               </>
             )}
           </Button>
