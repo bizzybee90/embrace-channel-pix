@@ -274,3 +274,6 @@ verify_jwt = false
 
 [functions.competitor-webhooks]
 verify_jwt = false
+
+[functions.competitor-serp-discovery]
+verify_jwt = false

@@ -377,17 +377,16 @@ export function CompetitorResearchStep({
     setError(null);
 
     try {
-      // Use the new strict-proximity discovery which:
-      // 1. Geocodes the FULL address (not just city) for precise center
-      // 2. Uses ONLY industry keyword (no city appended) to avoid city-center bias
-      // 3. Filters with Anti-Repair blocklist and Haversine distance
-      // 4. Auto-selects top N closest competitors
-      const { data, error: invokeError } = await supabase.functions.invoke('competitor-discovery-start', {
+      // Use SERP-based discovery which:
+      // 1. Generates location-specific search queries (e.g., "window cleaning luton")
+      // 2. Scrapes Google organic results to find businesses targeting that location
+      // 3. Filters out directories (Yell, Checkatrade, etc.)
+      // 4. Deduplicates by domain and ranks by SERP position
+      const { data, error: invokeError } = await supabase.functions.invoke('competitor-serp-discovery', {
         body: {
           workspaceId,
           industry: nicheQuery,
-          address: serviceArea || 'UK', // Full address for precise geocoding
-          radiusMiles: 25,
+          location: serviceArea || 'UK',
           maxCompetitors: targetCount,
         }
       });
@@ -398,7 +397,6 @@ export function CompetitorResearchStep({
         throw new Error(data?.error || 'Failed to start research');
       }
 
-      // Use the job ID created by start-competitor-research
       setJobId(data.jobId);
       setStatus('running');
       toast.success('Competitor research started!');
