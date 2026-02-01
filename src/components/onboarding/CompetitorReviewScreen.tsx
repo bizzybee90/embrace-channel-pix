@@ -31,6 +31,8 @@ import {
   MapPin,
   RotateCcw,
   ChevronDown,
+  ChevronUp,
+  Eye,
   XCircle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -91,6 +93,10 @@ export function CompetitorReviewScreen({
   const [isAddingUrl, setIsAddingUrl] = useState(false);
   const [displayLimit, setDisplayLimit] = useState(ITEMS_PER_PAGE);
 
+  // Transparency: show exact search terms used for SERP discovery
+  const [queriesUsed, setQueriesUsed] = useState<string[]>([]);
+  const [showQueriesUsed, setShowQueriesUsed] = useState(true);
+
   // Fetch competitors for this job
   useEffect(() => {
     const fetchCompetitors = async () => {
@@ -115,6 +121,31 @@ export function CompetitorReviewScreen({
     };
 
     fetchCompetitors();
+  }, [jobId]);
+
+  // Fetch exact search queries used for this job (stored on the job record)
+  useEffect(() => {
+    const fetchQueriesUsed = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('competitor_research_jobs')
+          .select('search_queries')
+          .eq('id', jobId)
+          .maybeSingle();
+
+        if (error) throw error;
+
+        // search_queries is a JSON column; in our usage we store an array of strings.
+        const raw = (data as any)?.search_queries;
+        const parsed = Array.isArray(raw) ? raw.filter((q) => typeof q === 'string') : [];
+        setQueriesUsed(parsed);
+      } catch (err) {
+        // Non-blocking; the screen should still work without this metadata.
+        console.warn('[CompetitorReviewScreen] Failed to load search queries used:', err);
+      }
+    };
+
+    fetchQueriesUsed();
   }, [jobId]);
 
   // Filter competitors based on search
@@ -395,6 +426,43 @@ export function CompetitorReviewScreen({
           <span className="text-muted-foreground">{competitors.length} found in your area</span>
         </p>
       </div>
+
+      {/* Search terms used (SERP) */}
+      {queriesUsed.length > 0 && (
+        <div className="border rounded-lg overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setShowQueriesUsed((v) => !v)}
+            className="w-full flex items-center justify-between p-3 text-left hover:bg-accent/50 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <Eye className="h-4 w-4 text-primary" />
+              <span className="font-medium text-sm">Search terms used</span>
+              <span className="text-xs text-muted-foreground">({queriesUsed.length})</span>
+            </div>
+            {showQueriesUsed ? (
+              <ChevronUp className="h-4 w-4 text-muted-foreground" />
+            ) : (
+              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+            )}
+          </button>
+
+          {showQueriesUsed && (
+            <div className="p-3 pt-0 space-y-2 border-t bg-muted/30">
+              <p className="text-xs text-muted-foreground">
+                These are the exact Google search phrases used to find the competitors below.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {queriesUsed.map((q) => (
+                  <Badge key={q} variant="secondary" className="font-mono text-xs">
+                    {q}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Search and bulk actions */}
       <div className="flex items-center gap-2">
