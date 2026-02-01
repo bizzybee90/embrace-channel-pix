@@ -840,10 +840,12 @@ export type Database = {
           faqs_generated: number | null
           faqs_validated: number | null
           filter_reason: string | null
+          google_place_id: string | null
           has_faq_page: boolean | null
           has_pricing_page: boolean | null
           id: string
           is_directory: boolean | null
+          is_places_verified: boolean | null
           is_selected: boolean | null
           is_valid: boolean | null
           job_id: string
@@ -856,6 +858,8 @@ export type Database = {
           phone: string | null
           place_id: string | null
           postcode: string | null
+          priority_tier: string | null
+          quality_score: number | null
           rating: number | null
           rejection_reason: string | null
           relevance_score: number | null
@@ -864,6 +868,8 @@ export type Database = {
           scrape_error: string | null
           scrape_status: string | null
           scraped_at: string | null
+          search_query_used: string | null
+          serp_position: number | null
           status: string
           title: string | null
           total_words: number | null
@@ -892,10 +898,12 @@ export type Database = {
           faqs_generated?: number | null
           faqs_validated?: number | null
           filter_reason?: string | null
+          google_place_id?: string | null
           has_faq_page?: boolean | null
           has_pricing_page?: boolean | null
           id?: string
           is_directory?: boolean | null
+          is_places_verified?: boolean | null
           is_selected?: boolean | null
           is_valid?: boolean | null
           job_id: string
@@ -908,6 +916,8 @@ export type Database = {
           phone?: string | null
           place_id?: string | null
           postcode?: string | null
+          priority_tier?: string | null
+          quality_score?: number | null
           rating?: number | null
           rejection_reason?: string | null
           relevance_score?: number | null
@@ -916,6 +926,8 @@ export type Database = {
           scrape_error?: string | null
           scrape_status?: string | null
           scraped_at?: string | null
+          search_query_used?: string | null
+          serp_position?: number | null
           status?: string
           title?: string | null
           total_words?: number | null
@@ -944,10 +956,12 @@ export type Database = {
           faqs_generated?: number | null
           faqs_validated?: number | null
           filter_reason?: string | null
+          google_place_id?: string | null
           has_faq_page?: boolean | null
           has_pricing_page?: boolean | null
           id?: string
           is_directory?: boolean | null
+          is_places_verified?: boolean | null
           is_selected?: boolean | null
           is_valid?: boolean | null
           job_id?: string
@@ -960,6 +974,8 @@ export type Database = {
           phone?: string | null
           place_id?: string | null
           postcode?: string | null
+          priority_tier?: string | null
+          quality_score?: number | null
           rating?: number | null
           rejection_reason?: string | null
           relevance_score?: number | null
@@ -968,6 +984,8 @@ export type Database = {
           scrape_error?: string | null
           scrape_status?: string | null
           scraped_at?: string | null
+          search_query_used?: string | null
+          serp_position?: number | null
           status?: string
           title?: string | null
           total_words?: number | null
@@ -5801,6 +5819,31 @@ export type Database = {
       }
     }
     Views: {
+      competitor_market_intelligence: {
+        Row: {
+          avg_distance: number | null
+          avg_quality_score: number | null
+          avg_rating: number | null
+          avg_reviews: number | null
+          from_places: number | null
+          from_serp: number | null
+          high_priority: number | null
+          job_id: string | null
+          low_priority: number | null
+          medium_priority: number | null
+          total_competitors: number | null
+          verified_count: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "competitor_sites_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "competitor_research_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       training_pairs: {
         Row: {
           conversation_id: string | null
