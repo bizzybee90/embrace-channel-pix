@@ -268,3 +268,9 @@ verify_jwt = false
 
 [functions.validate-competitor-sites]
 verify_jwt = false
+
+[functions.competitor-discovery-start]
+verify_jwt = false
+
+[functions.competitor-webhooks]
+verify_jwt = false
