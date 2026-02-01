@@ -21,7 +21,7 @@ const corsHeaders = {
  * - No coordinate bias toward city centers
  */
 
-// Generate location-specific search queries
+// Generate location-specific search queries - MORE VARIATIONS for better coverage
 function generateSearchQueries(industry: string, location: string): string[] {
   const queries: string[] = [];
   
@@ -33,28 +33,33 @@ function generateSearchQueries(industry: string, location: string): string[] {
   // Extract city/town name (first part before comma)
   const primaryLocation = cleanLocation.split(',')[0].trim();
   
-  // Core search patterns (most valuable)
+  // Core search patterns (most valuable) - these match how customers actually search
   queries.push(`${industry} ${primaryLocation}`);
   queries.push(`${industry} in ${primaryLocation}`);
-  queries.push(`${industry} near ${primaryLocation}`);
+  queries.push(`best ${industry} ${primaryLocation}`);
+  queries.push(`${industry} services ${primaryLocation}`);
   
   // Singular/plural variations
   const industryLower = industry.toLowerCase();
-  if (industryLower.endsWith('ing')) {
-    // "window cleaning" -> "window cleaner"
-    const singular = industry.replace(/ing$/i, 'er');
+  if (industryLower.includes('cleaning')) {
+    // "window cleaning" -> "window cleaner" and "window cleaners"
+    const singular = industry.replace(/cleaning/i, 'cleaner');
+    const plural = industry.replace(/cleaning/i, 'cleaners');
     queries.push(`${singular} ${primaryLocation}`);
+    queries.push(`${plural} ${primaryLocation}`);
+    queries.push(`local ${singular} ${primaryLocation}`);
   } else if (industryLower.endsWith('er')) {
     // "window cleaner" -> "window cleaning"
     const gerund = industry.replace(/er$/i, 'ing');
     queries.push(`${gerund} ${primaryLocation}`);
   }
   
-  // Add UK suffix for clarity
-  queries.push(`${industry} ${primaryLocation} UK`);
+  // Add nearby towns if we can guess (for broader coverage)
+  queries.push(`${industry} near ${primaryLocation}`);
+  queries.push(`${industry} ${primaryLocation} area`);
   
-  // Deduplicate and limit
-  return [...new Set(queries)].slice(0, 5);
+  // Deduplicate and return more queries for better coverage
+  return [...new Set(queries)].slice(0, 8);
 }
 
 serve(async (req) => {
@@ -144,16 +149,17 @@ serve(async (req) => {
     const webhookUrl = `${SUPABASE_URL}/functions/v1/competitor-webhooks?apikey=${SUPABASE_ANON_KEY}`;
     
     // Apify Google Search Scraper configuration
+    // Using more pages to get better coverage of organic results
     const apifyInput = {
       queries: searchQueries.join('\n'),
       countryCode: "gb",
       languageCode: "en",
-      resultsPerPage: 100,
-      maxPagesPerQuery: 2,
-      // Target UK Google specifically
-      customDataFunction: `async ({ input, $, request, response, html }) => {
-        return {};
-      }`,
+      resultsPerPage: 100, // Max per page
+      maxPagesPerQuery: 5, // More pages = more results (5 pages * 10 results = ~50 per query)
+      mobileResults: false, // Desktop results have more organic listings
+      includeUnfilteredResults: true, // Include all organic results
+      saveHtml: false, // Don't need HTML, saves bandwidth
+      saveHtmlToKeyValueStore: false,
     };
     
     console.log('[serp-discovery] Apify config:', {

@@ -169,6 +169,9 @@ const DIRECTORY_BLOCKLIST = new Set([
   'scoot.co.uk', 'hotfrog.co.uk', 'businessmagnet.co.uk',
   'misterwhat.co.uk', 'locanto.co.uk', 'gumtree.com',
   'localservices.amazon.co.uk', 'amazon.co.uk',
+  // Cost comparison / aggregator sites
+  'hamuch.com', 'checkatrader.co.uk', 'quotatis.co.uk', 'housetohome.co.uk',
+  'homeadvisor.com', 'thumbtack.com', 'angi.com', 'angie.com',
   // Social Media
   'facebook.com', 'nextdoor.com', 'nextdoor.co.uk',
   'instagram.com', 'twitter.com', 'x.com', 'linkedin.com',
@@ -186,8 +189,11 @@ const DIRECTORY_BLOCKLIST = new Set([
   'streetmapof.co.uk', 'lacartes.com', 'uksmallbusinessdirectory.co.uk',
   'hub.co.uk', 'applegate.co.uk', 'approved-business.co.uk',
   'locallife.co.uk', 'theukbd.co.uk', 'britaine.co.uk',
+  'houzz.co.uk', 'houzz.com', 'homebase.co.uk', 'diy.com',
   // Wikipedia and knowledge bases
   'wikipedia.org', 'wikihow.com',
+  // Gov and general info sites
+  'gov.uk', 'nhs.uk', 'bbc.co.uk', 'theguardian.com',
 ]);
 
 function isDomainBlocked(hostname: string): boolean {
