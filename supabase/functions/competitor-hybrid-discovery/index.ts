@@ -17,7 +17,8 @@ serve(async (req) => {
       industry, 
       location, 
       radiusMiles = 20,
-      maxCompetitors = 50 
+      maxCompetitors = 50,
+      customQueries = []
     } = await req.json();
     
     if (!workspaceId || !industry || !location) {
@@ -183,6 +184,7 @@ serve(async (req) => {
           originLon: lng,
           radiusMiles,
           maxCompetitors: placesTarget,
+          customQueries, // Pass user-provided search queries for SERP phase
           serpTarget, // Pass SERP target for phase 2
           runId: '{{resource.id}}',
           datasetId: '{{resource.defaultDatasetId}}',

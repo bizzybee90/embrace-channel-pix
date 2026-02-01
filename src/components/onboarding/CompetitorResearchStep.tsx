@@ -4,9 +4,10 @@ import { CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Search, Loader2, Sparkles, MapPin } from 'lucide-react';
+import { Search, Loader2, Sparkles, MapPin, Plus, X, Eye, ChevronDown, ChevronUp } from 'lucide-react';
 import { CompetitorPipelineProgress } from './CompetitorPipelineProgress';
 
 interface CompetitorResearchStepProps {
@@ -181,6 +182,11 @@ export function CompetitorResearchStep({
   const [jobId, setJobId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoadingContext, setIsLoadingContext] = useState(!hasInitialNiche);
+  
+  // Search query preview state
+  const [searchQueries, setSearchQueries] = useState<{query: string; enabled: boolean}[]>([]);
+  const [customQueryInput, setCustomQueryInput] = useState('');
+  const [showSearchQueries, setShowSearchQueries] = useState(false);
 
   // Resume the latest in-progress job after refresh so the UI doesn't look "paused".
   useEffect(() => {
@@ -367,6 +373,55 @@ export function CompetitorResearchStep({
     } catch { /* ignore */ }
   }, [draftKey, nicheQuery, serviceArea, targetCount, status]);
 
+  // Generate search queries when industry or location changes
+  useEffect(() => {
+    if (nicheQuery && serviceArea) {
+      const industry = nicheQuery.toLowerCase();
+      const location = serviceArea.toLowerCase();
+      
+      // Generate variants based on industry type
+      const variants: {query: string; enabled: boolean}[] = [
+        { query: `${industry} ${location}`, enabled: true },
+        { query: `${industry} near ${location}`, enabled: true },
+        { query: `best ${industry} ${location}`, enabled: true },
+      ];
+      
+      // Add singular/plural variants for cleaning services
+      if (industry.includes('cleaning')) {
+        const cleanerVariant = industry.replace('cleaning', 'cleaner');
+        variants.push({ query: `${cleanerVariant} ${location}`, enabled: true });
+      }
+      
+      // Add common variants
+      variants.push(
+        { query: `local ${industry} ${location}`, enabled: false },
+        { query: `${location} ${industry} services`, enabled: false }
+      );
+      
+      setSearchQueries(variants);
+    }
+  }, [nicheQuery, serviceArea]);
+
+  const toggleSearchQuery = (index: number, checked: boolean) => {
+    setSearchQueries(prev => 
+      prev.map((sq, i) => i === index ? { ...sq, enabled: checked } : sq)
+    );
+  };
+
+  const addCustomQuery = () => {
+    const trimmed = customQueryInput.trim().toLowerCase();
+    if (trimmed && !searchQueries.some(sq => sq.query.toLowerCase() === trimmed)) {
+      setSearchQueries(prev => [...prev, { query: trimmed, enabled: true }]);
+      setCustomQueryInput('');
+    }
+  };
+
+  const removeQuery = (index: number) => {
+    setSearchQueries(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const enabledQueries = searchQueries.filter(sq => sq.enabled).map(sq => sq.query);
+
   const startResearch = useCallback(async () => {
     if (!nicheQuery.trim()) {
       toast.error('Please enter your industry/niche');
@@ -387,6 +442,11 @@ export function CompetitorResearchStep({
       //    - Deduplicates against Places results
       //    - Filters out directories (40+ blocked domains)
       // 3. Phase 3: Quality scoring and priority tier assignment
+      // Get enabled search queries
+      const customQueries = searchQueries
+        .filter(sq => sq.enabled)
+        .map(sq => sq.query);
+
       const { data, error: invokeError } = await supabase.functions.invoke('competitor-hybrid-discovery', {
         body: {
           workspaceId,
@@ -394,6 +454,7 @@ export function CompetitorResearchStep({
           location: serviceArea || 'UK',
           radiusMiles: 20,
           maxCompetitors: targetCount,
+          customQueries: customQueries.length > 0 ? customQueries : undefined,
         }
       });
 
@@ -625,6 +686,85 @@ export function CompetitorResearchStep({
             We'll find real local competitors in your area using Google Places
           </p>
         </div>
+
+        {/* Search Terms Preview - Collapsible */}
+        {nicheQuery && serviceArea && searchQueries.length > 0 && (
+          <div className="space-y-2 border rounded-lg overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setShowSearchQueries(!showSearchQueries)}
+              className="w-full flex items-center justify-between p-3 text-left hover:bg-accent/50 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <Eye className="h-4 w-4 text-primary" />
+                <span className="font-medium text-sm">Preview Search Terms</span>
+                <span className="text-xs text-muted-foreground">
+                  ({enabledQueries.length} active)
+                </span>
+              </div>
+              {showSearchQueries ? (
+                <ChevronUp className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              )}
+            </button>
+            
+            {showSearchQueries && (
+              <div className="p-3 pt-0 space-y-3 border-t bg-muted/30">
+                <p className="text-xs text-muted-foreground">
+                  These exact terms will be searched on Google. Toggle or add your own:
+                </p>
+                
+                <div className="space-y-2">
+                  {searchQueries.map((sq, idx) => (
+                    <div key={idx} className="flex items-center gap-2 group">
+                      <Checkbox
+                        checked={sq.enabled}
+                        onCheckedChange={(checked) => toggleSearchQuery(idx, !!checked)}
+                      />
+                      <span className={`flex-1 text-sm font-mono px-2 py-1 rounded ${
+                        sq.enabled ? 'bg-background' : 'bg-muted/50 text-muted-foreground'
+                      }`}>
+                        {sq.query}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeQuery(idx)}
+                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-destructive/10 rounded transition-opacity"
+                      >
+                        <X className="h-3 w-3 text-muted-foreground hover:text-destructive" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                
+                {/* Add custom query */}
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Add custom search term..."
+                    value={customQueryInput}
+                    onChange={(e) => setCustomQueryInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addCustomQuery())}
+                    className="text-sm"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addCustomQuery}
+                    disabled={!customQueryInput.trim()}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+                
+                <p className="text-xs text-muted-foreground italic">
+                  💡 Tip: Use the exact terms you'd type into Google to find competitors
+                </p>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="space-y-2">
           <Label>How many competitors to analyze?</Label>
