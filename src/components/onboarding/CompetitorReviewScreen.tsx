@@ -100,8 +100,9 @@ export function CompetitorReviewScreen({
           .from('competitor_sites')
           .select('id, business_name, domain, url, rating, reviews_count, is_selected, discovery_source, location_data, distance_miles, match_reason, validation_status, relevance_score')
           .eq('job_id', jobId)
-          .order('relevance_score', { ascending: false, nullsFirst: false })
-          .order('distance_miles', { ascending: true, nullsFirst: false });
+          // Sort by distance first (closest competitors at top), then by relevance
+          .order('distance_miles', { ascending: true, nullsFirst: false })
+          .order('relevance_score', { ascending: false, nullsFirst: false });
 
         if (error) throw error;
         setCompetitors(data || []);

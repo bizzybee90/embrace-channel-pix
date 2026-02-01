@@ -278,8 +278,33 @@ serve(async (req) => {
       })
     }
 
-    // After sorting, only auto-select the top `maxCompetitors` sites
-    // This ensures we don't overwhelm the user with 300+ selections
+    // =========================================
+    // STEP 3.5: Sort by proximity (closest first), then by relevance
+    // This ensures we auto-select the CLOSEST competitors, not just any N
+    // =========================================
+    
+    validCompetitors.sort((a, b) => {
+      // First: prioritize sites with valid distance data
+      const aHasDistance = a.distance_miles !== null;
+      const bHasDistance = b.distance_miles !== null;
+      
+      if (aHasDistance && !bHasDistance) return -1;
+      if (!aHasDistance && bHasDistance) return 1;
+      
+      // If both have distance, sort by distance (closest first)
+      if (aHasDistance && bHasDistance) {
+        const distanceDiff = a.distance_miles - b.distance_miles;
+        if (Math.abs(distanceDiff) > 0.5) { // If >0.5 mile difference, use distance
+          return distanceDiff;
+        }
+      }
+      
+      // For similar distances (or no distance), use relevance score as tiebreaker
+      return (b.relevance_score || 0) - (a.relevance_score || 0);
+    });
+
+    // After sorting by distance, only auto-select the top `maxCompetitors` sites
+    // This ensures we select the CLOSEST competitors first
     validCompetitors.forEach((comp, index) => {
       // Only select if: within the limit AND has a reasonable relevance score
       comp.is_selected = index < maxCompetitors && comp.relevance_score >= 40;
@@ -293,11 +318,19 @@ serve(async (req) => {
       'Max allowed:', maxCompetitors,
       'Filtered out:', filteredOut.length);
     if (validCompetitors.length > 0) {
-      console.log('[handle-discovery-complete] Top competitor:', validCompetitors[0].business_name, 
+      console.log('[handle-discovery-complete] Closest competitor:', validCompetitors[0].business_name, 
         'score:', validCompetitors[0].relevance_score, 
         'reason:', validCompetitors[0].match_reason,
         'at', validCompetitors[0].distance_miles, 'miles',
         'selected:', validCompetitors[0].is_selected);
+      
+      // Log a few more for debugging
+      const selected = validCompetitors.filter(c => c.is_selected);
+      if (selected.length > 0) {
+        const farthestSelected = selected[selected.length - 1];
+        console.log('[handle-discovery-complete] Farthest selected:', farthestSelected.business_name,
+          'at', farthestSelected.distance_miles, 'miles');
+      }
     }
 
     // =========================================
