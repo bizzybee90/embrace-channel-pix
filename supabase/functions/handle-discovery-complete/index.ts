@@ -6,85 +6,163 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Haversine formula for calculating distance between two lat/lng points (in miles)
-function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
-  const R = 3959; // Earth radius in miles
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLng = (lng2 - lng1) * Math.PI / 180;
-  const a = 
+// =========================================
+// HAVERSINE FORMULA: Calculate distance between two points in miles
+// =========================================
+function getDistanceFromLatLonInMiles(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 3958.8; // Radius of earth in miles
+  const dLat = deg2rad(lat2 - lat1);
+  const dLon = deg2rad(lon2 - lon1);
+  const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
+  return parseFloat((R * c).toFixed(2));
 }
 
-// Common exclusions that apply to most service businesses
-// These are clearly unrelated to the typical local service business
-const GENERIC_EXCLUSIONS = [
-  'car wash', 'hand car wash', 'valeting', 'valet',
-  'roofing', 'roofer', 'roof repair',
-  'windscreen', 'auto glass', 'car glass', 'windshield',
-  'estate agent', 'letting agent', 'property',
-  'accountant', 'solicitor', 'lawyer', 'legal',
-  'driving school', 'driving instructor',
-  'taxi', 'cab', 'minicab',
-  'takeaway', 'restaurant', 'cafe', 'pub',
-  'hairdresser', 'barber', 'beauty salon',
-  'dentist', 'optician', 'pharmacy',
-  'petrol', 'fuel', 'garage',
-];
+function deg2rad(deg: number): number {
+  return deg * (Math.PI / 180);
+}
 
-// Generate relevance score based on business name matching the niche query
+// =========================================
+// INDUSTRY-SPECIFIC BLOCKLISTS
+// These filter out wrong-industry results based on Google category
+// =========================================
+function getBlocklistForIndustry(industry: string): string[] {
+  const industryLower = industry.toLowerCase();
+  
+  // Base blocklist that applies to all service businesses
+  const baseBlocklist = [
+    'estate agent', 'letting agent', 'property',
+    'accountant', 'solicitor', 'lawyer', 'legal',
+    'driving school', 'driving instructor',
+    'taxi', 'cab', 'minicab',
+    'takeaway', 'restaurant', 'cafe', 'pub', 'bar',
+    'hairdresser', 'barber', 'beauty salon', 'spa',
+    'dentist', 'optician', 'pharmacy', 'doctor', 'gp',
+    'petrol', 'fuel station',
+    'supermarket', 'grocery', 'convenience store',
+    'bank', 'building society', 'post office',
+    'school', 'college', 'university',
+    'church', 'mosque', 'temple',
+    'hotel', 'bed and breakfast', 'hostel',
+    'gym', 'fitness', 'leisure centre',
+  ];
+  
+  // WINDOW CLEANING specific blocklist
+  if (industryLower.includes('window') && industryLower.includes('clean')) {
+    return [
+      ...baseBlocklist,
+      // Anti-Repair: Block anything repair/installation related
+      'repair', 'repairs', 'repairing',
+      'install', 'installation', 'installer', 
+      'supply', 'supplier', 'supplies',
+      'manufacturing', 'manufacturer',
+      // Anti-Auto: Block car-related window services
+      'auto', 'automotive', 'automobile',
+      'windscreen', 'windshield',
+      'car glass', 'auto glass', 'vehicle glass',
+      'mot', 'car wash', 'hand car wash', 'valeting', 'valet',
+      'car dealer', 'car sales',
+      // Anti-Similar: Block similar but different trades
+      'glazier', 'glazing', 'double glazing',
+      'conservatory', 'upvc',
+      'roofing', 'roofer', 'roof',
+      'fascia', 'soffit',
+      // Keep it strictly cleaning
+      'blinds', 'curtains', 'shutters',
+    ];
+  }
+  
+  // PLUMBING specific blocklist
+  if (industryLower.includes('plumb')) {
+    return [
+      ...baseBlocklist,
+      'heating engineer', 'boiler', 'gas engineer',
+      'electrician', 'electrical',
+      'drainage', 'drain', 'sewer',
+      'bathroom showroom', 'kitchen showroom',
+      'tile', 'tiling',
+      'flooring',
+    ];
+  }
+  
+  // GARDENING/LANDSCAPING specific blocklist
+  if (industryLower.includes('garden') || industryLower.includes('landscap')) {
+    return [
+      ...baseBlocklist,
+      'garden centre', 'plant nursery',
+      'florist', 'flower shop',
+      'tree surgeon', 'arborist',
+      'fencing', 'fence',
+      'paving', 'patio',
+      'decking',
+    ];
+  }
+  
+  // CLEANING (general) specific blocklist
+  if (industryLower.includes('clean') && !industryLower.includes('window')) {
+    return [
+      ...baseBlocklist,
+      'laundry', 'laundrette', 'dry cleaner',
+      'car wash', 'valeting', 'valet',
+      'waste', 'skip hire', 'rubbish',
+      'pest control',
+    ];
+  }
+  
+  // Default: just use base blocklist
+  return baseBlocklist;
+}
+
+// Check if a business category matches any blocklist term
+function isCategoryBlocked(categoryName: string | undefined, blocklist: string[]): boolean {
+  if (!categoryName) return false;
+  const categoryLower = categoryName.toLowerCase();
+  return blocklist.some(term => categoryLower.includes(term));
+}
+
+// Check if business name contains blocklist terms
+function isNameBlocked(businessName: string | undefined, blocklist: string[]): boolean {
+  if (!businessName) return false;
+  const nameLower = businessName.toLowerCase();
+  return blocklist.some(term => nameLower.includes(term));
+}
+
+// Calculate relevance score (higher = better match)
 function scoreRelevance(
   businessName: string,
-  nicheQuery: string,
-  location: string,
-  address: string | null
+  category: string | undefined,
+  industry: string
 ): { score: number; reason: string } {
   const name = businessName.toLowerCase();
-  const niche = nicheQuery.toLowerCase();
-  const addr = (address || '').toLowerCase();
+  const industryLower = industry.toLowerCase();
+  const categoryLower = (category || '').toLowerCase();
   
-  // Extract meaningful words from the niche query (skip short words like "and", "the")
-  const nicheWords = niche.split(/\s+/).filter(word => word.length > 3);
+  // Extract meaningful keywords from industry
+  const industryWords = industryLower.split(/\s+/).filter(w => w.length > 3);
   
-  // Check if business name contains any niche keyword
-  const matchesNiche = nicheWords.some(word => name.includes(word));
+  // Check how many industry words appear in the business name
+  const nameMatches = industryWords.filter(word => name.includes(word)).length;
+  const categoryMatches = industryWords.filter(word => categoryLower.includes(word)).length;
   
-  // Check for obviously wrong categories
-  const isExcluded = GENERIC_EXCLUSIONS.some(excl => name.includes(excl));
-  
-  // Check if address contains target location (case-insensitive)
-  const locationLower = location.toLowerCase();
-  const inTargetArea = addr.includes(locationLower) || 
-    // Also check for UK postcode pattern for the location
-    (locationLower.length >= 2 && addr.includes(locationLower.substring(0, 2).toUpperCase()));
-  
-  // Scoring logic:
-  // - Excluded businesses get 0 (marked as Weak)
-  // - Matches niche + in target area = 100 (best match)
-  // - Matches niche only = 80
-  // - In target area only = 60 (local business, may need manual check)
-  // - Neither = 40 (needs manual review)
-  
-  if (isExcluded) {
-    return { score: 0, reason: 'Weak: Unrelated' };
+  // Perfect match: business name contains industry keywords
+  if (nameMatches >= 2 || (nameMatches >= 1 && categoryMatches >= 1)) {
+    return { score: 100, reason: industry };
   }
   
-  if (matchesNiche && inTargetArea) {
-    return { score: 100, reason: nicheQuery };
+  // Good match: name or category contains at least one keyword
+  if (nameMatches >= 1) {
+    return { score: 85, reason: industry };
   }
   
-  if (matchesNiche) {
-    return { score: 80, reason: nicheQuery };
+  if (categoryMatches >= 1) {
+    return { score: 70, reason: `Category: ${category}` };
   }
   
-  if (inTargetArea) {
-    return { score: 60, reason: 'Local business' };
-  }
-  
-  return { score: 40, reason: 'Manual check' };
+  // Weak match: no keywords found but not blocked
+  return { score: 50, reason: 'Related service' };
 }
 
 serve(async (req) => {
@@ -95,8 +173,7 @@ serve(async (req) => {
   try {
     const payload = await req.json()
 
-    // Apify webhook payloads can arrive in different shapes depending on whether
-    // a payloadTemplate is used and whether interpolation is enabled.
+    // Parse Apify webhook payload
     const jobId = payload?.jobId
     const workspaceId = payload?.workspaceId
 
@@ -126,7 +203,7 @@ serve(async (req) => {
     }
 
     if (!datasetId) {
-      throw new Error('Missing datasetId from Apify webhook (no interpolation + no resource.defaultDatasetId)')
+      throw new Error('Missing datasetId from Apify webhook')
     }
     
     const supabase = createClient(
@@ -140,29 +217,39 @@ serve(async (req) => {
       throw new Error('APIFY_API_KEY not configured')
     }
 
-    // Fetch job to get geocoded coordinates, niche query, and max_competitors for relevance scoring
+    // =========================================
+    // STEP 1: Fetch job context (origin coordinates, industry, radius)
+    // =========================================
+    
     const { data: jobData } = await supabase
       .from('competitor_research_jobs')
-      .select('geocoded_lat, geocoded_lng, niche_query, location, max_competitors')
+      .select('geocoded_lat, geocoded_lng, niche_query, industry, location, max_competitors, radius_miles')
       .eq('id', jobId)
       .single();
     
-    const jobLat = jobData?.geocoded_lat;
-    const jobLng = jobData?.geocoded_lng;
-    const nicheQuery = jobData?.niche_query || '';
+    const originLat = jobData?.geocoded_lat;
+    const originLng = jobData?.geocoded_lng;
+    const industry = jobData?.industry || jobData?.niche_query || '';
     const targetLocation = jobData?.location || '';
     const maxCompetitors = jobData?.max_competitors || 50;
+    const radiusMiles = jobData?.radius_miles || 20;
     
-    console.log('[handle-discovery-complete] Job data:', { jobLat, jobLng, nicheQuery, targetLocation, maxCompetitors });
+    console.log('[handle-discovery-complete] Job context:', { 
+      originLat, originLng, industry, targetLocation, maxCompetitors, radiusMiles 
+    });
 
-    // Update job status to filtering
+    if (!originLat || !originLng) {
+      throw new Error('Job missing geocoded coordinates');
+    }
+
+    // Update job status
     await supabase.from('competitor_research_jobs').update({
       status: 'filtering',
       heartbeat_at: new Date().toISOString()
     }).eq('id', jobId)
 
     // =========================================
-    // STEP 1: Fetch results from Apify dataset
+    // STEP 2: Fetch raw results from Apify dataset
     // =========================================
     
     const datasetResponse = await fetch(
@@ -174,84 +261,101 @@ serve(async (req) => {
     }
     
     const places = await datasetResponse.json()
-    console.log('[handle-discovery-complete] Fetched places:', places.length)
+    console.log('[handle-discovery-complete] Raw places from Apify:', places.length)
 
     // =========================================
-    // STEP 2: Fetch directory blocklist
+    // STEP 3: Get industry-specific blocklist
     // =========================================
     
-    const { data: blocklist } = await supabase
+    const blocklist = getBlocklistForIndustry(industry);
+    console.log('[handle-discovery-complete] Blocklist for', industry, ':', blocklist.length, 'terms');
+
+    // =========================================
+    // STEP 4: Fetch directory blocklist from DB
+    // =========================================
+    
+    const { data: dbBlocklist } = await supabase
       .from('directory_blocklist')
       .select('domain')
     
-    const blockedDomains = new Set(blocklist?.map(b => b.domain.toLowerCase()) || [])
+    const blockedDomains = new Set(dbBlocklist?.map(b => b.domain.toLowerCase()) || [])
 
     // =========================================
-    // STEP 3: Filter and validate competitors
+    // STEP 5: Filter, calculate distance, and score each result
     // =========================================
     
     const validCompetitors: any[] = []
-    const filteredOut: any[] = []
+    const filteredOut: { name: string; reason: string }[] = []
     
     for (const place of places) {
-      const websiteUrl = place.website || place.url
-      
-      if (!websiteUrl) {
-        filteredOut.push({ name: place.title, reason: 'no_website' })
-        continue
-      }
-      
-      let hostname: string
-      try {
-        hostname = new URL(websiteUrl).hostname.replace(/^www\./, '').toLowerCase()
-      } catch {
-        filteredOut.push({ name: place.title, reason: 'invalid_url' })
-        continue
-      }
-      
-      // Check against blocklist
-      const isBlocked = [...blockedDomains].some(domain => 
-        hostname.includes(domain) || hostname.endsWith(domain)
-      )
-      
-      if (isBlocked) {
-        filteredOut.push({ name: place.title, reason: 'directory' })
-        continue
-      }
-      
-      // Check for social media
-      if (hostname.includes('facebook.com') || 
-          hostname.includes('instagram.com') ||
-          hostname.includes('twitter.com') ||
-          hostname.includes('linkedin.com') ||
-          hostname.includes('x.com')) {
-        filteredOut.push({ name: place.title, reason: 'social_media' })
-        continue
-      }
-      
-      // Calculate distance from job's geocoded center if we have coordinates
-      let distanceMiles: number | null = null;
-      if (jobLat && jobLng && place.location?.lat && place.location?.lng) {
-        distanceMiles = haversineDistance(jobLat, jobLng, place.location.lat, place.location.lng);
-        distanceMiles = Math.round(distanceMiles * 10) / 10; // Round to 1 decimal place
-      }
-      
-      // Calculate relevance score based on niche match and location
       const businessName = place.title || place.name || '';
-      const relevance = scoreRelevance(businessName, nicheQuery, targetLocation, place.address);
+      const categoryName = place.categoryName || '';
+      const websiteUrl = place.website || place.url;
+      const placeLat = place.location?.lat;
+      const placeLng = place.location?.lng;
       
-      // Build location_data for user review
-      const locationData = {
-        address: place.address,
-        phone: place.phone,
-        rating: place.totalScore,
-        reviewsCount: place.reviewsCount,
-        openingHours: place.openingHours,
-        placeId: place.placeId,
-        lat: place.location?.lat,
-        lng: place.location?.lng,
+      // FILTER 1: Must have a website
+      if (!websiteUrl) {
+        filteredOut.push({ name: businessName, reason: 'no_website' });
+        continue;
       }
       
+      // FILTER 2: Must have coordinates for distance calculation
+      if (!placeLat || !placeLng) {
+        filteredOut.push({ name: businessName, reason: 'no_coordinates' });
+        continue;
+      }
+      
+      // FILTER 3: Check category against industry-specific blocklist
+      if (isCategoryBlocked(categoryName, blocklist)) {
+        filteredOut.push({ name: businessName, reason: `blocked_category: ${categoryName}` });
+        continue;
+      }
+      
+      // FILTER 4: Check business name against blocklist
+      if (isNameBlocked(businessName, blocklist)) {
+        filteredOut.push({ name: businessName, reason: `blocked_name` });
+        continue;
+      }
+      
+      // FILTER 5: Validate URL and check domain blocklist
+      let hostname: string;
+      try {
+        hostname = new URL(websiteUrl).hostname.replace(/^www\./, '').toLowerCase();
+      } catch {
+        filteredOut.push({ name: businessName, reason: 'invalid_url' });
+        continue;
+      }
+      
+      const isBlockedDomain = [...blockedDomains].some(domain => 
+        hostname.includes(domain) || hostname.endsWith(domain)
+      );
+      
+      if (isBlockedDomain) {
+        filteredOut.push({ name: businessName, reason: 'directory_domain' });
+        continue;
+      }
+      
+      // FILTER 6: Check for social media
+      if (['facebook.com', 'instagram.com', 'twitter.com', 'linkedin.com', 'x.com', 'tiktok.com']
+          .some(social => hostname.includes(social))) {
+        filteredOut.push({ name: businessName, reason: 'social_media' });
+        continue;
+      }
+      
+      // CALCULATE: Distance from origin using Haversine formula
+      const distanceMiles = getDistanceFromLatLonInMiles(originLat, originLng, placeLat, placeLng);
+      
+      // FILTER 7: Must be within the specified radius
+      if (distanceMiles > radiusMiles) {
+        filteredOut.push({ name: businessName, reason: `too_far: ${distanceMiles}mi > ${radiusMiles}mi` });
+        continue;
+      }
+      
+      // SCORE: Calculate relevance based on name/category match
+      const relevance = scoreRelevance(businessName, categoryName, industry);
+      
+      // Build competitor record
       validCompetitors.push({
         job_id: jobId,
         workspace_id: workspaceId,
@@ -261,103 +365,103 @@ serve(async (req) => {
         place_id: place.placeId,
         phone: place.phone,
         address: place.address,
+        city: place.city,
         rating: place.totalScore,
         reviews_count: place.reviewsCount,
-        latitude: place.location?.lat,
-        longitude: place.location?.lng,
+        latitude: placeLat,
+        longitude: placeLng,
         distance_miles: distanceMiles,
         is_directory: false,
         discovery_source: 'google_places',
         status: 'approved',
         scrape_status: 'pending',
-        is_selected: false, // Will be set below based on ranking + maxCompetitors
-        location_data: locationData,
+        is_selected: false, // Will be set below
+        location_data: {
+          address: place.address,
+          phone: place.phone,
+          rating: place.totalScore,
+          reviewsCount: place.reviewsCount,
+          openingHours: place.openingHours,
+          placeId: place.placeId,
+          lat: placeLat,
+          lng: placeLng,
+          categoryName: categoryName,
+        },
         match_reason: relevance.reason,
-        relevance_score: relevance.score, // Persisted for smart replacement
+        relevance_score: relevance.score,
         validation_status: 'pending',
-      })
+      });
     }
 
+    console.log('[handle-discovery-complete] After filtering:', validCompetitors.length, 
+      'valid,', filteredOut.length, 'filtered out');
+    
+    // Log some filtered examples for debugging
+    const sampleFiltered = filteredOut.slice(0, 5);
+    console.log('[handle-discovery-complete] Sample filtered:', sampleFiltered);
+
     // =========================================
-    // STEP 3.5: Sort by proximity (closest first), then by relevance
-    // This ensures we auto-select the CLOSEST competitors, not just any N
+    // STEP 6: Sort by distance (closest first), then by relevance
     // =========================================
     
     validCompetitors.sort((a, b) => {
-      // First: prioritize sites with valid distance data
-      const aHasDistance = a.distance_miles !== null;
-      const bHasDistance = b.distance_miles !== null;
-      
-      if (aHasDistance && !bHasDistance) return -1;
-      if (!aHasDistance && bHasDistance) return 1;
-      
-      // If both have distance, sort by distance (closest first)
-      if (aHasDistance && bHasDistance) {
-        const distanceDiff = a.distance_miles - b.distance_miles;
-        if (Math.abs(distanceDiff) > 0.5) { // If >0.5 mile difference, use distance
-          return distanceDiff;
-        }
+      // Primary sort: distance (closest first)
+      const distanceDiff = a.distance_miles - b.distance_miles;
+      if (Math.abs(distanceDiff) > 0.5) {
+        return distanceDiff;
       }
-      
-      // For similar distances (or no distance), use relevance score as tiebreaker
+      // Secondary sort: relevance score (highest first)
       return (b.relevance_score || 0) - (a.relevance_score || 0);
     });
 
-    // After sorting by distance, only auto-select the top `maxCompetitors` sites
-    // This ensures we select the CLOSEST competitors first
+    // =========================================
+    // STEP 7: Auto-select the top N closest competitors
+    // =========================================
+    
     validCompetitors.forEach((comp, index) => {
-      // Only select if: within the limit AND has a reasonable relevance score
-      comp.is_selected = index < maxCompetitors && comp.relevance_score >= 40;
+      comp.is_selected = index < maxCompetitors;
     });
 
-    // Count how many will be auto-selected
-    const autoSelectedCount = validCompetitors.filter(c => c.is_selected).length;
+    const selectedCount = validCompetitors.filter(c => c.is_selected).length;
     
-    console.log('[handle-discovery-complete] Valid competitors:', validCompetitors.length, 
-      'Auto-selected:', autoSelectedCount, 
-      'Max allowed:', maxCompetitors,
-      'Filtered out:', filteredOut.length);
+    console.log('[handle-discovery-complete] Selection summary:',
+      'Total valid:', validCompetitors.length,
+      'Selected:', selectedCount,
+      'Max allowed:', maxCompetitors);
+    
     if (validCompetitors.length > 0) {
-      console.log('[handle-discovery-complete] Closest competitor:', validCompetitors[0].business_name, 
-        'score:', validCompetitors[0].relevance_score, 
-        'reason:', validCompetitors[0].match_reason,
-        'at', validCompetitors[0].distance_miles, 'miles',
-        'selected:', validCompetitors[0].is_selected);
-      
-      // Log a few more for debugging
-      const selected = validCompetitors.filter(c => c.is_selected);
-      if (selected.length > 0) {
-        const farthestSelected = selected[selected.length - 1];
+      const closest = validCompetitors[0];
+      const farthestSelected = validCompetitors.filter(c => c.is_selected).pop();
+      console.log('[handle-discovery-complete] Closest:', closest.business_name, 
+        'at', closest.distance_miles, 'mi, score:', closest.relevance_score);
+      if (farthestSelected) {
         console.log('[handle-discovery-complete] Farthest selected:', farthestSelected.business_name,
-          'at', farthestSelected.distance_miles, 'miles');
+          'at', farthestSelected.distance_miles, 'mi');
       }
     }
 
     // =========================================
-    // STEP 4: Store ALL competitors in database (no slice limit!)
-    // Use UPSERT with correct conflict column (workspace_id, url)
+    // STEP 8: Save to database (upsert by workspace + url)
     // =========================================
     
-    let insertedCount = 0
-    let updatedCount = 0
+    let insertedCount = 0;
+    let updatedCount = 0;
     
     if (validCompetitors.length > 0) {
-      // Process each competitor individually to handle upsert correctly
       for (const comp of validCompetitors) {
-        // Check if site already exists
         const { data: existing } = await supabase
           .from('competitor_sites')
-          .select('id, job_id')
+          .select('id')
           .eq('workspace_id', workspaceId)
           .eq('url', comp.url)
-          .maybeSingle()
+          .maybeSingle();
         
         if (existing) {
-          // Update existing site to link to current job
           const { error: updateError } = await supabase
             .from('competitor_sites')
             .update({
               job_id: jobId,
+              distance_miles: comp.distance_miles,
               status: 'approved',
               scrape_status: 'pending',
               is_selected: comp.is_selected,
@@ -367,49 +471,47 @@ serve(async (req) => {
               validation_status: 'pending',
               discovered_at: new Date().toISOString()
             })
-            .eq('id', existing.id)
+            .eq('id', existing.id);
           
-          if (!updateError) updatedCount++
+          if (!updateError) updatedCount++;
         } else {
-          // Insert new site
           const { error: insertError } = await supabase
             .from('competitor_sites')
-            .insert(comp)
+            .insert(comp);
           
-          if (!insertError) insertedCount++
+          if (!insertError) insertedCount++;
         }
       }
       
-      console.log('[handle-discovery-complete] Inserted:', insertedCount, 'Updated:', updatedCount)
+      console.log('[handle-discovery-complete] Database: Inserted', insertedCount, 'Updated', updatedCount);
     }
 
     // =========================================
-    // STEP 5: Update job to REVIEW_READY status
-    // DO NOT auto-start scraping - wait for user review!
+    // STEP 9: Update job status to review_ready
     // =========================================
     
     await supabase.from('competitor_research_jobs').update({
       sites_discovered: places.length,
       sites_filtered: validCompetitors.length,
-      sites_validated: validCompetitors.length, // Fix UI field mismatch
-      sites_approved: validCompetitors.length, // Also set this for completeness
+      sites_validated: validCompetitors.length,
+      sites_approved: selectedCount,
       status: validCompetitors.length > 0 ? 'review_ready' : 'completed',
       heartbeat_at: new Date().toISOString(),
       ...(validCompetitors.length === 0 ? {
         completed_at: new Date().toISOString(),
-        error_message: 'No valid competitor websites found after filtering'
+        error_message: `No valid ${industry} businesses found within ${radiusMiles} miles after filtering`
       } : {})
-    }).eq('id', jobId)
+    }).eq('id', jobId);
 
-    console.log('[handle-discovery-complete] Job updated to review_ready - waiting for user confirmation')
+    console.log('[handle-discovery-complete] Job updated to review_ready');
 
     return new Response(JSON.stringify({
       success: true,
       placesFound: places.length,
       validCompetitors: validCompetitors.length,
+      selected: selectedCount,
       filteredOut: filteredOut.length,
-      status: 'review_ready',
-      message: 'Discovery complete. Waiting for user to review and confirm competitors before scraping.'
+      status: 'review_ready'
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
@@ -417,7 +519,6 @@ serve(async (req) => {
   } catch (error) {
     console.error('[handle-discovery-complete] Error:', error)
     
-    // Try to update job status to failed
     try {
       const supabase = createClient(
         Deno.env.get('SUPABASE_URL')!,

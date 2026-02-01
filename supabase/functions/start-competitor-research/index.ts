@@ -7,39 +7,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// UK city coordinates for common locations (fallback)
-const UK_COORDINATES: Record<string, { lat: number; lng: number }> = {
-  'luton': { lat: 51.8787, lng: -0.4200 },
-  'london': { lat: 51.5074, lng: -0.1278 },
-  'manchester': { lat: 53.4808, lng: -2.2426 },
-  'birmingham': { lat: 52.4862, lng: -1.8904 },
-  'leeds': { lat: 53.8008, lng: -1.5491 },
-  'milton keynes': { lat: 52.0406, lng: -0.7594 },
-  'bedford': { lat: 52.1356, lng: -0.4685 },
-  'st albans': { lat: 51.7520, lng: -0.3390 },
-  'dunstable': { lat: 51.8859, lng: -0.5214 },
-  'harpenden': { lat: 51.8154, lng: -0.3565 },
-  'watford': { lat: 51.6565, lng: -0.3903 },
-  'hemel hempstead': { lat: 51.7526, lng: -0.4692 },
-  'stevenage': { lat: 51.9017, lng: -0.2019 },
-  'hitchin': { lat: 51.9466, lng: -0.2818 },
-  'letchworth': { lat: 51.9789, lng: -0.2299 },
-  'cambridge': { lat: 52.2053, lng: 0.1218 },
-  'oxford': { lat: 51.7520, lng: -1.2577 },
-  'reading': { lat: 51.4543, lng: -0.9781 },
-  'bristol': { lat: 51.4545, lng: -2.5879 },
-  'liverpool': { lat: 53.4084, lng: -2.9916 },
-  'sheffield': { lat: 53.3811, lng: -1.4701 },
-  'newcastle': { lat: 54.9783, lng: -1.6178 },
-  'nottingham': { lat: 52.9548, lng: -1.1581 },
-  'leicester': { lat: 52.6369, lng: -1.1398 },
-  'coventry': { lat: 52.4068, lng: -1.5197 },
-  'glasgow': { lat: 55.8642, lng: -4.2518 },
-  'edinburgh': { lat: 55.9533, lng: -3.1883 },
-  'cardiff': { lat: 51.4816, lng: -3.1791 },
-  'belfast': { lat: 54.5973, lng: -5.9301 },
-};
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
@@ -83,15 +50,6 @@ serve(async (req) => {
       .eq('workspace_id', workspaceId)
       .in('status', ['queued', 'geocoding', 'discovering', 'filtering', 'scraping', 'extracting', 'refining']);
 
-    // Generate search queries
-    const searchQueries = [
-      `${industry} ${location}`,
-      `${industry} services ${location}`,
-      `${industry} company ${location}`,
-      `best ${industry} ${location}`,
-      `${industry} near ${location}`,
-    ];
-
     // =========================================
     // STEP 1: Create job record
     // =========================================
@@ -106,7 +64,6 @@ serve(async (req) => {
         service_area: location,
         radius_miles: radiusMiles,
         max_competitors: maxCompetitors,
-        search_queries: searchQueries,
         status: 'geocoding',
         started_at: new Date().toISOString(),
         heartbeat_at: new Date().toISOString(),
@@ -124,47 +81,37 @@ serve(async (req) => {
     console.log('[start-research] Created job:', job.id);
 
     // =========================================
-    // STEP 2: Geocode location to coordinates
+    // STEP 2: Geocode the FULL address (not just city)
+    // This ensures we anchor to the user's specific location
     // =========================================
     
-    let lat: number, lng: number;
+    console.log('[start-research] Geocoding address:', location);
+    const geocodeResponse = await fetch(
+      `https://nominatim.openstreetmap.org/search?` + 
+      `q=${encodeURIComponent(location + ', UK')}&format=json&limit=1`,
+      { headers: { 'User-Agent': 'BizzyBee/1.0' } }
+    );
     
-    // Try lookup table first
-    const locationKey = location.toLowerCase().trim();
-    if (UK_COORDINATES[locationKey]) {
-      lat = UK_COORDINATES[locationKey].lat;
-      lng = UK_COORDINATES[locationKey].lng;
-      console.log('[start-research] Using cached coordinates for:', locationKey);
-    } else {
-      // Use OpenStreetMap Nominatim (free geocoding)
-      console.log('[start-research] Geocoding location:', location);
-      const geocodeResponse = await fetch(
-        `https://nominatim.openstreetmap.org/search?` + 
-        `q=${encodeURIComponent(location + ', UK')}&format=json&limit=1`,
-        { headers: { 'User-Agent': 'BizzyBee/1.0' } }
-      );
+    const geocodeData = await geocodeResponse.json();
+    
+    if (!geocodeData || geocodeData.length === 0) {
+      await supabase.from('competitor_research_jobs').update({
+        status: 'failed',
+        error_message: `Could not geocode location: ${location}`
+      }).eq('id', job.id);
       
-      const geocodeData = await geocodeResponse.json();
-      
-      if (!geocodeData || geocodeData.length === 0) {
-        await supabase.from('competitor_research_jobs').update({
-          status: 'failed',
-          error_message: `Could not geocode location: ${location}`
-        }).eq('id', job.id);
-        
-        return new Response(JSON.stringify({ 
-          error: `Could not find location: ${location}. Try a UK city or postcode.` 
-        }), {
-          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
-      
-      lat = parseFloat(geocodeData[0].lat);
-      lng = parseFloat(geocodeData[0].lon);
-      console.log('[start-research] Geocoded to:', { lat, lng });
+      return new Response(JSON.stringify({ 
+        error: `Could not find location: ${location}. Try a UK city or postcode.` 
+      }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
     
+    const lat = parseFloat(geocodeData[0].lat);
+    const lng = parseFloat(geocodeData[0].lon);
     const radiusKm = radiusMiles * 1.60934;
+    
+    console.log('[start-research] Geocoded to:', { lat, lng, radiusKm });
 
     // Update job with coordinates
     await supabase.from('competitor_research_jobs').update({
@@ -177,25 +124,22 @@ serve(async (req) => {
 
     // =========================================
     // STEP 3: Trigger Apify Google Maps Scraper
+    // KEY CHANGE: Use ONLY the industry keyword, NOT "industry + city"
+    // Appending city name biases results to city center, not user's location
     // =========================================
     
-    // CRITICAL: Include apikey in the webhook URL so Apify can authenticate
     const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') || Deno.env.get('SUPABASE_PUBLISHABLE_KEY');
     const webhookUrl = `${SUPABASE_URL}/functions/v1/handle-discovery-complete?apikey=${SUPABASE_ANON_KEY}`;
     
-    // Request 3x more than needed to account for filtering (directories, social media, no-website)
-    // and distance-based trimming (some results may be too far). Cap at 300.
-    const crawlLimit = Math.min(maxCompetitors * 3, 300);
+    // Fetch MORE than needed to allow for strict filtering
+    // We'll filter by distance + relevance on the webhook side
+    const crawlLimit = Math.min(maxCompetitors * 3, 150);
     
-    // Include location in search terms to force Google to prioritize local results
-    // This ensures "Window Cleaning Luton" finds Luton businesses, not just nearby ones
+    // CRITICAL: Use ONLY the industry keyword for search
+    // The customGeolocation will anchor results to the user's location
     const apifyInput = {
-      searchStringsArray: [
-        `${industry} ${location}`,            // "Window Cleaning Luton"
-        `${industry} services ${location}`,   // "Window Cleaning services Luton"
-        `${industry} near ${location}`,       // "Window Cleaning near Luton"
-      ],
-      locationQuery: `${location}, UK`,
+      searchStringsArray: [industry], // e.g., just "Window Cleaning"
+      locationQuery: `${location}, UK`, // Acts as center anchor
       maxCrawledPlacesPerSearch: crawlLimit,
       language: "en",
       countryCode: "gb",
@@ -203,23 +147,23 @@ serve(async (req) => {
       onlyDataFromSearchPage: false,
       customGeolocation: {
         type: "Point",
-        coordinates: [lng, lat],  // [Longitude, Latitude] - note the order!
+        coordinates: [lng, lat], // [Longitude, Latitude]
         radiusKm: radiusKm
       }
     };
     
-    console.log('[start-research] Requesting', crawlLimit, 'places to yield ~', maxCompetitors, 'after filtering');
-    console.log('[start-research] Webhook URL:', webhookUrl.replace(SUPABASE_ANON_KEY || '', '***'));
-    console.log('[start-research] Calling Apify with:', apifyInput);
+    console.log('[start-research] Apify config:', {
+      searchStrings: apifyInput.searchStringsArray,
+      locationQuery: apifyInput.locationQuery,
+      center: { lat, lng },
+      radiusKm,
+      crawlLimit
+    });
 
-    // Apify ad-hoc webhooks must be passed via the `webhooks` URL parameter.
-    // Apify uses {{resource.*}} for interpolation in webhook payload templates.
-    // If we send '{{defaultDatasetId}}' literally, our handler will try to fetch a non-existent dataset and fail.
     const webhookDefs = [
       {
         eventTypes: ['ACTOR.RUN.SUCCEEDED'],
         requestUrl: webhookUrl,
-        // Ensure Apify interpolates "{{resource.*}}" placeholders inside strings.
         shouldInterpolateStrings: true,
         payloadTemplate: JSON.stringify({
           jobId: job.id,
@@ -264,10 +208,6 @@ serve(async (req) => {
       heartbeat_at: new Date().toISOString()
     }).eq('id', job.id);
 
-    // =========================================
-    // DONE - Return immediately
-    // =========================================
-    
     return new Response(JSON.stringify({
       success: true,
       jobId: job.id,
