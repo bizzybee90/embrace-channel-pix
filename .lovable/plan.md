@@ -1,5 +1,4 @@
-
-# Switch to Google SERP-Based Discovery
+# Switch to Google SERP-Based Discovery ✅ IMPLEMENTED
 
 ## Problem Analysis
 
@@ -9,9 +8,9 @@ The current Google Places approach has fundamental limitations:
 - Businesses from Bedford, Hitchin, Letchworth appear because they have better Google profiles
 - Only 3 businesses within 5 miles of Luton are being returned
 
-## Proposed Solution: Organic SERP Discovery
+## Solution: Organic SERP Discovery ✅
 
-Use **Google Search SERP scraping** instead of Google Places. When a user searches "window cleaner luton", Google returns what customers actually see - businesses optimized for that local search.
+Uses **Google Search SERP scraping** instead of Google Places. When a user searches "window cleaner luton", Google returns what customers actually see - businesses optimized for that local search.
 
 ### Why This Works Better
 
@@ -24,123 +23,57 @@ Use **Google Search SERP scraping** instead of Google Places. When a user search
 
 ### Search Strategy
 
-Generate multiple location-specific search queries:
+Generates multiple location-specific search queries:
 ```text
 1. "window cleaning luton"
-2. "window cleaner luton" 
+2. "window cleaning in luton" 
 3. "window cleaning near luton"
-4. "window cleaning luton dunstable"  (nearby towns)
-5. "window cleaner bedfordshire"
+4. "window cleaner luton" (singular/plural variations)
+5. "window cleaning luton UK"
 ```
-
-This mirrors how real customers search and returns businesses that are actually targeting Luton customers.
 
 ---
 
-## Technical Implementation
+## Implementation Complete ✅
 
 ### New Edge Function: `competitor-serp-discovery`
 
 **Apify Actor:** `apify/google-search-scraper`
 
-**Input Configuration:**
-```typescript
-{
-  queries: [
-    "window cleaning luton",
-    "window cleaner luton",
-    "window cleaning near luton uk"
-  ],
-  countryCode: "gb",
-  languageCode: "en",
-  resultsPerPage: 100,
-  maxPagesPerQuery: 3,
-  // Target UK Google
-  googleDomain: "google.co.uk"
-}
-```
+**Features:**
+- Generates 5 location-specific search queries
+- Uses UK Google domain (`google.co.uk`)
+- Fetches up to 200 results per query (100 per page × 2 pages)
+- Triggers webhook on completion
 
-**Output Processing:**
-1. Extract organic results (skip ads)
-2. Filter out directories (Yell, Checkatrade, Bark, etc.)
-3. Deduplicate by domain
-4. Extract business websites
-5. Sort by SERP position (higher = more relevant to "luton")
+### Updated: `competitor-webhooks`
 
-### Changes to Existing Functions
+**New Handler:** `handleSerpDiscoveryWebhook`
 
-**`competitor-discovery-start`:**
-- Add option: `discoveryMethod: 'places' | 'serp'` (default: 'serp')
-- Generate location-specific search queries
-- Call SERP actor instead of Places actor
+**Features:**
+- Parses Google organic results (skips ads)
+- **Expanded directory blocklist** (40+ domains):
+  - UK directories: yell.com, checkatrade.com, bark.com, rated-people.com, etc.
+  - Social media: facebook.com, instagram.com, linkedin.com, etc.
+  - Aggregators: trustpilot.com, tripadvisor.com, etc.
+- Deduplicates by domain (first occurrence = higher SERP position wins)
+- Ranks by SERP position (position 1-10 = most relevant to location)
+- Auto-selects top N results
 
-**`competitor-webhooks`:**
-- Handle `type: 'serp_discovery'`
-- Parse organic results format
-- Apply directory blocklist
-- No distance calculation needed (SERP already filters by location intent)
+### Updated: `CompetitorResearchStep.tsx`
+
+Now calls `competitor-serp-discovery` instead of `competitor-discovery-start`
 
 ---
 
-## User Experience Flow
-
-```text
-User enters:
-  Industry: "Window Cleaning"
-  Location: "Luton"
-  
-System generates searches:
-  → "window cleaning luton"
-  → "window cleaner luton" 
-  → "window cleaning luton uk"
-
-SERP returns:
-  → Position 1: crystalclearwindows-luton.co.uk
-  → Position 2: lutonwindowcleaners.com
-  → Position 3: abc-cleaning-luton.co.uk
-  ...
-
-Result: Businesses that actively target Luton customers
-```
-
----
-
-## Directory Blocklist (Expanded)
-
-Organic results will include directory sites. Expand blocklist:
-
-```text
-yell.com, checkatrade.com, bark.com, rated-people.com,
-trustatrader.com, mybuilder.com, which.co.uk, 
-freeindex.co.uk, cyclex.co.uk, yelp.com, 
-192.com, thebestof.co.uk, thomsonlocal.com,
-scoot.co.uk, hotfrog.co.uk, businessmagnet.co.uk,
-facebook.com, nextdoor.com, gumtree.com
-```
-
----
-
-## Hybrid Approach (Optional)
-
-For best results, combine both methods:
-
-1. **SERP Discovery** (Primary): Get businesses targeting that location
-2. **Places Validation** (Secondary): Verify they have a physical presence
-
-This ensures we get:
-- Businesses that market to Luton (SERP)
-- Businesses that actually operate near Luton (Places cross-reference)
-
----
-
-## Files to Create/Modify
+## Files Modified
 
 | File | Action |
 |------|--------|
-| `supabase/functions/competitor-serp-discovery/index.ts` | NEW - SERP-based discovery |
-| `supabase/functions/competitor-webhooks/index.ts` | Add SERP result handler |
-| `src/components/onboarding/CompetitorResearchStep.tsx` | Use new discovery function |
-| Database: `directory_blocklist` | Add 20+ new directory domains |
+| `supabase/functions/competitor-serp-discovery/index.ts` | ✅ NEW |
+| `supabase/functions/competitor-webhooks/index.ts` | ✅ Updated with SERP handler |
+| `src/components/onboarding/CompetitorResearchStep.tsx` | ✅ Updated invocation |
+| `supabase/config.toml` | ✅ Added function config |
 
 ---
 
@@ -152,16 +85,3 @@ This ensures we get:
 | Actually target "Luton" | ~30% | ~90% |
 | Relevant to search intent | Low | High |
 | Directory noise | Medium | Low (filtered) |
-
----
-
-## Alternative: Keep Places but Add SERP Validation
-
-If you prefer to keep the Places approach:
-
-1. Keep current Places discovery
-2. ADD a SERP check: Search "business name + luton"
-3. If business doesn't appear in top 50 for "luton" searches → deprioritize
-4. This validates they actually serve the area
-
-This is more API calls but uses both data sources.
