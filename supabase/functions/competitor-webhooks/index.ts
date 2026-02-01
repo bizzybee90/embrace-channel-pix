@@ -1,5 +1,8 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { withApifyAdHocWebhooks } from '../_shared/apifyWebhooks.ts'
+import { generateUULE } from '../_shared/uule-generator.ts'
+import { calculateQualityScore } from '../_shared/quality-scorer.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -227,6 +230,15 @@ serve(async (req) => {
 
     if (webhookType === 'serp_discovery') {
       return await handleSerpDiscoveryWebhook(payload);
+    }
+
+    // NEW: Hybrid discovery handlers
+    if (webhookType === 'hybrid_places') {
+      return await handleHybridPlacesWebhook(payload);
+    }
+
+    if (webhookType === 'hybrid_serp') {
+      return await handleHybridSerpWebhook(payload);
     }
 
     // Future: handle 'scrape' type webhooks here
@@ -799,6 +811,635 @@ async function handleSerpDiscoveryWebhook(payload: any) {
     discovered: totalOrganicResults,
     filtered: validCompetitors.length,
     selected: selectedCount,
+  }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  });
+}
+
+// =========================================
+// HYBRID PLACES DISCOVERY WEBHOOK HANDLER
+// Phase 1 of hybrid discovery - saves Places results, triggers SERP
+// =========================================
+async function handleHybridPlacesWebhook(payload: any) {
+  const {
+    jobId,
+    workspaceId,
+    industry,
+    location,
+    originLat,
+    originLon,
+    radiusMiles,
+    maxCompetitors,
+    serpTarget,
+    datasetId,
+  } = payload;
+
+  // Handle Apify interpolation
+  const rawDatasetId = datasetId;
+  const resourceDatasetId = payload?.resource?.defaultDatasetId;
+  const finalDatasetId = (typeof rawDatasetId === 'string' && !rawDatasetId.includes('{{'))
+    ? rawDatasetId
+    : (typeof resourceDatasetId === 'string' ? resourceDatasetId : undefined);
+
+  console.log('[hybrid-places-webhook] Processing:', { jobId, workspaceId, datasetId: finalDatasetId });
+
+  if (!jobId || !workspaceId || !finalDatasetId) {
+    throw new Error('Missing required fields: jobId, workspaceId, datasetId');
+  }
+
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  );
+  
+  const APIFY_API_KEY = Deno.env.get('APIFY_API_KEY');
+  const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+
+  if (!APIFY_API_KEY) {
+    throw new Error('APIFY_API_KEY not configured');
+  }
+
+  // Update job status
+  await supabase.from('competitor_research_jobs').update({
+    status: 'filtering',
+    heartbeat_at: new Date().toISOString()
+  }).eq('id', jobId);
+
+  // =========================================
+  // STEP 1: Fetch raw results from Apify dataset
+  // =========================================
+  
+  const datasetResponse = await fetch(
+    `https://api.apify.com/v2/datasets/${finalDatasetId}/items?token=${APIFY_API_KEY}`
+  );
+  
+  if (!datasetResponse.ok) {
+    throw new Error(`Failed to fetch dataset: ${datasetResponse.status}`);
+  }
+  
+  const places = await datasetResponse.json();
+  console.log('[hybrid-places-webhook] Raw places from Apify:', places.length);
+
+  // =========================================
+  // STEP 2: Get blocklists
+  // =========================================
+  
+  const industryBlocklist = getBlocklistForIndustry(industry || '');
+
+  const { data: dbBlocklist } = await supabase
+    .from('directory_blocklist')
+    .select('domain');
+  
+  const blockedDomains = new Set(dbBlocklist?.map(b => b.domain.toLowerCase()) || []);
+
+  // =========================================
+  // STEP 3: Filter, score, and enhance each result
+  // =========================================
+  
+  const validCompetitors: any[] = [];
+  const filteredOut: { name: string; reason: string }[] = [];
+  const seenDomains = new Set<string>();
+  
+  const centerLat = originLat || 51.5074;
+  const centerLon = originLon || -0.1278;
+  const maxRadius = radiusMiles || 20;
+  
+  for (const place of places) {
+    const businessName = place.title || place.name || '';
+    const categoryName = place.categoryName || '';
+    const websiteUrl = place.website || place.url;
+    const placeLat = place.location?.lat;
+    const placeLng = place.location?.lng;
+    
+    // FILTER 1: Must have a website
+    if (!websiteUrl) {
+      filteredOut.push({ name: businessName, reason: 'no_website' });
+      continue;
+    }
+    
+    // FILTER 2: Must have coordinates
+    if (!placeLat || !placeLng) {
+      filteredOut.push({ name: businessName, reason: 'no_coordinates' });
+      continue;
+    }
+    
+    // FILTER 3: Check category against Anti-Repair blocklist
+    if (isCategoryBlocked(categoryName, industryBlocklist)) {
+      filteredOut.push({ name: businessName, reason: `blocked_category: ${categoryName}` });
+      continue;
+    }
+    
+    // FILTER 4: Check business name against blocklist
+    if (isNameBlocked(businessName, industryBlocklist)) {
+      filteredOut.push({ name: businessName, reason: 'blocked_name' });
+      continue;
+    }
+    
+    // FILTER 5: Validate URL and check domain blocklist
+    let hostname: string;
+    try {
+      hostname = new URL(websiteUrl).hostname.replace(/^www\./, '').toLowerCase();
+    } catch {
+      filteredOut.push({ name: businessName, reason: 'invalid_url' });
+      continue;
+    }
+    
+    // Skip duplicates
+    if (seenDomains.has(hostname)) {
+      filteredOut.push({ name: businessName, reason: 'duplicate_domain' });
+      continue;
+    }
+    
+    const isBlockedDomain = [...blockedDomains].some(domain => 
+      hostname.includes(domain) || hostname.endsWith(domain)
+    ) || isDomainBlocked(hostname);
+    
+    if (isBlockedDomain) {
+      filteredOut.push({ name: businessName, reason: 'directory_domain' });
+      continue;
+    }
+    
+    // FILTER 6: Check for social media
+    if (['facebook.com', 'instagram.com', 'twitter.com', 'linkedin.com', 'x.com', 'tiktok.com']
+        .some(social => hostname.includes(social))) {
+      filteredOut.push({ name: businessName, reason: 'social_media' });
+      continue;
+    }
+    
+    // CALCULATE: Distance using Haversine formula
+    const distanceMiles = getDistanceFromLatLonInMiles(centerLat, centerLon, placeLat, placeLng);
+    
+    // FILTER 7: Must be within radius
+    if (distanceMiles > maxRadius) {
+      filteredOut.push({ name: businessName, reason: `too_far: ${distanceMiles}mi > ${maxRadius}mi` });
+      continue;
+    }
+    
+    seenDomains.add(hostname);
+    
+    // SCORE: Calculate quality score
+    const qualityResult = calculateQualityScore({
+      distance_miles: distanceMiles,
+      rating: place.totalScore,
+      reviews_count: place.reviewsCount,
+      domain: hostname,
+    });
+    
+    validCompetitors.push({
+      job_id: jobId,
+      workspace_id: workspaceId,
+      business_name: businessName,
+      url: websiteUrl,
+      domain: hostname,
+      place_id: place.placeId,
+      google_place_id: place.placeId,
+      phone: place.phone,
+      address: place.address,
+      city: place.city,
+      rating: place.totalScore,
+      reviews_count: place.reviewsCount,
+      latitude: placeLat,
+      longitude: placeLng,
+      distance_miles: distanceMiles,
+      is_directory: false,
+      is_places_verified: true,
+      discovery_source: 'google_places',
+      status: 'approved',
+      scrape_status: 'pending',
+      is_selected: false,
+      quality_score: qualityResult.quality_score,
+      priority_tier: qualityResult.priority_tier,
+      location_data: {
+        address: place.address,
+        phone: place.phone,
+        rating: place.totalScore,
+        reviewsCount: place.reviewsCount,
+        placeId: place.placeId,
+        lat: placeLat,
+        lng: placeLng,
+        categoryName: categoryName,
+        qualityBreakdown: qualityResult.score_breakdown,
+      },
+      match_reason: `Places verified - ${qualityResult.priority_tier} priority`,
+      validation_status: 'pending',
+    });
+  }
+
+  console.log('[hybrid-places-webhook] After filtering:', validCompetitors.length, 'valid,', filteredOut.length, 'filtered');
+
+  // =========================================
+  // STEP 4: Sort by QUALITY SCORE (best first)
+  // =========================================
+  
+  validCompetitors.sort((a, b) => {
+    // Primary: quality score (highest first)
+    const scoreDiff = (b.quality_score || 0) - (a.quality_score || 0);
+    if (scoreDiff !== 0) return scoreDiff;
+    // Secondary: distance (closest first)
+    return (a.distance_miles || 999) - (b.distance_miles || 999);
+  });
+
+  // =========================================
+  // STEP 5: Auto-select the top N highest quality
+  // =========================================
+  
+  const targetCount = maxCompetitors || 50;
+  validCompetitors.forEach((comp, index) => {
+    comp.is_selected = index < targetCount;
+  });
+
+  const selectedCount = validCompetitors.filter(c => c.is_selected).length;
+  
+  console.log('[hybrid-places-webhook] Selection summary:',
+    'Total valid:', validCompetitors.length,
+    'Selected:', selectedCount,
+    'Target:', targetCount);
+
+  // =========================================
+  // STEP 6: Save to database
+  // =========================================
+  
+  let insertedCount = 0;
+  
+  if (validCompetitors.length > 0) {
+    // Batch insert for efficiency
+    const { error: insertError } = await supabase
+      .from('competitor_sites')
+      .upsert(validCompetitors, { 
+        onConflict: 'workspace_id,domain',
+        ignoreDuplicates: false 
+      });
+    
+    if (insertError) {
+      console.error('[hybrid-places-webhook] Insert error:', insertError);
+    } else {
+      insertedCount = validCompetitors.length;
+    }
+    
+    console.log('[hybrid-places-webhook] Database: Inserted/updated', insertedCount, 'records');
+  }
+
+  // =========================================
+  // STEP 7: Trigger SERP Discovery (Phase 2)
+  // =========================================
+  
+  const effectiveSerpTarget = serpTarget || Math.floor((maxCompetitors || 50) * 0.25);
+  
+  if (effectiveSerpTarget > 0) {
+    console.log('[hybrid-places-webhook] Starting SERP discovery (Phase 2) for', effectiveSerpTarget, 'additional results');
+    
+    // Collect existing domains to exclude from SERP
+    const existingDomains = [...seenDomains];
+    
+    // Generate UULE for location-anchored search
+    const uule = generateUULE(location || '');
+    
+    // Build search queries
+    const queries = [
+      `${industry} ${location}`,
+      `${industry} near ${location}`,
+      `best ${industry} ${location}`,
+      `local ${industry} ${location}`,
+      `${industry} services ${location}`,
+    ];
+    
+    const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') || Deno.env.get('SUPABASE_PUBLISHABLE_KEY');
+    const serpWebhookUrl = `${SUPABASE_URL}/functions/v1/competitor-webhooks?apikey=${SUPABASE_ANON_KEY}`;
+    
+    const serpInput = {
+      queries: queries,
+      maxPagesPerQuery: 3,
+      resultsPerPage: 100,
+      countryCode: 'uk',
+      languageCode: 'en',
+      locationUule: uule,
+      mobileResults: false,
+      includeUnfilteredResults: true,
+      proxyConfiguration: {
+        useApifyProxy: true,
+        apifyProxyCountry: 'GB',
+      },
+    };
+    
+    const serpWebhookDefs = [
+      {
+        eventTypes: ['ACTOR.RUN.SUCCEEDED'],
+        requestUrl: serpWebhookUrl,
+        shouldInterpolateStrings: true,
+        payloadTemplate: JSON.stringify({
+          type: 'hybrid_serp',
+          jobId,
+          workspaceId,
+          industry,
+          location,
+          maxCompetitors: effectiveSerpTarget,
+          existingDomains,
+          placesCount: validCompetitors.length,
+          runId: '{{resource.id}}',
+          datasetId: '{{resource.defaultDatasetId}}',
+        }),
+      },
+    ];
+
+    const serpRunUrl = withApifyAdHocWebhooks(
+      `https://api.apify.com/v2/acts/apify~google-search-scraper/runs?token=${APIFY_API_KEY}`,
+      serpWebhookDefs,
+    );
+    
+    const serpResponse = await fetch(serpRunUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(serpInput),
+    });
+    
+    if (serpResponse.ok) {
+      const serpData = await serpResponse.json();
+      console.log('[hybrid-places-webhook] SERP discovery started:', serpData.data?.id);
+      
+      // Update job to show SERP is starting
+      await supabase.from('competitor_research_jobs').update({
+        sites_discovered: places.length,
+        sites_filtered: validCompetitors.length,
+        heartbeat_at: new Date().toISOString()
+      }).eq('id', jobId);
+    } else {
+      console.error('[hybrid-places-webhook] Failed to start SERP discovery:', await serpResponse.text());
+      // Continue anyway - Places results are still valid
+    }
+  }
+
+  // If no SERP phase, go straight to review_ready
+  if (!effectiveSerpTarget || effectiveSerpTarget <= 0) {
+    await supabase.from('competitor_research_jobs').update({
+      sites_discovered: places.length,
+      sites_filtered: validCompetitors.length,
+      sites_approved: selectedCount,
+      status: 'review_ready',
+      heartbeat_at: new Date().toISOString()
+    }).eq('id', jobId);
+    
+    console.log('[hybrid-places-webhook] Complete (no SERP phase). Job', jobId, 'is now review_ready');
+  }
+
+  return new Response(JSON.stringify({ 
+    success: true,
+    phase: 'places',
+    discovered: places.length,
+    filtered: validCompetitors.length,
+    selected: selectedCount,
+    serpStarted: effectiveSerpTarget > 0,
+  }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  });
+}
+
+// =========================================
+// HYBRID SERP DISCOVERY WEBHOOK HANDLER
+// Phase 2 of hybrid discovery - adds SERP results, scores all, finalizes
+// =========================================
+async function handleHybridSerpWebhook(payload: any) {
+  const {
+    jobId,
+    workspaceId,
+    industry,
+    location,
+    maxCompetitors,
+    existingDomains,
+    placesCount,
+    datasetId,
+  } = payload;
+
+  // Handle Apify interpolation
+  const rawDatasetId = datasetId;
+  const resourceDatasetId = payload?.resource?.defaultDatasetId;
+  const finalDatasetId = (typeof rawDatasetId === 'string' && !rawDatasetId.includes('{{'))
+    ? rawDatasetId
+    : (typeof resourceDatasetId === 'string' ? resourceDatasetId : undefined);
+
+  console.log('[hybrid-serp-webhook] Processing:', { jobId, workspaceId, datasetId: finalDatasetId, existingDomains: existingDomains?.length });
+
+  if (!jobId || !workspaceId || !finalDatasetId) {
+    throw new Error('Missing required fields: jobId, workspaceId, datasetId');
+  }
+
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  );
+  
+  const APIFY_API_KEY = Deno.env.get('APIFY_API_KEY');
+
+  if (!APIFY_API_KEY) {
+    throw new Error('APIFY_API_KEY not configured');
+  }
+
+  // =========================================
+  // STEP 1: Fetch raw results from Apify dataset
+  // =========================================
+  
+  const datasetResponse = await fetch(
+    `https://api.apify.com/v2/datasets/${finalDatasetId}/items?token=${APIFY_API_KEY}`
+  );
+  
+  if (!datasetResponse.ok) {
+    throw new Error(`Failed to fetch dataset: ${datasetResponse.status}`);
+  }
+  
+  const serpResults = await datasetResponse.json();
+  console.log('[hybrid-serp-webhook] Raw SERP results:', serpResults.length);
+
+  // =========================================
+  // STEP 2: Extract and deduplicate organic results
+  // =========================================
+  
+  const existingDomainsSet = new Set((existingDomains || []).map((d: string) => d.toLowerCase()));
+  const seenDomains = new Set<string>();
+  const validCompetitors: any[] = [];
+  const filteredOut: { url: string; reason: string }[] = [];
+  
+  const industryBlocklist = getBlocklistForIndustry(industry || '');
+
+  for (const result of serpResults) {
+    const organicResults = result.organicResults || [result];
+    
+    for (const organic of organicResults) {
+      const url = organic.url || organic.link;
+      const title = organic.title || '';
+      const description = organic.description || organic.snippet || '';
+      const position = organic.position || organic.rank || 0;
+      
+      if (!url) continue;
+      
+      // Skip ads
+      if (organic.isAd || organic.type === 'ad') {
+        filteredOut.push({ url, reason: 'ad' });
+        continue;
+      }
+      
+      // Parse URL
+      let hostname: string;
+      try {
+        hostname = new URL(url).hostname.replace(/^www\./, '').toLowerCase();
+      } catch {
+        filteredOut.push({ url, reason: 'invalid_url' });
+        continue;
+      }
+      
+      // Skip if already found in Places phase
+      if (existingDomainsSet.has(hostname)) {
+        filteredOut.push({ url, reason: 'already_from_places' });
+        continue;
+      }
+      
+      // Skip directories
+      if (isDomainBlocked(hostname)) {
+        filteredOut.push({ url, reason: 'directory' });
+        continue;
+      }
+      
+      // Skip duplicates within SERP results
+      if (seenDomains.has(hostname)) {
+        filteredOut.push({ url, reason: 'duplicate' });
+        continue;
+      }
+      
+      // Skip if name/title matches industry blocklist
+      if (isNameBlocked(title, industryBlocklist)) {
+        filteredOut.push({ url, reason: 'blocked_title' });
+        continue;
+      }
+      
+      seenDomains.add(hostname);
+      
+      // SERP-only results get lower quality scores (no distance/rating data)
+      const qualityResult = calculateQualityScore({
+        distance_miles: null, // Unknown
+        rating: null,         // Unknown
+        reviews_count: null,  // Unknown
+        domain: hostname,
+      });
+      
+      validCompetitors.push({
+        job_id: jobId,
+        workspace_id: workspaceId,
+        business_name: title,
+        url: url,
+        domain: hostname,
+        description: description,
+        discovery_source: 'google_serp',
+        discovery_query: result.searchQuery?.term || location,
+        serp_position: position,
+        search_query_used: result.searchQuery?.term,
+        is_places_verified: false,
+        status: 'approved',
+        scrape_status: 'pending',
+        is_selected: false,
+        quality_score: qualityResult.quality_score,
+        priority_tier: qualityResult.priority_tier,
+        match_reason: `SERP position ${position} for "${result.searchQuery?.term || industry}"`,
+        validation_status: 'pending',
+        location_data: {
+          serpPosition: position,
+          searchQuery: result.searchQuery?.term,
+          snippet: description,
+        }
+      });
+    }
+  }
+
+  console.log('[hybrid-serp-webhook] After filtering:', validCompetitors.length, 'valid,', filteredOut.length, 'filtered');
+
+  // =========================================
+  // STEP 3: Sort by SERP position (best = lowest)
+  // =========================================
+  
+  validCompetitors.sort((a, b) => {
+    return (a.serp_position || 999) - (b.serp_position || 999);
+  });
+
+  // =========================================
+  // STEP 4: Select top N from SERP results
+  // =========================================
+  
+  const targetCount = maxCompetitors || 25;
+  validCompetitors.forEach((comp, index) => {
+    comp.is_selected = index < targetCount;
+  });
+
+  const selectedCount = validCompetitors.filter(c => c.is_selected).length;
+
+  // =========================================
+  // STEP 5: Save to database
+  // =========================================
+  
+  if (validCompetitors.length > 0) {
+    const { error: insertError } = await supabase
+      .from('competitor_sites')
+      .upsert(validCompetitors, { 
+        onConflict: 'workspace_id,domain',
+        ignoreDuplicates: false 
+      });
+    
+    if (insertError) {
+      console.error('[hybrid-serp-webhook] Insert error:', insertError);
+    }
+    
+    console.log('[hybrid-serp-webhook] Database: Inserted/updated', validCompetitors.length, 'records');
+  }
+
+  // =========================================
+  // STEP 6: Get final counts and update job
+  // =========================================
+  
+  const { data: allSites } = await supabase
+    .from('competitor_sites')
+    .select('id, discovery_source, is_selected, quality_score, priority_tier')
+    .eq('job_id', jobId);
+  
+  const totalFiltered = allSites?.length || 0;
+  const totalSelected = allSites?.filter(s => s.is_selected).length || 0;
+  const placesVerified = allSites?.filter(s => s.discovery_source === 'google_places').length || 0;
+  const serpAdded = allSites?.filter(s => s.discovery_source === 'google_serp').length || 0;
+  
+  // Count priority tiers
+  const highPriority = allSites?.filter(s => s.priority_tier === 'high' && s.is_selected).length || 0;
+  const mediumPriority = allSites?.filter(s => s.priority_tier === 'medium' && s.is_selected).length || 0;
+  const lowPriority = allSites?.filter(s => s.priority_tier === 'low' && s.is_selected).length || 0;
+  
+  const totalOrganicResults = serpResults.reduce((sum: number, r: any) => {
+    return sum + (r.organicResults?.length || 1);
+  }, 0);
+  
+  await supabase.from('competitor_research_jobs').update({
+    sites_discovered: (placesCount || 0) + totalOrganicResults,
+    sites_filtered: totalFiltered,
+    sites_approved: totalSelected,
+    status: 'review_ready',
+    heartbeat_at: new Date().toISOString()
+  }).eq('id', jobId);
+
+  console.log('[hybrid-serp-webhook] Complete. Job', jobId, 'is now review_ready');
+  console.log('[hybrid-serp-webhook] Final stats:', {
+    placesVerified,
+    serpAdded,
+    totalFiltered,
+    totalSelected,
+    priorities: { high: highPriority, medium: mediumPriority, low: lowPriority }
+  });
+
+  return new Response(JSON.stringify({ 
+    success: true,
+    phase: 'serp',
+    discovered: totalOrganicResults,
+    filtered: validCompetitors.length,
+    selected: selectedCount,
+    totals: {
+      placesVerified,
+      serpAdded,
+      totalFiltered,
+      totalSelected,
+      priorities: { high: highPriority, medium: mediumPriority, low: lowPriority }
+    }
   }), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' }
   });

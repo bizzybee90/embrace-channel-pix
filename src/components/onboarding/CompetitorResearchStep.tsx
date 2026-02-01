@@ -377,16 +377,22 @@ export function CompetitorResearchStep({
     setError(null);
 
     try {
-      // Use SERP-based discovery which:
-      // 1. Generates location-specific search queries (e.g., "window cleaning luton")
-      // 2. Scrapes Google organic results to find businesses targeting that location
-      // 3. Filters out directories (Yell, Checkatrade, etc.)
-      // 4. Deduplicates by domain and ranks by SERP position
-      const { data, error: invokeError } = await supabase.functions.invoke('competitor-serp-discovery', {
+      // Use HYBRID discovery which:
+      // 1. Phase 1: Google Places for verified businesses (75% of target)
+      //    - Precise radius filtering using coordinates
+      //    - Verified business data (phone, address, ratings)
+      //    - Quality scoring based on distance, rating, reviews
+      // 2. Phase 2: Google SERP for SEO-strong competitors (25% of target)
+      //    - UK proxies and UULE location encoding
+      //    - Deduplicates against Places results
+      //    - Filters out directories (40+ blocked domains)
+      // 3. Phase 3: Quality scoring and priority tier assignment
+      const { data, error: invokeError } = await supabase.functions.invoke('competitor-hybrid-discovery', {
         body: {
           workspaceId,
           industry: nicheQuery,
           location: serviceArea || 'UK',
+          radiusMiles: 20,
           maxCompetitors: targetCount,
         }
       });
@@ -399,7 +405,7 @@ export function CompetitorResearchStep({
 
       setJobId(data.jobId);
       setStatus('running');
-      toast.success('Competitor research started!');
+      toast.success('Hybrid competitor research started!');
 
     } catch (err) {
       console.error('Failed to start research:', err);
