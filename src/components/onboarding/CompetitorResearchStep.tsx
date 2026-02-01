@@ -508,6 +508,7 @@ export function CompetitorResearchStep({
         nicheQuery={nicheQuery}
         serviceArea={serviceArea}
         targetCount={targetCount}
+        searchQueries={enabledQueries}
         onComplete={handlePipelineComplete}
         onBack={onBack}
         onRetry={handleRetry}
