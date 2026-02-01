@@ -377,13 +377,16 @@ export function CompetitorResearchStep({
     setError(null);
 
     try {
-      // Use the Apify-based discovery which creates its own job
-      // and returns 50-100+ competitors via Google Maps Scraper
-      const { data, error: invokeError } = await supabase.functions.invoke('start-competitor-research', {
+      // Use the new strict-proximity discovery which:
+      // 1. Geocodes the FULL address (not just city) for precise center
+      // 2. Uses ONLY industry keyword (no city appended) to avoid city-center bias
+      // 3. Filters with Anti-Repair blocklist and Haversine distance
+      // 4. Auto-selects top N closest competitors
+      const { data, error: invokeError } = await supabase.functions.invoke('competitor-discovery-start', {
         body: {
           workspaceId,
           industry: nicheQuery,
-          location: serviceArea || 'UK',
+          address: serviceArea || 'UK', // Full address for precise geocoding
           radiusMiles: 25,
           maxCompetitors: targetCount,
         }
