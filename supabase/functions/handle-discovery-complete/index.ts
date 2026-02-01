@@ -140,10 +140,10 @@ serve(async (req) => {
       throw new Error('APIFY_API_KEY not configured')
     }
 
-    // Fetch job to get geocoded coordinates and niche query for relevance scoring
+    // Fetch job to get geocoded coordinates, niche query, and max_competitors for relevance scoring
     const { data: jobData } = await supabase
       .from('competitor_research_jobs')
-      .select('geocoded_lat, geocoded_lng, niche_query, location')
+      .select('geocoded_lat, geocoded_lng, niche_query, location, max_competitors')
       .eq('id', jobId)
       .single();
     
@@ -151,8 +151,9 @@ serve(async (req) => {
     const jobLng = jobData?.geocoded_lng;
     const nicheQuery = jobData?.niche_query || '';
     const targetLocation = jobData?.location || '';
+    const maxCompetitors = jobData?.max_competitors || 50;
     
-    console.log('[handle-discovery-complete] Job data:', { jobLat, jobLng, nicheQuery, targetLocation });
+    console.log('[handle-discovery-complete] Job data:', { jobLat, jobLng, nicheQuery, targetLocation, maxCompetitors });
 
     // Update job status to filtering
     await supabase.from('competitor_research_jobs').update({
@@ -269,30 +270,34 @@ serve(async (req) => {
         discovery_source: 'google_places',
         status: 'approved',
         scrape_status: 'pending',
-        is_selected: relevance.score >= 40, // Only select if not weak match
+        is_selected: false, // Will be set below based on ranking + maxCompetitors
         location_data: locationData,
         match_reason: relevance.reason,
-        relevance_score: relevance.score, // Used for sorting only
+        relevance_score: relevance.score, // Persisted for smart replacement
+        validation_status: 'pending',
       })
     }
 
-    // Sort by: (1) relevance score descending, (2) distance ascending
-    // This puts the best matches first, with closest ones within each tier
-    validCompetitors.sort((a, b) => {
-      // First by relevance score (higher is better)
-      if (a.relevance_score !== b.relevance_score) {
-        return (b.relevance_score ?? 0) - (a.relevance_score ?? 0);
-      }
-      // Then by distance (closer is better)
-      return (a.distance_miles ?? 999) - (b.distance_miles ?? 999);
+    // After sorting, only auto-select the top `maxCompetitors` sites
+    // This ensures we don't overwhelm the user with 300+ selections
+    validCompetitors.forEach((comp, index) => {
+      // Only select if: within the limit AND has a reasonable relevance score
+      comp.is_selected = index < maxCompetitors && comp.relevance_score >= 40;
     });
+
+    // Count how many will be auto-selected
+    const autoSelectedCount = validCompetitors.filter(c => c.is_selected).length;
     
-    console.log('[handle-discovery-complete] Valid competitors:', validCompetitors.length, 'Filtered:', filteredOut.length);
+    console.log('[handle-discovery-complete] Valid competitors:', validCompetitors.length, 
+      'Auto-selected:', autoSelectedCount, 
+      'Max allowed:', maxCompetitors,
+      'Filtered out:', filteredOut.length);
     if (validCompetitors.length > 0) {
       console.log('[handle-discovery-complete] Top competitor:', validCompetitors[0].business_name, 
         'score:', validCompetitors[0].relevance_score, 
         'reason:', validCompetitors[0].match_reason,
-        'at', validCompetitors[0].distance_miles, 'miles');
+        'at', validCompetitors[0].distance_miles, 'miles',
+        'selected:', validCompetitors[0].is_selected);
     }
 
     // =========================================
@@ -306,15 +311,12 @@ serve(async (req) => {
     if (validCompetitors.length > 0) {
       // Process each competitor individually to handle upsert correctly
       for (const comp of validCompetitors) {
-        // Remove relevance_score before inserting (not a DB column)
-        const { relevance_score, ...compData } = comp;
-        
         // Check if site already exists
         const { data: existing } = await supabase
           .from('competitor_sites')
           .select('id, job_id')
           .eq('workspace_id', workspaceId)
-          .eq('url', compData.url)
+          .eq('url', comp.url)
           .maybeSingle()
         
         if (existing) {
@@ -325,9 +327,11 @@ serve(async (req) => {
               job_id: jobId,
               status: 'approved',
               scrape_status: 'pending',
-              is_selected: compData.is_selected,
-              location_data: compData.location_data,
-              match_reason: compData.match_reason,
+              is_selected: comp.is_selected,
+              location_data: comp.location_data,
+              match_reason: comp.match_reason,
+              relevance_score: comp.relevance_score,
+              validation_status: 'pending',
               discovered_at: new Date().toISOString()
             })
             .eq('id', existing.id)
@@ -337,7 +341,7 @@ serve(async (req) => {
           // Insert new site
           const { error: insertError } = await supabase
             .from('competitor_sites')
-            .insert(compData)
+            .insert(comp)
           
           if (!insertError) insertedCount++
         }

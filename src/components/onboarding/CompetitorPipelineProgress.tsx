@@ -432,6 +432,7 @@ export function CompetitorPipelineProgress({
         jobId={jobId}
         nicheQuery={nicheQuery}
         serviceArea={serviceArea}
+        targetCount={targetCount}
         onConfirm={handleReviewConfirm}
         onBack={onBack}
         onSkip={() => onComplete({ sitesScraped: 0, faqsGenerated: 0 })}

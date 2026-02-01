@@ -858,6 +858,7 @@ export type Database = {
           postcode: string | null
           rating: number | null
           rejection_reason: string | null
+          relevance_score: number | null
           review_count: number | null
           reviews_count: number | null
           scrape_error: string | null
@@ -867,7 +868,9 @@ export type Database = {
           title: string | null
           total_words: number | null
           url: string
+          validated_at: string | null
           validation_reason: string | null
+          validation_status: string | null
           workspace_id: string
         }
         Insert: {
@@ -907,6 +910,7 @@ export type Database = {
           postcode?: string | null
           rating?: number | null
           rejection_reason?: string | null
+          relevance_score?: number | null
           review_count?: number | null
           reviews_count?: number | null
           scrape_error?: string | null
@@ -916,7 +920,9 @@ export type Database = {
           title?: string | null
           total_words?: number | null
           url: string
+          validated_at?: string | null
           validation_reason?: string | null
+          validation_status?: string | null
           workspace_id: string
         }
         Update: {
@@ -956,6 +962,7 @@ export type Database = {
           postcode?: string | null
           rating?: number | null
           rejection_reason?: string | null
+          relevance_score?: number | null
           review_count?: number | null
           reviews_count?: number | null
           scrape_error?: string | null
@@ -965,7 +972,9 @@ export type Database = {
           title?: string | null
           total_words?: number | null
           url?: string
+          validated_at?: string | null
           validation_reason?: string | null
+          validation_status?: string | null
           workspace_id?: string
         }
         Relationships: [
