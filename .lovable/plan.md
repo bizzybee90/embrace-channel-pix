@@ -1,316 +1,167 @@
 
-# Fix: Enforce Target Limit + Validate Website Availability
+# Switch to Google SERP-Based Discovery
 
-## Problem Summary
+## Problem Analysis
 
-1. **Too many competitors displayed**: When user selects 50, system shows all 321 discovered sites
-2. **Dead sites count toward limit**: 404 errors, expired domains, and unreachable websites are included
-3. **No guarantee of 50 valid scrapes**: User pays for 50 but might only get 42 usable results
+The current Google Places approach has fundamental limitations:
+- `customGeolocation` is a **hint**, not a strict filter
+- Google Places prioritizes "relevance" (reviews, popularity) over proximity
+- Businesses from Bedford, Hitchin, Letchworth appear because they have better Google profiles
+- Only 3 businesses within 5 miles of Luton are being returned
 
-## Solution Overview
+## Proposed Solution: Organic SERP Discovery
 
-Implement a **three-phase validation system**:
+Use **Google Search SERP scraping** instead of Google Places. When a user searches "window cleaner luton", Google returns what customers actually see - businesses optimized for that local search.
 
-1. **Pre-selection**: Auto-select only the top N sites based on relevance + proximity
-2. **Health check**: Validate each site is reachable before counting it
-3. **Smart replacement**: If a site fails, auto-swap in the next-best alternative
+### Why This Works Better
+
+| Google Places | Google SERP |
+|---------------|-------------|
+| Returns by coordinates | Returns by search relevance |
+| Ignores local SEO | Respects local SEO |
+| Scattered results | Location-focused results |
+| No "near me" context | Simulates real customer search |
+
+### Search Strategy
+
+Generate multiple location-specific search queries:
+```text
+1. "window cleaning luton"
+2. "window cleaner luton" 
+3. "window cleaning near luton"
+4. "window cleaning luton dunstable"  (nearby towns)
+5. "window cleaner bedfordshire"
+```
+
+This mirrors how real customers search and returns businesses that are actually targeting Luton customers.
 
 ---
 
-## Technical Changes
+## Technical Implementation
 
-### Phase 1: Pre-Selection Limit
+### New Edge Function: `competitor-serp-discovery`
 
-**File: `supabase/functions/handle-discovery-complete/index.ts`**
+**Apify Actor:** `apify/google-search-scraper`
 
-After sorting by relevance and distance, only mark the top `max_competitors` as `is_selected: true`:
-
-```text
-Changes:
-1. Fetch job.max_competitors from database (e.g., 50)
-2. After sorting competitors by relevance + distance
-3. Loop through and set is_selected = true ONLY for first N items
-4. Rest are stored but with is_selected = false
-```
-
-Logic:
+**Input Configuration:**
 ```typescript
-// Fetch max_competitors from job
-const { data: jobData } = await supabase
-  .from('competitor_research_jobs')
-  .select('geocoded_lat, geocoded_lng, niche_query, location, max_competitors')
-  .eq('id', jobId)
-  .single();
-
-const maxCompetitors = jobData?.max_competitors || 50;
-
-// After sorting by relevance + distance...
-validCompetitors.forEach((comp, index) => {
-  // Only auto-select the top N competitors
-  comp.is_selected = index < maxCompetitors && relevance.score >= 40;
-});
-```
-
----
-
-### Phase 2: Website Health Check
-
-**New Edge Function: `supabase/functions/validate-competitor-sites/index.ts`**
-
-Before starting the deep scrape, run a lightweight health check on each selected site:
-
-```text
-For each selected site:
-1. Send a HEAD request (fast, minimal data)
-2. Check response status (200-399 = valid)
-3. Timeout after 5 seconds
-4. Mark site as validation_status: 'valid' | 'invalid' | 'timeout'
-```
-
-Health check logic:
-```typescript
-async function validateSite(url: string): Promise<'valid' | 'invalid' | 'timeout'> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 5000);
-  
-  try {
-    const response = await fetch(url, {
-      method: 'HEAD',
-      signal: controller.signal,
-      redirect: 'follow',
-    });
-    clearTimeout(timeout);
-    
-    // Valid if 2xx or 3xx
-    return response.status < 400 ? 'valid' : 'invalid';
-  } catch (err) {
-    clearTimeout(timeout);
-    return err.name === 'AbortError' ? 'timeout' : 'invalid';
-  }
+{
+  queries: [
+    "window cleaning luton",
+    "window cleaner luton",
+    "window cleaning near luton uk"
+  ],
+  countryCode: "gb",
+  languageCode: "en",
+  resultsPerPage: 100,
+  maxPagesPerQuery: 3,
+  // Target UK Google
+  googleDomain: "google.co.uk"
 }
 ```
 
-**Database column additions to `competitor_sites`:**
-- `validation_status`: 'pending' | 'valid' | 'invalid' | 'timeout'
-- `validated_at`: timestamp
+**Output Processing:**
+1. Extract organic results (skip ads)
+2. Filter out directories (Yell, Checkatrade, Bark, etc.)
+3. Deduplicate by domain
+4. Extract business websites
+5. Sort by SERP position (higher = more relevant to "luton")
 
----
+### Changes to Existing Functions
 
-### Phase 3: Smart Replacement
+**`competitor-discovery-start`:**
+- Add option: `discoveryMethod: 'places' | 'serp'` (default: 'serp')
+- Generate location-specific search queries
+- Call SERP actor instead of Places actor
 
-If a selected site fails validation, automatically swap in the next-best unselected site:
-
-```text
-1. Count how many selected sites are valid
-2. If count < targetCount:
-   - Find next-best unselected site (by relevance + distance)
-   - Validate it
-   - If valid, mark as is_selected = true
-3. Repeat until we have targetCount valid sites (or run out of candidates)
-```
-
-Logic:
-```typescript
-// After validation, check if we need replacements
-const validSelected = selectedSites.filter(s => s.validation_status === 'valid');
-const shortfall = targetCount - validSelected.length;
-
-if (shortfall > 0) {
-  // Get next-best unselected candidates
-  const { data: candidates } = await supabase
-    .from('competitor_sites')
-    .select('*')
-    .eq('job_id', jobId)
-    .eq('is_selected', false)
-    .eq('validation_status', 'pending')
-    .order('relevance_score', { ascending: false })
-    .limit(shortfall * 2); // Get extra in case some fail
-  
-  for (const candidate of candidates) {
-    if (validSelected.length >= targetCount) break;
-    
-    const status = await validateSite(candidate.url);
-    if (status === 'valid') {
-      await supabase.from('competitor_sites')
-        .update({ is_selected: true, validation_status: 'valid' })
-        .eq('id', candidate.id);
-      validSelected.push(candidate);
-    }
-  }
-}
-```
-
----
-
-### Phase 4: UI Updates
-
-**File: `src/components/onboarding/CompetitorReviewScreen.tsx`**
-
-1. **Pass `targetCount` as prop** (already exists in pipeline)
-2. **Show selection limit**: "47 of 50 selected"
-3. **Enforce limit on toggle**: Prevent selecting more than `targetCount`
-4. **Show validation status**: Badge for valid/invalid/pending sites
-5. **Paginate results**: Show first 50, with "Show more" button
-
-UI changes:
-```text
-Header:
-- "47 of 50 selected" (with warning if over limit)
-- "321 found" (total discovered)
-
-Selection enforcement:
-- When user clicks checkbox to select 51st item:
-  - Toast: "Limit reached. Deselect one to add another."
-  - OR auto-deselect the oldest selection
-
-Validation badges:
-- Green checkmark: Site verified as reachable
-- Red X: Site returned 404 or unreachable
-- Gray spinner: Validation pending
-
-Pagination:
-- Show first 50 by default (matches targetCount)
-- "Show 50 more" button to reveal rest
-- Selecting from "overflow" auto-swaps with an existing selection
-```
-
-**File: `src/components/onboarding/CompetitorPipelineProgress.tsx`**
-
-Pass `targetCount` to `CompetitorReviewScreen`:
-```typescript
-<CompetitorReviewScreen
-  workspaceId={workspaceId}
-  jobId={jobId}
-  nicheQuery={nicheQuery}
-  serviceArea={serviceArea}
-  targetCount={targetCount}  // NEW
-  onConfirm={handleReviewConfirm}
-  ...
-/>
-```
-
----
-
-### Phase 5: Integration with Scrape Start
-
-**File: `supabase/functions/competitor-scrape-start/index.ts`**
-
-Before starting the Apify scrape:
-
-1. **Trigger validation** for all selected sites
-2. **Wait for validation** to complete (with timeout)
-3. **Ensure exactly N valid sites** before proceeding
-4. **Reject if insufficient valid sites** with clear error message
-
-Flow:
-```text
-User clicks "Confirm & Start Analysis"
-  ↓
-competitor-scrape-start invoked
-  ↓
-Call validate-competitor-sites (parallel HEAD requests)
-  ↓
-Check: Do we have 50 valid sites?
-  ├─ YES → Proceed to Apify scrape
-  └─ NO → Run smart replacement, then check again
-      ├─ Still not enough → Return error with count
-      └─ Now have 50 → Proceed to Apify scrape
-```
-
----
-
-## Database Changes
-
-Add columns to `competitor_sites`:
-```sql
-ALTER TABLE competitor_sites 
-ADD COLUMN IF NOT EXISTS validation_status TEXT DEFAULT 'pending',
-ADD COLUMN IF NOT EXISTS validated_at TIMESTAMPTZ;
-```
-
-Add column for sorting in `handle-discovery-complete`:
-```sql
--- Already exists: match_reason TEXT
--- Need to persist: relevance_score INTEGER (for replacement sorting)
-ALTER TABLE competitor_sites 
-ADD COLUMN IF NOT EXISTS relevance_score INTEGER DEFAULT 0;
-```
+**`competitor-webhooks`:**
+- Handle `type: 'serp_discovery'`
+- Parse organic results format
+- Apply directory blocklist
+- No distance calculation needed (SERP already filters by location intent)
 
 ---
 
 ## User Experience Flow
 
 ```text
-1. User selects "50 competitors" and starts research
-   ↓
-2. Discovery finds 321 businesses
-   ↓
-3. System auto-selects top 50 (by relevance + distance)
-   ↓
-4. Review screen shows:
-   - "50 selected of 321 found"
-   - Top 50 are pre-checked
-   - "Show more" reveals the rest
-   ↓
-5. User reviews, maybe swaps a few
-   ↓
-6. User clicks "Confirm & Start Analysis"
-   ↓
-7. System validates 50 sites (fast HEAD requests)
-   ↓
-8. 3 sites are dead (404)
-   ↓
-9. System auto-swaps in 3 more from the unselected pool
-   ↓
-10. 50 valid sites proceed to deep scrape
-   ↓
-11. User gets exactly 50 competitor analyses
+User enters:
+  Industry: "Window Cleaning"
+  Location: "Luton"
+  
+System generates searches:
+  → "window cleaning luton"
+  → "window cleaner luton" 
+  → "window cleaning luton uk"
+
+SERP returns:
+  → Position 1: crystalclearwindows-luton.co.uk
+  → Position 2: lutonwindowcleaners.com
+  → Position 3: abc-cleaning-luton.co.uk
+  ...
+
+Result: Businesses that actively target Luton customers
 ```
 
 ---
 
-## Visual Mockup - Review Screen
+## Directory Blocklist (Expanded)
+
+Organic results will include directory sites. Expand blocklist:
 
 ```text
-┌─────────────────────────────────────────────────────────────┐
-│ Review Competitors                                          │
-│ 50 of 50 selected  •  321 found in your area               │
-│                                                             │
-│ [Search...]                     [Select All] [Clear]        │
-├─────────────────────────────────────────────────────────────┤
-│ ☑ ✓ ABC Window Cleaning       0.5 mi   Window Cleaning      │
-│ ☑ ✓ Crystal Clear Windows     1.2 mi   Window Cleaning      │
-│ ☑ ✗ Old Company (Site down)   2.1 mi   Window Cleaning      │
-│ ☑ ⟳ Pro Glass Services        2.8 mi   Local business       │
-│ ... (46 more selected)                                      │
-│                                                             │
-│           [ Show 271 more competitors ]                     │
-├─────────────────────────────────────────────────────────────┤
-│ ⚠️ 3 sites could not be reached - they'll be replaced      │
-│                                                             │
-│ [Back]  [Redo]  [Skip]      [Confirm & Start (50/50)] ✓    │
-└─────────────────────────────────────────────────────────────┘
+yell.com, checkatrade.com, bark.com, rated-people.com,
+trustatrader.com, mybuilder.com, which.co.uk, 
+freeindex.co.uk, cyclex.co.uk, yelp.com, 
+192.com, thebestof.co.uk, thomsonlocal.com,
+scoot.co.uk, hotfrog.co.uk, businessmagnet.co.uk,
+facebook.com, nextdoor.com, gumtree.com
 ```
 
 ---
 
-## Files to Modify
+## Hybrid Approach (Optional)
 
-| File | Change |
-|------|--------|
-| `supabase/functions/handle-discovery-complete/index.ts` | Limit pre-selection to `max_competitors`, persist `relevance_score` |
-| `supabase/functions/validate-competitor-sites/index.ts` | NEW: Health check edge function |
-| `supabase/functions/competitor-scrape-start/index.ts` | Add validation + smart replacement before scraping |
-| `src/components/onboarding/CompetitorReviewScreen.tsx` | Add `targetCount` prop, selection limit, validation badges, pagination |
-| `src/components/onboarding/CompetitorPipelineProgress.tsx` | Pass `targetCount` to review screen |
-| Database migration | Add `validation_status`, `validated_at`, `relevance_score` columns |
+For best results, combine both methods:
+
+1. **SERP Discovery** (Primary): Get businesses targeting that location
+2. **Places Validation** (Secondary): Verify they have a physical presence
+
+This ensures we get:
+- Businesses that market to Luton (SERP)
+- Businesses that actually operate near Luton (Places cross-reference)
 
 ---
 
-## Expected Outcome
+## Files to Create/Modify
 
-1. **Exactly N valid competitors**: If user selects 50, they get 50 working websites
-2. **No wasted scrape costs**: Dead sites are filtered before Apify runs
-3. **Transparent limits**: UI shows "50 of 50 selected" with clear enforcement
-4. **Smart fallback**: Invalid sites are auto-replaced from the discovery pool
-5. **Future-proof**: Easy to adjust limits based on subscription tier
+| File | Action |
+|------|--------|
+| `supabase/functions/competitor-serp-discovery/index.ts` | NEW - SERP-based discovery |
+| `supabase/functions/competitor-webhooks/index.ts` | Add SERP result handler |
+| `src/components/onboarding/CompetitorResearchStep.tsx` | Use new discovery function |
+| Database: `directory_blocklist` | Add 20+ new directory domains |
+
+---
+
+## Expected Improvement
+
+| Metric | Before (Places) | After (SERP) |
+|--------|-----------------|--------------|
+| Businesses within 5mi | 3 | 15-20 |
+| Actually target "Luton" | ~30% | ~90% |
+| Relevant to search intent | Low | High |
+| Directory noise | Medium | Low (filtered) |
+
+---
+
+## Alternative: Keep Places but Add SERP Validation
+
+If you prefer to keep the Places approach:
+
+1. Keep current Places discovery
+2. ADD a SERP check: Search "business name + luton"
+3. If business doesn't appear in top 50 for "luton" searches → deprioritize
+4. This validates they actually serve the area
+
+This is more API calls but uses both data sources.
