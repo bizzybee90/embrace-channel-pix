@@ -186,7 +186,7 @@ export function CompetitorResearchStep({
   // Search query preview state
   const [searchQueries, setSearchQueries] = useState<{query: string; enabled: boolean}[]>([]);
   const [customQueryInput, setCustomQueryInput] = useState('');
-  const [showSearchQueries, setShowSearchQueries] = useState(false);
+  const [showSearchQueries, setShowSearchQueries] = useState(true); // Default to expanded so users see the search terms
 
   // Resume the latest in-progress job after refresh so the UI doesn't look "paused".
   useEffect(() => {
