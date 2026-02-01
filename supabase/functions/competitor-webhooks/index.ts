@@ -1094,14 +1094,19 @@ async function handleHybridPlacesWebhook(payload: any) {
     // Generate UULE for location-anchored search
     const uule = generateUULE(location || '');
     
-    // Build search queries
-    const queries = [
-      `${industry} ${location}`,
-      `${industry} near ${location}`,
-      `best ${industry} ${location}`,
-      `local ${industry} ${location}`,
-      `${industry} services ${location}`,
-    ];
+    // Use custom queries if provided, otherwise generate defaults
+    const customQueries = payload.customQueries as string[] | undefined;
+    const queries = (customQueries && customQueries.length > 0)
+      ? customQueries
+      : [
+          `${industry} ${location}`,
+          `${industry} near ${location}`,
+          `best ${industry} ${location}`,
+          `local ${industry} ${location}`,
+          `${industry} services ${location}`,
+        ];
+    
+    console.log('[hybrid-places-webhook] Using search queries:', queries);
     
     const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') || Deno.env.get('SUPABASE_PUBLISHABLE_KEY');
     const serpWebhookUrl = `${SUPABASE_URL}/functions/v1/competitor-webhooks?apikey=${SUPABASE_ANON_KEY}`;
