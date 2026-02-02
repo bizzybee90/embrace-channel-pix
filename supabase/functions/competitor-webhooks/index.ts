@@ -1062,18 +1062,35 @@ async function handleHybridPlacesWebhook(payload: any) {
   let insertedCount = 0;
   
   if (validCompetitors.length > 0) {
-    // Batch insert for efficiency
-    const { error: insertError } = await supabase
-      .from('competitor_sites')
-      .upsert(validCompetitors, { 
-        onConflict: 'workspace_id,domain',
-        ignoreDuplicates: false 
-      });
-    
-    if (insertError) {
-      console.error('[hybrid-places-webhook] Insert error:', insertError);
-    } else {
-      insertedCount = validCompetitors.length;
+    // Insert one by one to handle duplicates gracefully
+    for (const comp of validCompetitors) {
+      // Check if domain already exists for this job
+      const { data: existing } = await supabase
+        .from('competitor_sites')
+        .select('id')
+        .eq('job_id', jobId)
+        .eq('domain', comp.domain)
+        .maybeSingle();
+      
+      if (existing) {
+        // Update existing
+        await supabase
+          .from('competitor_sites')
+          .update({
+            ...comp,
+            discovered_at: new Date().toISOString()
+          })
+          .eq('id', existing.id);
+      } else {
+        // Insert new
+        const { error: insertError } = await supabase
+          .from('competitor_sites')
+          .insert(comp);
+        
+        if (!insertError) {
+          insertedCount++;
+        }
+      }
     }
     
     console.log('[hybrid-places-webhook] Database: Inserted/updated', insertedCount, 'records');
@@ -1121,8 +1138,9 @@ async function handleHybridPlacesWebhook(payload: any) {
     const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') || Deno.env.get('SUPABASE_PUBLISHABLE_KEY');
     const serpWebhookUrl = `${SUPABASE_URL}/functions/v1/competitor-webhooks?apikey=${SUPABASE_ANON_KEY}`;
     
+    // IMPORTANT: Google Search Scraper expects 'queries' as a newline-separated STRING, not array
     const serpInput = {
-      queries: queries,
+      queries: queries.join('\n'),
       maxPagesPerQuery: 3,
       resultsPerPage: 100,
       countryCode: 'uk',
