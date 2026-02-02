@@ -6,13 +6,34 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Expanded directory blocklist
+const DIRECTORY_BLOCKLIST = new Set([
+  'yell.com', 'checkatrade.com', 'bark.com', 'rated-people.com',
+  'trustatrader.com', 'mybuilder.com', 'which.co.uk',
+  'freeindex.co.uk', 'yelp.com', 'yelp.co.uk',
+  '192.com', 'thebestof.co.uk', 'thomsonlocal.com',
+  'facebook.com', 'nextdoor.com', 'instagram.com', 'twitter.com', 
+  'linkedin.com', 'tiktok.com', 'youtube.com',
+  'trustpilot.com', 'google.com', 'google.co.uk',
+  'wikipedia.org', 'gov.uk', 'amazon.co.uk', 'gumtree.com',
+]);
+
+function isDomainBlocked(hostname: string): boolean {
+  const domain = hostname.replace(/^www\./, '').toLowerCase();
+  if (DIRECTORY_BLOCKLIST.has(domain)) return true;
+  for (const blocked of DIRECTORY_BLOCKLIST) {
+    if (domain.endsWith('.' + blocked)) return true;
+  }
+  return false;
+}
+
 /**
  * Recovery function for stalled competitor research jobs.
  * 
  * This handles cases where:
  * 1. The Apify webhook never fired (network issues, timeout, etc.)
  * 2. The extraction phase got stuck with 0 pages
- * 3. The job needs to be manually recovered
+ * 3. The discovery phase is stuck in filtering with 0 sites
  */
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -61,6 +82,249 @@ serve(async (req) => {
       error_message: 'Recovery in progress...'
     }).eq('id', jobId)
 
+    // =========================================
+    // DISCOVERY PHASE RECOVERY
+    // If stuck in filtering/discovering/failed with discovery_run_id but no sites
+    // =========================================
+    const isDiscoveryStuck = job.discovery_run_id && (!job.sites_discovered || job.sites_discovered === 0);
+    const canRecoverDiscovery = ['filtering', 'discovering', 'failed', 'error'].includes(job.status);
+    
+    if (isDiscoveryStuck && canRecoverDiscovery) {
+      console.log('[recover-competitor-job] Attempting to recover discovery phase. Run ID:', job.discovery_run_id);
+      
+      // Check Apify run status
+      const runResponse = await fetch(
+        `https://api.apify.com/v2/actor-runs/${job.discovery_run_id}?token=${APIFY_API_KEY}`
+      );
+      
+      if (!runResponse.ok) {
+        throw new Error(`Failed to fetch Apify run: ${runResponse.status}`);
+      }
+      
+      const runData = await runResponse.json();
+      const runStatus = runData.data?.status;
+      console.log('[recover-competitor-job] Discovery run status:', runStatus);
+      
+      if (runStatus === 'RUNNING' || runStatus === 'READY') {
+        await supabase.from('competitor_research_jobs').update({
+          heartbeat_at: new Date().toISOString(),
+          error_message: null
+        }).eq('id', jobId);
+        
+        return new Response(JSON.stringify({
+          success: true,
+          action: 'still_running',
+          message: 'Discovery is still running. Please wait a few more minutes.'
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+      
+      if (runStatus !== 'SUCCEEDED') {
+        await supabase.from('competitor_research_jobs').update({
+          status: 'failed',
+          error_message: `Discovery failed: ${runStatus}. Try starting a new search.`
+        }).eq('id', jobId);
+        
+        return new Response(JSON.stringify({
+          success: false,
+          error: `Discovery failed: ${runStatus}`
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+      
+      // Fetch the dataset
+      const datasetId = runData.data?.defaultDatasetId;
+      if (!datasetId) {
+        throw new Error('No dataset ID found in discovery run');
+      }
+      
+      console.log('[recover-competitor-job] Fetching discovery dataset:', datasetId);
+      
+      const datasetResponse = await fetch(
+        `https://api.apify.com/v2/datasets/${datasetId}/items?token=${APIFY_API_KEY}`
+      );
+      
+      if (!datasetResponse.ok) {
+        throw new Error(`Failed to fetch dataset: ${datasetResponse.status}`);
+      }
+      
+      const serpResults = await datasetResponse.json();
+      console.log('[recover-competitor-job] SERP results count:', serpResults.length);
+      console.log('[recover-competitor-job] Sample SERP result:', JSON.stringify(serpResults[0] || {}).substring(0, 500));
+      
+      if (!serpResults || serpResults.length === 0) {
+        await supabase.from('competitor_research_jobs').update({
+          status: 'failed',
+          error_message: 'No search results found. Try different keywords or location.'
+        }).eq('id', jobId);
+        
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'No search results found'
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+      
+      // Extract unique business URLs from results
+      // Support both Google Places format AND SERP organic format
+      const seenDomains = new Set<string>();
+      const validSites: any[] = [];
+      const targetCount = job.max_competitors || 50;
+      
+      // Get existing URLs in this workspace to avoid unique constraint violations
+      const { data: existingUrls } = await supabase
+        .from('competitor_sites')
+        .select('url')
+        .eq('workspace_id', effectiveWorkspaceId);
+      
+      const existingUrlSet = new Set((existingUrls || []).map(u => u.url.toLowerCase()));
+      console.log('[recover-competitor-job] Existing URLs in workspace:', existingUrlSet.size);
+      
+      for (const result of serpResults) {
+        // Check if this is Google Places format (has website directly)
+        if (result.website) {
+          const url = result.website;
+          let hostname: string;
+          try {
+            hostname = new URL(url).hostname.replace(/^www\./, '').toLowerCase();
+          } catch {
+            continue;
+          }
+          
+          // Skip if already seen, blocked, or exists in this workspace
+          if (seenDomains.has(hostname) || isDomainBlocked(hostname) || existingUrlSet.has(url.toLowerCase())) continue;
+          seenDomains.add(hostname);
+          
+          validSites.push({
+            job_id: jobId,
+            workspace_id: effectiveWorkspaceId,
+            business_name: result.title || result.name || hostname,
+            url: url,
+            domain: hostname,
+            description: result.categoryName || result.description,
+            phone: result.phone,
+            address: result.address,
+            city: result.city,
+            postcode: result.postalCode,
+            rating: result.totalScore,
+            reviews_count: result.reviewsCount,
+            latitude: result.location?.lat,
+            longitude: result.location?.lng,
+            place_id: result.placeId,
+            discovery_source: 'places_recovery',
+            discovery_query: job.industry,
+            status: 'approved',
+            scrape_status: 'pending',
+            is_selected: validSites.length < targetCount,
+            location_data: {
+              address: result.address,
+              phone: result.phone,
+              rating: result.totalScore,
+              reviewsCount: result.reviewsCount,
+              categoryName: result.categoryName,
+              lat: result.location?.lat,
+              lng: result.location?.lng,
+            }
+          });
+          
+          if (validSites.length >= targetCount * 2) break;
+          continue;
+        }
+        
+        // Handle Google SERP scraper output format (has organicResults array)
+        const organicResults = result.organicResults || [];
+        
+        for (const organic of organicResults) {
+          const url = organic.url || organic.link;
+          if (!url) continue;
+          
+          let hostname: string;
+          try {
+            hostname = new URL(url).hostname.replace(/^www\./, '').toLowerCase();
+          } catch {
+            continue;
+          }
+          
+          // Skip if already seen, blocked, or exists in this workspace
+          if (seenDomains.has(hostname) || isDomainBlocked(hostname) || existingUrlSet.has(url.toLowerCase())) continue;
+          seenDomains.add(hostname);
+          
+          validSites.push({
+            job_id: jobId,
+            workspace_id: effectiveWorkspaceId,
+            business_name: organic.title || hostname,
+            url: url,
+            domain: hostname,
+            description: organic.description || organic.snippet,
+            discovery_source: 'serp_recovery',
+            discovery_query: result.searchQuery?.term || job.industry,
+            serp_position: organic.position || validSites.length + 1,
+            status: 'approved',
+            scrape_status: 'pending',
+            is_selected: validSites.length < targetCount,
+          });
+          
+          if (validSites.length >= targetCount * 2) break;
+        }
+        
+        if (validSites.length >= targetCount * 2) break;
+      }
+      
+      console.log('[recover-competitor-job] Valid sites extracted:', validSites.length);
+      
+      if (validSites.length === 0) {
+        await supabase.from('competitor_research_jobs').update({
+          status: 'failed',
+          error_message: 'Could not find valid business websites in search results.'
+        }).eq('id', jobId);
+        
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'No valid business websites found'
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+      
+      // Insert sites (simple insert, dedup handled above by seenDomains)
+      const { error: insertError } = await supabase
+        .from('competitor_sites')
+        .insert(validSites);
+      
+      if (insertError) {
+        console.error('[recover-competitor-job] Insert error:', insertError);
+        throw new Error(`Failed to insert sites: ${insertError.message}`);
+      }
+      
+      const selectedCount = validSites.filter(s => s.is_selected).length;
+      
+      // Update job status to review_ready
+      await supabase.from('competitor_research_jobs').update({
+        status: 'review_ready',
+        sites_discovered: validSites.length,
+        target_count: targetCount,
+        heartbeat_at: new Date().toISOString(),
+        error_message: null
+      }).eq('id', jobId);
+      
+      return new Response(JSON.stringify({
+        success: true,
+        action: 'discovery_recovered',
+        sitesRecovered: validSites.length,
+        sitesSelected: selectedCount,
+        message: `Recovered ${validSites.length} businesses from search results.`
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // =========================================
+    // SCRAPE PHASE RECOVERY (existing logic)
+    // =========================================
+    
     // Check if we have a scrape_run_id to recover from
     if (!job.scrape_run_id) {
       // No scrape was started - check if we have sites to scrape
