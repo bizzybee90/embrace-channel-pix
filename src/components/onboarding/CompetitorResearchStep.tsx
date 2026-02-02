@@ -5,10 +5,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Search, Loader2, Sparkles, MapPin, Plus, X, Eye, ChevronDown, ChevronUp } from 'lucide-react';
+import { Search, Loader2, Sparkles, MapPin, Plus, X, ArrowRight, ArrowLeft, Lightbulb } from 'lucide-react';
 import { CompetitorPipelineProgress } from './CompetitorPipelineProgress';
+
+type FormStep = 'setup' | 'search-terms';
 
 interface CompetitorResearchStepProps {
   workspaceId: string;
@@ -183,10 +186,12 @@ export function CompetitorResearchStep({
   const [error, setError] = useState<string | null>(null);
   const [isLoadingContext, setIsLoadingContext] = useState(!hasInitialNiche);
   
+  // Form step state for two-step flow
+  const [formStep, setFormStep] = useState<FormStep>('setup');
+  
   // Search query preview state
   const [searchQueries, setSearchQueries] = useState<{query: string; enabled: boolean}[]>([]);
   const [customQueryInput, setCustomQueryInput] = useState('');
-  const [showSearchQueries, setShowSearchQueries] = useState(true); // Default to expanded so users see the search terms
 
   // Resume the latest in-progress job after refresh so the UI doesn't look "paused".
   useEffect(() => {
@@ -422,6 +427,32 @@ export function CompetitorResearchStep({
 
   const enabledQueries = searchQueries.filter(sq => sq.enabled).map(sq => sq.query);
 
+  // Quick-add suggestions - common patterns not already in the list
+  const quickSuggestions = useMemo(() => {
+    if (!nicheQuery || !serviceArea) return [];
+    
+    const industry = nicheQuery.toLowerCase();
+    const location = serviceArea.toLowerCase();
+    
+    const patterns = [
+      `professional ${industry} ${location}`,
+      `${industry} near me ${location}`,
+      `affordable ${industry} ${location}`,
+      `top rated ${industry} ${location}`,
+      `cheap ${industry} ${location}`,
+      `${industry} company ${location}`,
+      `${industry} services ${location}`,
+      `trusted ${industry} ${location}`,
+    ];
+    
+    const existingQueries = searchQueries.map(sq => sq.query.toLowerCase());
+    return patterns.filter(p => !existingQueries.includes(p));
+  }, [nicheQuery, serviceArea, searchQueries]);
+
+  const addQuickSuggestion = (suggestion: string) => {
+    setSearchQueries(prev => [...prev, { query: suggestion, enabled: true }]);
+  };
+
   const startResearch = useCallback(async () => {
     if (!nicheQuery.trim()) {
       toast.error('Please enter your industry/niche');
@@ -573,251 +604,296 @@ export function CompetitorResearchStep({
     );
   }
 
-  // Idle state - show form
+  // Idle state - show form based on current step
+  if (formStep === 'setup') {
+    return (
+      <div className="space-y-6">
+        <div className="text-center">
+          <CardTitle className="text-xl flex items-center justify-center gap-2">
+            <Sparkles className="h-5 w-5 text-primary" />
+            Competitor Research
+          </CardTitle>
+          <CardDescription className="mt-2">
+            Learn from your competitors' FAQs to build a comprehensive knowledge base.
+          </CardDescription>
+        </div>
+
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="niche">Your Industry / Niche</Label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground z-10" />
+              <Input
+                id="niche"
+                value={nicheFocused ? nicheSearch : nicheQuery}
+                onChange={(e) => {
+                  setNicheSearch(e.target.value);
+                  if (!nicheFocused) setNicheQuery(e.target.value);
+                }}
+                onFocus={() => {
+                  setNicheFocused(true);
+                  setNicheSearch('');
+                }}
+                onBlur={() => {
+                  setTimeout(() => setNicheFocused(false), 200);
+                }}
+                placeholder="Start typing to search..."
+                className="pl-10"
+              />
+              {nicheFocused && filteredBusinessTypes.length > 0 && (
+                <div className="absolute z-50 w-full mt-1 bg-background border rounded-md shadow-lg max-h-48 overflow-auto">
+                  {filteredBusinessTypes.map((type) => (
+                    <button
+                      key={type.value}
+                      type="button"
+                      className="w-full px-3 py-2 text-left text-sm hover:bg-accent flex items-center gap-2"
+                      onClick={() => handleSelectNiche(type.label)}
+                    >
+                      <Search className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                      {type.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            {nicheQuery && !nicheFocused && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Search className="h-3 w-3" />
+                <span>Selected: <strong className="text-foreground">{nicheQuery}</strong></span>
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Be specific: "end of tenancy cleaning" works better than just "cleaning"
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="area">Service Area</Label>
+            <div className="relative">
+              <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground z-10" />
+              <Input
+                id="area"
+                value={serviceAreaFocused ? serviceAreaSearch : serviceArea}
+                onChange={(e) => {
+                  setServiceAreaSearch(e.target.value);
+                  if (!serviceAreaFocused) setServiceArea(e.target.value);
+                }}
+                onFocus={() => {
+                  setServiceAreaFocused(true);
+                  setServiceAreaSearch(serviceArea);
+                }}
+                onBlur={() => {
+                  setTimeout(() => setServiceAreaFocused(false), 200);
+                }}
+                placeholder="Search for a city or town..."
+                className="pl-10"
+              />
+              {isLoadingPlaces && (
+                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+              )}
+              {serviceAreaFocused && placePredictions.length > 0 && (
+                <div className="absolute z-50 w-full mt-1 bg-background border rounded-md shadow-lg max-h-48 overflow-auto">
+                  {placePredictions.map((prediction) => (
+                    <button
+                      key={prediction.place_id}
+                      type="button"
+                      className="w-full px-3 py-2 text-left text-sm hover:bg-accent flex items-center gap-2"
+                      onClick={() => handleSelectLocation(prediction.description)}
+                    >
+                      <MapPin className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                      {prediction.description}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            {serviceArea && !serviceAreaFocused && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <MapPin className="h-3 w-3" />
+                <span>Selected: <strong className="text-foreground">{serviceArea}</strong></span>
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">
+              We'll find real local competitors in your area using Google Places
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label>How many competitors to analyze?</Label>
+            <RadioGroup
+              value={targetCount.toString()}
+              onValueChange={(v) => setTargetCount(parseInt(v))}
+              className="space-y-2"
+            >
+              {targetCountOptions.map((option) => (
+                <div
+                  key={option.value}
+                  className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                    targetCount === option.value
+                      ? 'border-primary/50 bg-primary/5'
+                      : 'hover:bg-accent/50'
+                  } ${option.recommended ? 'ring-1 ring-primary/30' : ''}`}
+                  onClick={() => setTargetCount(option.value)}
+                >
+                  <RadioGroupItem value={option.value.toString()} />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{option.label}</span>
+                      {option.recommended && (
+                        <span className="text-[10px] font-medium text-primary bg-primary/10 px-1.5 py-0.5 rounded">
+                          Recommended
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">{option.description}</p>
+                  </div>
+                </div>
+              ))}
+            </RadioGroup>
+          </div>
+        </div>
+
+        <div className="bg-primary/5 rounded-lg p-3 text-sm border border-primary/20">
+          <p className="text-foreground">
+            <strong>What happens:</strong> We discover real {nicheQuery || 'businesses'} via Google Places, 
+            scrape their websites, extract FAQs, remove duplicates, then refine each FAQ 
+            to match YOUR business voice.
+          </p>
+        </div>
+
+        <div className="flex gap-3">
+          <Button variant="outline" onClick={onBack} className="flex-1">
+            Back
+          </Button>
+          <Button variant="outline" onClick={handleSkip} className="flex-1">
+            Skip
+          </Button>
+          <Button 
+            onClick={() => setFormStep('search-terms')} 
+            disabled={!nicheQuery.trim() || !serviceArea.trim()} 
+            className="flex-1 gap-2"
+          >
+            Next: Review Search Terms
+            <ArrowRight className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Step 2: Dedicated Search Terms UI
   return (
     <div className="space-y-6">
       <div className="text-center">
         <CardTitle className="text-xl flex items-center justify-center gap-2">
-          <Sparkles className="h-5 w-5 text-primary" />
-          Competitor Research
+          <Search className="h-5 w-5 text-primary" />
+          Confirm Search Terms
         </CardTitle>
         <CardDescription className="mt-2">
-          Learn from your competitors' FAQs to build a comprehensive knowledge base.
+          These exact phrases will be searched on Google to find competitors
         </CardDescription>
       </div>
 
-      <div className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="niche">Your Industry / Niche</Label>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground z-10" />
-            <Input
-              id="niche"
-              value={nicheFocused ? nicheSearch : nicheQuery}
-              onChange={(e) => {
-                setNicheSearch(e.target.value);
-                if (!nicheFocused) setNicheQuery(e.target.value);
-              }}
-              onFocus={() => {
-                setNicheFocused(true);
-                setNicheSearch('');
-              }}
-              onBlur={() => {
-                // Delay to allow click on dropdown
-                setTimeout(() => setNicheFocused(false), 200);
-              }}
-              placeholder="Start typing to search..."
-              className="pl-10"
-            />
-            {nicheFocused && filteredBusinessTypes.length > 0 && (
-              <div className="absolute z-50 w-full mt-1 bg-background border rounded-md shadow-lg max-h-48 overflow-auto">
-                {filteredBusinessTypes.map((type) => (
-                  <button
-                    key={type.value}
-                    type="button"
-                    className="w-full px-3 py-2 text-left text-sm hover:bg-accent flex items-center gap-2"
-                    onClick={() => handleSelectNiche(type.label)}
-                  >
-                    <Search className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                    {type.label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          {nicheQuery && !nicheFocused && (
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Search className="h-3 w-3" />
-              <span>Selected: <strong className="text-foreground">{nicheQuery}</strong></span>
-            </div>
-          )}
-          <p className="text-xs text-muted-foreground">
-            Be specific: "end of tenancy cleaning" works better than just "cleaning"
-          </p>
+      {/* Search context reminder */}
+      <div className="flex items-center gap-4 text-sm text-muted-foreground bg-muted/30 rounded-lg px-3 py-2">
+        <div className="flex items-center gap-1.5">
+          <Search className="h-3.5 w-3.5" />
+          <span className="font-medium text-foreground">{nicheQuery}</span>
         </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="area">Service Area</Label>
-          <div className="relative">
-            <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground z-10" />
-            <Input
-              id="area"
-              value={serviceAreaFocused ? serviceAreaSearch : serviceArea}
-              onChange={(e) => {
-                setServiceAreaSearch(e.target.value);
-                if (!serviceAreaFocused) setServiceArea(e.target.value);
-              }}
-              onFocus={() => {
-                setServiceAreaFocused(true);
-                setServiceAreaSearch(serviceArea);
-              }}
-              onBlur={() => {
-                // Delay to allow click on dropdown
-                setTimeout(() => setServiceAreaFocused(false), 200);
-              }}
-              placeholder="Search for a city or town..."
-              className="pl-10"
-            />
-            {isLoadingPlaces && (
-              <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
-            )}
-            {serviceAreaFocused && placePredictions.length > 0 && (
-              <div className="absolute z-50 w-full mt-1 bg-background border rounded-md shadow-lg max-h-48 overflow-auto">
-                {placePredictions.map((prediction) => (
-                  <button
-                    key={prediction.place_id}
-                    type="button"
-                    className="w-full px-3 py-2 text-left text-sm hover:bg-accent flex items-center gap-2"
-                    onClick={() => handleSelectLocation(prediction.description)}
-                  >
-                    <MapPin className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                    {prediction.description}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          {serviceArea && !serviceAreaFocused && (
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <MapPin className="h-3 w-3" />
-              <span>Selected: <strong className="text-foreground">{serviceArea}</strong></span>
-            </div>
-          )}
-          <p className="text-xs text-muted-foreground">
-            We'll find real local competitors in your area using Google Places
-          </p>
-        </div>
-
-        {/* Search Terms Preview - Collapsible */}
-        {nicheQuery && serviceArea && searchQueries.length > 0 && (
-          <div className="space-y-2 border rounded-lg overflow-hidden">
-            <button
-              type="button"
-              onClick={() => setShowSearchQueries(!showSearchQueries)}
-              className="w-full flex items-center justify-between p-3 text-left hover:bg-accent/50 transition-colors"
-            >
-              <div className="flex items-center gap-2">
-                <Eye className="h-4 w-4 text-primary" />
-                <span className="font-medium text-sm">Preview Search Terms</span>
-                <span className="text-xs text-muted-foreground">
-                  ({enabledQueries.length} active)
-                </span>
-              </div>
-              {showSearchQueries ? (
-                <ChevronUp className="h-4 w-4 text-muted-foreground" />
-              ) : (
-                <ChevronDown className="h-4 w-4 text-muted-foreground" />
-              )}
-            </button>
-            
-            {showSearchQueries && (
-              <div className="p-3 pt-0 space-y-3 border-t bg-muted/30">
-                <p className="text-xs text-muted-foreground">
-                  These exact terms will be searched on Google. Toggle or add your own:
-                </p>
-                
-                <div className="space-y-2">
-                  {searchQueries.map((sq, idx) => (
-                    <div key={idx} className="flex items-center gap-2 group">
-                      <Checkbox
-                        checked={sq.enabled}
-                        onCheckedChange={(checked) => toggleSearchQuery(idx, !!checked)}
-                      />
-                      <span className={`flex-1 text-sm font-mono px-2 py-1 rounded ${
-                        sq.enabled ? 'bg-background' : 'bg-muted/50 text-muted-foreground'
-                      }`}>
-                        {sq.query}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => removeQuery(idx)}
-                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-destructive/10 rounded transition-opacity"
-                      >
-                        <X className="h-3 w-3 text-muted-foreground hover:text-destructive" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-                
-                {/* Add custom query */}
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Add custom search term..."
-                    value={customQueryInput}
-                    onChange={(e) => setCustomQueryInput(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addCustomQuery())}
-                    className="text-sm"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={addCustomQuery}
-                    disabled={!customQueryInput.trim()}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-                
-                <p className="text-xs text-muted-foreground italic">
-                  💡 Tip: Use the exact terms you'd type into Google to find competitors
-                </p>
-              </div>
-            )}
-          </div>
-        )}
-
-        <div className="space-y-2">
-          <Label>How many competitors to analyze?</Label>
-          <RadioGroup
-            value={targetCount.toString()}
-            onValueChange={(v) => setTargetCount(parseInt(v))}
-            className="space-y-2"
-          >
-            {targetCountOptions.map((option) => (
-              <div
-                key={option.value}
-                className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                  targetCount === option.value
-                    ? 'border-primary/50 bg-primary/5'
-                    : 'hover:bg-accent/50'
-                } ${option.recommended ? 'ring-1 ring-primary/30' : ''}`}
-                onClick={() => setTargetCount(option.value)}
-              >
-                <RadioGroupItem value={option.value.toString()} />
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">{option.label}</span>
-                    {option.recommended && (
-                      <span className="text-[10px] font-medium text-primary bg-primary/10 px-1.5 py-0.5 rounded">
-                        Recommended
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground">{option.description}</p>
-                </div>
-              </div>
-            ))}
-          </RadioGroup>
+        <div className="flex items-center gap-1.5">
+          <MapPin className="h-3.5 w-3.5" />
+          <span className="font-medium text-foreground">{serviceArea}</span>
         </div>
       </div>
 
-      <div className="bg-primary/5 rounded-lg p-3 text-sm border border-primary/20">
-        <p className="text-foreground">
-          <strong>What happens:</strong> We discover real {nicheQuery || 'businesses'} via Google Places, 
-          scrape their websites, extract FAQs, remove duplicates, then refine each FAQ 
-          to match YOUR business voice.
-        </p>
+      {/* Search terms list - always visible, not collapsed */}
+      <div className="space-y-3">
+        <Label>Search terms ({enabledQueries.length} active)</Label>
+        <div className="space-y-2 max-h-64 overflow-y-auto pr-2">
+          {searchQueries.map((sq, idx) => (
+            <div key={idx} className="flex items-center gap-2 group">
+              <Checkbox
+                checked={sq.enabled}
+                onCheckedChange={(checked) => toggleSearchQuery(idx, !!checked)}
+              />
+              <span className={`flex-1 text-sm font-mono px-2 py-1.5 rounded ${
+                sq.enabled ? 'bg-background border' : 'bg-muted/50 text-muted-foreground'
+              }`}>
+                {sq.query}
+              </span>
+              <button
+                type="button"
+                onClick={() => removeQuery(idx)}
+                className="opacity-0 group-hover:opacity-100 p-1 hover:bg-destructive/10 rounded transition-opacity"
+              >
+                <X className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Quick add suggestions */}
+      {quickSuggestions.length > 0 && (
+        <div className="space-y-2">
+          <Label className="text-muted-foreground">Quick add suggestions</Label>
+          <div className="flex flex-wrap gap-2">
+            {quickSuggestions.slice(0, 6).map((suggestion) => (
+              <Badge
+                key={suggestion}
+                variant="outline"
+                className="cursor-pointer hover:bg-primary/10 hover:border-primary/50 transition-colors px-2 py-1"
+                onClick={() => addQuickSuggestion(suggestion)}
+              >
+                <Plus className="h-3 w-3 mr-1" />
+                {suggestion}
+              </Badge>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Add custom query */}
+      <div className="space-y-2">
+        <Label htmlFor="custom-query">Add custom search term</Label>
+        <div className="flex gap-2">
+          <Input
+            id="custom-query"
+            placeholder="e.g., trusted window cleaning luton"
+            value={customQueryInput}
+            onChange={(e) => setCustomQueryInput(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addCustomQuery())}
+            className="text-sm"
+          />
+          <Button
+            type="button"
+            variant="outline"
+            onClick={addCustomQuery}
+            disabled={!customQueryInput.trim()}
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+
+      {/* Tip */}
+      <div className="flex items-start gap-2 text-xs text-muted-foreground bg-muted/50 border border-border rounded-lg p-3">
+        <Lightbulb className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
+        <span>
+          Use the exact terms you'd type into Google to find competitors. 
+          More specific terms like "professional window cleaning luton" often find better quality results.
+        </span>
       </div>
 
       <div className="flex gap-3">
-        <Button variant="outline" onClick={onBack} className="flex-1">
-          Back
+        <Button variant="outline" onClick={() => setFormStep('setup')} className="flex-1 gap-2">
+          <ArrowLeft className="h-4 w-4" />
+          Back to Setup
         </Button>
         <Button variant="outline" onClick={handleSkip} className="flex-1">
           Skip
         </Button>
-        <Button onClick={handleStart} disabled={!nicheQuery.trim()} className="flex-1 gap-2">
+        <Button onClick={handleStart} disabled={enabledQueries.length === 0} className="flex-1 gap-2">
           <Search className="h-4 w-4" />
           Start Research
         </Button>
