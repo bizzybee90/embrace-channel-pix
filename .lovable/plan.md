@@ -1,144 +1,222 @@
 
-# Show Search Terms During Stage 1 Discovery
+# Dedicated Search Query Step for Competitor Research
 
-## Problem Identified
+## Overview
 
-The search terms are only visible in two places:
-1. **Before starting** - in the setup form (collapsed by default, and bypassed when resuming a job)
-2. **After completion** - in the Review Competitors screen
+Transform the search query customization from a collapsible section within the main form into its own **dedicated step** in the competitor research flow. This gives the search terms the prominence they deserve and ensures users explicitly confirm their queries before starting discovery.
 
-But they're **NOT visible during Stage 1** while discovery is actively running. This is exactly when users want to see them to understand what's being searched.
-
-## Solution
-
-Add a "Search terms being used" section **inside Stage 1** of `CompetitorPipelineProgress.tsx`, shown while discovery is `in_progress`.
-
-### Visual Design
+## Current vs Proposed Flow
 
 ```text
+CURRENT FLOW (Single Step):
 ┌─────────────────────────────────────────────────────────────┐
-│ STAGE 1  Discover Competitors                  In Progress │
-│ Finding businesses in your area                            │
-│                                                            │
-│ ┌─ Progress ───────────────────────────────────┐           │
-│ │ ████████░░░░░░░░░░░░░░░░░░░░░░  12/50 found │           │
-│ │ 🔵 Searching Google Maps...          1:23   │           │
-│ └──────────────────────────────────────────────┘           │
-│                                                            │
-│ ┌─ Search terms being used ────────────────────┐           │
-│ │ ⊛ window cleaning luton                      │           │
-│ │ ⊛ window cleaner luton                       │           │
-│ │ ⊛ window cleaning near luton                 │           │
-│ │ ⊛ best window cleaning luton                 │           │
-│ └──────────────────────────────────────────────┘           │
-│                                                            │
-│ 💡 This step uses Google Maps to find real businesses...  │
+│ 1. SETUP FORM                                               │
+│    ├─ Industry / Niche: [Window Cleaning]                   │
+│    ├─ Service Area: [Luton]                                 │
+│    ├─ ▼ Preview Search Terms (collapsible, easy to miss)    │
+│    └─ Target count: ○ 50 ● 100 ○ 250                       │
+│                                                             │
+│    [Back] [Skip] [Start Research]                           │
+└─────────────────────────────────────────────────────────────┘
+                            ↓
+              (Discovery starts immediately)
+
+
+PROPOSED FLOW (Two Steps):
+┌─────────────────────────────────────────────────────────────┐
+│ STEP 1: SETUP                                               │
+│    ├─ Industry / Niche: [Window Cleaning]                   │
+│    ├─ Service Area: [Luton]                                 │
+│    └─ Target count: ○ 50 ● 100 ○ 250                       │
+│                                                             │
+│    [Back] [Skip] [Next: Review Search Terms →]              │
+└─────────────────────────────────────────────────────────────┘
+                            ↓
+┌─────────────────────────────────────────────────────────────┐
+│ STEP 2: SEARCH TERMS (NEW DEDICATED STEP)                   │
+│                                                             │
+│    🔍 Confirm Your Google Search Terms                      │
+│    These exact phrases will be searched on Google:          │
+│                                                             │
+│    ┌──────────────────────────────────────────────────────┐ │
+│    │ ☑ window cleaning luton                           ✕  │ │
+│    │ ☑ window cleaning near luton                      ✕  │ │
+│    │ ☑ best window cleaning luton                      ✕  │ │
+│    │ ☑ window cleaner luton                            ✕  │ │
+│    │ ☐ local window cleaning luton                     ✕  │ │
+│    │ ☐ luton window cleaning services                  ✕  │ │
+│    └──────────────────────────────────────────────────────┘ │
+│                                                             │
+│    ┌─ Quick Add Suggestions ─────────────────────────────┐  │
+│    │ [+ "professional window cleaning luton"]            │  │
+│    │ [+ "window cleaners near me luton"]                 │  │
+│    │ [+ "affordable window cleaning luton"]              │  │
+│    └─────────────────────────────────────────────────────┘  │
+│                                                             │
+│    [+ Add custom term...                      ]             │
+│                                                             │
+│    💡 Tip: Use terms you'd actually type into Google        │
+│                                                             │
+│    [← Back to Setup] [Skip] [Start Research]                │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ## Technical Implementation
 
-### 1. Pass Search Queries to Pipeline Progress
+### 1. Add Internal Step State
 
-**File: `src/components/onboarding/CompetitorResearchStep.tsx`**
+Introduce a `formStep` state to track whether the user is on the "setup" or "search-terms" step:
 
-When the job is running, pass the enabled search queries to `CompetitorPipelineProgress`:
+```typescript
+type FormStep = 'setup' | 'search-terms';
 
-```tsx
-<CompetitorPipelineProgress
-  workspaceId={workspaceId}
-  jobId={jobId}
-  nicheQuery={nicheQuery}
-  serviceArea={serviceArea}
-  targetCount={targetCount}
-  searchQueries={enabledQueries}  // NEW: pass the queries
-  onComplete={handlePipelineComplete}
-  ...
-/>
+const [formStep, setFormStep] = useState<FormStep>('setup');
 ```
 
-### 2. Display Search Queries in Stage 1
+### 2. Modify "Next" Button Behavior
 
-**File: `src/components/onboarding/CompetitorPipelineProgress.tsx`**
+The "Start Research" button on Step 1 becomes "Next: Review Search Terms" and advances to Step 2:
 
-Add a new prop and display the queries inside the Stage 1 card:
+```typescript
+// Step 1 button
+<Button 
+  onClick={() => setFormStep('search-terms')} 
+  disabled={!nicheQuery.trim() || !serviceArea.trim()}
+>
+  Next: Review Search Terms →
+</Button>
+```
+
+### 3. Create Dedicated Search Terms UI
+
+A clean, focused UI for Step 2 with:
+- Clear header explaining what will happen
+- Full-height list of search terms (not collapsed)
+- **Quick Add Suggestions** - clickable buttons for common query patterns:
+  - `professional [industry] [location]`
+  - `[industry] near me [location]`
+  - `affordable [industry] [location]`
+  - `top rated [industry] [location]`
+- Custom input field with Add button
+- Back button to return to setup
+
+### 4. Quick Add Suggestions Logic
+
+Generate context-aware suggestions based on industry:
+
+```typescript
+const quickSuggestions = useMemo(() => {
+  if (!nicheQuery || !serviceArea) return [];
+  
+  const industry = nicheQuery.toLowerCase();
+  const location = serviceArea.toLowerCase();
+  
+  // Common patterns that aren't already in the list
+  const patterns = [
+    `professional ${industry} ${location}`,
+    `${industry} near me ${location}`,
+    `affordable ${industry} ${location}`,
+    `top rated ${industry} ${location}`,
+    `cheap ${industry} ${location}`,
+    `${industry} company ${location}`,
+  ];
+  
+  // Filter out suggestions that already exist in the query list
+  const existingQueries = searchQueries.map(sq => sq.query.toLowerCase());
+  return patterns.filter(p => !existingQueries.includes(p));
+}, [nicheQuery, serviceArea, searchQueries]);
+```
+
+### 5. Handle Resume Behavior
+
+When a job resumes (page refresh), skip directly to the progress screen as before:
+
+```typescript
+// Existing resume logic handles this - no changes needed
+if (status === 'running' && jobId) {
+  return <CompetitorPipelineProgress ... />;
+}
+```
+
+### 6. Conditional Rendering Based on formStep
+
+Replace the single form with conditional rendering:
 
 ```tsx
-interface CompetitorPipelineProgressProps {
-  // ... existing props
-  searchQueries?: string[];  // NEW
+// Idle state - show form based on current step
+if (formStep === 'setup') {
+  return (
+    <div className="space-y-6">
+      {/* Industry input */}
+      {/* Service area input */}
+      {/* Target count selection */}
+      {/* What happens explanation */}
+      
+      <div className="flex gap-3">
+        <Button variant="outline" onClick={onBack}>Back</Button>
+        <Button variant="outline" onClick={handleSkip}>Skip</Button>
+        <Button 
+          onClick={() => setFormStep('search-terms')} 
+          disabled={!nicheQuery.trim() || !serviceArea.trim()}
+        >
+          Next: Review Search Terms →
+        </Button>
+      </div>
+    </div>
+  );
 }
 
-// Inside Stage 1's children, after the progress section:
-{searchQueries && searchQueries.length > 0 && (
-  <div className="mt-3 p-3 bg-muted/30 rounded-lg border border-border/50">
-    <div className="flex items-center gap-2 mb-2">
-      <Eye className="h-3.5 w-3.5 text-primary" />
-      <span className="text-xs font-medium text-foreground">
-        Search terms being used
-      </span>
+if (formStep === 'search-terms') {
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="text-center">
+        <CardTitle className="text-xl flex items-center justify-center gap-2">
+          <Search className="h-5 w-5 text-primary" />
+          Confirm Search Terms
+        </CardTitle>
+        <CardDescription className="mt-2">
+          These exact phrases will be searched on Google to find competitors
+        </CardDescription>
+      </div>
+      
+      {/* Search terms list (not collapsed) */}
+      {/* Quick add suggestions */}
+      {/* Custom input */}
+      
+      <div className="flex gap-3">
+        <Button variant="outline" onClick={() => setFormStep('setup')}>
+          ← Back
+        </Button>
+        <Button variant="outline" onClick={handleSkip}>Skip</Button>
+        <Button onClick={handleStart} disabled={enabledQueries.length === 0}>
+          Start Research
+        </Button>
+      </div>
     </div>
-    <div className="flex flex-wrap gap-1.5">
-      {searchQueries.map((query) => (
-        <Badge 
-          key={query} 
-          variant="secondary" 
-          className="font-mono text-xs"
-        >
-          {query}
-        </Badge>
-      ))}
-    </div>
-  </div>
-)}
-```
-
-### 3. Fetch Queries from DB for Resumed Jobs
-
-When a user refreshes the page and the job resumes, the `searchQueries` state will be empty. We need to fetch them from the database:
-
-**File: `src/components/onboarding/CompetitorPipelineProgress.tsx`**
-
-Add a useEffect to fetch the stored queries:
-
-```tsx
-const [storedSearchQueries, setStoredSearchQueries] = useState<string[]>([]);
-
-useEffect(() => {
-  const fetchJobQueries = async () => {
-    const { data } = await supabase
-      .from('competitor_research_jobs')
-      .select('search_queries')
-      .eq('id', jobId)
-      .maybeSingle();
-    
-    if (data?.search_queries && Array.isArray(data.search_queries)) {
-      setStoredSearchQueries(data.search_queries);
-    }
-  };
-  
-  fetchJobQueries();
-}, [jobId]);
-
-// Merge: prefer passed queries, fall back to stored
-const displayQueries = searchQueries?.length 
-  ? searchQueries 
-  : storedSearchQueries;
+  );
+}
 ```
 
 ## Files to Modify
 
 | File | Changes |
 |------|---------|
-| `src/components/onboarding/CompetitorResearchStep.tsx` | Pass `searchQueries` prop to pipeline |
-| `src/components/onboarding/CompetitorPipelineProgress.tsx` | Accept prop, fetch from DB, display in Stage 1 |
+| `src/components/onboarding/CompetitorResearchStep.tsx` | Add `formStep` state, split UI into two steps, add quick suggestions |
 
-## Expected Result
+## Visual Highlights for Step 2
 
-When users are on Stage 1 (discovery in progress), they will now see:
-1. Progress bar with count
-2. Status message ("Searching Google Maps...")
-3. **NEW: List of exact search terms being used** (e.g., "window cleaning luton")
-4. Helpful tip about timing
+- **Full-screen focus** on search terms (no other inputs competing for attention)
+- **Prominent checkboxes** for enabling/disabling queries
+- **Quick Add Suggestions** as clickable pills/badges for one-click addition
+- **Clear call-to-action** explaining that these are the exact Google searches
+- **Validation** - "Start Research" disabled if no queries enabled
 
-This gives users immediate visibility into what the system is searching for, building trust and allowing them to verify the terms match their expectations.
+## Expected User Experience
+
+1. User fills in "Window Cleaning" + "Luton" on Step 1
+2. Clicks "Next: Review Search Terms"
+3. Sees a dedicated page showing exactly what will be searched
+4. Can toggle existing suggestions, add custom terms, or click quick-add buttons
+5. Clicks "Start Research" with full confidence in the search strategy
+6. During Stage 1, sees the same terms displayed as badges (existing feature)
