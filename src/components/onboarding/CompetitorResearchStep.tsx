@@ -185,6 +185,7 @@ export function CompetitorResearchStep({
   const [jobId, setJobId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoadingContext, setIsLoadingContext] = useState(!hasInitialNiche);
+  const [isCheckingResume, setIsCheckingResume] = useState(true); // Block render until resume check completes
   
   // Form step state for two-step flow
   const [formStep, setFormStep] = useState<FormStep>('setup');
@@ -195,36 +196,47 @@ export function CompetitorResearchStep({
 
   // Resume the latest in-progress job after refresh so the UI doesn't look "paused".
   useEffect(() => {
-    if (status !== 'idle' || jobId) return;
+    // Always run on mount to check for active jobs
+    if (status !== 'idle' || jobId) {
+      setIsCheckingResume(false);
+      return;
+    }
 
     const resume = async () => {
-      const { data, error } = await supabase
-        .from('competitor_research_jobs')
-        .select('id,status')
-        .eq('workspace_id', workspaceId)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      try {
+        const { data, error } = await supabase
+          .from('competitor_research_jobs')
+          .select('id,status')
+          .eq('workspace_id', workspaceId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
-      if (error || !data?.id) return;
+        if (error || !data?.id) {
+          setIsCheckingResume(false);
+          return;
+        }
 
-      // Only resume if the job is still active.
-      const activeStatuses = new Set([
-        'queued',
-        'geocoding',
-        'discovering',
-        'filtering',
-        'review_ready', // NEW - resume review state
-        'scraping',
-        'extracting',
-        'deduplicating',
-        'refining',
-        'embedding',
-      ]);
+        // Only resume if the job is still active.
+        const activeStatuses = new Set([
+          'queued',
+          'geocoding',
+          'discovering',
+          'filtering',
+          'review_ready',
+          'scraping',
+          'extracting',
+          'deduplicating',
+          'refining',
+          'embedding',
+        ]);
 
-      if (activeStatuses.has(String(data.status))) {
-        setJobId(data.id);
-        setStatus('running');
+        if (activeStatuses.has(String(data.status))) {
+          setJobId(data.id);
+          setStatus('running');
+        }
+      } finally {
+        setIsCheckingResume(false);
       }
     };
 
@@ -529,6 +541,23 @@ export function CompetitorResearchStep({
     setJobId(null);
     startResearch();
   };
+
+  // Show loading while checking for an active job to resume
+  if (isCheckingResume) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center">
+          <CardTitle className="text-xl flex items-center justify-center gap-2">
+            <Loader2 className="h-5 w-5 animate-spin text-primary" />
+            Loading...
+          </CardTitle>
+          <CardDescription className="mt-2">
+            Checking for active research...
+          </CardDescription>
+        </div>
+      </div>
+    );
+  }
 
   // Show pipeline progress when job is running
   if (status === 'running' && jobId) {
