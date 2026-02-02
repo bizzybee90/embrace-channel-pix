@@ -223,7 +223,7 @@ serve(async (req) => {
     
     const { data: jobData } = await supabase
       .from('competitor_research_jobs')
-      .select('geocoded_lat, geocoded_lng, niche_query, industry, location, max_competitors, radius_miles')
+      .select('status, geocoded_lat, geocoded_lng, niche_query, industry, location, max_competitors, radius_miles')
       .eq('id', jobId)
       .single();
     
@@ -237,6 +237,19 @@ serve(async (req) => {
     console.log('[handle-discovery-complete] Job context:', { 
       originLat, originLng, industry, targetLocation, maxCompetitors, radiusMiles 
     });
+
+    // If the user cancelled (or the job is otherwise terminal), do not continue processing.
+    const terminalStatuses = new Set(['completed', 'cancelled', 'failed', 'error']);
+    if (terminalStatuses.has(String(jobData?.status))) {
+      console.log('[handle-discovery-complete] Job is terminal, skipping processing:', {
+        jobId,
+        status: jobData?.status,
+      });
+      return new Response(JSON.stringify({ success: true, skipped: true, reason: 'terminal_status' }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     if (!originLat || !originLng) {
       throw new Error('Job missing geocoded coordinates');

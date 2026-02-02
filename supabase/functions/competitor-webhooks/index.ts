@@ -9,6 +9,25 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// If a job is cancelled/completed/failed, we should no-op webhooks to avoid continuing costly pipelines.
+const TERMINAL_JOB_STATUSES = new Set(['completed', 'cancelled', 'failed', 'error']);
+
+async function isJobTerminal(supabase: any, jobId: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('competitor_research_jobs')
+    .select('status')
+    .eq('id', jobId)
+    .maybeSingle();
+
+  if (error) {
+    console.error('[competitor-webhooks] Failed to read job status:', error);
+    // If we can't read status, do NOT assume terminal.
+    return false;
+  }
+
+  return TERMINAL_JOB_STATUSES.has(String(data?.status));
+}
+
 // =========================================
 // HAVERSINE FORMULA: Calculate distance between two points in miles
 // =========================================
@@ -284,6 +303,15 @@ async function handleDiscoveryWebhook(payload: any) {
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   );
+
+  // Guard: if the job was cancelled (or otherwise terminal), do nothing.
+  if (await isJobTerminal(supabase, jobId)) {
+    console.log('[discovery-webhook] Job is terminal; skipping webhook processing:', jobId);
+    return new Response(JSON.stringify({ success: true, skipped: true, reason: 'terminal_status' }), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
   
   const APIFY_API_KEY = Deno.env.get('APIFY_API_KEY');
 
@@ -588,7 +616,16 @@ async function handleSerpDiscoveryWebhook(payload: any) {
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   );
-  
+
+  // Guard: if the job was cancelled (or otherwise terminal), do nothing.
+  if (await isJobTerminal(supabase, jobId)) {
+    console.log('[serp-webhook] Job is terminal; skipping webhook processing:', jobId);
+    return new Response(JSON.stringify({ success: true, skipped: true, reason: 'terminal_status' }), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
   const APIFY_API_KEY = Deno.env.get('APIFY_API_KEY');
 
   if (!APIFY_API_KEY) {
@@ -851,7 +888,16 @@ async function handleHybridPlacesWebhook(payload: any) {
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   );
-  
+
+  // Guard: if the job was cancelled (or otherwise terminal), do nothing.
+  if (await isJobTerminal(supabase, jobId)) {
+    console.log('[hybrid-places-webhook] Job is terminal; skipping webhook processing:', jobId);
+    return new Response(JSON.stringify({ success: true, skipped: true, reason: 'terminal_status' }), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
   const APIFY_API_KEY = Deno.env.get('APIFY_API_KEY');
   const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 
@@ -1259,6 +1305,15 @@ async function handleHybridSerpWebhook(payload: any) {
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   );
+
+  // Guard: if the job was cancelled (or otherwise terminal), do nothing.
+  if (await isJobTerminal(supabase, jobId)) {
+    console.log('[hybrid-serp-webhook] Job is terminal; skipping webhook processing:', jobId);
+    return new Response(JSON.stringify({ success: true, skipped: true, reason: 'terminal_status' }), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
   
   const APIFY_API_KEY = Deno.env.get('APIFY_API_KEY');
 
