@@ -533,6 +533,8 @@ export function CompetitorResearchStep({
     setError(null);
     setJobId(null);
     setStatus('idle');
+    // Return to search-terms step so user can review/adjust queries before restarting
+    setFormStep('search-terms');
   };
 
   const handleRestartNow = () => {
