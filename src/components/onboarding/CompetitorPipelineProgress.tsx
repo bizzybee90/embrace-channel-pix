@@ -406,6 +406,36 @@ export function CompetitorPipelineProgress({
   const isError = stats.phase === 'error' || stats.phase === 'failed';
   const isComplete = stats.phase === 'completed';
   const isReviewReady = stats.phase === 'review_ready';
+
+  const [isCancelling, setIsCancelling] = useState(false);
+
+  const handleCancelRun = async () => {
+    setIsCancelling(true);
+    try {
+      const { error } = await supabase
+        .from('competitor_research_jobs')
+        .update({
+          status: 'cancelled',
+          completed_at: new Date().toISOString(),
+          heartbeat_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          error_message: 'Cancelled by user',
+        })
+        .eq('id', jobId);
+
+      if (error) throw error;
+
+      toast.success('Stopped competitor research');
+      onRetry();
+    } catch (err: any) {
+      console.error('[CompetitorPipelineProgress] Cancel failed:', err);
+      toast.error('Could not stop the run', {
+        description: err?.message || 'Please try again',
+      });
+    } finally {
+      setIsCancelling(false);
+    }
+  };
   
   // Check if extraction is stalled.
   // Two paths:
@@ -838,6 +868,40 @@ export function CompetitorPipelineProgress({
             Continue <ArrowRight className="h-4 w-4" />
           </Button>
         </div>
+
+        {!isComplete && (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="outline"
+                className="w-full"
+                disabled={isCancelling}
+              >
+                {isCancelling ? (
+                  <span className="inline-flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Stopping…
+                  </span>
+                ) : (
+                  'Stop this run'
+                )}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Stop competitor research?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will mark the job as cancelled so the backend stops progressing it. Any already-running external
+                  work may still finish in the background, but it won’t continue the pipeline.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Keep running</AlertDialogCancel>
+                <AlertDialogAction onClick={handleCancelRun}>Stop run</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
         
         {/* Restart Research button */}
         <AlertDialog>
