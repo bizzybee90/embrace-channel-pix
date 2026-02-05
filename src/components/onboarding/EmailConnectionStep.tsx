@@ -307,46 +307,54 @@ export function EmailConnectionStep({
   const startImport = async () => {
     if (!workspaceId || importStarted) return;
     
-    // Optimistically show a progress UI immediately so the user isn't left on a blank screen
     setImportStarted(true);
-    setProgress({
-      status: 'importing',
-      emails_imported: 0,
-      emails_classified: 0,
-      emails_total: 0,
-      voice_profile_complete: false,
-      error_message: null,
-      started_at: new Date().toISOString(),
-      completed_at: null,
-    });
     
     try {
-      // Call the email-import-v2 edge function to trigger the relay-race import
       const { data: session } = await supabase.auth.getSession();
-      const response = await fetch(`${SUPABASE_URL}/functions/v1/email-import-v2`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.session?.access_token || ''}`,
-        },
-        body: JSON.stringify({
-          workspace_id: workspaceId,
-          import_mode: importMode
-        })
-      });
+      const authToken = session?.session?.access_token || '';
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Import error response:', errorText);
-        throw new Error('Failed to trigger import');
+      // Trigger BOTH n8n workflows simultaneously
+      const [competitorRes, emailRes] = await Promise.all([
+        // Competitor Discovery workflow
+        fetch(`${SUPABASE_URL}/functions/v1/trigger-n8n-workflow`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`,
+          },
+          body: JSON.stringify({
+            workspace_id: workspaceId,
+            workflow_type: 'competitor_discovery',
+          })
+        }),
+        // Email Import workflow
+        fetch(`${SUPABASE_URL}/functions/v1/trigger-n8n-workflow`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`,
+          },
+          body: JSON.stringify({
+            workspace_id: workspaceId,
+            workflow_type: 'email_import',
+          })
+        }),
+      ]);
+
+      if (!competitorRes.ok || !emailRes.ok) {
+        console.error('Failed to trigger n8n workflows');
+        toast.error('Failed to start AI training. Please try again.');
+        setImportStarted(false);
+        return;
       }
 
-      toast.success('Starting email import...');
+      toast.success('AI training started! This will take a few minutes...');
+      // Advance to the progress screen
+      onNext();
     } catch (error) {
-      console.error('Error starting import:', error);
-      toast.error('Failed to start email import');
+      console.error('Error triggering n8n workflows:', error);
+      toast.error('Failed to start AI training');
       setImportStarted(false);
-      setProgress(null);
     }
   };
 
@@ -462,10 +470,10 @@ export function EmailConnectionStep({
               </Button>
             </div>
 
-            {/* Start Import */}
+            {/* Start n8n workflows */}
             <div className="space-y-4">
-              <Button onClick={startImport} className="w-full gap-2">
-                Start Learning from Emails
+              <Button onClick={startImport} disabled={importStarted} className="w-full gap-2">
+                {importStarted ? 'Starting...' : 'Start AI Training'}
               </Button>
               <Button variant="outline" onClick={onNext} className="w-full">
                 Skip for Now
