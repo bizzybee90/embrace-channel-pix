@@ -840,6 +840,7 @@ export type Database = {
           faqs_generated: number | null
           faqs_validated: number | null
           filter_reason: string | null
+          found_by: string | null
           google_place_id: string | null
           has_faq_page: boolean | null
           has_pricing_page: boolean | null
@@ -861,6 +862,7 @@ export type Database = {
           priority_tier: string | null
           quality_score: number | null
           rating: number | null
+          raw_content: string | null
           rejection_reason: string | null
           relevance_score: number | null
           review_count: number | null
@@ -877,6 +879,7 @@ export type Database = {
           validated_at: string | null
           validation_reason: string | null
           validation_status: string | null
+          verification_status: string | null
           workspace_id: string
         }
         Insert: {
@@ -898,6 +901,7 @@ export type Database = {
           faqs_generated?: number | null
           faqs_validated?: number | null
           filter_reason?: string | null
+          found_by?: string | null
           google_place_id?: string | null
           has_faq_page?: boolean | null
           has_pricing_page?: boolean | null
@@ -919,6 +923,7 @@ export type Database = {
           priority_tier?: string | null
           quality_score?: number | null
           rating?: number | null
+          raw_content?: string | null
           rejection_reason?: string | null
           relevance_score?: number | null
           review_count?: number | null
@@ -935,6 +940,7 @@ export type Database = {
           validated_at?: string | null
           validation_reason?: string | null
           validation_status?: string | null
+          verification_status?: string | null
           workspace_id: string
         }
         Update: {
@@ -956,6 +962,7 @@ export type Database = {
           faqs_generated?: number | null
           faqs_validated?: number | null
           filter_reason?: string | null
+          found_by?: string | null
           google_place_id?: string | null
           has_faq_page?: boolean | null
           has_pricing_page?: boolean | null
@@ -977,6 +984,7 @@ export type Database = {
           priority_tier?: string | null
           quality_score?: number | null
           rating?: number | null
+          raw_content?: string | null
           rejection_reason?: string | null
           relevance_score?: number | null
           review_count?: number | null
@@ -993,6 +1001,7 @@ export type Database = {
           validated_at?: string | null
           validation_reason?: string | null
           validation_status?: string | null
+          verification_status?: string | null
           workspace_id?: string
         }
         Relationships: [
@@ -3980,6 +3989,50 @@ export type Database = {
           },
         ]
       }
+      n8n_workflow_progress: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          details: Json | null
+          id: string
+          started_at: string | null
+          status: string
+          updated_at: string | null
+          workflow_type: string
+          workspace_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          started_at?: string | null
+          status?: string
+          updated_at?: string | null
+          workflow_type: string
+          workspace_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          started_at?: string | null
+          status?: string
+          updated_at?: string | null
+          workflow_type?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "n8n_workflow_progress_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notification_preferences: {
         Row: {
           created_at: string | null
@@ -4092,6 +4145,16 @@ export type Database = {
           few_shot_status: string | null
           id: string
           ignored_email_count: number | null
+          n8n_competitor_message: string | null
+          n8n_competitor_status: string | null
+          n8n_competitors_found: number | null
+          n8n_competitors_scraped: number | null
+          n8n_email_message: string | null
+          n8n_email_status: string | null
+          n8n_emails_classified: number | null
+          n8n_emails_imported: number | null
+          n8n_execution_id: string | null
+          n8n_faqs_generated: number | null
           pairs_categorized: number | null
           pairs_matched: number | null
           response_rate_percent: number | null
@@ -4116,6 +4179,16 @@ export type Database = {
           few_shot_status?: string | null
           id?: string
           ignored_email_count?: number | null
+          n8n_competitor_message?: string | null
+          n8n_competitor_status?: string | null
+          n8n_competitors_found?: number | null
+          n8n_competitors_scraped?: number | null
+          n8n_email_message?: string | null
+          n8n_email_status?: string | null
+          n8n_emails_classified?: number | null
+          n8n_emails_imported?: number | null
+          n8n_execution_id?: string | null
+          n8n_faqs_generated?: number | null
           pairs_categorized?: number | null
           pairs_matched?: number | null
           response_rate_percent?: number | null
@@ -4140,6 +4213,16 @@ export type Database = {
           few_shot_status?: string | null
           id?: string
           ignored_email_count?: number | null
+          n8n_competitor_message?: string | null
+          n8n_competitor_status?: string | null
+          n8n_competitors_found?: number | null
+          n8n_competitors_scraped?: number | null
+          n8n_email_message?: string | null
+          n8n_email_status?: string | null
+          n8n_emails_classified?: number | null
+          n8n_emails_imported?: number | null
+          n8n_execution_id?: string | null
+          n8n_faqs_generated?: number | null
           pairs_categorized?: number | null
           pairs_matched?: number | null
           response_rate_percent?: number | null

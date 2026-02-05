@@ -4,16 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { BusinessContextStep } from './BusinessContextStep';
 import { KnowledgeBaseStep } from './KnowledgeBaseStep';
-import { SenderRecognitionStep } from './SenderRecognitionStep';
-import { InboxLearningStep } from './InboxLearningStep';
-import { ReviewLearningStep } from './ReviewLearningStep';
-import { AutomationLevelStep } from './AutomationLevelStep';
+import { SearchTermsStep } from './SearchTermsStep';
 import { EmailConnectionStep } from './EmailConnectionStep';
-import { CompetitorResearchStep } from './CompetitorResearchStep';
-import { BackgroundImportBanner } from './BackgroundImportBanner';
-import { AILearningReport } from './report/AILearningReport';
+import { ProgressScreen } from './ProgressScreen';
 import bizzybeelogo from '@/assets/bizzybee-logo.png';
-import { CheckCircle2, Mail, BookOpen } from 'lucide-react';
+import { CheckCircle2, Mail, BookOpen, MessageCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface OnboardingWizardProps {
@@ -21,10 +16,10 @@ interface OnboardingWizardProps {
   onComplete: () => void;
 }
 
-type Step = 'welcome' | 'email' | 'business' | 'knowledge' | 'competitors' | 'senders' | 'triage' | 'review_learning' | 'automation' | 'complete';
+// New step order: welcome → business → knowledge → search_terms → email → progress → complete
+type Step = 'welcome' | 'business' | 'knowledge' | 'search_terms' | 'email' | 'progress' | 'complete';
 
-// Added review_learning step after triage
-const STEPS: Step[] = ['welcome', 'email', 'business', 'knowledge', 'competitors', 'senders', 'triage', 'review_learning', 'automation', 'complete'];
+const STEPS: Step[] = ['welcome', 'business', 'knowledge', 'search_terms', 'email', 'progress', 'complete'];
 
 export function OnboardingWizard({ workspaceId, onComplete }: OnboardingWizardProps) {
   const storageKey = `bizzybee:onboarding:${workspaceId}`;
@@ -75,10 +70,7 @@ export function OnboardingWizard({ workspaceId, onComplete }: OnboardingWizardPr
   const [businessContext, setBusinessContext] = useState(() => {
     return { ...businessContextDefaults, ...(stored.businessContext ?? {}) };
   });
-  const [senderRulesCreated, setSenderRulesCreated] = useState(0);
-  const [triageResults, setTriageResults] = useState({ processed: 0, changed: 0 });
   const [knowledgeResults, setKnowledgeResults] = useState({ industryFaqs: 0, websiteFaqs: 0 });
-  const [competitorResults, setCompetitorResults] = useState({ sitesScraped: 0, faqsGenerated: 0 });
   const [connectedEmail, setConnectedEmail] = useState<string | null>(null);
 
   useEffect(() => {
@@ -204,11 +196,6 @@ export function OnboardingWizard({ workspaceId, onComplete }: OnboardingWizardPr
         </CardHeader>
 
         <CardContent className="space-y-6">
-          {/* Background import banner - shows only during middle steps (knowledge through automation) */}
-          {['knowledge', 'competitors', 'senders', 'triage', 'review_learning', 'automation'].includes(currentStep) && (
-            <BackgroundImportBanner workspaceId={workspaceId} />
-          )}
-          
           {currentStep === 'welcome' && (
             <div className="text-center space-y-10 py-2">
               {/* Headline - Reassuring and confident */}
@@ -230,15 +217,6 @@ export function OnboardingWizard({ workspaceId, onComplete }: OnboardingWizardPr
                 Get started
               </Button>
             </div>
-          )}
-
-          {currentStep === 'email' && (
-            <EmailConnectionStep
-              workspaceId={workspaceId}
-              onEmailConnected={(email) => setConnectedEmail(email)}
-              onNext={handleNext}
-              onBack={handleBack}
-            />
           )}
 
           {currentStep === 'business' && (
@@ -267,52 +245,25 @@ export function OnboardingWizard({ workspaceId, onComplete }: OnboardingWizardPr
             />
           )}
 
-          {currentStep === 'competitors' && (
-            <CompetitorResearchStep
-              workspaceId={workspaceId}
-              businessContext={{
-                companyName: businessContext.companyName,
-                businessType: businessContext.businessType,
-                serviceArea: businessContext.serviceArea,
-              }}
-              onComplete={(results) => {
-                setCompetitorResults(results);
-                handleNext();
-              }}
-              onBack={handleBack}
-            />
-          )}
-
-          {currentStep === 'senders' && (
-            <SenderRecognitionStep
-              workspaceId={workspaceId}
-              onRulesCreated={(count) => setSenderRulesCreated(count)}
-              onNext={handleNext}
-              onBack={handleBack}
-            />
-          )}
-
-          {currentStep === 'triage' && (
-            <InboxLearningStep
-              workspaceId={workspaceId}
-              onComplete={(results) => {
-                setTriageResults({ processed: results.emailsAnalyzed, changed: results.patternsLearned });
-                handleNext();
-              }}
-              onBack={handleBack}
-            />
-          )}
-
-          {currentStep === 'review_learning' && (
-            <AILearningReport
+          {currentStep === 'search_terms' && (
+            <SearchTermsStep
               workspaceId={workspaceId}
               onNext={handleNext}
               onBack={handleBack}
             />
           )}
 
-          {currentStep === 'automation' && (
-            <AutomationLevelStep
+          {currentStep === 'email' && (
+            <EmailConnectionStep
+              workspaceId={workspaceId}
+              onEmailConnected={(email) => setConnectedEmail(email)}
+              onNext={handleNext}
+              onBack={handleBack}
+            />
+          )}
+
+          {currentStep === 'progress' && (
+            <ProgressScreen
               workspaceId={workspaceId}
               onNext={handleNext}
               onBack={handleBack}
@@ -321,28 +272,24 @@ export function OnboardingWizard({ workspaceId, onComplete }: OnboardingWizardPr
 
           {currentStep === 'complete' && (
             <div className="text-center space-y-6 py-8">
-              <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto">
-                <CheckCircle2 className="h-8 w-8 text-green-600" />
+              <div className="w-16 h-16 bg-success/10 rounded-full flex items-center justify-center mx-auto">
+                <CheckCircle2 className="h-8 w-8 text-success" />
               </div>
               <div className="space-y-2">
-                <CardTitle className="text-2xl">You're All Set!</CardTitle>
+                <CardTitle className="text-2xl">Your AI Agent is Ready!</CardTitle>
                 <CardDescription className="text-base">
-                  BizzyBee is now configured for your inbox.
+                  BizzyBee has learned from your competitors and email patterns.
                 </CardDescription>
               </div>
               
-              <div className="grid grid-cols-3 gap-3 max-w-md mx-auto">
+              <div className="grid grid-cols-2 gap-3 max-w-sm mx-auto">
                 <div className="bg-muted/30 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-primary">{senderRulesCreated}</div>
-                  <div className="text-xs text-muted-foreground">Rules created</div>
-                </div>
-                <div className="bg-muted/30 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-green-600">{triageResults.changed}</div>
-                  <div className="text-xs text-muted-foreground">Emails sorted</div>
-                </div>
-                <div className="bg-muted/30 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-blue-600">{totalFaqs}</div>
+                  <div className="text-2xl font-bold text-primary">{knowledgeResults.websiteFaqs + knowledgeResults.industryFaqs}</div>
                   <div className="text-xs text-muted-foreground">FAQs ready</div>
+                </div>
+                <div className="bg-muted/30 rounded-lg p-4 text-center">
+                  <div className="text-2xl font-bold text-success">✓</div>
+                  <div className="text-xs text-muted-foreground">AI trained</div>
                 </div>
               </div>
 
@@ -353,48 +300,35 @@ export function OnboardingWizard({ workspaceId, onComplete }: OnboardingWizardPr
                 </div>
               )}
 
-              {totalFaqs > 0 && (
-                <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                  <BookOpen className="h-4 w-4" />
-                  <span>
-                    {knowledgeResults.websiteFaqs > 0 
-                      ? `${knowledgeResults.websiteFaqs} FAQs extracted from your website`
-                      : `${knowledgeResults.industryFaqs} industry FAQs loaded`
-                    }
-                  </span>
-                </div>
-              )}
-
               <div className="flex flex-col gap-3">
-                <Button onClick={onComplete} size="lg" className="px-8">
+                <Button onClick={onComplete} size="lg" className="px-8 gap-2">
+                  <MessageCircle className="h-4 w-4" />
                   Start Using BizzyBee
                 </Button>
-                {totalFaqs > 0 && (
-                  <Button 
-                    variant="outline" 
-                    onClick={async () => {
-                      // Mark onboarding complete before navigating
-                      const { data: { user } } = await supabase.auth.getUser();
-                      if (user) {
-                        await supabase
-                          .from('users')
-                          .update({ 
-                            onboarding_completed: true,
-                            onboarding_step: 'complete'
-                          })
-                          .eq('id', user.id);
-                      }
-                      window.location.href = '/settings?tab=knowledge';
-                    }}
-                    className="gap-2"
-                  >
-                    <BookOpen className="h-4 w-4" />
-                    View Knowledge Base
-                  </Button>
-                )}
+                <Button 
+                  variant="outline" 
+                  onClick={async () => {
+                    const { data: { user } } = await supabase.auth.getUser();
+                    if (user) {
+                      await supabase
+                        .from('users')
+                        .update({ 
+                          onboarding_completed: true,
+                          onboarding_step: 'complete'
+                        })
+                        .eq('id', user.id);
+                    }
+                    window.location.href = '/settings?tab=knowledge';
+                  }}
+                  className="gap-2"
+                >
+                  <BookOpen className="h-4 w-4" />
+                  View Knowledge Base
+                </Button>
               </div>
             </div>
           )}
+
         </CardContent>
       </Card>
     </div>
