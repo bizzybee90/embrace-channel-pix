@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
@@ -10,14 +10,10 @@ import {
   ArrowRight,
   RotateCcw,
   Mail,
-  Brain,
   Sparkles,
-  Download
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { LearningProgressDisplay } from '@/components/email/LearningProgressDisplay';
 import { toast } from 'sonner';
-import { generateLearningReportPDF } from './report/generatePDF';
 
 interface EmailPipelineProgressProps {
   workspaceId: string;
@@ -25,19 +21,6 @@ interface EmailPipelineProgressProps {
   onNext: () => void;
   onBack: () => void;
   onRetry: () => void;
-}
-
-type PipelinePhase = 'idle' | 'connecting' | 'importing' | 'classifying' | 'learning' | 'complete' | 'error';
-
-interface PipelineStats {
-  phase: PipelinePhase;
-  emailsReceived: number;
-  emailsClassified: number;
-  estimatedTotal: number;
-  inboxCount: number;
-  sentCount: number;
-  voiceProfileComplete: boolean;
-  errorMessage: string | null;
 }
 
 type StageStatus = 'pending' | 'in_progress' | 'done' | 'error';
@@ -129,7 +112,7 @@ function StageCard({
 }
 
 function ProgressLine({ currentStage }: { currentStage: number }) {
-  const stages = ['Import', 'Classify', 'Learn', 'Ready!'];
+  const stages = ['Import', 'Classify', 'Ready!'];
 
   return (
     <div className="flex items-center justify-center gap-1 py-4">
@@ -158,7 +141,7 @@ function ProgressLine({ currentStage }: { currentStage: number }) {
           {index < stages.length - 1 && (
             <div
               className={cn(
-                'w-12 h-0.5 mx-1 mt-[-12px] transition-all duration-300',
+                'w-16 h-0.5 mx-1 mt-[-12px] transition-all duration-300',
                 index < currentStage ? 'bg-success' : 'bg-muted'
               )}
             />
@@ -169,6 +152,10 @@ function ProgressLine({ currentStage }: { currentStage: number }) {
   );
 }
 
+// n8n classification webhook URL
+const N8N_CLASSIFY_URL = 'https://bizzybee.app.n8n.cloud/webhook/email-classification';
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+
 export function EmailPipelineProgress({
   workspaceId,
   connectedEmail,
@@ -176,31 +163,35 @@ export function EmailPipelineProgress({
   onBack,
   onRetry,
 }: EmailPipelineProgressProps) {
-  const [stats, setStats] = useState<PipelineStats>({
-    phase: 'importing',
+  const [stats, setStats] = useState({
     emailsReceived: 0,
     emailsClassified: 0,
-    estimatedTotal: 0,
     inboxCount: 0,
     sentCount: 0,
-    voiceProfileComplete: false,
-    errorMessage: null,
+    errorMessage: null as string | null,
   });
 
-  const [downloading, setDownloading] = useState(false);
+  const [classificationTriggered, setClassificationTriggered] = useState(false);
+  const [webhookError, setWebhookError] = useState(false);
+  const [startTime] = useState(Date.now());
+  const [showSlowMessage, setShowSlowMessage] = useState(false);
+  const classificationTriggeredRef = useRef(false);
 
-  // Fetch initial stats and subscribe to updates
+  // Poll raw_emails for real-time progress every 3 seconds
   useEffect(() => {
     if (!workspaceId) return;
 
     const fetchStats = async () => {
-      // Fetch progress record and use COUNT queries to avoid 1000-row limit
-      const [progressResult, inboxResult, sentResult, classifiedResult] = await Promise.all([
+      const [totalResult, classifiedResult, inboxResult, sentResult] = await Promise.all([
         supabase
-          .from('email_import_progress')
-          .select('*')
+          .from('raw_emails')
+          .select('id', { count: 'exact', head: true })
+          .eq('workspace_id', workspaceId),
+        supabase
+          .from('raw_emails')
+          .select('id', { count: 'exact', head: true })
           .eq('workspace_id', workspaceId)
-          .maybeSingle(),
+          .not('category', 'is', null),
         supabase
           .from('email_import_queue')
           .select('*', { count: 'exact', head: true })
@@ -211,156 +202,136 @@ export function EmailPipelineProgress({
           .select('*', { count: 'exact', head: true })
           .eq('workspace_id', workspaceId)
           .eq('direction', 'outbound'),
-        supabase
-          .from('email_import_queue')
-          .select('*', { count: 'exact', head: true })
-          .eq('workspace_id', workspaceId)
-          .not('category', 'is', null),
       ]);
 
-      const progress = progressResult.data;
-      const inboxCount = inboxResult.count || 0;
-      const sentCount = sentResult.count || 0;
-      const classifiedCount = classifiedResult.count || 0;
-      const totalCount = inboxCount + sentCount;
+      const total = totalResult.count || 0;
+      const classified = classifiedResult.count || 0;
+      const inbox = inboxResult.count || 0;
+      const sent = sentResult.count || 0;
 
-      // Use REAL-TIME counts from queue as source of truth (progress table can be stale)
       setStats({
-        phase: (progress?.current_phase as PipelinePhase) || 'importing',
-        emailsReceived: totalCount > 0 ? totalCount : (progress?.emails_received || 0),
-        emailsClassified: classifiedCount, // Always use real count, not stale progress value
-        estimatedTotal: totalCount > 0 ? totalCount : (progress?.estimated_total_emails || 0),
-        inboxCount,
-        sentCount,
-        voiceProfileComplete: progress?.voice_profile_complete || false,
-        errorMessage: progress?.last_error || null,
+        emailsReceived: total,
+        emailsClassified: classified,
+        inboxCount: inbox,
+        sentCount: sent,
+        errorMessage: null,
       });
     };
 
     fetchStats();
-
-    // Poll every 3 seconds for updates
     const interval = setInterval(fetchStats, 3000);
-
-    // Also subscribe to realtime updates on email_import_progress
-    const channel = supabase
-      .channel(`pipeline-progress-${workspaceId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'email_import_progress',
-          filter: `workspace_id=eq.${workspaceId}`,
-        },
-        () => {
-          fetchStats();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      clearInterval(interval);
-      supabase.removeChannel(channel);
-    };
+    return () => clearInterval(interval);
   }, [workspaceId]);
 
-  // Derive stage statuses from ACTUAL DATA, not just the phase field
-  // (The phase field can get stuck due to edge function issues)
-  const getStageStatuses = (): { import: StageStatus; classify: StageStatus; learn: StageStatus } => {
-    const { phase, emailsReceived, emailsClassified, voiceProfileComplete } = stats;
-    const totalEmails = stats.inboxCount + stats.sentCount;
+  // Show slow message after 5 minutes
+  useEffect(() => {
+    const timer = setTimeout(() => setShowSlowMessage(true), 5 * 60 * 1000);
+    return () => clearTimeout(timer);
+  }, []);
 
-    // If error phase, determine which stage errored
-    if (phase === 'error') {
-      if (emailsClassified === 0 && emailsReceived === 0) {
-        return { import: 'error', classify: 'pending', learn: 'pending' };
+  // Derive stage statuses
+  const totalEmails = stats.inboxCount + stats.sentCount;
+  const importComplete = totalEmails > 0 && stats.emailsReceived > 0;
+  const allClassified = stats.emailsReceived > 0 && 
+    (stats.emailsClassified >= stats.emailsReceived || stats.emailsClassified / stats.emailsReceived >= 0.99);
+
+  // If no emails need classification (all already have categories), skip to done
+  const skipClassification = importComplete && stats.emailsReceived > 0 && allClassified && !classificationTriggered;
+
+  const importStatus: StageStatus = importComplete ? 'done' : 'in_progress';
+  
+  const classifyStatus: StageStatus = (() => {
+    if (webhookError) return 'error';
+    if (allClassified && stats.emailsReceived > 0) return 'done';
+    if (classificationTriggered && stats.emailsClassified > 0) return 'in_progress';
+    if (classificationTriggered) return 'in_progress';
+    if (!importComplete) return 'pending';
+    return 'pending';
+  })();
+
+  const isComplete = classifyStatus === 'done';
+
+  // Trigger n8n classification when import completes
+  useEffect(() => {
+    if (!importComplete || classificationTriggeredRef.current || skipClassification) return;
+    
+    const triggerClassification = async () => {
+      classificationTriggeredRef.current = true;
+      setClassificationTriggered(true);
+      setWebhookError(false);
+
+      try {
+        const response = await fetch(N8N_CLASSIFY_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            workspace_id: workspaceId,
+            callback_url: `${SUPABASE_URL}/functions/v1/n8n-email-callback`,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Webhook returned ${response.status}`);
+        }
+
+        console.log('[EmailPipeline] n8n classification triggered');
+      } catch (error) {
+        console.error('[EmailPipeline] Failed to trigger classification:', error);
+        setWebhookError(true);
+        classificationTriggeredRef.current = false;
+        toast.error('Failed to start classification. Click retry.');
       }
-      if (emailsClassified < emailsReceived) {
-        return { import: 'done', classify: 'error', learn: 'pending' };
+    };
+
+    triggerClassification();
+  }, [importComplete, workspaceId, skipClassification]);
+
+  // Update onboarding_progress when classification completes
+  useEffect(() => {
+    if (!isComplete) return;
+
+    const updateProgress = async () => {
+      try {
+        await supabase
+          .from('onboarding_progress')
+          .update({
+            email_import_status: 'complete',
+            emails_classified: stats.emailsClassified,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('workspace_id', workspaceId);
+      } catch (err) {
+        console.error('Failed to update onboarding_progress:', err);
       }
-      return { import: 'done', classify: 'done', learn: 'error' };
-    }
+    };
 
-    // SMART DETECTION: Derive actual state from data, not just phase
-    const importComplete = totalEmails > 0 && emailsReceived > 0;
-    // Consider classification complete if >= 99% classified (edge case: a few emails may error/skip)
-    const classifyComplete = emailsReceived > 0 && (emailsClassified >= emailsReceived || emailsClassified / emailsReceived >= 0.99);
+    updateProgress();
+  }, [isComplete, stats.emailsClassified, workspaceId]);
 
-    // All stages complete
-    if (classifyComplete && voiceProfileComplete) {
-      return { import: 'done', classify: 'done', learn: 'done' };
-    }
+  const classifyPercent = stats.emailsReceived > 0
+    ? Math.round((stats.emailsClassified / stats.emailsReceived) * 100)
+    : 0;
 
-    // Classification complete, learning in progress or complete
-    if (classifyComplete && !voiceProfileComplete) {
-      return { import: 'done', classify: 'done', learn: 'in_progress' };
-    }
-
-    // Import complete, classification in progress
-    if (importComplete && emailsClassified > 0 && !classifyComplete) {
-      return { import: 'done', classify: 'in_progress', learn: 'pending' };
-    }
-
-    // Import complete, classification hasn't started
-    if (importComplete && emailsClassified === 0) {
-      // Check phase to see if classification should start
-      if (phase === 'classifying') {
-        return { import: 'done', classify: 'in_progress', learn: 'pending' };
-      }
-      return { import: 'done', classify: 'pending', learn: 'pending' };
-    }
-
-    // Still importing
-    return { import: 'in_progress', classify: 'pending', learn: 'pending' };
-  };
-
-  const stageStatuses = getStageStatuses();
-
-  const canDownloadReport = stageStatuses.import === 'done' && stageStatuses.classify === 'done' && stageStatuses.learn === 'done';
-
-  const handleDownloadPDF = async () => {
-    if (!canDownloadReport || downloading) return;
-    setDownloading(true);
-    try {
-      await generateLearningReportPDF(workspaceId);
-      toast.success('Report downloaded');
-    } catch (err) {
-      console.error('PDF generation error:', err);
-      toast.error('Failed to generate PDF');
-    } finally {
-      setDownloading(false);
-    }
-  };
-
-  // Calculate current stage for progress line (0-3)
-  const getCurrentStage = (): number => {
-    if (stageStatuses.learn === 'done') return 3;
-    if (stageStatuses.learn === 'in_progress') return 2;
-    if (stageStatuses.classify === 'in_progress') return 1;
-    return 0;
-  };
-
-  // Calculate classification progress
-  const classifyPercent =
-    stats.emailsReceived > 0
-      ? Math.round((stats.emailsClassified / stats.emailsReceived) * 100)
-      : 0;
-
-  // Estimate time remaining for classification
-  const estimateClassifyTime = (): string => {
+  const estimateTime = (): string => {
     const remaining = stats.emailsReceived - stats.emailsClassified;
     if (remaining <= 0) return 'Almost done...';
-    // Roughly 200 emails per minute with batch processing
     const minutes = Math.ceil(remaining / 200);
     if (minutes <= 1) return 'Less than a minute';
     if (minutes < 60) return `~${minutes} min remaining`;
     return `~${Math.ceil(minutes / 60)} hour${Math.ceil(minutes / 60) > 1 ? 's' : ''} remaining`;
   };
 
-  const totalEmails = stats.inboxCount + stats.sentCount;
-  const isError = stats.phase === 'error';
-  const isComplete = stats.phase === 'complete';
+  const handleRetryClassification = () => {
+    classificationTriggeredRef.current = false;
+    setClassificationTriggered(false);
+    setWebhookError(false);
+  };
+
+  const getCurrentStage = (): number => {
+    if (isComplete) return 2;
+    if (classifyStatus === 'in_progress') return 1;
+    return 0;
+  };
 
   return (
     <div className="space-y-6">
@@ -368,7 +339,7 @@ export function EmailPipelineProgress({
       <div className="text-center space-y-2">
         <h2 className="text-xl font-semibold text-foreground">🐝 Setting Up Your AI Assistant</h2>
         <p className="text-sm text-muted-foreground">
-          We're teaching BizzyBee how you communicate so it can respond just like you would.
+          Teaching BizzyBee to understand your emails.
           <br />
           <span className="font-medium text-foreground">{connectedEmail}</span>
         </p>
@@ -380,15 +351,11 @@ export function EmailPipelineProgress({
         <StageCard
           stage={1}
           title="Import Emails"
-          description={
-            stageStatuses.import === 'done'
-              ? 'Downloaded your email history'
-              : 'Downloading your email history'
-          }
-          status={stageStatuses.import}
+          description={importComplete ? 'Downloaded your email history' : 'Downloading your email history'}
+          status={importStatus}
           icon={Mail}
         >
-          {stageStatuses.import === 'done' && totalEmails > 0 && (
+          {importComplete && totalEmails > 0 && (
             <div className="space-y-2 text-sm">
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground flex items-center gap-2">
@@ -413,7 +380,7 @@ export function EmailPipelineProgress({
               </div>
             </div>
           )}
-          {stageStatuses.import === 'in_progress' && (
+          {!importComplete && (
             <div className="space-y-2 text-sm">
               <div className="flex items-center gap-2 text-muted-foreground">
                 <span className="relative flex h-2 w-2">
@@ -426,28 +393,30 @@ export function EmailPipelineProgress({
           )}
         </StageCard>
 
-        {/* Stage 2: Classify */}
+        {/* Stage 2: Classify (n8n) */}
         <StageCard
           stage={2}
           title="Classify Emails"
           description={
-            stageStatuses.classify === 'done'
+            classifyStatus === 'done'
               ? 'AI sorted emails into categories'
-              : stageStatuses.classify === 'in_progress'
+              : classifyStatus === 'in_progress'
               ? 'AI is sorting emails into categories'
+              : classifyStatus === 'error'
+              ? 'Classification failed'
               : 'AI will sort emails into categories'
           }
-          status={stageStatuses.classify}
+          status={classifyStatus}
           icon={Sparkles}
         >
-          {stageStatuses.classify === 'pending' && (
+          {classifyStatus === 'pending' && (
             <p className="text-sm text-muted-foreground">
               (quotes, bookings, complaints, etc.)
               <br />
               Waiting for import to complete...
             </p>
           )}
-          {stageStatuses.classify === 'in_progress' && (
+          {classifyStatus === 'in_progress' && (
             <div className="space-y-3">
               <div className="space-y-1.5">
                 <Progress value={classifyPercent} className="h-2" />
@@ -463,42 +432,28 @@ export function EmailPipelineProgress({
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
                 </span>
-                <span>Processing in batches... {estimateClassifyTime()}</span>
+                <span>Classifying... {estimateTime()}</span>
               </div>
+              {showSlowMessage && (
+                <p className="text-xs text-muted-foreground italic">
+                  Still processing... This can take a few minutes for large inboxes.
+                </p>
+              )}
             </div>
           )}
-          {stageStatuses.classify === 'done' && (
+          {classifyStatus === 'done' && (
             <p className="text-sm text-success">
               ✓ {stats.emailsClassified.toLocaleString()} emails categorised
             </p>
           )}
-        </StageCard>
-
-        {/* Stage 3: Learn Voice */}
-        <StageCard
-          stage={3}
-          title="Learn Your Voice"
-          description={
-            stageStatuses.learn === 'done'
-              ? 'Analysed your sent emails'
-              : stageStatuses.learn === 'in_progress'
-              ? 'Analysing your sent emails'
-              : 'Analyse your sent emails to learn how you respond'
-          }
-          status={stageStatuses.learn}
-          icon={Brain}
-        >
-          {stageStatuses.learn === 'pending' && (
-            <p className="text-sm text-muted-foreground">Coming next... (takes ~2-3 minutes)</p>
-          )}
-          {stageStatuses.learn === 'in_progress' && (
-            <LearningProgressDisplay
-              workspaceId={workspaceId}
-              emailsImported={stats.sentCount}
-            />
-          )}
-          {stageStatuses.learn === 'done' && (
-            <p className="text-sm text-success">✓ Voice profile created</p>
+          {classifyStatus === 'error' && (
+            <div className="space-y-2">
+              <p className="text-sm text-destructive">Failed to start classification</p>
+              <Button onClick={handleRetryClassification} size="sm" variant="outline" className="gap-2">
+                <RotateCcw className="h-3.5 w-3.5" />
+                Retry
+              </Button>
+            </div>
           )}
         </StageCard>
       </div>
@@ -506,59 +461,21 @@ export function EmailPipelineProgress({
       {/* Progress Line */}
       <ProgressLine currentStage={getCurrentStage()} />
 
-      {/* Error State */}
-      {isError && stats.errorMessage && (
-        <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-lg">
-          <div className="flex items-start gap-2">
-            <AlertCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
-            <div className="flex-1">
-              <p className="text-sm font-medium text-destructive">Something went wrong</p>
-              <p className="text-xs text-muted-foreground mt-1">{stats.errorMessage}</p>
-            </div>
-          </div>
-          <Button onClick={onRetry} size="sm" variant="outline" className="mt-3 w-full gap-2">
-            <RotateCcw className="h-4 w-4" />
-            Retry
-          </Button>
-        </div>
-      )}
-
       {/* Completion Message */}
-      {(isComplete || canDownloadReport) && (
-        <div className="p-3 bg-success/10 border border-success/30 rounded-lg text-center space-y-2">
-          <div>
-            <CheckCircle2 className="h-6 w-6 text-success mx-auto mb-2" />
-            <p className="text-sm font-medium text-success">Setup Complete!</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              BizzyBee is ready to help you with emails.
-            </p>
-          </div>
-
-          {canDownloadReport && (
-            <div className="pt-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleDownloadPDF}
-                disabled={downloading}
-                className="w-full gap-2"
-              >
-                {downloading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Download className="h-4 w-4" />
-                )}
-                Download PDF
-              </Button>
-            </div>
-          )}
+      {isComplete && (
+        <div className="p-4 bg-success/10 border border-success/30 rounded-lg text-center space-y-2">
+          <CheckCircle2 className="h-6 w-6 text-success mx-auto mb-2" />
+          <p className="text-sm font-medium text-success">Analysis Complete!</p>
+          <p className="text-xs text-muted-foreground">
+            Your AI assistant has learned from {stats.emailsClassified.toLocaleString()} emails
+          </p>
         </div>
       )}
 
       {/* Action Buttons */}
       <div className="space-y-3">
         <Button onClick={onNext} className="w-full gap-2">
-          Continue <ArrowRight className="h-4 w-4" />
+          {isComplete ? 'Continue to Dashboard' : 'Continue'} <ArrowRight className="h-4 w-4" />
         </Button>
         {!isComplete && (
           <p className="text-xs text-center text-muted-foreground">
