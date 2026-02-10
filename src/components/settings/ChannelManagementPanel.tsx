@@ -157,7 +157,7 @@ export const ChannelManagementPanel = () => {
     try {
       const { data, error } = await supabase
         .from('email_provider_configs')
-        .select('*')
+        .select('id, email_address, provider, import_mode, last_sync_at, connected_at, workspace_id')
         .eq('workspace_id', workspace.id);
 
       if (error) throw error;

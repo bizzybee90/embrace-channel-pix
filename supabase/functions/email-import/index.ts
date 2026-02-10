@@ -85,6 +85,23 @@ serve(async (req) => {
 
   try {
     // -------------------------------------------------------------------------
+    // STEP 0: Authenticate caller
+    // -------------------------------------------------------------------------
+    currentStep = 'authenticating';
+
+    const { validateAuth, AuthError, authErrorResponse } = await import('../_shared/auth.ts');
+    let bodyRaw: any;
+    try {
+      bodyRaw = await req.clone().json();
+    } catch { bodyRaw = {}; }
+    try {
+      await validateAuth(req, bodyRaw.workspace_id);
+    } catch (authErr: any) {
+      if (authErr instanceof AuthError) return authErrorResponse(authErr);
+      throw authErr;
+    }
+
+    // -------------------------------------------------------------------------
     // STEP 1: Validate environment
     // -------------------------------------------------------------------------
     currentStep = 'validating_environment';
