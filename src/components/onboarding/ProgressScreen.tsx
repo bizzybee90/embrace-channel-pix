@@ -21,19 +21,15 @@ interface ProgressScreenProps {
   onBack: () => void;
 }
 
-interface WorkflowProgress {
+interface TrackState {
   status: string;
-  details: Record<string, unknown>;
-}
-
-interface ProgressState {
-  competitor: WorkflowProgress;
-  email: WorkflowProgress;
+  counts: { label: string; value: number }[];
+  error?: string | null;
 }
 
 const COMPETITOR_PHASES = [
   { key: 'pending', label: 'Waiting to start', icon: Loader2 },
-  { key: 'discovering', label: 'Searching Google...', icon: Search },
+  { key: 'discovering', label: 'Searching for competitors...', icon: Search },
   { key: 'search_complete', label: 'Verifying results...', icon: FileCheck },
   { key: 'verification_complete', label: 'Checking domains...', icon: FileCheck },
   { key: 'health_check_complete', label: 'Scraping websites...', icon: FileCheck },
@@ -44,8 +40,7 @@ const COMPETITOR_PHASES = [
 
 const EMAIL_PHASES = [
   { key: 'pending', label: 'Waiting to start', icon: Loader2 },
-  { key: 'importing_emails', label: 'Importing emails...', icon: Mail },
-  { key: 'emails_fetched', label: 'Classifying emails...', icon: FileCheck },
+  { key: 'classifying', label: 'Classifying emails...', icon: FileCheck },
   { key: 'classification_complete', label: 'Complete', icon: CheckCircle2 },
   { key: 'complete', label: 'Complete', icon: CheckCircle2 },
   { key: 'failed', label: 'Failed', icon: AlertCircle },
@@ -72,7 +67,7 @@ function TrackProgress({
   const currentIndex = getPhaseIndex(phases, currentStatus);
   const isComplete = currentStatus === 'complete' || currentStatus === 'classification_complete';
   const isFailed = currentStatus === 'failed';
-  const totalPhases = phases.length - 1; // Exclude 'failed' from progress
+  const totalPhases = phases.length - 1;
   const progressPercent = isComplete ? 100 : (currentIndex / (totalPhases - 1)) * 100;
 
   const CurrentIcon = phases[currentIndex]?.icon || Loader2;
@@ -116,7 +111,6 @@ function TrackProgress({
         </div>
       </div>
 
-      {/* Progress bar */}
       <Progress 
         value={progressPercent} 
         className={cn(
@@ -126,7 +120,6 @@ function TrackProgress({
         )} 
       />
 
-      {/* Counts */}
       {counts && counts.length > 0 && (
         <div className="flex gap-4 mt-3 text-xs text-muted-foreground">
           {counts.map((count, i) => (
@@ -141,49 +134,106 @@ function TrackProgress({
 }
 
 export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenProps) {
-  const [progress, setProgress] = useState<ProgressState>({
-    competitor: { status: 'pending', details: {} },
-    email: { status: 'pending', details: {} },
+  const [competitorTrack, setCompetitorTrack] = useState<TrackState>({
+    status: 'pending',
+    counts: [],
+  });
+  const [emailTrack, setEmailTrack] = useState<TrackState>({
+    status: 'pending',
+    counts: [],
   });
   const [isLoading, setIsLoading] = useState(true);
   const [elapsedTime, setElapsedTime] = useState(0);
   const startTimeRef = useRef<number>(Date.now());
-  const pollIntervalRef = useRef<number | undefined>(undefined);
 
-  // Poll for progress updates from n8n_workflow_progress table
+  // Poll for progress using hybrid approach: n8n_workflow_progress + direct DB counts
   useEffect(() => {
     const pollProgress = async () => {
       try {
-        // Use raw query to avoid TypeScript issues with new table
-        const { data, error } = await supabase
-          .from('n8n_workflow_progress' as 'allowed_webhook_ips') // Type workaround
-          .select('*')
-          .eq('workspace_id', workspaceId);
+        // Fetch all data in parallel
+        const [workflowRes, competitorCountRes, faqCountRes, emailsRes] = await Promise.all([
+          // n8n workflow status (for phase tracking)
+          supabase
+            .from('n8n_workflow_progress' as 'allowed_webhook_ips')
+            .select('*')
+            .eq('workspace_id', workspaceId),
+          // Direct DB: competitor sites count
+          supabase
+            .from('competitor_sites')
+            .select('*', { count: 'exact', head: true })
+            .eq('workspace_id', workspaceId),
+          // Direct DB: FAQ count
+          supabase
+            .from('faq_database' as 'allowed_webhook_ips')
+            .select('*', { count: 'exact', head: true })
+            .eq('workspace_id', workspaceId),
+          // Direct DB: email classification progress
+          supabase
+            .from('raw_emails')
+            .select('id, category')
+            .eq('workspace_id', workspaceId),
+        ]);
 
-        if (error) {
-          console.error('Error fetching progress:', error);
-          return;
-        }
-
-        // Parse the results
-        const records = (data || []) as unknown as Array<{
+        // Parse n8n workflow status records
+        const records = ((workflowRes.data || []) as unknown as Array<{
           workflow_type: string;
           status: string;
           details: Record<string, unknown>;
-        }>;
+        }>);
 
         const competitorRecord = records.find(r => r.workflow_type === 'competitor_discovery');
         const emailRecord = records.find(r => r.workflow_type === 'email_import');
 
-        setProgress({
-          competitor: {
-            status: competitorRecord?.status || 'pending',
-            details: (competitorRecord?.details || {}) as Record<string, unknown>,
-          },
-          email: {
-            status: emailRecord?.status || 'pending',
-            details: (emailRecord?.details || {}) as Record<string, unknown>,
-          },
+        // Competitor track
+        const competitorsFound = competitorCountRes.count || 0;
+        const faqsGenerated = faqCountRes.count || 0;
+        const competitorDetails = (competitorRecord?.details || {}) as Record<string, unknown>;
+        const competitorStatus = competitorRecord?.status || 'pending';
+        
+        // Infer status from DB counts if n8n hasn't reported yet
+        let effectiveCompetitorStatus = competitorStatus;
+        if (competitorStatus === 'pending' && competitorsFound > 0) {
+          effectiveCompetitorStatus = 'discovering';
+        }
+        if (faqsGenerated > 0 && competitorStatus !== 'complete') {
+          effectiveCompetitorStatus = 'scraping_complete';
+        }
+
+        setCompetitorTrack({
+          status: effectiveCompetitorStatus,
+          counts: [
+            { label: 'competitors found', value: competitorsFound },
+            { label: 'scraped', value: (competitorDetails.competitors_scraped as number) || 0 },
+            { label: 'FAQs generated', value: faqsGenerated },
+          ],
+          error: competitorDetails.error as string | undefined,
+        });
+
+        // Email track
+        const emails = emailsRes.data || [];
+        const totalEmails = emails.length;
+        const classifiedEmails = emails.filter(e => e.category).length;
+        const emailStatus = emailRecord?.status || 'pending';
+        const emailDetails = (emailRecord?.details || {}) as Record<string, unknown>;
+
+        // Infer email status from DB counts
+        let effectiveEmailStatus = emailStatus;
+        if (totalEmails > 0 && classifiedEmails < totalEmails && emailStatus === 'pending') {
+          effectiveEmailStatus = 'classifying';
+        }
+        if (totalEmails > 0 && classifiedEmails === totalEmails) {
+          effectiveEmailStatus = 'complete';
+        }
+
+        const percentage = totalEmails > 0 ? Math.round((classifiedEmails / totalEmails) * 100) : 0;
+
+        setEmailTrack({
+          status: effectiveEmailStatus,
+          counts: [
+            { label: 'total emails', value: totalEmails },
+            { label: `classified (${percentage}%)`, value: classifiedEmails },
+          ],
+          error: emailDetails.error as string | undefined,
         });
       } catch (error) {
         console.error('Error polling progress:', error);
@@ -192,17 +242,9 @@ export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenPr
       }
     };
 
-    // Initial poll
     pollProgress();
-
-    // Poll every 3 seconds
-    pollIntervalRef.current = window.setInterval(pollProgress, 3000);
-
-    return () => {
-      if (pollIntervalRef.current) {
-        window.clearInterval(pollIntervalRef.current);
-      }
-    };
+    const interval = window.setInterval(pollProgress, 3000);
+    return () => window.clearInterval(interval);
   }, [workspaceId]);
 
   // Track elapsed time
@@ -210,15 +252,11 @@ export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenPr
     const timer = window.setInterval(() => {
       setElapsedTime(Math.floor((Date.now() - startTimeRef.current) / 1000));
     }, 1000);
-
     return () => window.clearInterval(timer);
   }, []);
 
-  const competitorStatus = progress.competitor.status;
-  const emailStatus = progress.email.status;
-  
-  const isCompetitorComplete = competitorStatus === 'complete';
-  const isEmailComplete = emailStatus === 'complete' || emailStatus === 'classification_complete';
+  const isCompetitorComplete = competitorTrack.status === 'complete';
+  const isEmailComplete = emailTrack.status === 'complete' || emailTrack.status === 'classification_complete';
   const bothComplete = isCompetitorComplete && isEmailComplete;
 
   const formatTime = (seconds: number) => {
@@ -227,18 +265,12 @@ export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenPr
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Extract counts from details
-  const competitorDetails = progress.competitor.details;
-  const emailDetails = progress.email.details;
-
   if (isLoading) {
     return (
       <div className="space-y-6">
         <div className="text-center">
           <CardTitle className="text-xl">Setting Up Your AI Agent</CardTitle>
-          <CardDescription className="mt-2">
-            Loading progress...
-          </CardDescription>
+          <CardDescription className="mt-2">Loading progress...</CardDescription>
         </div>
         <div className="flex justify-center py-8">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -256,37 +288,26 @@ export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenPr
         </CardDescription>
       </div>
 
-      {/* Elapsed time */}
       <div className="text-center text-sm text-muted-foreground">
         Elapsed: {formatTime(elapsedTime)}
       </div>
 
-      {/* Track 1: Competitor Research */}
       <TrackProgress
         title="Competitor Research"
         phases={COMPETITOR_PHASES}
-        currentStatus={competitorStatus}
-        counts={[
-          { label: 'competitors found', value: (competitorDetails.competitors_found as number) || 0 },
-          { label: 'scraped', value: (competitorDetails.competitors_scraped as number) || 0 },
-          { label: 'FAQs generated', value: (competitorDetails.faqs_generated as number) || 0 },
-        ]}
-        error={competitorDetails.error as string | undefined}
+        currentStatus={competitorTrack.status}
+        counts={competitorTrack.counts}
+        error={competitorTrack.error}
       />
 
-      {/* Track 2: Email Import */}
       <TrackProgress
-        title="Email Analysis"
+        title="Email Classification"
         phases={EMAIL_PHASES}
-        currentStatus={emailStatus}
-        counts={[
-          { label: 'emails imported', value: (emailDetails.emails_imported as number) || 0 },
-          { label: 'classified', value: (emailDetails.emails_classified as number) || 0 },
-        ]}
-        error={emailDetails.error as string | undefined}
+        currentStatus={emailTrack.status}
+        counts={emailTrack.counts}
+        error={emailTrack.error}
       />
 
-      {/* Info message */}
       {!bothComplete && (
         <div className="text-center text-sm text-muted-foreground p-4 bg-muted/30 rounded-lg">
           <p>This typically takes 5-20 minutes depending on the research scope.</p>
@@ -294,7 +315,6 @@ export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenPr
         </div>
       )}
 
-      {/* Continue button */}
       <div className="flex justify-center pt-4">
         <Button 
           onClick={onNext} 
