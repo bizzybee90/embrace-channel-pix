@@ -2,11 +2,26 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-n8n-signature',
 };
 
+async function verifyN8nSignature(payload: string, signature: string, secret: string): Promise<boolean> {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    'raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+  );
+  const sig = await crypto.subtle.sign('HMAC', key, encoder.encode(payload));
+  const computed = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, '0')).join('');
+  // Constant-time comparison
+  if (computed.length !== signature.length) return false;
+  let result = 0;
+  for (let i = 0; i < computed.length; i++) {
+    result |= computed.charCodeAt(i) ^ signature.charCodeAt(i);
+  }
+  return result === 0;
+}
+
 Deno.serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -14,18 +29,31 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const n8nSecret = Deno.env.get('N8N_WEBHOOK_SECRET');
 
-    const body = await req.json();
+    // Read raw body for signature verification
+    const rawBody = await req.text();
+
+    // Verify HMAC signature if secret is configured
+    if (n8nSecret) {
+      const signature = req.headers.get('x-n8n-signature') || '';
+      if (!signature || !(await verifyN8nSignature(rawBody, signature, n8nSecret))) {
+        console.error('[n8n-email-callback] Invalid or missing webhook signature');
+        return new Response(
+          JSON.stringify({ error: 'Unauthorized: invalid signature' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    } else {
+      console.warn('[n8n-email-callback] N8N_WEBHOOK_SECRET not configured - skipping signature verification');
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const body = JSON.parse(rawBody);
     const { 
-      workspace_id, 
-      status, 
-      message,
-      total_emails,
-      emails_imported,
-      emails_classified,
-      categories,
-      error: errorMsg
+      workspace_id, status, message,
+      total_emails, emails_imported, emails_classified,
+      categories, error: errorMsg
     } = body;
 
     if (!workspace_id) {
@@ -37,7 +65,6 @@ Deno.serve(async (req) => {
 
     console.log(`[n8n-email-callback] workspace=${workspace_id} status=${status} message=${message}`);
 
-    // Build details object
     const details: Record<string, unknown> = {
       message,
       updated_at: new Date().toISOString(),
@@ -49,7 +76,6 @@ Deno.serve(async (req) => {
     if (categories) details.categories = categories;
     if (errorMsg) details.error = errorMsg;
 
-    // Upsert to n8n_workflow_progress table
     const { error: upsertError } = await supabase
       .from('n8n_workflow_progress')
       .upsert({
@@ -68,7 +94,7 @@ Deno.serve(async (req) => {
     if (upsertError) {
       console.error('[n8n-email-callback] Upsert error:', upsertError);
       return new Response(
-        JSON.stringify({ error: 'Failed to update progress', details: upsertError.message }),
+        JSON.stringify({ error: 'Failed to update progress' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
