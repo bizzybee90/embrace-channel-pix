@@ -556,11 +556,9 @@ serve(async (req) => {
       } catch {}
     }
 
-    // Trigger FAQ extraction
-    console.log('[recover-competitor-job] Triggering FAQ extraction')
-    await supabase.functions.invoke('competitor-extract-faqs', {
-      body: { jobId, workspaceId: effectiveWorkspaceId }
-    })
+    // FAQ extraction is now handled by n8n workflow
+    // Re-trigger the n8n competitor workflow for this job
+    console.log('[recover-competitor-job] Pages recovered - FAQ extraction handled by n8n pipeline')
 
     return new Response(JSON.stringify({
       success: true,

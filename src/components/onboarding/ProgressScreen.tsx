@@ -25,13 +25,18 @@ interface TrackState {
   status: string;
   counts: { label: string; value: number }[];
   error?: string | null;
+  currentCompetitor?: string | null;
+  current?: number;
+  total?: number;
 }
 
 const COMPETITOR_PHASES = [
   { key: 'pending', label: 'Waiting to start', icon: Loader2 },
+  { key: 'starting', label: 'Starting discovery...', icon: Search },
   { key: 'discovering', label: 'Searching for competitors...', icon: Search },
   { key: 'search_complete', label: 'Verifying results...', icon: FileCheck },
   { key: 'verification_complete', label: 'Checking domains...', icon: FileCheck },
+  { key: 'processing', label: 'Scraping & extracting FAQs...', icon: Sparkles },
   { key: 'health_check_complete', label: 'Scraping websites...', icon: FileCheck },
   { key: 'scraping_complete', label: 'Generating FAQs...', icon: Sparkles },
   { key: 'complete', label: 'Complete', icon: CheckCircle2 },
@@ -56,19 +61,34 @@ function TrackProgress({
   phases, 
   currentStatus, 
   counts,
-  error
+  error,
+  currentCompetitor,
+  current,
+  total,
 }: { 
   title: string;
   phases: typeof COMPETITOR_PHASES;
   currentStatus: string;
   counts?: { label: string; value: number }[];
   error?: string | null;
+  currentCompetitor?: string | null;
+  current?: number;
+  total?: number;
 }) {
   const currentIndex = getPhaseIndex(phases, currentStatus);
   const isComplete = currentStatus === 'complete' || currentStatus === 'classification_complete';
   const isFailed = currentStatus === 'failed';
   const totalPhases = phases.length - 1;
-  const progressPercent = isComplete ? 100 : (currentIndex / (totalPhases - 1)) * 100;
+  
+  // Use per-competitor progress when in 'processing' status
+  let progressPercent: number;
+  if (currentStatus === 'processing' && current && total && total > 0) {
+    // Map processing phase to ~30-90% of total progress
+    const processingProgress = (current / total) * 60;
+    progressPercent = 30 + processingProgress;
+  } else {
+    progressPercent = isComplete ? 100 : (currentIndex / (totalPhases - 1)) * 100;
+  }
 
   const CurrentIcon = phases[currentIndex]?.icon || Loader2;
   const currentLabel = phases[currentIndex]?.label || 'Processing...';
@@ -108,6 +128,11 @@ function TrackProgress({
           )}>
             {isFailed ? (error || 'An error occurred') : currentLabel}
           </p>
+          {currentStatus === 'processing' && currentCompetitor && current && total && (
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Competitor {current} of {total}: <span className="font-medium">{currentCompetitor}</span>
+            </p>
+          )}
         </div>
       </div>
 
@@ -186,6 +211,9 @@ export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenPr
             { label: 'FAQs generated', value: (competitorDetails.faqs_generated as number) || 0 },
           ] : [],
           error: competitorDetails.error as string | undefined,
+          currentCompetitor: competitorDetails.current_competitor as string | undefined,
+          current: competitorDetails.current as number | undefined,
+          total: competitorDetails.total as number | undefined,
         });
 
         // Email track — only use DB inference if n8n email_import workflow exists
@@ -286,6 +314,9 @@ export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenPr
         currentStatus={competitorTrack.status}
         counts={competitorTrack.counts}
         error={competitorTrack.error}
+        currentCompetitor={competitorTrack.currentCompetitor}
+        current={competitorTrack.current}
+        total={competitorTrack.total}
       />
 
       <TrackProgress
