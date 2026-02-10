@@ -225,7 +225,7 @@ serve(async (req) => {
 
     // Get decrypted access token securely
     const { data: accessToken, error: tokenError } = await supabase
-      .rpc('get_decrypted_access_token', { p_workspace_id: workspace_id });
+      .rpc('get_decrypted_access_token', { p_config_id: emailConfig.id });
 
     if (tokenError || !accessToken) {
       throw new Error('Email access token is missing. Please reconnect your email account.');
