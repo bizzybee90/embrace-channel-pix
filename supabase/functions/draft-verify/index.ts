@@ -30,12 +30,25 @@ serve(async (req) => {
   const functionName = 'draft-verify';
 
   try {
+    // Auth validation
+    const { validateAuth, AuthError, authErrorResponse } = await import('../_shared/auth.ts');
+    let bodyRaw: any;
+    try {
+      bodyRaw = await req.clone().json();
+    } catch { bodyRaw = {}; }
+    try {
+      await validateAuth(req, bodyRaw.workspace_id);
+    } catch (authErr: any) {
+      if (authErr instanceof AuthError) return authErrorResponse(authErr);
+      throw authErr;
+    }
+
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    const body: VerifyRequest = await req.json();
+    const body: VerifyRequest = bodyRaw;
     console.log(`[${functionName}] Starting verification:`, { 
       workspace_id: body.workspace_id,
       conversation_id: body.conversation_id,

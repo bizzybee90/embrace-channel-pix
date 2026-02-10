@@ -32,12 +32,25 @@ serve(async (req) => {
   let currentStep = 'initializing';
 
   try {
+    // Auth validation
+    const { validateAuth, AuthError, authErrorResponse } = await import('../_shared/auth.ts');
+    let bodyRaw: any;
+    try {
+      bodyRaw = await req.clone().json();
+    } catch { bodyRaw = {}; }
+    try {
+      await validateAuth(req, bodyRaw.workspace_id);
+    } catch (authErr: any) {
+      if (authErr instanceof AuthError) return authErrorResponse(authErr);
+      throw authErr;
+    }
+
     // ========================================
     // STEP 1: Parse and validate input
     // ========================================
     currentStep = 'parsing_input';
     
-    const body: SendEmailRequest = await req.json();
+    const body: SendEmailRequest = bodyRaw;
     
     if (!body.conversation_id) {
       throw new Error('conversation_id is required');
