@@ -310,46 +310,53 @@ export function EmailConnectionStep({
     setImportStarted(true);
     
     try {
-      const { data: session } = await supabase.auth.getSession();
-      const authToken = session?.session?.access_token || '';
-
-      // Trigger BOTH n8n workflows simultaneously
-      const [competitorRes, emailRes] = await Promise.all([
-        // Competitor Discovery workflow
-        fetch(`${SUPABASE_URL}/functions/v1/trigger-n8n-workflow`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`,
-          },
-          body: JSON.stringify({
-            workspace_id: workspaceId,
-            workflow_type: 'competitor_discovery',
-          })
-        }),
-        // Email Classification workflow (n8n reads emails from DB)
-        fetch(`${SUPABASE_URL}/functions/v1/trigger-n8n-workflow`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`,
-          },
-          body: JSON.stringify({
-            workspace_id: workspaceId,
-            workflow_type: 'email_classification',
-          })
-        }),
+      // Fetch business context for the competitor discovery payload
+      const [profileRes, contextRes, searchTermsRes] = await Promise.all([
+        supabase.from('business_profile').select('*').eq('workspace_id', workspaceId).maybeSingle(),
+        supabase.from('business_context').select('*').eq('workspace_id', workspaceId).maybeSingle(),
+        supabase.from('search_queries' as 'business_facts').select('*').eq('workspace_id', workspaceId),
       ]);
 
-      if (!competitorRes.ok || !emailRes.ok) {
-        console.error('Failed to trigger n8n workflows');
-        toast.error('Failed to start AI training. Please try again.');
-        setImportStarted(false);
-        return;
-      }
+      const profile = profileRes.data as Record<string, unknown> | null;
+      const context = contextRes.data as Record<string, unknown> | null;
+      const searchQueries = ((searchTermsRes.data || []) as unknown as Array<{ query: string }>).map(q => q.query);
+
+      const callbackBaseUrl = `${SUPABASE_URL}/functions/v1`;
+      const websiteUrl = (profile?.website as string) || (context?.website_url as string) || '';
+      const ownDomain = websiteUrl.replace(/https?:\/\//, '').replace(/\/$/, '');
+
+      // Trigger BOTH n8n workflows simultaneously (direct webhook calls)
+      await Promise.all([
+        // Competitor Discovery
+        fetch('https://bizzybee.app.n8n.cloud/webhook/competitor-discovery', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            workspace_id: workspaceId,
+            business_name: (profile?.business_name as string) || (context?.company_name as string) || '',
+            business_type: (profile?.industry as string) || (context?.business_type as string) || '',
+            website_url: websiteUrl,
+            location: (profile?.formatted_address as string) || (context?.service_area as string) || '',
+            radius_miles: (profile?.service_radius_miles as number) || 20,
+            search_queries: searchQueries,
+            target_count: 50,
+            exclude_domains: ownDomain ? [ownDomain] : [],
+            callback_url: `${callbackBaseUrl}/n8n-competitor-callback`,
+          }),
+        }).catch(err => console.error('Competitor discovery trigger failed:', err)),
+
+        // Email Classification
+        fetch('https://bizzybee.app.n8n.cloud/webhook/email-classification', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            workspace_id: workspaceId,
+            callback_url: `${callbackBaseUrl}/n8n-email-callback`,
+          }),
+        }).catch(err => console.error('Email classification trigger failed:', err)),
+      ]);
 
       toast.success('AI training started! This will take a few minutes...');
-      // Advance to the progress screen
       onNext();
     } catch (error) {
       console.error('Error triggering n8n workflows:', error);
