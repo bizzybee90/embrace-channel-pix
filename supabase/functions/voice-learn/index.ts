@@ -18,6 +18,19 @@ serve(async (req) => {
   const functionName = 'voice-learn';
 
   try {
+    // Auth validation
+    const { validateAuth, AuthError, authErrorResponse } = await import('../_shared/auth.ts');
+    let bodyRaw: any;
+    try {
+      bodyRaw = await req.clone().json();
+    } catch { bodyRaw = {}; }
+    try {
+      await validateAuth(req, bodyRaw.workspace_id);
+    } catch (authErr: any) {
+      if (authErr instanceof AuthError) return authErrorResponse(authErr);
+      throw authErr;
+    }
+
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -25,7 +38,7 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) throw new Error('LOVABLE_API_KEY not configured');
 
-    const body = await req.json();
+    const body = bodyRaw;
     console.log(`[${functionName}] Starting:`, { workspace_id: body.workspace_id });
 
     if (!body.workspace_id) throw new Error('workspace_id is required');

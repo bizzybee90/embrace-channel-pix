@@ -56,6 +56,19 @@ serve(async (req) => {
   const startTime = Date.now();
 
   try {
+    // Auth validation
+    const { validateAuth, AuthError, authErrorResponse } = await import('../_shared/auth.ts');
+    let bodyRaw: any;
+    try {
+      bodyRaw = await req.clone().json();
+    } catch { bodyRaw = {}; }
+    try {
+      await validateAuth(req, bodyRaw.workspace_id);
+    } catch (authErr: any) {
+      if (authErr instanceof AuthError) return authErrorResponse(authErr);
+      throw authErr;
+    }
+
     // -------------------------------------------------------------------------
     // Validate Environment
     // -------------------------------------------------------------------------
@@ -75,7 +88,7 @@ serve(async (req) => {
     // -------------------------------------------------------------------------
     // Validate Input
     // -------------------------------------------------------------------------
-    const body = await req.json() as ClassifyRequest;
+    const body = bodyRaw as ClassifyRequest;
     
     if (!body.workspace_id) {
       throw new Error('workspace_id is required');

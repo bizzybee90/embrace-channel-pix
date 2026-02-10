@@ -17,6 +17,19 @@ serve(async (req) => {
   const functionName = 'test-conversation';
 
   try {
+    // Auth validation
+    const { validateAuth, AuthError, authErrorResponse } = await import('../_shared/auth.ts');
+    let bodyRaw: any;
+    try {
+      bodyRaw = await req.clone().json();
+    } catch { bodyRaw = {}; }
+    try {
+      await validateAuth(req, bodyRaw.workspace_id);
+    } catch (authErr: any) {
+      if (authErr instanceof AuthError) return authErrorResponse(authErr);
+      throw authErr;
+    }
+
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -25,7 +38,7 @@ serve(async (req) => {
     const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
     if (!ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY not configured');
 
-    const body = await req.json();
+    const body = bodyRaw;
     console.log(`[${functionName}] Starting:`, { workspace_id: body.workspace_id });
 
     if (!body.workspace_id) throw new Error('workspace_id is required');

@@ -33,6 +33,19 @@ serve(async (req) => {
   let currentStep = 'initializing';
 
   try {
+    // Auth validation
+    const { validateAuth, AuthError, authErrorResponse } = await import('../_shared/auth.ts');
+    let bodyRaw: any;
+    try {
+      bodyRaw = await req.clone().json();
+    } catch { bodyRaw = {}; }
+    try {
+      await validateAuth(req, bodyRaw.workspace_id);
+    } catch (authErr: any) {
+      if (authErr instanceof AuthError) return authErrorResponse(authErr);
+      throw authErr;
+    }
+
     // Validate environment
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
