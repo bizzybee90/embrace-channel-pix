@@ -24,6 +24,47 @@ function isRateLimited(ip: string): boolean {
 
 const MAX_PAYLOAD_SIZE = 512_000; // 512 KB
 
+// HMAC signature verification for webhook security
+async function verifyWebhookSignature(bodyText: string, signatureHeader: string | null): Promise<boolean> {
+  const webhookSecret = Deno.env.get('AURINKO_WEBHOOK_SECRET');
+  
+  // If no secret is configured, skip verification (log warning)
+  if (!webhookSecret) {
+    console.warn('AURINKO_WEBHOOK_SECRET not configured - skipping HMAC verification');
+    return true;
+  }
+  
+  // If secret is configured but no signature provided, reject
+  if (!signatureHeader) {
+    console.error('Webhook signature missing but AURINKO_WEBHOOK_SECRET is configured');
+    return false;
+  }
+
+  try {
+    const encoder = new TextEncoder();
+    const key = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(webhookSecret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign']
+    );
+    const sig = await crypto.subtle.sign('HMAC', key, encoder.encode(bodyText));
+    const computed = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, '0')).join('');
+    
+    // Constant-time comparison
+    if (computed.length !== signatureHeader.length) return false;
+    let mismatch = 0;
+    for (let i = 0; i < computed.length; i++) {
+      mismatch |= computed.charCodeAt(i) ^ signatureHeader.charCodeAt(i);
+    }
+    return mismatch === 0;
+  } catch (e) {
+    console.error('HMAC verification error:', e);
+    return false;
+  }
+}
+
 // Verify the request is from Aurinko by checking the accountId exists in our database
 async function verifyAurinkoRequest(supabase: any, accountId: string): Promise<boolean> {
   if (!accountId) return false;
@@ -93,6 +134,17 @@ serve(async (req) => {
     }
 
     const bodyText = await req.text();
+
+    // Verify HMAC signature if webhook secret is configured
+    const signature = req.headers.get('x-aurinko-signature') || req.headers.get('x-webhook-signature');
+    const isValidSignature = await verifyWebhookSignature(bodyText, signature);
+    if (!isValidSignature) {
+      console.error('Webhook HMAC signature verification failed');
+      return new Response(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
 
     if (bodyText.length > MAX_PAYLOAD_SIZE) {
       console.warn('Webhook body too large:', bodyText.length);
