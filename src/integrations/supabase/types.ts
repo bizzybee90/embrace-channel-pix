@@ -855,6 +855,7 @@ export type Database = {
           location_data: Json | null
           longitude: number | null
           match_reason: string | null
+          notes: string | null
           pages_scraped: number | null
           phone: string | null
           place_id: string | null
@@ -916,6 +917,7 @@ export type Database = {
           location_data?: Json | null
           longitude?: number | null
           match_reason?: string | null
+          notes?: string | null
           pages_scraped?: number | null
           phone?: string | null
           place_id?: string | null
@@ -977,6 +979,7 @@ export type Database = {
           location_data?: Json | null
           longitude?: number | null
           match_reason?: string | null
+          notes?: string | null
           pages_scraped?: number | null
           phone?: string | null
           place_id?: string | null
@@ -4136,12 +4139,18 @@ export type Database = {
           avg_response_time_hours: number | null
           categorization_progress: number | null
           categorization_status: string | null
+          competitor_discovery_status: string | null
+          competitors_found: number | null
+          competitors_scraped: number | null
           completed_at: string | null
           created_at: string | null
           email_import_count: number | null
           email_import_progress: number | null
           email_import_status: string | null
+          emails_classified: number | null
+          emails_imported: number | null
           estimated_completion_at: string | null
+          faqs_generated: number | null
           few_shot_status: string | null
           id: string
           ignored_email_count: number | null
@@ -4170,12 +4179,18 @@ export type Database = {
           avg_response_time_hours?: number | null
           categorization_progress?: number | null
           categorization_status?: string | null
+          competitor_discovery_status?: string | null
+          competitors_found?: number | null
+          competitors_scraped?: number | null
           completed_at?: string | null
           created_at?: string | null
           email_import_count?: number | null
           email_import_progress?: number | null
           email_import_status?: string | null
+          emails_classified?: number | null
+          emails_imported?: number | null
           estimated_completion_at?: string | null
+          faqs_generated?: number | null
           few_shot_status?: string | null
           id?: string
           ignored_email_count?: number | null
@@ -4204,12 +4219,18 @@ export type Database = {
           avg_response_time_hours?: number | null
           categorization_progress?: number | null
           categorization_status?: string | null
+          competitor_discovery_status?: string | null
+          competitors_found?: number | null
+          competitors_scraped?: number | null
           completed_at?: string | null
           created_at?: string | null
           email_import_count?: number | null
           email_import_progress?: number | null
           email_import_status?: string | null
+          emails_classified?: number | null
+          emails_imported?: number | null
           estimated_completion_at?: string | null
+          faqs_generated?: number | null
           few_shot_status?: string | null
           id?: string
           ignored_email_count?: number | null
