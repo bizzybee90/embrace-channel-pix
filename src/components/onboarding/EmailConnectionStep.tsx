@@ -472,6 +472,11 @@ export function EmailConnectionStep({
                   'Start AI Training'
                 )}
               </Button>
+              {importStarted && (
+                <Button variant="ghost" size="sm" onClick={() => setImportStarted(false)} className="w-full text-muted-foreground">
+                  Cancel &amp; Retry
+                </Button>
+              )}
               <Button variant="outline" onClick={onNext} className="w-full">
                 Skip for Now
               </Button>
