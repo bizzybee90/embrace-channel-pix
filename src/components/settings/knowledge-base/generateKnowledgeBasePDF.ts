@@ -5,7 +5,6 @@ interface FAQItem {
   question: string;
   answer: string;
   category: string | null;
-  source: string | null;
   priority: number | null;
   is_own_content: boolean | null;
   source_type: string | null;
@@ -99,7 +98,7 @@ export async function generateKnowledgeBasePDF(workspaceId: string, companyName?
 
   // --- Fetch data ---
   const [faqs, facts, scrapingJob] = await Promise.all([
-    fetchAll<FAQItem>('faq_database', 'question, answer, category, source, priority, is_own_content, source_type', q => q.eq('is_active', true).order('priority', { ascending: false })),
+    fetchAll<FAQItem>('faq_database', 'question, answer, category, priority, is_own_content, source_type', q => q.eq('is_active', true).order('priority', { ascending: false })),
     fetchAll<BusinessFact>('business_facts', 'fact_key, fact_value, category'),
     sb.from('scraping_jobs').select('website_url, total_pages_found, pages_processed, faqs_found, completed_at').eq('workspace_id', workspaceId).eq('status', 'completed').order('completed_at', { ascending: false }).limit(1).maybeSingle().then((r: any) => r.data),
   ]);
