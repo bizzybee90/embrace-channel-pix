@@ -78,12 +78,23 @@ serve(async (req) => {
     // =============================================
     // SECURITY: Only find customers in user's workspace
     // =============================================
-    const { data: customer, error: customerError } = await supabase
+    let { data: customer, error: customerError } = await supabase
       .from('customers')
       .select('id, name, email')
       .eq('workspace_id', workspaceId)
-      .or(`email.eq.${customer_identifier},phone.eq.${customer_identifier}`)
-      .single();
+      .eq('email', customer_identifier)
+      .maybeSingle();
+
+    if (!customer) {
+      const result = await supabase
+        .from('customers')
+        .select('id, name, email')
+        .eq('workspace_id', workspaceId)
+        .eq('phone', customer_identifier)
+        .maybeSingle();
+      customer = result.data;
+      customerError = result.error;
+    }
 
     if (customerError || !customer) {
       return new Response(
