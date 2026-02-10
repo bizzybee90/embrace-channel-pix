@@ -23,16 +23,22 @@ serve(async (req) => {
     const [profileRes, contextRes, searchTermsRes] = await Promise.all([
       supabase.from('business_profile').select('*').eq('workspace_id', workspaceId).maybeSingle(),
       supabase.from('business_context').select('*').eq('workspace_id', workspaceId).maybeSingle(),
-      supabase.from('search_queries').select('*').eq('workspace_id', workspaceId),
+      supabase.from('n8n_workflow_progress').select('details')
+        .eq('workspace_id', workspaceId)
+        .eq('workflow_type', 'search_terms_config')
+        .maybeSingle(),
     ])
 
     const profile = profileRes.data as Record<string, unknown> | null
     const context = contextRes.data as Record<string, unknown> | null
-    const searchQueries = ((searchTermsRes.data || []) as unknown as Array<{ query: string }>).map(q => q.query)
+    const searchConfig = (searchTermsRes.data?.details as Record<string, unknown>) || {}
+    const searchQueries = (searchConfig.search_queries as string[]) || []
 
     const callbackBaseUrl = `${supabaseUrl}/functions/v1`
     const websiteUrl = (profile?.website as string) || (context?.website_url as string) || ''
     const ownDomain = websiteUrl.replace(/https?:\/\//, '').replace(/\/$/, '')
+
+    console.log(`[trigger-n8n-workflows] workspace=${workspaceId} queries=${searchQueries.length} business=${(context?.company_name as string) || 'unknown'}`)
 
     // Trigger BOTH n8n workflows simultaneously from the server side (no CORS issues)
     const results = await Promise.allSettled([
