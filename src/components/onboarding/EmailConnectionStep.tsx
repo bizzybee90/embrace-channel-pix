@@ -310,51 +310,17 @@ export function EmailConnectionStep({
     setImportStarted(true);
     
     try {
-      // Fetch business context for the competitor discovery payload
-      const [profileRes, contextRes, searchTermsRes] = await Promise.all([
-        supabase.from('business_profile').select('*').eq('workspace_id', workspaceId).maybeSingle(),
-        supabase.from('business_context').select('*').eq('workspace_id', workspaceId).maybeSingle(),
-        supabase.from('search_queries' as 'business_facts').select('*').eq('workspace_id', workspaceId),
-      ]);
+      // Trigger n8n workflows via edge function (avoids CORS issues from browser)
+      const { data, error: fnError } = await supabase.functions.invoke('trigger-n8n-workflows', {
+        body: { workspaceId },
+      });
 
-      const profile = profileRes.data as Record<string, unknown> | null;
-      const context = contextRes.data as Record<string, unknown> | null;
-      const searchQueries = ((searchTermsRes.data || []) as unknown as Array<{ query: string }>).map(q => q.query);
+      if (fnError) {
+        console.error('Edge function error:', fnError);
+        throw new Error('Failed to trigger AI training workflows');
+      }
 
-      const callbackBaseUrl = `${SUPABASE_URL}/functions/v1`;
-      const websiteUrl = (profile?.website as string) || (context?.website_url as string) || '';
-      const ownDomain = websiteUrl.replace(/https?:\/\//, '').replace(/\/$/, '');
-
-      // Trigger BOTH n8n workflows simultaneously (direct webhook calls)
-      await Promise.all([
-        // Competitor Discovery
-        fetch('https://bizzybee.app.n8n.cloud/webhook/competitor-discovery', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            workspace_id: workspaceId,
-            business_name: (profile?.business_name as string) || (context?.company_name as string) || '',
-            business_type: (profile?.industry as string) || (context?.business_type as string) || '',
-            website_url: websiteUrl,
-            location: (profile?.formatted_address as string) || (context?.service_area as string) || '',
-            radius_miles: (profile?.service_radius_miles as number) || 20,
-            search_queries: searchQueries,
-            target_count: 50,
-            exclude_domains: ownDomain ? [ownDomain] : [],
-            callback_url: `${callbackBaseUrl}/n8n-competitor-callback`,
-          }),
-        }).catch(err => console.error('Competitor discovery trigger failed:', err)),
-
-        // Email Classification
-        fetch('https://bizzybee.app.n8n.cloud/webhook/email-classification', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            workspace_id: workspaceId,
-            callback_url: `${callbackBaseUrl}/n8n-email-callback`,
-          }),
-        }).catch(err => console.error('Email classification trigger failed:', err)),
-      ]);
+      console.log('n8n workflows triggered:', data);
 
       toast.success('AI training started! This will take a few minutes...');
       onNext();
