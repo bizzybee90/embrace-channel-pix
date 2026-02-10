@@ -238,7 +238,26 @@ serve(async (req) => {
   }
 
   try {
-    const payload = await req.json()
+    // =============================================
+    // SECURITY: Verify webhook authenticity
+    // =============================================
+    const webhookSecret = Deno.env.get('APIFY_WEBHOOK_SECRET');
+    let payload: any;
+
+    if (webhookSecret) {
+      const authHeader = req.headers.get('authorization') || req.headers.get('x-apify-signature') || '';
+      if (!authHeader || authHeader !== webhookSecret) {
+        console.error('[competitor-webhooks] Invalid webhook signature/secret');
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+          status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+      payload = await req.json();
+    } else {
+      console.warn('[competitor-webhooks] APIFY_WEBHOOK_SECRET not configured - webhook authentication disabled');
+      payload = await req.json();
+    }
+
     const webhookType = payload?.type;
 
     console.log('[competitor-webhooks] Received:', { type: webhookType, jobId: payload?.jobId });
@@ -268,7 +287,7 @@ serve(async (req) => {
     
   } catch (error) {
     console.error('[competitor-webhooks] Error:', error);
-    return new Response(JSON.stringify({ error: String(error) }), {
+    return new Response(JSON.stringify({ error: 'Internal error' }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }

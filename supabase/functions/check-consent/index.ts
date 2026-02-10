@@ -27,12 +27,21 @@ serve(async (req) => {
 
     console.log('Checking consent for:', customer_identifier, 'on channel:', channel);
 
-    // Find customer by email or phone
-    const { data: customer } = await supabase
+    // Find customer by email or phone using safe parameterized queries
+    let { data: customer } = await supabase
       .from('customers')
       .select('id')
-      .or(`email.eq.${customer_identifier},phone.eq.${customer_identifier}`)
-      .single();
+      .eq('email', customer_identifier)
+      .maybeSingle();
+
+    if (!customer) {
+      const result = await supabase
+        .from('customers')
+        .select('id')
+        .eq('phone', customer_identifier)
+        .maybeSingle();
+      customer = result.data;
+    }
 
     if (!customer) {
       console.log('Customer not found');
