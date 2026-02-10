@@ -257,17 +257,15 @@ export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, on
           </div>
         </div>
 
-        {/* Success banner */}
-        <div className="bg-success/5 border border-success/20 rounded-lg p-4 text-center space-y-1">
+        {/* Success banner with PDF download */}
+        <div className="bg-success/5 border border-success/20 rounded-lg p-4 text-center space-y-3">
           <CheckCircle2 className="h-8 w-8 text-success mx-auto" />
-          <p className="text-success font-semibold">Website Analysed!</p>
-          <p className="text-sm text-muted-foreground">
-            {faqCount} FAQs extracted from {pagesCount} pages.
-          </p>
-        </div>
-
-        {/* Download PDF */}
-        <div className="flex justify-center">
+          <div className="space-y-1">
+            <p className="text-success font-semibold">Website Analysed!</p>
+            <p className="text-sm text-muted-foreground">
+              {faqCount} FAQs extracted from {pagesCount} pages.
+            </p>
+          </div>
           <Button
             variant="outline"
             size="sm"
@@ -284,8 +282,9 @@ export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, on
               }
             }}
             disabled={downloadingPDF}
+            className="gap-2"
           >
-            {downloadingPDF ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+            {downloadingPDF ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
             Download Knowledge Base PDF
           </Button>
         </div>
