@@ -303,7 +303,7 @@ export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenPr
         </div>
       )}
 
-      <div className="flex justify-center pt-4">
+      <div className="flex flex-col items-center gap-3 pt-4">
         <Button 
           onClick={onNext} 
           disabled={!bothComplete}
@@ -322,6 +322,16 @@ export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenPr
             </>
           )}
         </Button>
+        {!bothComplete && (
+          <div className="flex gap-3">
+            <Button variant="ghost" size="sm" onClick={onBack} className="text-muted-foreground">
+              ← Back
+            </Button>
+            <Button variant="ghost" size="sm" onClick={onNext} className="text-muted-foreground">
+              Skip for now →
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );
