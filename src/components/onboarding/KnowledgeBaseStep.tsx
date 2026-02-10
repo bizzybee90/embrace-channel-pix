@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { ChevronLeft, ChevronRight, AlertCircle, CheckCircle2, RotateCcw, Globe, FileText } from 'lucide-react';
+import { ChevronLeft, ChevronRight, AlertCircle, CheckCircle2, RotateCcw, Globe, FileText, Download, Loader2, Search, Sparkles } from 'lucide-react';
 import { WebsitePipelineProgress } from './WebsitePipelineProgress';
+import { generateKnowledgeBasePDF } from '@/components/settings/knowledge-base/generateKnowledgeBasePDF';
+import { toast } from 'sonner';
 
 interface KnowledgeBaseStepProps {
   workspaceId: string;
@@ -28,6 +30,7 @@ export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, on
   const [jobId, setJobId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState({ faqsExtracted: 0, pagesScraped: 0 });
+  const [downloadingPDF, setDownloadingPDF] = useState(false);
   const [existingKnowledge, setExistingKnowledge] = useState<ExistingKnowledge | null>(null);
 
   // Check if we already have website knowledge
@@ -177,37 +180,118 @@ export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, on
 
   // Already done state - website knowledge exists
   if (status === 'already_done' && existingKnowledge) {
+    const pagesCount = existingKnowledge.pagesScraped || 0;
+    const faqCount = existingKnowledge.faqCount || 0;
+
     return (
       <div className="space-y-6">
-        <div className="text-center space-y-2">
-          <div className="w-16 h-16 bg-success/10 rounded-full flex items-center justify-center mx-auto">
-            <CheckCircle2 className="h-8 w-8 text-success" />
-          </div>
-          <h2 className="text-xl font-semibold">Website Knowledge Ready</h2>
+        <div className="text-center space-y-1">
+          <h2 className="text-xl font-semibold">Your Website Knowledge</h2>
           <p className="text-sm text-muted-foreground">
-            We already have knowledge from your website
+            We're extracting FAQs, pricing, and services from your website.
+          </p>
+          <p className="text-sm font-medium">{businessContext.websiteUrl}</p>
+        </div>
+
+        {/* Stage cards */}
+        <div className="space-y-3">
+          {/* Stage 1 */}
+          <div className="border rounded-lg p-4 bg-success/5 border-success/20">
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-2">
+                <Search className="h-4 w-4 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">STAGE 1</span>
+                <span className="font-semibold">Discover Pages</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-success font-medium">Done</span>
+                <CheckCircle2 className="h-4 w-4 text-success" />
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground ml-6">Found pages on your website</p>
+            {pagesCount > 0 && (
+              <p className="text-sm text-success ml-6 mt-1">✓ {pagesCount} pages discovered</p>
+            )}
+          </div>
+
+          {/* Stage 2 */}
+          <div className="border rounded-lg p-4 bg-success/5 border-success/20">
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-2">
+                <Globe className="h-4 w-4 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">STAGE 2</span>
+                <span className="font-semibold">Scrape Content</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-success font-medium">Done</span>
+                <CheckCircle2 className="h-4 w-4 text-success" />
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground ml-6">Downloaded page content</p>
+            {pagesCount > 0 && (
+              <p className="text-sm text-success ml-6 mt-1">✓ {pagesCount} pages scraped</p>
+            )}
+          </div>
+
+          {/* Stage 3 */}
+          <div className="border rounded-lg p-4 bg-success/5 border-success/20">
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">STAGE 3</span>
+                <span className="font-semibold">Extract Knowledge</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-success font-medium">Done</span>
+                <CheckCircle2 className="h-4 w-4 text-success" />
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground ml-6">AI extracted FAQs and business facts</p>
+            <div className="flex items-center justify-between ml-6 mt-1">
+              <span className="text-sm text-muted-foreground">FAQs extracted</span>
+              <div className="flex items-center gap-1">
+                <span className="text-sm font-semibold">{faqCount}</span>
+                <CheckCircle2 className="h-4 w-4 text-success" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Success banner */}
+        <div className="bg-success/5 border border-success/20 rounded-lg p-4 text-center space-y-1">
+          <CheckCircle2 className="h-8 w-8 text-success mx-auto" />
+          <p className="text-success font-semibold">Website Analysed!</p>
+          <p className="text-sm text-muted-foreground">
+            {faqCount} FAQs extracted from {pagesCount} pages.
           </p>
         </div>
 
-        <div className="bg-success/5 border border-success/20 rounded-lg p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Globe className="h-5 w-5 text-success" />
-              <div>
-                <p className="font-medium">{businessContext.websiteUrl}</p>
-                <p className="text-sm text-muted-foreground">
-                  {existingKnowledge.faqCount} FAQs extracted
-                  {existingKnowledge.pagesScraped > 0 && ` from ${existingKnowledge.pagesScraped} pages`}
-                </p>
-              </div>
-            </div>
-            <FileText className="h-5 w-5 text-muted-foreground" />
-          </div>
+        {/* Download PDF */}
+        <div className="flex justify-center">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={async () => {
+              setDownloadingPDF(true);
+              try {
+                await generateKnowledgeBasePDF(workspaceId, businessContext.companyName);
+                toast.success('Knowledge Base PDF downloaded!');
+              } catch (err) {
+                console.error('PDF error:', err);
+                toast.error('Failed to generate PDF');
+              } finally {
+                setDownloadingPDF(false);
+              }
+            }}
+            disabled={downloadingPDF}
+          >
+            {downloadingPDF ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+            Download Knowledge Base PDF
+          </Button>
         </div>
 
         <div className="flex gap-3">
           <Button variant="outline" onClick={onBack} className="flex-1">
-            <ChevronLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
           <Button 
