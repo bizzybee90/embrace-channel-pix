@@ -7,13 +7,17 @@ import { BusinessFactsManager } from './knowledge-base/BusinessFactsManager';
 import { PricingManager } from './knowledge-base/PricingManager';
 import { DocumentUpload } from '@/components/knowledge/DocumentUpload';
 import { generateKnowledgeBasePDF } from './knowledge-base/generateKnowledgeBasePDF';
-import { HelpCircle, BookOpen, DollarSign, FileUp, Download, Loader2 } from 'lucide-react';
+import { generateCompetitorResearchPDF } from './knowledge-base/generateCompetitorResearchPDF';
+import { HelpCircle, BookOpen, DollarSign, FileUp, Download, Loader2, FileSearch, Trash2 } from 'lucide-react';
 import { useWorkspace } from '@/hooks/useWorkspace';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 export function KnowledgeBasePanel() {
   const { workspace } = useWorkspace();
   const [downloading, setDownloading] = useState(false);
+  const [downloadingCompetitor, setDownloadingCompetitor] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const handleDownloadPDF = async () => {
     if (!workspace?.id) return;
@@ -29,6 +33,54 @@ export function KnowledgeBasePanel() {
     }
   };
 
+  const handleDownloadCompetitorPDF = async () => {
+    if (!workspace?.id) return;
+    setDownloadingCompetitor(true);
+    try {
+      await generateCompetitorResearchPDF(workspace.id, workspace.name || undefined);
+      toast.success('Competitor Research PDF downloaded!');
+    } catch (err) {
+      console.error('Competitor PDF error:', err);
+      toast.error('Failed to generate competitor PDF');
+    } finally {
+      setDownloadingCompetitor(false);
+    }
+  };
+
+  const handleDeleteAllScrapedData = async () => {
+    if (!workspace?.id) return;
+    const confirmed = window.confirm(
+      'This will delete ALL scraped FAQs (website + competitor). Manual and document FAQs will be kept. Are you sure?'
+    );
+    if (!confirmed) return;
+
+    setDeleting(true);
+    try {
+      const sb: any = supabase as any;
+      // Delete scraped FAQs (priority 10 with is_own_content, and priority 5 competitor)
+      const { error } = await sb
+        .from('faq_database')
+        .delete()
+        .eq('workspace_id', workspace.id)
+        .in('priority', [10, 5]);
+
+      if (error) throw error;
+
+      // Also reset scraping jobs
+      await sb
+        .from('scraping_jobs')
+        .delete()
+        .eq('workspace_id', workspace.id);
+
+      toast.success('All scraped data deleted successfully');
+    } catch (err) {
+      console.error('Delete error:', err);
+      toast.error('Failed to delete scraped data');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <Card className="p-6">
       <div className="mb-6 flex items-start justify-between">
@@ -39,10 +91,20 @@ export function KnowledgeBasePanel() {
             and upload documents that the AI will use to answer customer questions accurately.
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={handleDownloadPDF} disabled={downloading || !workspace?.id}>
-          {downloading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
-          Download PDF
-        </Button>
+        <div className="flex gap-2 flex-shrink-0">
+          <Button variant="outline" size="sm" onClick={handleDownloadPDF} disabled={downloading || !workspace?.id}>
+            {downloading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+            Your KB PDF
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleDownloadCompetitorPDF} disabled={downloadingCompetitor || !workspace?.id}>
+            {downloadingCompetitor ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileSearch className="h-4 w-4 mr-2" />}
+            Competitor PDF
+          </Button>
+          <Button variant="destructive" size="sm" onClick={handleDeleteAllScrapedData} disabled={deleting || !workspace?.id}>
+            {deleting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Trash2 className="h-4 w-4 mr-2" />}
+            Delete Scraped Data
+          </Button>
+        </div>
       </div>
 
       <Tabs defaultValue="faqs" className="space-y-6">
