@@ -40,6 +40,24 @@ serve(async (req) => {
 
     console.log(`[trigger-n8n-workflows] workspace=${workspaceId} queries=${searchQueries.length} business=${(context?.company_name as string) || 'unknown'}`)
 
+    // Initialize progress records so UI shows "pending" immediately
+    await Promise.all([
+      supabase.from('n8n_workflow_progress').upsert({
+        workspace_id: workspaceId,
+        workflow_type: 'competitor_discovery',
+        status: 'pending',
+        details: { message: 'Workflow triggered, waiting for n8n...' },
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'workspace_id,workflow_type' }),
+      supabase.from('n8n_workflow_progress').upsert({
+        workspace_id: workspaceId,
+        workflow_type: 'email_import',
+        status: 'pending',
+        details: { message: 'Email classification triggered, waiting for n8n...' },
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'workspace_id,workflow_type' }),
+    ]);
+
     // Trigger BOTH n8n workflows simultaneously from the server side (no CORS issues)
     const results = await Promise.allSettled([
       // Competitor Discovery
