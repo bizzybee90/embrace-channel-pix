@@ -151,21 +151,11 @@ export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenPr
     const pollProgress = async () => {
       try {
         // Fetch all data in parallel
-        const [workflowRes, competitorCountRes, faqCountRes, emailsRes] = await Promise.all([
+        const [workflowRes, emailsRes] = await Promise.all([
           // n8n workflow status (for phase tracking)
           supabase
             .from('n8n_workflow_progress' as 'allowed_webhook_ips')
             .select('*')
-            .eq('workspace_id', workspaceId),
-          // Direct DB: competitor sites count
-          supabase
-            .from('competitor_sites')
-            .select('*', { count: 'exact', head: true })
-            .eq('workspace_id', workspaceId),
-          // Direct DB: FAQ count
-          supabase
-            .from('faq_database' as 'allowed_webhook_ips')
-            .select('*', { count: 'exact', head: true })
             .eq('workspace_id', workspaceId),
           // Direct DB: email classification progress
           supabase
@@ -184,57 +174,55 @@ export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenPr
         const competitorRecord = records.find(r => r.workflow_type === 'competitor_discovery');
         const emailRecord = records.find(r => r.workflow_type === 'email_import');
 
-        // Competitor track
-        const competitorsFound = competitorCountRes.count || 0;
-        const faqsGenerated = faqCountRes.count || 0;
+        // Competitor track — only use counts from n8n progress record to avoid stale DB data
         const competitorDetails = (competitorRecord?.details || {}) as Record<string, unknown>;
         const competitorStatus = competitorRecord?.status || 'pending';
-        
-        // Infer status from DB counts if n8n hasn't reported yet
-        let effectiveCompetitorStatus = competitorStatus;
-        if (competitorStatus === 'pending' && competitorsFound > 0) {
-          effectiveCompetitorStatus = 'discovering';
-        }
-        if (faqsGenerated > 0 && competitorStatus !== 'complete') {
-          effectiveCompetitorStatus = 'scraping_complete';
-        }
 
         setCompetitorTrack({
-          status: effectiveCompetitorStatus,
-          counts: [
-            { label: 'competitors found', value: competitorsFound },
+          status: competitorStatus,
+          counts: competitorRecord ? [
+            { label: 'competitors found', value: (competitorDetails.competitors_found as number) || 0 },
             { label: 'scraped', value: (competitorDetails.competitors_scraped as number) || 0 },
-            { label: 'FAQs generated', value: faqsGenerated },
-          ],
+            { label: 'FAQs generated', value: (competitorDetails.faqs_generated as number) || 0 },
+          ] : [],
           error: competitorDetails.error as string | undefined,
         });
 
-        // Email track
-        const emails = emailsRes.data || [];
-        const totalEmails = emails.length;
-        const classifiedEmails = emails.filter(e => e.category).length;
+        // Email track — only use DB inference if n8n email_import workflow exists
         const emailStatus = emailRecord?.status || 'pending';
         const emailDetails = (emailRecord?.details || {}) as Record<string, unknown>;
 
-        // Infer email status from DB counts
-        let effectiveEmailStatus = emailStatus;
-        if (totalEmails > 0 && classifiedEmails < totalEmails && emailStatus === 'pending') {
-          effectiveEmailStatus = 'classifying';
-        }
-        if (totalEmails > 0 && classifiedEmails === totalEmails) {
-          effectiveEmailStatus = 'complete';
-        }
+        if (emailRecord) {
+          // n8n workflow exists — use DB emails for classification progress
+          const emails = emailsRes.data || [];
+          const totalEmails = emails.length;
+          const classifiedEmails = emails.filter(e => e.category).length;
 
-        const percentage = totalEmails > 0 ? Math.round((classifiedEmails / totalEmails) * 100) : 0;
+          let effectiveEmailStatus = emailStatus;
+          if (totalEmails > 0 && classifiedEmails < totalEmails && emailStatus === 'pending') {
+            effectiveEmailStatus = 'classifying';
+          }
+          if (totalEmails > 0 && classifiedEmails === totalEmails) {
+            effectiveEmailStatus = 'complete';
+          }
 
-        setEmailTrack({
-          status: effectiveEmailStatus,
-          counts: [
-            { label: 'total emails', value: totalEmails },
-            { label: `classified (${percentage}%)`, value: classifiedEmails },
-          ],
-          error: emailDetails.error as string | undefined,
-        });
+          const percentage = totalEmails > 0 ? Math.round((classifiedEmails / totalEmails) * 100) : 0;
+
+          setEmailTrack({
+            status: effectiveEmailStatus,
+            counts: [
+              { label: 'total emails', value: totalEmails },
+              { label: `classified (${percentage}%)`, value: classifiedEmails },
+            ],
+            error: emailDetails.error as string | undefined,
+          });
+        } else {
+          // No n8n email workflow yet — show waiting state
+          setEmailTrack({
+            status: 'pending',
+            counts: [],
+          });
+        }
       } catch (error) {
         console.error('Error polling progress:', error);
       } finally {
