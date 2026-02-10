@@ -122,44 +122,17 @@ Deno.serve(async (req) => {
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
 
-    } else if (workflow_type === 'email_import') {
-      // Get email provider config for Aurinko credentials
-      const { data: emailConfig, error: emailError } = await supabase
-        .from('email_provider_configs')
-        .select('*')
-        .eq('workspace_id', workspace_id)
-        .maybeSingle();
-
-      if (emailError || !emailConfig) {
-        return new Response(
-          JSON.stringify({ error: 'No email config found for workspace' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      // Decrypt the access token
-      const { data: tokenData, error: tokenError } = await supabase
-        .rpc('decrypt_aurinko_token', { encrypted_token: emailConfig.encrypted_access_token });
-
-      if (tokenError || !tokenData) {
-        console.error('[trigger-n8n] Failed to decrypt token:', tokenError);
-        return new Response(
-          JSON.stringify({ error: 'Failed to decrypt email credentials' }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
+    } else if (workflow_type === 'email_classification') {
+      // n8n email classification workflow reads emails directly from DB
+      // No need for Aurinko credentials — just workspace_id and callback
       const emailPayload = {
         workspace_id,
-        aurinko_account_id: emailConfig.aurinko_account_id,
-        aurinko_access_token: tokenData,
-        email_address: emailConfig.email_address,
         callback_url: emailCallbackUrl,
       };
 
-      console.log('[trigger-n8n] Sending to email-import (token redacted)');
+      console.log('[trigger-n8n] Sending to email-classification');
 
-      const response = await fetch(`${n8nWebhookBaseUrl}/email-import`, {
+      const response = await fetch(`${n8nWebhookBaseUrl}/email-classification`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(emailPayload),
@@ -179,12 +152,12 @@ Deno.serve(async (req) => {
         workspace_id,
         workflow_type: 'email_import',
         status: 'pending',
-        details: { message: 'Email import triggered, waiting for n8n...' },
+        details: { message: 'Email classification triggered, waiting for n8n...' },
         updated_at: new Date().toISOString(),
       }, { onConflict: 'workspace_id,workflow_type' });
 
       return new Response(
-        JSON.stringify({ success: true, workflow: 'email_import' }),
+        JSON.stringify({ success: true, workflow: 'email_classification' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
 

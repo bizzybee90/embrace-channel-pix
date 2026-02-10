@@ -327,7 +327,7 @@ export function EmailConnectionStep({
             workflow_type: 'competitor_discovery',
           })
         }),
-        // Email Import workflow
+        // Email Classification workflow (n8n reads emails from DB)
         fetch(`${SUPABASE_URL}/functions/v1/trigger-n8n-workflow`, {
           method: 'POST',
           headers: {
@@ -336,7 +336,7 @@ export function EmailConnectionStep({
           },
           body: JSON.stringify({
             workspace_id: workspaceId,
-            workflow_type: 'email_import',
+            workflow_type: 'email_classification',
           })
         }),
       ]);
