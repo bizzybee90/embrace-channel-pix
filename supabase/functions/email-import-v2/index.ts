@@ -508,9 +508,14 @@ serve(async (req) => {
     // Determine if Complete or Need Continuation
     // -------------------------------------------------------------------------
     const totalImported = job.sent_imported + job.inbox_imported;
+    // Only consider "no more pages" as complete if we actually fetched at least
+    // one batch from the INBOX (inbox_imported > 0). Otherwise we just switched
+    // folders and haven't started scanning INBOX yet.
+    const noMorePages = !job.inbox_page_token && !job.sent_page_token && 
+                        job.current_folder === 'INBOX' && job.inbox_imported > 0;
     const isComplete = totalImported >= job.total_target || 
                       (job.inbox_imported >= targetPerFolder && job.sent_imported >= targetPerFolder) ||
-                      (!job.inbox_page_token && !job.sent_page_token && job.current_folder === 'INBOX');
+                      noMorePages;
 
     if (isComplete) {
       // =========================================================================
