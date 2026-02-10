@@ -1,55 +1,66 @@
 
 
-# Disable Redundant pg_cron Workers After n8n Migration
+# Fix: Empty Search Queries in n8n Trigger
 
 ## Problem
-Five pg_cron scheduled functions poll every 60-120 seconds (24/7), costing ~5,760+ idle invocations daily. With n8n handling competitor discovery and email processing, these workers are redundant.
+The `trigger-n8n-workflows` edge function sends an **empty `search_queries` array** to n8n because it reads from a non-existent `search_queries` table. The actual search terms are stored in `n8n_workflow_progress` with `workflow_type = 'search_terms_config'`.
 
-## What Changes
+This causes the n8n competitor discovery workflow to receive no search terms, likely causing it to fail silently before reaching its callback nodes.
 
-### 1. Remove pg_cron Schedules
-Disable the following scheduled jobs via a database migration:
+## Evidence
+- `search_queries` table: **does not exist** (SQL error confirmed)
+- `n8n_workflow_progress` (workflow_type `search_terms_config`): Contains 10 validated search terms like "window cleaning luton", "best window cleaning luton", etc.
+- Both n8n webhooks return HTTP 200, confirming `workspace_id` (`681ad707-...`) is received correctly
+- The competitor discovery workflow fails internally because it has no search queries to act on
 
-- `hydrate-worker` (every 60s)
-- `classification-worker` (every 60s)
-- `process-worker` (every 60s)
-- `pipeline-watchdog` (every 2 mins)
-- `competitor-research-watchdog` (every 2 mins)
+## Fix
 
-### 2. Keep the Edge Functions (Don't Delete)
-The function code stays in place as a safety net. Only the automatic scheduling is removed. They can still be called manually from the admin DevOps dashboard if needed for debugging.
+### File: `supabase/functions/trigger-n8n-workflows/index.ts`
 
-### 3. What Replaces Them
-- **n8n workflows** manage retries, error handling, and orchestration natively
-- **`n8n-competitor-callback`** receives status updates from n8n (event-driven, zero idle cost)
-- **`n8n-email-callback`** receives email import progress from n8n (event-driven, zero idle cost)
-- **`trigger-n8n-workflow`** is called on-demand from the onboarding UI (zero idle cost)
+Replace the query to the non-existent `search_queries` table (line 26) with a query to `n8n_workflow_progress`:
 
-### 4. Estimated Savings
-- ~5,760 function invocations per day eliminated
-- ~40,320 per week
-- Each invocation currently costs boot time (168-867ms) plus execution even when doing nothing
+**Before:**
+```typescript
+const [profileRes, contextRes, searchTermsRes] = await Promise.all([
+  supabase.from('business_profile').select('*').eq('workspace_id', workspaceId).maybeSingle(),
+  supabase.from('business_context').select('*').eq('workspace_id', workspaceId).maybeSingle(),
+  supabase.from('search_queries').select('*').eq('workspace_id', workspaceId),
+])
 
-## Technical Details
-
-### Database Migration SQL
-```sql
--- Remove all polling cron jobs that n8n now handles
-SELECT cron.unschedule('hydrate-worker');
-SELECT cron.unschedule('classification-worker');
-SELECT cron.unschedule('process-worker');
-SELECT cron.unschedule('pipeline-watchdog');
-SELECT cron.unschedule('competitor-research-watchdog');
+const profile = profileRes.data as Record<string, unknown> | null
+const context = contextRes.data as Record<string, unknown> | null
+const searchQueries = ((searchTermsRes.data || []) as unknown as Array<{ query: string }>).map(q => q.query)
 ```
 
-Note: The exact job names will be confirmed by querying `cron.job` before running the migration.
+**After:**
+```typescript
+const [profileRes, contextRes, searchTermsRes] = await Promise.all([
+  supabase.from('business_profile').select('*').eq('workspace_id', workspaceId).maybeSingle(),
+  supabase.from('business_context').select('*').eq('workspace_id', workspaceId).maybeSingle(),
+  supabase.from('n8n_workflow_progress').select('details')
+    .eq('workspace_id', workspaceId)
+    .eq('workflow_type', 'search_terms_config')
+    .maybeSingle(),
+])
 
-### Safety Check
-Before disabling, verify n8n workflows are active and tested:
-- Competitor discovery workflow responds to webhook trigger
-- Email import workflow responds to webhook trigger
-- Both callback endpoints are reachable from n8n
+const profile = profileRes.data as Record<string, unknown> | null
+const context = contextRes.data as Record<string, unknown> | null
+const searchConfig = (searchTermsRes.data?.details as Record<string, unknown>) || {}
+const searchQueries = (searchConfig.search_queries as string[]) || []
+```
 
-### Rollback
-If n8n has issues, the cron jobs can be re-added with a simple migration re-inserting the schedules.
+This matches exactly how `trigger-n8n-workflow` (singular, the older version) already reads search terms -- aligning the two functions.
+
+### Add Logging
+
+Add a `console.log` before the fetch calls to log the actual payload being sent, making future debugging easier:
+
+```typescript
+console.log(`[trigger-n8n-workflows] workspace=${workspaceId} queries=${searchQueries.length} business=${context?.company_name || 'unknown'}`)
+```
+
+## Impact
+- Competitor discovery workflow will receive the 10 validated search terms
+- No other files need changes
+- After deploying, you will need to re-trigger (Cancel and Retry + Start AI Training)
 
