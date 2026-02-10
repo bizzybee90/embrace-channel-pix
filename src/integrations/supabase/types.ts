@@ -6016,7 +6016,7 @@ export type Database = {
         }[]
       }
       get_decrypted_access_token: {
-        Args: { p_workspace_id: string }
+        Args: { p_config_id: string }
         Returns: string
       }
       get_emails_to_hydrate: {
