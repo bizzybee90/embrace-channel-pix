@@ -53,6 +53,7 @@ Deno.serve(async (req) => {
       verified_count, probable_count, hallucinations_caught,
       live_domains, dead_domains, scraped, failed,
       faq_count, competitor_count, claude_found, gemini_found,
+      current, total, current_competitor,
       error: errorMsg
     } = body;
 
@@ -83,6 +84,9 @@ Deno.serve(async (req) => {
     if (competitor_count !== undefined) details.competitor_count = competitor_count;
     if (claude_found !== undefined) details.claude_found = claude_found;
     if (gemini_found !== undefined) details.gemini_found = gemini_found;
+    if (current !== undefined) details.current = current;
+    if (total !== undefined) details.total = total;
+    if (current_competitor !== undefined) details.current_competitor = current_competitor;
     if (errorMsg) details.error = errorMsg;
 
     const { error: upsertError } = await supabase

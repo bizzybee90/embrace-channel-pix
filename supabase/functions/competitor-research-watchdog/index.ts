@@ -76,16 +76,12 @@ serve(async (req) => {
       }
 
       // Determine which function to restart based on status
+      // Only restart functions still managed by edge functions
+      // scraping/extracting are now handled by n8n workflow
       let functionToCall: string | null = null;
       switch (job.status) {
         case 'discovering':
           functionToCall = 'competitor-discover';
-          break;
-        case 'scraping':
-          functionToCall = 'competitor-scrape-worker';
-          break;
-        case 'extracting':
-          functionToCall = 'extract-competitor-faqs';
           break;
         case 'deduplicating':
           functionToCall = 'competitor-dedupe-faqs';
@@ -93,8 +89,13 @@ serve(async (req) => {
         case 'refining':
           functionToCall = 'refine-competitor-faqs';
           break;
+        case 'scraping':
+        case 'extracting':
+          // These are now managed by n8n - skip watchdog restart
+          console.log(`[research-watchdog] Skipping job ${job.id} - status '${job.status}' managed by n8n`);
+          skipped++;
+          continue;
         default:
-          // Unknown or terminal status - skip
           console.log(`[research-watchdog] Skipping job ${job.id} with status ${job.status}`);
           skipped++;
           continue;

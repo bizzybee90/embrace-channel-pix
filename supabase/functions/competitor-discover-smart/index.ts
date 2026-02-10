@@ -241,12 +241,9 @@ serve(async (req) => {
         : null,
     }).eq('id', jobId);
 
-    // If we have sites, trigger the scraping worker
+    // Scraping is now handled by n8n workflow - no need to trigger scrape worker
     if (finalCompetitors.length > 0) {
-      console.log('Triggering scrape worker...');
-      supabase.functions.invoke('competitor-scrape-worker', {
-        body: { jobId, workspaceId, nicheQuery, serviceArea }
-      }).catch(err => console.error('Failed to start scraper:', err));
+      console.log('Sites discovered and ready for n8n scraping pipeline');
     }
 
     return new Response(JSON.stringify({
