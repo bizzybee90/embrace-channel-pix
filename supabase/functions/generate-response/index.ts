@@ -17,7 +17,21 @@ serve(async (req) => {
   const startTime = Date.now()
 
   try {
-    const { workspace_id, conversation_id, incoming_message } = await req.json()
+    // Auth validation
+    const { validateAuth, AuthError, authErrorResponse } = await import('../_shared/auth.ts');
+    let bodyRaw: any;
+    try {
+      bodyRaw = await req.clone().json();
+    } catch { bodyRaw = {}; }
+
+    const { workspace_id, conversation_id, incoming_message } = bodyRaw;
+
+    try {
+      await validateAuth(req, workspace_id);
+    } catch (authErr: any) {
+      if (authErr instanceof AuthError) return authErrorResponse(authErr);
+      throw authErr;
+    }
     
     if (!workspace_id || !incoming_message) {
       throw new Error('workspace_id and incoming_message are required')
