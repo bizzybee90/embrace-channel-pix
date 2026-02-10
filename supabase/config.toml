@@ -281,5 +281,3 @@ verify_jwt = false
 [functions.competitor-hybrid-discovery]
 verify_jwt = false
 
-[functions.get-service-key]
-verify_jwt = false
