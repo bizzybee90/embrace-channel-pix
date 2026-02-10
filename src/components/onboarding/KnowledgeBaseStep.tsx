@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { ChevronLeft, ChevronRight, AlertCircle, CheckCircle2, RotateCcw, Globe, FileText, Download, Loader2, Search, Sparkles } from 'lucide-react';
+import { ChevronLeft, ChevronRight, AlertCircle, CheckCircle2, RotateCcw, Globe, FileText, Download, Loader2, Search, Sparkles, ArrowRight } from 'lucide-react';
 import { WebsitePipelineProgress } from './WebsitePipelineProgress';
 import { generateKnowledgeBasePDF } from '@/components/settings/knowledge-base/generateKnowledgeBasePDF';
 import { toast } from 'sonner';
+import bizzybeeLogoSrc from '@/assets/bizzybee-logo.png';
 
 interface KnowledgeBaseStepProps {
   workspaceId: string;
@@ -183,125 +184,101 @@ export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, on
     const pagesCount = existingKnowledge.pagesScraped || 0;
     const faqCount = existingKnowledge.faqCount || 0;
 
+    const websiteDomain = businessContext.websiteUrl?.replace(/^https?:\/\//, '').replace(/\/.*$/, '') || '';
+    const faviconUrl = businessContext.websiteUrl ? `https://www.google.com/s2/favicons?domain=${websiteDomain}&sz=64` : null;
+
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
+        {/* Header with dual logos */}
+        <div className="flex items-center justify-center gap-4 pt-2">
+          <div className="flex items-center gap-2">
+            <img src={bizzybeeLogoSrc} alt="BizzyBee" className="h-10 w-10 rounded-lg" />
+            <span className="font-bold text-base">BizzyBee</span>
+          </div>
+          <ArrowRight className="h-4 w-4 text-muted-foreground" />
+          <div className="flex items-center gap-2">
+            {faviconUrl && <img src={faviconUrl} alt={businessContext.companyName} className="h-8 w-8 rounded" />}
+            <span className="font-bold text-base">{businessContext.companyName || websiteDomain}</span>
+          </div>
+        </div>
+
         <div className="text-center space-y-1">
-          <h2 className="text-xl font-semibold">Your Website Knowledge</h2>
-          <p className="text-sm text-muted-foreground">
-            We're extracting FAQs, pricing, and services from your website.
-          </p>
-          <p className="text-sm font-medium">{businessContext.websiteUrl}</p>
+          <h2 className="text-xl font-semibold">Knowledge Base Ready</h2>
+          <p className="text-sm text-muted-foreground">{businessContext.websiteUrl}</p>
         </div>
 
-        {/* Stage cards */}
-        <div className="space-y-3">
-          {/* Stage 1 */}
-          <div className="border rounded-lg p-4 bg-success/5 border-success/20">
-            <div className="flex items-center justify-between mb-1">
-              <div className="flex items-center gap-2">
-                <Search className="h-4 w-4 text-muted-foreground" />
-                <span className="text-xs text-muted-foreground">STAGE 1</span>
-                <span className="font-semibold">Discover Pages</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-success font-medium">Done</span>
-                <CheckCircle2 className="h-4 w-4 text-success" />
-              </div>
-            </div>
-            <p className="text-sm text-muted-foreground ml-6">Found pages on your website</p>
-            {pagesCount > 0 && (
-              <p className="text-sm text-success ml-6 mt-1">✓ {pagesCount} pages discovered</p>
-            )}
+        {/* Compact results summary */}
+        <div className="grid grid-cols-3 gap-3">
+          <div className="bg-card border rounded-xl p-3 text-center">
+            <p className="text-2xl font-bold text-primary">{pagesCount}</p>
+            <p className="text-xs text-muted-foreground">Pages Scraped</p>
           </div>
-
-          {/* Stage 2 */}
-          <div className="border rounded-lg p-4 bg-success/5 border-success/20">
-            <div className="flex items-center justify-between mb-1">
-              <div className="flex items-center gap-2">
-                <Globe className="h-4 w-4 text-muted-foreground" />
-                <span className="text-xs text-muted-foreground">STAGE 2</span>
-                <span className="font-semibold">Scrape Content</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-success font-medium">Done</span>
-                <CheckCircle2 className="h-4 w-4 text-success" />
-              </div>
-            </div>
-            <p className="text-sm text-muted-foreground ml-6">Downloaded page content</p>
-            {pagesCount > 0 && (
-              <p className="text-sm text-success ml-6 mt-1">✓ {pagesCount} pages scraped</p>
-            )}
+          <div className="bg-card border rounded-xl p-3 text-center">
+            <p className="text-2xl font-bold text-primary">{faqCount}</p>
+            <p className="text-xs text-muted-foreground">FAQs Extracted</p>
           </div>
-
-          {/* Stage 3 */}
-          <div className="border rounded-lg p-4 bg-success/5 border-success/20">
-            <div className="flex items-center justify-between mb-1">
-              <div className="flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-muted-foreground" />
-                <span className="text-xs text-muted-foreground">STAGE 3</span>
-                <span className="font-semibold">Extract Knowledge</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-success font-medium">Done</span>
-                <CheckCircle2 className="h-4 w-4 text-success" />
-              </div>
-            </div>
-            <p className="text-sm text-muted-foreground ml-6">AI extracted FAQs and business facts</p>
-            <div className="flex items-center justify-between ml-6 mt-1">
-              <span className="text-sm text-muted-foreground">FAQs extracted</span>
-              <div className="flex items-center gap-1">
-                <span className="text-sm font-semibold">{faqCount}</span>
-                <CheckCircle2 className="h-4 w-4 text-success" />
-              </div>
-            </div>
+          <div className="bg-card border rounded-xl p-3 text-center">
+            <CheckCircle2 className="h-6 w-6 text-success mx-auto mb-1" />
+            <p className="text-xs text-muted-foreground">Complete</p>
           </div>
         </div>
 
-        {/* Success banner with PDF download */}
-        <div className="bg-success/5 border border-success/20 rounded-lg p-4 text-center space-y-3">
-          <CheckCircle2 className="h-8 w-8 text-success mx-auto" />
-          <div className="space-y-1">
-            <p className="text-success font-semibold">Website Analysed!</p>
-            <p className="text-sm text-muted-foreground">
-              {faqCount} FAQs extracted from {pagesCount} pages.
-            </p>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={async () => {
-              setDownloadingPDF(true);
-              try {
-                await generateKnowledgeBasePDF(workspaceId, businessContext.companyName);
-                toast.success('Knowledge Base PDF downloaded!');
-              } catch (err) {
-                console.error('PDF error:', err);
-                toast.error('Failed to generate PDF');
-              } finally {
-                setDownloadingPDF(false);
-              }
-            }}
-            disabled={downloadingPDF}
-            className="gap-2"
-          >
-            {downloadingPDF ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-            Download Knowledge Base PDF
-          </Button>
+        {/* Stage progress (collapsed) */}
+        <div className="border rounded-xl overflow-hidden">
+          {[
+            { icon: Search, label: 'Discover Pages', detail: `${pagesCount} pages found` },
+            { icon: Globe, label: 'Scrape Content', detail: `${pagesCount} pages scraped` },
+            { icon: Sparkles, label: 'Extract Knowledge', detail: `${faqCount} FAQs extracted` },
+          ].map(({ icon: Icon, label, detail }, i) => (
+            <div key={i} className={`flex items-center justify-between px-4 py-2.5 ${i < 2 ? 'border-b' : ''}`}>
+              <div className="flex items-center gap-2">
+                <Icon className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium">{label}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">{detail}</span>
+                <CheckCircle2 className="h-3.5 w-3.5 text-success" />
+              </div>
+            </div>
+          ))}
         </div>
+
+        {/* PDF Download */}
+        <Button
+          variant="outline"
+          onClick={async () => {
+            setDownloadingPDF(true);
+            try {
+              await generateKnowledgeBasePDF(workspaceId, businessContext.companyName);
+              toast.success('Knowledge Base PDF downloaded!');
+            } catch (err) {
+              console.error('PDF error:', err);
+              toast.error('Failed to generate PDF');
+            } finally {
+              setDownloadingPDF(false);
+            }
+          }}
+          disabled={downloadingPDF}
+          className="w-full gap-2"
+        >
+          {downloadingPDF ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+          Download Knowledge Base PDF
+        </Button>
 
         <div className="flex gap-3">
           <Button variant="outline" onClick={onBack} className="flex-1">
             Back
           </Button>
           <Button 
-            variant="outline" 
+            variant="ghost" 
+            size="sm"
             onClick={() => {
               setExistingKnowledge(null);
               setStatus('idle');
             }}
-            className="flex-1 gap-2"
+            className="gap-1 text-muted-foreground"
           >
-            <RotateCcw className="h-4 w-4" />
+            <RotateCcw className="h-3.5 w-3.5" />
             Re-scrape
           </Button>
           <Button onClick={handleContinueWithExisting} className="flex-1">

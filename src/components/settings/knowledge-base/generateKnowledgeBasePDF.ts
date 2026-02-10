@@ -1,5 +1,6 @@
 import { jsPDF } from 'jspdf';
 import { supabase } from '@/integrations/supabase/client';
+import bizzybeeLogoSrc from '@/assets/bizzybee-logo.png';
 
 interface FAQItem {
   question: string;
@@ -119,20 +120,41 @@ export async function generateKnowledgeBasePDF(workspaceId: string, companyName?
     factsByCategory[f.category].push(f);
   });
 
-  // ===== HEADER =====
+  // ===== HEADER with logo =====
   doc.setFillColor(245, 245, 250);
-  doc.rect(0, 0, pageWidth, 45, 'F');
-  doc.setFontSize(22);
+  doc.rect(0, 0, pageWidth, 50, 'F');
+
+  // Try to add BizzyBee logo
+  try {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    await new Promise<void>((resolve) => {
+      img.onload = () => {
+        doc.addImage(img, 'PNG', margin, 10, 12, 12);
+        resolve();
+      };
+      img.onerror = () => resolve();
+      img.src = bizzybeeLogoSrc;
+    });
+  } catch { /* skip logo if it fails */ }
+
+  doc.setFontSize(20);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(0, 0, 0);
-  doc.text('BizzyBee Knowledge Base Report', margin, 25);
+  doc.text('BizzyBee Knowledge Base', margin + 16, 20);
   doc.setFontSize(11);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(100, 100, 100);
-  doc.text(companyName || 'Your Business', margin, 35);
-  doc.text(new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }), pageWidth - margin - 50, 35);
+  doc.text(`Prepared for ${companyName || 'Your Business'}`, margin + 16, 28);
+  doc.text(new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }), pageWidth - margin - 50, 28);
+  
+  // Accent line
+  doc.setDrawColor(59, 130, 246);
+  doc.setLineWidth(1.5);
+  doc.line(margin, 45, pageWidth - margin, 45);
+  
   doc.setTextColor(0, 0, 0);
-  y = 55;
+  y = 58;
 
   // ===== SUMMARY =====
   addTitle('Summary', 14);
