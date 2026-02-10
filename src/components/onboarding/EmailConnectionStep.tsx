@@ -439,17 +439,7 @@ export function EmailConnectionStep({
       )}
 
       {connectedEmail ? (
-        importStarted || (progress && progress.status !== 'idle') ? (
-          // Full pipeline progress view
-          <EmailPipelineProgress
-            workspaceId={workspaceId}
-            connectedEmail={connectedEmail}
-            onNext={onNext}
-            onBack={onBack}
-            onRetry={handleRetry}
-          />
-        ) : (
-          // Connected but not started yet - show start button
+          // Connected - show start button (no inline pipeline progress)
           <div className="space-y-6">
             {/* Connected status */}
             <div className="flex items-center justify-between gap-3 p-4 bg-success/10 rounded-lg border border-success/30">
@@ -473,14 +463,20 @@ export function EmailConnectionStep({
             {/* Start n8n workflows */}
             <div className="space-y-4">
               <Button onClick={startImport} disabled={importStarted} className="w-full gap-2">
-                {importStarted ? 'Starting...' : 'Start AI Training'}
+                {importStarted ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Starting...
+                  </>
+                ) : (
+                  'Start AI Training'
+                )}
               </Button>
               <Button variant="outline" onClick={onNext} className="w-full">
                 Skip for Now
               </Button>
             </div>
           </div>
-        )
       ) : (
         <div className="space-y-6">
           {/* Import Mode Selection */}
