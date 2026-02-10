@@ -1,23 +1,48 @@
+import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { FAQManager } from './knowledge-base/FAQManager';
 import { BusinessFactsManager } from './knowledge-base/BusinessFactsManager';
 import { PricingManager } from './knowledge-base/PricingManager';
 import { DocumentUpload } from '@/components/knowledge/DocumentUpload';
-import { HelpCircle, BookOpen, DollarSign, FileUp } from 'lucide-react';
+import { generateKnowledgeBasePDF } from './knowledge-base/generateKnowledgeBasePDF';
+import { HelpCircle, BookOpen, DollarSign, FileUp, Download, Loader2 } from 'lucide-react';
 import { useWorkspace } from '@/hooks/useWorkspace';
+import { toast } from 'sonner';
 
 export function KnowledgeBasePanel() {
   const { workspace } = useWorkspace();
+  const [downloading, setDownloading] = useState(false);
+
+  const handleDownloadPDF = async () => {
+    if (!workspace?.id) return;
+    setDownloading(true);
+    try {
+      await generateKnowledgeBasePDF(workspace.id, workspace.name || undefined);
+      toast.success('Knowledge Base PDF downloaded!');
+    } catch (err) {
+      console.error('PDF generation error:', err);
+      toast.error('Failed to generate PDF');
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   return (
     <Card className="p-6">
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold mb-2">Knowledge Base</h2>
-        <p className="text-muted-foreground">
-          Manage your AI agent's knowledge base. Add FAQs, business facts, pricing information,
-          and upload documents that the AI will use to answer customer questions accurately.
-        </p>
+      <div className="mb-6 flex items-start justify-between">
+        <div>
+          <h2 className="text-2xl font-bold mb-2">Knowledge Base</h2>
+          <p className="text-muted-foreground">
+            Manage your AI agent's knowledge base. Add FAQs, business facts, pricing information,
+            and upload documents that the AI will use to answer customer questions accurately.
+          </p>
+        </div>
+        <Button variant="outline" size="sm" onClick={handleDownloadPDF} disabled={downloading || !workspace?.id}>
+          {downloading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+          Download PDF
+        </Button>
       </div>
 
       <Tabs defaultValue="faqs" className="space-y-6">
