@@ -5,6 +5,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-n8n-signature',
 };
 
+const FAQ_WORKFLOW_URL = 'https://bizzybee.app.n8n.cloud/webhook/faq-generation';
+
 async function verifyN8nSignature(payload: string, signature: string, secret: string): Promise<boolean> {
   const encoder = new TextEncoder();
   const key = await crypto.subtle.importKey(
@@ -18,6 +20,100 @@ async function verifyN8nSignature(payload: string, signature: string, secret: st
     result |= computed.charCodeAt(i) ^ signature.charCodeAt(i);
   }
   return result === 0;
+}
+
+async function triggerFaqWorkflow(
+  supabase: ReturnType<typeof createClient>,
+  workspaceId: string,
+  callbackUrl: string,
+  details: Record<string, unknown>
+) {
+  console.log(`[n8n-callback] discovery_complete for workspace=${workspaceId}, triggering FAQ workflow`);
+
+  // Fetch validated competitors saved by Workflow 1
+  const { data: competitors, error: fetchError } = await supabase
+    .from('competitor_sites')
+    .select('id, business_name, domain, url, address, rating, reviews_count, phone')
+    .eq('workspace_id', workspaceId)
+    .in('status', ['discovered', 'validated', 'approved'])
+    .order('created_at', { ascending: false })
+    .limit(100);
+
+  if (fetchError) {
+    console.error('[n8n-callback] Failed to fetch competitors:', fetchError);
+    return;
+  }
+
+  if (!competitors || competitors.length === 0) {
+    console.warn('[n8n-callback] No competitors found to scrape');
+    // Update progress to reflect this
+    await supabase.from('n8n_workflow_progress').upsert({
+      workspace_id: workspaceId,
+      workflow_type: 'competitor_scrape',
+      status: 'complete',
+      details: { message: 'No competitors to scrape', competitors_found: 0 },
+      updated_at: new Date().toISOString(),
+      completed_at: new Date().toISOString(),
+    }, { onConflict: 'workspace_id,workflow_type' });
+    return;
+  }
+
+  // Fetch business context for the FAQ extraction prompt
+  const { data: context } = await supabase
+    .from('business_context')
+    .select('business_type, company_name')
+    .eq('workspace_id', workspaceId)
+    .maybeSingle();
+
+  // Initialize the scrape progress track
+  await supabase.from('n8n_workflow_progress').upsert({
+    workspace_id: workspaceId,
+    workflow_type: 'competitor_scrape',
+    status: 'pending',
+    details: {
+      message: `Queued ${competitors.length} competitors for scraping & FAQ extraction`,
+      total: competitors.length,
+      competitors_found: details.competitors_found || competitors.length,
+    },
+    updated_at: new Date().toISOString(),
+  }, { onConflict: 'workspace_id,workflow_type' });
+
+  // Trigger Workflow 2
+  const payload = {
+    workspace_id: workspaceId,
+    business_type: context?.business_type || '',
+    business_name: context?.company_name || '',
+    competitors: competitors.map(c => ({
+      id: c.id,
+      business_name: c.business_name,
+      domain: c.domain,
+      url: c.url,
+      address: c.address,
+      rating: c.rating,
+      reviews_count: c.reviews_count,
+      phone: c.phone,
+    })),
+    callback_url: callbackUrl,
+  };
+
+  try {
+    const response = await fetch(FAQ_WORKFLOW_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    console.log(`[n8n-callback] FAQ workflow triggered: status=${response.status}, competitors=${competitors.length}`);
+  } catch (err) {
+    console.error('[n8n-callback] Failed to trigger FAQ workflow:', err);
+    await supabase.from('n8n_workflow_progress').upsert({
+      workspace_id: workspaceId,
+      workflow_type: 'competitor_scrape',
+      status: 'failed',
+      details: { message: 'Failed to trigger FAQ generation workflow', error: String(err) },
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'workspace_id,workflow_type' });
+  }
 }
 
 Deno.serve(async (req) => {
@@ -66,6 +162,11 @@ Deno.serve(async (req) => {
 
     console.log(`[n8n-callback] workspace=${workspace_id} status=${status} message=${message}`);
 
+    // Determine which workflow_type this callback belongs to
+    // "scraping"/"extracting"/"scrape_complete" statuses come from Workflow 2 (FAQ generation)
+    const scrapeStatuses = ['scraping', 'extracting', 'scrape_processing', 'scrape_complete'];
+    const workflowType = scrapeStatuses.includes(status) ? 'competitor_scrape' : 'competitor_discovery';
+
     const details: Record<string, unknown> = {
       message,
       updated_at: new Date().toISOString(),
@@ -89,15 +190,19 @@ Deno.serve(async (req) => {
     if (current_competitor !== undefined) details.current_competitor = current_competitor;
     if (errorMsg) details.error = errorMsg;
 
+    // Map status for DB storage
+    const isComplete = status === 'discovery_complete' || status === 'complete' || status === 'scrape_complete';
+    const dbStatus = isComplete ? 'complete' : (status || 'in_progress');
+
     const { error: upsertError } = await supabase
       .from('n8n_workflow_progress')
       .upsert({
         workspace_id,
-        workflow_type: 'competitor_discovery',
-        status: status || 'in_progress',
+        workflow_type: workflowType,
+        status: dbStatus,
         details,
         updated_at: new Date().toISOString(),
-        completed_at: status === 'complete' ? new Date().toISOString() : null,
+        completed_at: isComplete ? new Date().toISOString() : null,
       }, {
         onConflict: 'workspace_id,workflow_type',
       });
@@ -110,8 +215,14 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Chain: when discovery is complete, trigger the FAQ generation workflow
+    if (status === 'discovery_complete') {
+      const callbackUrl = body.callback_url || `${supabaseUrl}/functions/v1/n8n-competitor-callback`;
+      await triggerFaqWorkflow(supabase, workspace_id, callbackUrl, details);
+    }
+
     return new Response(
-      JSON.stringify({ success: true, status, workspace_id }),
+      JSON.stringify({ success: true, status, workspace_id, workflow_type: workflowType }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
