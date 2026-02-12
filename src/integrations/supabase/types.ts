@@ -6040,48 +6040,12 @@ export type Database = {
           p_workspace_id: string
         }
         Returns: {
-          aurinko_id: string | null
-          body_html: string | null
-          body_text: string | null
-          category: string | null
-          classification: Json | null
-          classification_category: string | null
-          classification_confidence: number | null
-          classification_reasoning: string | null
-          classified_at: string | null
-          classified_by: string | null
-          confidence: number | null
-          created_at: string | null
-          email_type: string | null
-          error_message: string | null
-          external_id: string
-          folder: string | null
+          body: string
+          direction: string
           from_email: string
-          from_name: string | null
-          has_attachments: boolean | null
           id: string
-          job_id: string | null
-          lane: string | null
-          processed: boolean | null
-          processing_completed_at: string | null
-          processing_started_at: string | null
-          received_at: string | null
-          requires_reply: boolean | null
-          retry_count: number | null
-          status: string | null
-          subject: string | null
-          thread_id: string | null
-          to_email: string | null
-          to_name: string | null
-          urgency: string | null
-          workspace_id: string
+          subject: string
         }[]
-        SetofOptions: {
-          from: "*"
-          to: "raw_emails"
-          isOneToOne: false
-          isSetofReturn: true
-        }
       }
       get_research_job_stats: {
         Args: { p_job_id: string }
