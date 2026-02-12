@@ -84,6 +84,13 @@ Extract ALL of the following:
 5. **Voice Profile**: The tone and style of writing used on the website
 6. **Search Keywords**: Keywords that describe what this business does (for finding competitors)
 
+CRITICAL VOICE RULE FOR ALL FAQ ANSWERS:
+- Write ALL answers in FIRST PERSON ("we", "our", "us") as if YOU ARE the business.
+- NEVER refer to the business by name in the third person.
+- Instead of "[Business Name] offers..." write "We offer..."
+- Instead of "They provide..." write "We provide..."
+- Instead of "The company uses..." write "We use..."
+
 For FAQs, create questions customers would actually ask, with answers based on the website content.
 
 CRITICAL: Return ONLY valid JSON. No markdown formatting, no code blocks, no explanation.
