@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { OnboardingWizard } from '@/components/onboarding/OnboardingWizard';
 import { isOnboardingComplete } from '@/lib/onboardingStatus';
 
 export default function Onboarding() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const isReset = searchParams.get('reset') === 'true';
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -56,7 +58,7 @@ export default function Onboarding() {
             return;
           }
           
-          if (isOnboardingComplete(retryData)) {
+          if (!isReset && isOnboardingComplete(retryData)) {
             navigate('/');
             return;
           }
@@ -73,8 +75,8 @@ export default function Onboarding() {
 
         console.log('[Onboarding] User data:', userData);
 
-        // If already onboarded, go to home
-        if (isOnboardingComplete(userData)) {
+        // If already onboarded and NOT a reset, go to home
+        if (!isReset && isOnboardingComplete(userData)) {
           console.log('[Onboarding] Already completed, going home');
           clearSafetyTimeout(loadingSafetyTimeout);
           navigate('/');

@@ -8,5 +8,5 @@ export type OnboardingRow = {
 // onboarding_completed=true while onboarding_step is still mid-flow.
 export function isOnboardingComplete(row?: OnboardingRow | null): boolean {
   if (!row) return false;
-  return row.onboarding_step === "complete";
+  return row.onboarding_step === "complete" || row.onboarding_step === "skipped";
 }
