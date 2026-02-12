@@ -502,6 +502,13 @@ async function extractFaqsWithClaude(
   
   const systemPrompt = `You are an expert Content Analyst for BizzyBee, extracting a Knowledge Base from UK service business websites.
 
+CRITICAL VOICE RULE:
+- Write ALL answers in FIRST PERSON ("we", "our", "us") as if YOU ARE the business.
+- NEVER refer to the business by name in the third person. 
+- Instead of "MAC Cleaning offers..." write "We offer..."
+- Instead of "They provide..." write "We provide..."
+- Instead of "The company uses..." write "We use..."
+
 RULES:
 - Focus on FACTS: Prices (in £), Locations, Services, Process, Policies
 - Ignore generic marketing fluff ("We're the best!")
