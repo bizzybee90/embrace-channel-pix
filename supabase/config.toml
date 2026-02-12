@@ -281,3 +281,9 @@ verify_jwt = false
 [functions.competitor-hybrid-discovery]
 verify_jwt = false
 
+[functions.classify-emails-dispatcher]
+verify_jwt = false
+
+[functions.email-classify-bulk]
+verify_jwt = false
+

@@ -2,11 +2,12 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 /**
- * BULK EMAIL CLASSIFIER - Simplified Pipeline
+ * BULK EMAIL CLASSIFIER - Parallel Relay-Race Edition
  * 
- * Sends emails to Gemini in batches of 5000 (to handle Supabase row limits).
- * Uses .range() to bypass 1000-row default limit.
- * Self-invokes until all emails are classified, then triggers voice-learning.
+ * Supports two modes:
+ * 1. Partitioned (called by dispatcher): receives partition_id & total_partitions,
+ *    uses RPC to fetch only its slice of emails. Last worker standing triggers voice-learning.
+ * 2. Legacy (direct call): fetches all unclassified emails sequentially. Backward compatible.
  */
 
 const corsHeaders = {
@@ -15,8 +16,8 @@ const corsHeaders = {
 };
 
 const LOVABLE_AI_GATEWAY = 'https://ai.gateway.lovable.dev/v1/chat/completions';
-const MODEL = 'google/gemini-2.5-flash'; // Fast, cheap, 1M token context
-const BATCH_SIZE = 5000; // Process 5000 emails per invocation (Supabase range limit)
+const MODEL = 'google/gemini-2.5-flash';
+const BATCH_SIZE = 5000;
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -24,7 +25,13 @@ serve(async (req) => {
   }
 
   try {
-    const { workspace_id, _batch_number = 0 } = await req.json();
+    const { 
+      workspace_id, 
+      partition_id, 
+      total_partitions, 
+      callback_url,
+      _batch_number = 0 
+    } = await req.json();
     
     if (!workspace_id) {
       return new Response(JSON.stringify({ error: 'workspace_id required' }), {
@@ -32,6 +39,9 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
+    const isPartitioned = partition_id !== undefined && total_partitions !== undefined;
+    const workerTag = isPartitioned ? `[Worker ${partition_id}/${total_partitions}]` : '[legacy]';
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -47,9 +57,9 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const startTime = Date.now();
 
-    console.log(`[email-classify-bulk] Starting batch ${_batch_number} for workspace ${workspace_id}`);
+    console.log(`${workerTag} Starting batch ${_batch_number} for workspace ${workspace_id}`);
 
-    // Update progress to classifying phase
+    // Update progress
     await supabase
       .from('email_import_progress')
       .upsert({
@@ -59,60 +69,45 @@ serve(async (req) => {
       }, { onConflict: 'workspace_id' });
 
     // ==========================================================================
-    // STEP 1: Fetch batch of unclassified emails using .range() to bypass 1000 limit
+    // STEP 1: Fetch emails (partitioned or legacy)
     // ==========================================================================
-    const rangeStart = 0; // Always start from 0 since we're filtering by category IS NULL
-    const rangeEnd = BATCH_SIZE - 1;
-    
-    const { data: emails, error: fetchError } = await supabase
-      .from('email_import_queue')
-      .select('id, from_email, subject, body, direction')
-      .eq('workspace_id', workspace_id)
-      .is('category', null) // Not yet classified
-      .order('id', { ascending: true })
-      .range(rangeStart, rangeEnd);
+    let emails: any[] | null = null;
+    let fetchError: any = null;
+
+    if (isPartitioned) {
+      const result = await supabase.rpc('get_partitioned_unclassified_batch', {
+        p_workspace_id: workspace_id,
+        p_partition_id: partition_id,
+        p_total_partitions: total_partitions,
+        p_batch_size: BATCH_SIZE,
+      });
+      emails = result.data;
+      fetchError = result.error;
+    } else {
+      const result = await supabase
+        .from('email_import_queue')
+        .select('id, from_email, subject, body, direction')
+        .eq('workspace_id', workspace_id)
+        .is('category', null)
+        .order('id', { ascending: true })
+        .range(0, BATCH_SIZE - 1);
+      emails = result.data;
+      fetchError = result.error;
+    }
 
     if (fetchError) throw fetchError;
 
     if (!emails || emails.length === 0) {
-      console.log(`[email-classify-bulk] No more emails to classify, triggering voice-learn`);
-      
-      // Get total classified count
-      const { count: totalClassified } = await supabase
-        .from('email_import_queue')
-        .select('id', { count: 'exact', head: true })
-        .eq('workspace_id', workspace_id)
-        .not('category', 'is', null);
-      
-      // Update progress and trigger voice learning
-      await supabase
-        .from('email_import_progress')
-        .upsert({
-          workspace_id,
-          current_phase: 'learning',
-          emails_classified: totalClassified || 0,
-          updated_at: new Date().toISOString(),
-        }, { onConflict: 'workspace_id' });
-
-      // Trigger voice learning
-      await triggerVoiceLearning(supabaseUrl, supabaseServiceKey, workspace_id);
-
-      return new Response(JSON.stringify({ 
-        success: true, 
-        status: 'complete',
-        total_classified: totalClassified,
-        message: 'All emails classified, triggered voice learning' 
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      console.log(`${workerTag} No more emails in partition`);
+      return await handlePartitionComplete(supabase, supabaseUrl, supabaseServiceKey, workspace_id, workerTag, callback_url, isPartitioned);
     }
 
-    console.log(`[email-classify-bulk] Found ${emails.length} emails to classify in batch ${_batch_number}`);
+    console.log(`${workerTag} Found ${emails.length} emails in batch ${_batch_number}`);
 
     // ==========================================================================
-    // STEP 2: Build prompt with batch of emails
+    // STEP 2: Build prompt
     // ==========================================================================
-    const emailLines = emails.map((e, i) => {
+    const emailLines = emails.map((e: any, i: number) => {
       const dir = e.direction === 'outbound' ? 'OUT' : 'IN';
       const subject = (e.subject || '(none)').substring(0, 100).replace(/[\n\r|]/g, ' ');
       const snippet = (e.body || '').substring(0, 150).replace(/[\n\r|]/g, ' ');
@@ -147,14 +142,11 @@ Return ONLY valid JSON. No markdown. No explanation. Just the array.
 EMAILS (${emails.length} total, format: index|direction|from|subject|snippet):
 ${emailLines}`;
 
-    const estimatedTokens = Math.ceil(prompt.length / 4);
-    console.log(`[email-classify-bulk] Prompt size: ${prompt.length} chars, ~${estimatedTokens} tokens`);
+    console.log(`${workerTag} Prompt: ${prompt.length} chars, ~${Math.ceil(prompt.length / 4)} tokens`);
 
     // ==========================================================================
     // STEP 3: Call Lovable AI Gateway
     // ==========================================================================
-    console.log(`[email-classify-bulk] Calling Lovable AI Gateway (${MODEL})...`);
-    
     const response = await fetch(LOVABLE_AI_GATEWAY, {
       method: 'POST',
       headers: { 
@@ -171,35 +163,30 @@ ${emailLines}`;
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`[email-classify-bulk] AI Gateway error:`, errorText);
+      console.error(`${workerTag} AI Gateway error:`, errorText);
       throw new Error(`AI Gateway error: ${response.status} - ${errorText}`);
     }
 
     const aiData = await response.json();
     const responseText = aiData.choices?.[0]?.message?.content || '';
-    
-    console.log(`[email-classify-bulk] Got response, length: ${responseText.length} chars`);
 
     // ==========================================================================
     // STEP 4: Parse classifications
     // ==========================================================================
     const jsonMatch = responseText.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) {
-      throw new Error('No JSON array in AI response');
-    }
+    if (!jsonMatch) throw new Error('No JSON array in AI response');
 
     let classifications: Array<{ i: number; c: string; r: boolean }>;
     try {
       classifications = JSON.parse(jsonMatch[0]);
-    } catch (parseErr) {
-      console.error(`[email-classify-bulk] JSON parse error:`, parseErr);
+    } catch {
       throw new Error('Failed to parse AI response as JSON');
     }
 
-    console.log(`[email-classify-bulk] Parsed ${classifications.length} classifications`);
+    console.log(`${workerTag} Parsed ${classifications.length} classifications`);
 
     // ==========================================================================
-    // STEP 5: Bulk update emails - parallel updates for speed
+    // STEP 5: Bulk update emails
     // ==========================================================================
     const classMap = new Map<number, { c: string; r: boolean }>();
     for (const cl of classifications) {
@@ -210,56 +197,63 @@ ${emailLines}`;
     let updated = 0;
     let failed = 0;
 
-    // Build all update promises
-    const updatePromises = emails.map(async (email, index) => {
-      const classification = classMap.get(index);
-      const { error } = await supabase
-        .from('email_import_queue')
-        .update({
-          category: classification?.c || 'unknown',
-          requires_reply: classification?.r || false,
-          classified_at: now,
-          status: 'processed',
-          processed_at: now,
-        })
-        .eq('id', email.id);
-      
-      return { success: !error, id: email.id };
-    });
-
-    // Execute in batches of 50 to avoid overwhelming the DB
     const PARALLEL_BATCH = 50;
-    for (let i = 0; i < updatePromises.length; i += PARALLEL_BATCH) {
-      const batch = updatePromises.slice(i, i + PARALLEL_BATCH);
-      const results = await Promise.all(batch);
-      updated += results.filter(r => r.success).length;
-      failed += results.filter(r => !r.success).length;
+    for (let i = 0; i < emails.length; i += PARALLEL_BATCH) {
+      const batch = emails.slice(i, i + PARALLEL_BATCH);
+      const results = await Promise.all(batch.map(async (email: any, batchIdx: number) => {
+        const globalIdx = i + batchIdx;
+        const classification = classMap.get(globalIdx);
+        const { error } = await supabase
+          .from('email_import_queue')
+          .update({
+            category: classification?.c || 'unknown',
+            requires_reply: classification?.r || false,
+            classified_at: now,
+            status: 'processed',
+            processed_at: now,
+          })
+          .eq('id', email.id);
+        return !error;
+      }));
+      updated += results.filter(Boolean).length;
+      failed += results.filter(r => !r).length;
     }
 
-    console.log(`[email-classify-bulk] Updated ${updated} emails, ${failed} failed`);
-
     const elapsed = Date.now() - startTime;
-    console.log(`[email-classify-bulk] Batch ${_batch_number} complete: ${updated} emails in ${elapsed}ms`);
+    console.log(`${workerTag} Batch ${_batch_number}: ${updated} updated, ${failed} failed in ${elapsed}ms`);
 
     // ==========================================================================
-    // STEP 6: Check if more emails remain, self-invoke if needed
+    // STEP 6: Self-chain if more emails in partition
     // ==========================================================================
-    const { count: remaining } = await supabase
-      .from('email_import_queue')
-      .select('id', { count: 'exact', head: true })
-      .eq('workspace_id', workspace_id)
-      .is('category', null);
+    // Check if there are more in THIS worker's partition
+    let moreInPartition = false;
+    if (isPartitioned) {
+      const { data: nextBatch } = await supabase.rpc('get_partitioned_unclassified_batch', {
+        p_workspace_id: workspace_id,
+        p_partition_id: partition_id,
+        p_total_partitions: total_partitions,
+        p_batch_size: 1,
+      });
+      moreInPartition = nextBatch && nextBatch.length > 0;
+    } else {
+      const { count } = await supabase
+        .from('email_import_queue')
+        .select('id', { count: 'exact', head: true })
+        .eq('workspace_id', workspace_id)
+        .is('category', null);
+      moreInPartition = (count || 0) > 0;
+    }
 
-    if (remaining && remaining > 0) {
-      console.log(`[email-classify-bulk] ${remaining} emails remaining, self-invoking batch ${_batch_number + 1}`);
-      
-      // Update progress with current count
+    if (moreInPartition) {
+      console.log(`${workerTag} More emails remain, self-chaining batch ${_batch_number + 1}`);
+
+      // Update progress count
       const { count: totalClassified } = await supabase
         .from('email_import_queue')
         .select('id', { count: 'exact', head: true })
         .eq('workspace_id', workspace_id)
         .not('category', 'is', null);
-      
+
       await supabase
         .from('email_import_progress')
         .upsert({
@@ -268,8 +262,7 @@ ${emailLines}`;
           emails_classified: totalClassified || 0,
           updated_at: new Date().toISOString(),
         }, { onConflict: 'workspace_id' });
-      
-      // Self-invoke for next batch
+
       fetch(`${supabaseUrl}/functions/v1/email-classify-bulk`, {
         method: 'POST',
         headers: {
@@ -278,16 +271,19 @@ ${emailLines}`;
         },
         body: JSON.stringify({ 
           workspace_id, 
-          _batch_number: _batch_number + 1 
+          partition_id: isPartitioned ? partition_id : undefined,
+          total_partitions: isPartitioned ? total_partitions : undefined,
+          callback_url,
+          _batch_number: _batch_number + 1,
         }),
-      }).catch(e => console.error('[email-classify-bulk] Self-invoke failed:', e));
+      }).catch(e => console.error(`${workerTag} Self-chain failed:`, e));
 
       return new Response(JSON.stringify({
         success: true,
         status: 'continuing',
+        worker: workerTag,
         batch: _batch_number,
         emails_classified: updated,
-        emails_remaining: remaining,
         elapsed_ms: elapsed,
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -295,35 +291,9 @@ ${emailLines}`;
     }
 
     // ==========================================================================
-    // STEP 7: All done - trigger voice learning
+    // STEP 7: Partition empty → check global remaining
     // ==========================================================================
-    const { count: finalCount } = await supabase
-      .from('email_import_queue')
-      .select('id', { count: 'exact', head: true })
-      .eq('workspace_id', workspace_id)
-      .not('category', 'is', null);
-
-    await supabase
-      .from('email_import_progress')
-      .upsert({
-        workspace_id,
-        current_phase: 'learning',
-        emails_classified: finalCount || 0,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'workspace_id' });
-
-    await triggerVoiceLearning(supabaseUrl, supabaseServiceKey, workspace_id);
-
-    return new Response(JSON.stringify({
-      success: true,
-      status: 'complete',
-      total_batches: _batch_number + 1,
-      emails_classified: finalCount,
-      elapsed_ms: elapsed,
-      chained_to: 'voice-learning',
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return await handlePartitionComplete(supabase, supabaseUrl, supabaseServiceKey, workspace_id, workerTag, callback_url, isPartitioned);
 
   } catch (error) {
     console.error('[email-classify-bulk] Error:', error);
@@ -341,7 +311,7 @@ ${emailLines}`;
             updated_at: new Date().toISOString(),
           }, { onConflict: 'workspace_id' });
       }
-    } catch (e) {
+    } catch {
       // Ignore
     }
     
@@ -354,15 +324,95 @@ ${emailLines}`;
   }
 });
 
+/**
+ * Called when a worker's partition is empty.
+ * Checks global remaining count - only the LAST worker triggers voice-learning and callback.
+ */
+async function handlePartitionComplete(
+  supabase: any,
+  supabaseUrl: string,
+  supabaseServiceKey: string,
+  workspace_id: string,
+  workerTag: string,
+  callback_url: string | null,
+  isPartitioned: boolean,
+) {
+  // Check global remaining
+  const { data: globalRemaining } = await supabase
+    .rpc('count_unclassified_emails', { p_workspace_id: workspace_id });
+
+  const remaining = Number(globalRemaining) || 0;
+
+  if (remaining > 0 && isPartitioned) {
+    console.log(`${workerTag} Partition empty but ${remaining} emails remain globally (other workers still running)`);
+    return new Response(JSON.stringify({
+      success: true,
+      status: 'partition_complete',
+      worker: workerTag,
+      global_remaining: remaining,
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
+  // This is the last worker! Trigger voice-learning and callback.
+  console.log(`${workerTag} ALL DONE - triggering voice-learning`);
+
+  const { count: totalClassified } = await supabase
+    .from('email_import_queue')
+    .select('id', { count: 'exact', head: true })
+    .eq('workspace_id', workspace_id)
+    .not('category', 'is', null);
+
+  await supabase
+    .from('email_import_progress')
+    .upsert({
+      workspace_id,
+      current_phase: 'learning',
+      emails_classified: totalClassified || 0,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'workspace_id' });
+
+  // Trigger voice learning
+  await triggerVoiceLearning(supabaseUrl, supabaseServiceKey, workspace_id);
+
+  // Send callback to n8n if provided
+  if (callback_url) {
+    try {
+      await fetch(callback_url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          workspace_id,
+          status: 'classification_complete',
+          total_classified: totalClassified || 0,
+          message: 'All emails classified, voice learning triggered',
+        }),
+      });
+      console.log(`${workerTag} Sent completion callback to ${callback_url}`);
+    } catch (e) {
+      console.error(`${workerTag} Callback failed:`, e);
+    }
+  }
+
+  return new Response(JSON.stringify({
+    success: true,
+    status: 'complete',
+    worker: workerTag,
+    total_classified: totalClassified,
+    chained_to: 'voice-learning',
+  }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+}
+
 async function triggerVoiceLearning(
   supabaseUrl: string,
   supabaseServiceKey: string,
   workspace_id: string
 ): Promise<void> {
   try {
-    const functionUrl = `${supabaseUrl}/functions/v1/voice-learning`;
-    
-    const response = await fetch(functionUrl, {
+    const response = await fetch(`${supabaseUrl}/functions/v1/voice-learning`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -372,11 +422,11 @@ async function triggerVoiceLearning(
     });
 
     if (!response.ok) {
-      console.error(`[email-classify-bulk] Failed to trigger voice-learning: ${response.status}`);
+      console.error(`Failed to trigger voice-learning: ${response.status}`);
     } else {
-      console.log(`[email-classify-bulk] Triggered voice-learning for workspace ${workspace_id}`);
+      console.log(`Triggered voice-learning for workspace ${workspace_id}`);
     }
   } catch (e) {
-    console.error(`[email-classify-bulk] Error triggering voice-learning:`, e);
+    console.error(`Error triggering voice-learning:`, e);
   }
 }

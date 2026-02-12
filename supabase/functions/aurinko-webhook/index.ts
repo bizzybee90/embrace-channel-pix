@@ -79,6 +79,13 @@ async function verifyAurinkoRequest(supabase: any, accountId: string): Promise<b
 }
 
 serve(async (req) => {
+  // ===== KILL SWITCH: Return immediately if webhook processing is disabled =====
+  // This prevents cloud balance drain from frequent Aurinko webhook calls.
+  // Set AURINKO_WEBHOOK_ENABLED=true in secrets to re-enable processing.
+  if (Deno.env.get('AURINKO_WEBHOOK_ENABLED') !== 'true') {
+    return new Response('OK', { status: 200 });
+  }
+
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
