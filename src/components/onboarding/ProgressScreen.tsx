@@ -8,7 +8,6 @@ import {
   Search, 
   FileCheck, 
   Sparkles,
-  Mail,
   AlertCircle,
   ChevronRight
 } from 'lucide-react';
@@ -30,28 +29,40 @@ interface TrackState {
   total?: number;
 }
 
-const COMPETITOR_PHASES = [
+// Discovery phases (Workflow 1)
+const DISCOVERY_PHASES = [
   { key: 'pending', label: 'Waiting to start', icon: Loader2 },
   { key: 'starting', label: 'Starting discovery...', icon: Search },
   { key: 'discovering', label: 'Searching for competitors...', icon: Search },
   { key: 'search_complete', label: 'Verifying results...', icon: FileCheck },
   { key: 'verification_complete', label: 'Checking domains...', icon: FileCheck },
-  { key: 'processing', label: 'Scraping & extracting FAQs...', icon: Sparkles },
-  { key: 'health_check_complete', label: 'Scraping websites...', icon: FileCheck },
-  { key: 'scraping_complete', label: 'Generating FAQs...', icon: Sparkles },
+  { key: 'health_check_complete', label: 'Finalising competitors...', icon: FileCheck },
   { key: 'complete', label: 'Complete', icon: CheckCircle2 },
   { key: 'failed', label: 'Failed', icon: AlertCircle },
 ];
 
+// FAQ scrape phases (Workflow 2)
+const SCRAPE_PHASES = [
+  { key: 'waiting', label: 'Waiting for discovery...', icon: Loader2 },
+  { key: 'pending', label: 'Queued for scraping', icon: Loader2 },
+  { key: 'scraping', label: 'Scraping competitor websites...', icon: Search },
+  { key: 'extracting', label: 'Extracting FAQs...', icon: Sparkles },
+  { key: 'scrape_processing', label: 'Processing FAQs...', icon: Sparkles },
+  { key: 'complete', label: 'Complete', icon: CheckCircle2 },
+  { key: 'failed', label: 'Failed', icon: AlertCircle },
+];
+
+// Bug 6 Fix: Added 'dispatched' status
 const EMAIL_PHASES = [
-  { key: 'pending', label: 'Waiting to start', icon: Loader2 },
+  { key: 'pending', label: 'Waiting for import...', icon: Loader2 },
+  { key: 'dispatched', label: 'Starting classification...', icon: FileCheck },
   { key: 'classifying', label: 'Classifying emails...', icon: FileCheck },
   { key: 'classification_complete', label: 'Complete', icon: CheckCircle2 },
   { key: 'complete', label: 'Complete', icon: CheckCircle2 },
   { key: 'failed', label: 'Failed', icon: AlertCircle },
 ];
 
-function getPhaseIndex(phases: typeof COMPETITOR_PHASES, currentStatus: string): number {
+function getPhaseIndex(phases: typeof DISCOVERY_PHASES, currentStatus: string): number {
   const index = phases.findIndex(p => p.key === currentStatus);
   return index >= 0 ? index : 0;
 }
@@ -67,7 +78,7 @@ function TrackProgress({
   total,
 }: { 
   title: string;
-  phases: typeof COMPETITOR_PHASES;
+  phases: typeof DISCOVERY_PHASES;
   currentStatus: string;
   counts?: { label: string; value: number }[];
   error?: string | null;
@@ -78,16 +89,15 @@ function TrackProgress({
   const currentIndex = getPhaseIndex(phases, currentStatus);
   const isComplete = currentStatus === 'complete' || currentStatus === 'classification_complete';
   const isFailed = currentStatus === 'failed';
-  const totalPhases = phases.length - 1;
+  const isWaiting = currentStatus === 'waiting';
+  const totalPhases = phases.length - 1; // exclude 'failed'
   
-  // Use per-competitor progress when in 'processing' status
   let progressPercent: number;
-  if (currentStatus === 'processing' && current && total && total > 0) {
-    // Map processing phase to ~30-90% of total progress
+  if (currentStatus === 'scraping' && current && total && total > 0) {
     const processingProgress = (current / total) * 60;
-    progressPercent = 30 + processingProgress;
+    progressPercent = 20 + processingProgress;
   } else {
-    progressPercent = isComplete ? 100 : (currentIndex / (totalPhases - 1)) * 100;
+    progressPercent = isComplete ? 100 : isWaiting ? 0 : (currentIndex / (totalPhases - 1)) * 100;
   }
 
   const CurrentIcon = phases[currentIndex]?.icon || Loader2;
@@ -105,7 +115,8 @@ function TrackProgress({
           "h-10 w-10 rounded-full flex items-center justify-center",
           isComplete && "bg-success/10 text-success",
           isFailed && "bg-destructive/10 text-destructive",
-          !isComplete && !isFailed && "bg-primary/10 text-primary"
+          isWaiting && "bg-muted text-muted-foreground",
+          !isComplete && !isFailed && !isWaiting && "bg-primary/10 text-primary"
         )}>
           {isComplete ? (
             <CheckCircle2 className="h-5 w-5" />
@@ -114,7 +125,7 @@ function TrackProgress({
           ) : (
             <CurrentIcon className={cn(
               "h-5 w-5",
-              currentStatus !== 'pending' && "animate-spin"
+              !isWaiting && currentStatus !== 'pending' && "animate-spin"
             )} />
           )}
         </div>
@@ -128,7 +139,7 @@ function TrackProgress({
           )}>
             {isFailed ? (error || 'An error occurred') : currentLabel}
           </p>
-          {currentStatus === 'processing' && currentCompetitor && current && total && (
+          {(currentStatus === 'scraping' || currentStatus === 'extracting') && currentCompetitor && current && total && (
             <p className="text-xs text-muted-foreground mt-0.5">
               Competitor {current} of {total}: <span className="font-medium">{currentCompetitor}</span>
             </p>
@@ -159,78 +170,86 @@ function TrackProgress({
 }
 
 export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenProps) {
-  const [competitorTrack, setCompetitorTrack] = useState<TrackState>({
-    status: 'pending',
-    counts: [],
-  });
-  const [emailTrack, setEmailTrack] = useState<TrackState>({
-    status: 'pending',
-    counts: [],
-  });
+  const [discoveryTrack, setDiscoveryTrack] = useState<TrackState>({ status: 'pending', counts: [] });
+  const [scrapeTrack, setScrapeTrack] = useState<TrackState>({ status: 'waiting', counts: [] });
+  const [emailTrack, setEmailTrack] = useState<TrackState>({ status: 'pending', counts: [] });
   const [isLoading, setIsLoading] = useState(true);
   const [elapsedTime, setElapsedTime] = useState(0);
   const startTimeRef = useRef<number>(Date.now());
 
-  // Poll for progress using hybrid approach: n8n_workflow_progress + direct DB counts
   useEffect(() => {
     const pollProgress = async () => {
       try {
-        // Fetch all data in parallel
-        const [workflowRes, emailsRes] = await Promise.all([
-          // n8n workflow status (for phase tracking)
+        // Bug 5 Fix: Poll n8n_workflow_progress for ALL tracks + email_import_progress for email counts
+        const [workflowRes, emailProgressRes] = await Promise.all([
           supabase
             .from('n8n_workflow_progress' as 'allowed_webhook_ips')
             .select('*')
             .eq('workspace_id', workspaceId),
-          // Direct DB: email classification progress
           supabase
-            .from('raw_emails')
-            .select('id, category')
-            .eq('workspace_id', workspaceId),
+            .from('email_import_progress' as 'allowed_webhook_ips')
+            .select('*')
+            .eq('workspace_id', workspaceId)
+            .maybeSingle(),
         ]);
 
-        // Parse n8n workflow status records
         const records = ((workflowRes.data || []) as unknown as Array<{
           workflow_type: string;
           status: string;
           details: Record<string, unknown>;
         }>);
 
-        const competitorRecord = records.find(r => r.workflow_type === 'competitor_discovery');
+        // Bug 4 Fix: Track all three workflow types
+        const discoveryRecord = records.find(r => r.workflow_type === 'competitor_discovery');
+        const scrapeRecord = records.find(r => r.workflow_type === 'competitor_scrape');
         const emailRecord = records.find(r => r.workflow_type === 'email_import');
 
-        // Competitor track — only use counts from n8n progress record to avoid stale DB data
-        const competitorDetails = (competitorRecord?.details || {}) as Record<string, unknown>;
-        const competitorStatus = competitorRecord?.status || 'pending';
+        // Discovery track (Workflow 1)
+        const discoveryDetails = (discoveryRecord?.details || {}) as Record<string, unknown>;
+        const discoveryStatus = discoveryRecord?.status || 'pending';
 
-        setCompetitorTrack({
-          status: competitorStatus,
-          counts: competitorRecord ? [
-            { label: 'competitors found', value: (competitorDetails.competitors_found as number) || 0 },
-            { label: 'scraped', value: (competitorDetails.competitors_scraped as number) || 0 },
-            { label: 'FAQs generated', value: (competitorDetails.faqs_generated as number) || 0 },
+        setDiscoveryTrack({
+          status: discoveryStatus,
+          counts: discoveryRecord ? [
+            { label: 'competitors found', value: (discoveryDetails.competitors_found as number) || 0 },
           ] : [],
-          error: competitorDetails.error as string | undefined,
-          currentCompetitor: competitorDetails.current_competitor as string | undefined,
-          current: competitorDetails.current as number | undefined,
-          total: competitorDetails.total as number | undefined,
+          error: discoveryDetails.error as string | undefined,
         });
 
-        // Email track — only use DB inference if n8n email_import workflow exists
+        // Scrape track (Workflow 2) — stays 'waiting' until discovery completes
+        const scrapeDetails = (scrapeRecord?.details || {}) as Record<string, unknown>;
+        const scrapeStatus = scrapeRecord?.status || (discoveryStatus === 'complete' ? 'pending' : 'waiting');
+
+        setScrapeTrack({
+          status: scrapeStatus,
+          counts: scrapeRecord ? [
+            { label: 'scraped', value: (scrapeDetails.competitors_scraped as number) || 0 },
+            { label: 'FAQs generated', value: (scrapeDetails.faqs_generated as number) || 0 },
+          ] : [],
+          error: scrapeDetails.error as string | undefined,
+          currentCompetitor: scrapeDetails.current_competitor as string | undefined,
+          current: scrapeDetails.current as number | undefined,
+          total: scrapeDetails.total as number | undefined,
+        });
+
+        // Email track — use email_import_progress table for accurate counts
         const emailStatus = emailRecord?.status || 'pending';
         const emailDetails = (emailRecord?.details || {}) as Record<string, unknown>;
+        const emailProgress = emailProgressRes.data as unknown as Record<string, unknown> | null;
 
-        if (emailRecord) {
-          // n8n workflow exists — use DB emails for classification progress
-          const emails = emailsRes.data || [];
-          const totalEmails = emails.length;
-          const classifiedEmails = emails.filter(e => e.category).length;
+        if (emailProgress || emailRecord) {
+          const totalEmails = (emailDetails.total_emails as number) || 
+                             (emailProgress?.total_emails as number) || 0;
+          const classifiedEmails = (emailDetails.emails_classified as number) || 
+                                   (emailProgress?.classified_count as number) || 0;
 
           let effectiveEmailStatus = emailStatus;
+          // Auto-advance from pending if we can see classification is happening
           if (totalEmails > 0 && classifiedEmails < totalEmails && emailStatus === 'pending') {
             effectiveEmailStatus = 'classifying';
           }
-          if (totalEmails > 0 && classifiedEmails === totalEmails) {
+          // 99% threshold to handle stragglers
+          if (totalEmails > 0 && classifiedEmails >= totalEmails * 0.99) {
             effectiveEmailStatus = 'complete';
           }
 
@@ -238,18 +257,14 @@ export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenPr
 
           setEmailTrack({
             status: effectiveEmailStatus,
-            counts: [
+            counts: totalEmails > 0 ? [
               { label: 'total emails', value: totalEmails },
               { label: `classified (${percentage}%)`, value: classifiedEmails },
-            ],
+            ] : [],
             error: emailDetails.error as string | undefined,
           });
         } else {
-          // No n8n email workflow yet — show waiting state
-          setEmailTrack({
-            status: 'pending',
-            counts: [],
-          });
+          setEmailTrack({ status: 'pending', counts: [] });
         }
       } catch (error) {
         console.error('Error polling progress:', error);
@@ -263,7 +278,6 @@ export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenPr
     return () => window.clearInterval(interval);
   }, [workspaceId]);
 
-  // Track elapsed time
   useEffect(() => {
     const timer = window.setInterval(() => {
       setElapsedTime(Math.floor((Date.now() - startTimeRef.current) / 1000));
@@ -271,9 +285,11 @@ export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenPr
     return () => window.clearInterval(timer);
   }, []);
 
-  const isCompetitorComplete = competitorTrack.status === 'complete';
+  // Bug 4 Fix: Require ALL three tracks to be complete
+  const isDiscoveryComplete = discoveryTrack.status === 'complete';
+  const isScrapeComplete = scrapeTrack.status === 'complete';
   const isEmailComplete = emailTrack.status === 'complete' || emailTrack.status === 'classification_complete';
-  const bothComplete = isCompetitorComplete && isEmailComplete;
+  const allComplete = isDiscoveryComplete && isScrapeComplete && isEmailComplete;
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -308,26 +324,45 @@ export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenPr
         Elapsed: {formatTime(elapsedTime)}
       </div>
 
-      <TrackProgress
-        title="Competitor Research"
-        phases={COMPETITOR_PHASES}
-        currentStatus={competitorTrack.status}
-        counts={competitorTrack.counts}
-        error={competitorTrack.error}
-        currentCompetitor={competitorTrack.currentCompetitor}
-        current={competitorTrack.current}
-        total={competitorTrack.total}
-      />
+      {/* Competitor Research: 2-stage composite */}
+      <div className="space-y-3">
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide px-1">
+          Competitor Research
+        </h2>
+        <TrackProgress
+          title="Finding Competitors"
+          phases={DISCOVERY_PHASES}
+          currentStatus={discoveryTrack.status}
+          counts={discoveryTrack.counts}
+          error={discoveryTrack.error}
+        />
+        <TrackProgress
+          title="Analysing Competitors"
+          phases={SCRAPE_PHASES}
+          currentStatus={scrapeTrack.status}
+          counts={scrapeTrack.counts}
+          error={scrapeTrack.error}
+          currentCompetitor={scrapeTrack.currentCompetitor}
+          current={scrapeTrack.current}
+          total={scrapeTrack.total}
+        />
+      </div>
 
-      <TrackProgress
-        title="Email Classification"
-        phases={EMAIL_PHASES}
-        currentStatus={emailTrack.status}
-        counts={emailTrack.counts}
-        error={emailTrack.error}
-      />
+      {/* Email Classification */}
+      <div className="space-y-3">
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide px-1">
+          Email Classification
+        </h2>
+        <TrackProgress
+          title="Email Classification"
+          phases={EMAIL_PHASES}
+          currentStatus={emailTrack.status}
+          counts={emailTrack.counts}
+          error={emailTrack.error}
+        />
+      </div>
 
-      {!bothComplete && (
+      {!allComplete && (
         <div className="text-center text-sm text-muted-foreground p-4 bg-muted/30 rounded-lg">
           <p>This typically takes 5-20 minutes depending on the research scope.</p>
           <p className="mt-1">You can leave this page and come back — progress will continue.</p>
@@ -337,11 +372,11 @@ export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenPr
       <div className="flex flex-col items-center gap-3 pt-4">
         <Button 
           onClick={onNext} 
-          disabled={!bothComplete}
+          disabled={!allComplete}
           size="lg"
           className="gap-2"
         >
-          {bothComplete ? (
+          {allComplete ? (
             <>
               Continue
               <ChevronRight className="h-4 w-4" />
@@ -353,7 +388,7 @@ export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenPr
             </>
           )}
         </Button>
-        {!bothComplete && (
+        {!allComplete && (
           <div className="flex gap-3">
             <Button variant="ghost" size="sm" onClick={onBack} className="text-muted-foreground">
               ← Back

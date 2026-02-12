@@ -34,11 +34,30 @@ serve(async (req) => {
     const searchConfig = (searchTermsRes.data?.details as Record<string, unknown>) || {}
     const searchQueries = (searchConfig.search_queries as string[]) || []
 
+    // Bug 7 Fix: Read target_count from saved config instead of hardcoding
+    const targetCount = (searchConfig.target_count as number) || 50
+
+    // Bug 8 Fix: Generate a job_id for this research session
+    const jobId = crypto.randomUUID()
+
     const callbackBaseUrl = `${supabaseUrl}/functions/v1`
     const websiteUrl = (profile?.website as string) || (context?.website_url as string) || ''
     const ownDomain = websiteUrl.replace(/https?:\/\//, '').replace(/\/$/, '')
 
-    console.log(`[trigger-n8n-workflows] workspace=${workspaceId} queries=${searchQueries.length} business=${(context?.company_name as string) || 'unknown'}`)
+    console.log(`[trigger-n8n-workflows] workspace=${workspaceId} queries=${searchQueries.length} target=${targetCount} jobId=${jobId} business=${(context?.company_name as string) || 'unknown'}`)
+
+    // Bug 8 Fix: Create a competitor_research_jobs record so job_id is valid
+    await supabase.from('competitor_research_jobs').insert({
+      id: jobId,
+      workspace_id: workspaceId,
+      niche_query: searchQueries[0] || (context?.business_type as string) || 'general',
+      status: 'pending',
+      target_count: targetCount,
+      search_queries: searchQueries,
+      location: (profile?.formatted_address as string) || (context?.service_area as string) || '',
+      industry: (profile?.industry as string) || (context?.business_type as string) || '',
+      exclude_domains: ownDomain ? [ownDomain] : [],
+    })
 
     // Initialize progress records so UI shows "pending" immediately
     await Promise.all([
@@ -46,61 +65,48 @@ serve(async (req) => {
         workspace_id: workspaceId,
         workflow_type: 'competitor_discovery',
         status: 'pending',
-        details: { message: 'Workflow triggered, waiting for n8n...' },
+        details: { message: 'Workflow triggered, waiting for n8n...', job_id: jobId },
         updated_at: new Date().toISOString(),
       }, { onConflict: 'workspace_id,workflow_type' }),
+      // Bug 9 Fix: Only init email track status — don't trigger email classification from here.
+      // Email classification is already chained from the email-import-v2 pipeline when import completes.
       supabase.from('n8n_workflow_progress').upsert({
         workspace_id: workspaceId,
         workflow_type: 'email_import',
         status: 'pending',
-        details: { message: 'Email classification triggered, waiting for n8n...' },
+        details: { message: 'Waiting for email import to complete...' },
         updated_at: new Date().toISOString(),
       }, { onConflict: 'workspace_id,workflow_type' }),
     ]);
 
-    // Trigger BOTH n8n workflows simultaneously from the server side (no CORS issues)
-    const results = await Promise.allSettled([
-      // Competitor Discovery
-      fetch('https://bizzybee.app.n8n.cloud/webhook/competitor-discovery', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          workspace_id: workspaceId,
-          business_name: (profile?.business_name as string) || (context?.company_name as string) || '',
-          business_type: (profile?.industry as string) || (context?.business_type as string) || '',
-          website_url: websiteUrl,
-          location: (profile?.formatted_address as string) || (context?.service_area as string) || '',
-          radius_miles: (profile?.service_radius_miles as number) || 20,
-          search_queries: searchQueries,
-          target_count: 50,
-          exclude_domains: ownDomain ? [ownDomain] : [],
-          callback_url: `${callbackBaseUrl}/n8n-competitor-callback`,
-        }),
+    // Bug 9 Fix: Only trigger competitor discovery — NOT email classification.
+    // Email classification is already handled by the email-import-v2 → email-classify-bulk chain.
+    const competitorResult = await fetch('https://bizzybee.app.n8n.cloud/webhook/competitor-discovery', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        workspace_id: workspaceId,
+        job_id: jobId,
+        business_name: (profile?.business_name as string) || (context?.company_name as string) || '',
+        business_type: (profile?.industry as string) || (context?.business_type as string) || '',
+        website_url: websiteUrl,
+        location: (profile?.formatted_address as string) || (context?.service_area as string) || '',
+        radius_miles: (profile?.service_radius_miles as number) || 20,
+        search_queries: searchQueries,
+        target_count: targetCount,
+        exclude_domains: ownDomain ? [ownDomain] : [],
+        callback_url: `${callbackBaseUrl}/n8n-competitor-callback`,
       }),
+    }).catch(err => ({ ok: false, status: 0, error: String(err) }));
 
-      // Email Classification
-      fetch('https://bizzybee.app.n8n.cloud/webhook/email-classification', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          workspace_id: workspaceId,
-          callback_url: `${callbackBaseUrl}/n8n-email-callback`,
-        }),
-      }),
-    ])
-
-    const competitorResult = results[0]
-    const emailResult = results[1]
-
-    console.log('Competitor discovery trigger:', competitorResult.status, 
-      competitorResult.status === 'fulfilled' ? competitorResult.value.status : (competitorResult as PromiseRejectedResult).reason)
-    console.log('Email classification trigger:', emailResult.status,
-      emailResult.status === 'fulfilled' ? emailResult.value.status : (emailResult as PromiseRejectedResult).reason)
+    const resultStatus = 'status' in competitorResult ? competitorResult.status : 0;
+    console.log('Competitor discovery trigger: status=', resultStatus);
 
     return new Response(JSON.stringify({
       success: true,
-      competitor: competitorResult.status === 'fulfilled' ? { status: competitorResult.value.status } : { error: String((competitorResult as PromiseRejectedResult).reason) },
-      email: emailResult.status === 'fulfilled' ? { status: emailResult.value.status } : { error: String((emailResult as PromiseRejectedResult).reason) },
+      job_id: jobId,
+      competitor: { status: resultStatus },
+      email: { status: 'deferred', message: 'Email classification chains from import pipeline' },
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
