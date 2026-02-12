@@ -40,7 +40,7 @@ export function OnboardingTriggerPanel({ workspaceId }: OnboardingTriggerPanelPr
       } catch { /* ignore */ }
 
       toast.success('Redirecting to onboarding...');
-      navigate('/onboarding');
+      navigate('/onboarding?reset=true');
     } catch (error) {
       console.error('Error resetting onboarding:', error);
       toast.error('Failed to start onboarding');
