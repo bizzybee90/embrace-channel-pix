@@ -647,12 +647,12 @@ async function storeFaqsWithDedup(
       const fullEmbeddingData = await fullEmbeddingResponse.json();
       const fullEmbedding = fullEmbeddingData.data?.[0]?.embedding;
       
-      await supabase.from('faq_database').insert({
+      const { error: insertError } = await supabase.from('faq_database').insert({
         workspace_id: workspaceId,
         question: faq.question,
         answer: faq.answer,
         category: faq.category,
-        source: 'own_website',
+        generation_source: 'own_website',
         source_type: faq.source_type,
         source_page_url: sourceUrl,
         quality_score: qualityScore,
@@ -662,6 +662,11 @@ async function storeFaqsWithDedup(
         is_active: true,
         embedding: fullEmbedding
       });
+      
+      if (insertError) {
+        console.error('FAQ insert error:', insertError.message);
+        continue;
+      }
       
       storedCount++;
       

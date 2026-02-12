@@ -17,40 +17,46 @@ interface BusinessFact {
   category: string;
 }
 
-// ── BizzyBee Brand Palette (warm amber / honey bee) ──
-const B = {
-  // Core bee colours
-  honey:      [245, 166, 35]  as [number, number, number],   // #F5A623  – primary amber
-  honeyDark:  [212, 136, 18]  as [number, number, number],   // #D48812
-  honeyLight: [255, 214, 102] as [number, number, number],   // #FFD666
-  honeyCream: [255, 248, 230] as [number, number, number],   // #FFF8E6
+// ── BizzyBee Design System (matches app's index.css) ──
+const C = {
+  // Primary blue (--primary: 217 91% 60%)
+  primary:      [59, 130, 246]  as [number, number, number],   // hsl(217,91%,60%) ≈ #3B82F6
+  primaryDark:  [37, 99, 235]   as [number, number, number],   // slightly darker
+  primaryLight: [147, 187, 253] as [number, number, number],   // light tint
+  primaryPale:  [235, 242, 254] as [number, number, number],   // very light bg
 
-  // Neutrals
-  charcoal:   [38, 38, 38]    as [number, number, number],   // #262626
-  slate:      [68, 68, 68]    as [number, number, number],   // #444444
-  grey:       [120, 120, 120] as [number, number, number],   // #787878
-  lightGrey:  [245, 245, 240] as [number, number, number],   // #F5F5F0
-  offWhite:   [252, 250, 245] as [number, number, number],   // #FCFAF5
-  white:      [255, 255, 255] as [number, number, number],
+  // Backgrounds (--background: 220 17% 97%)
+  background:   [245, 247, 250] as [number, number, number],   // #F5F7FA
+  white:        [255, 255, 255] as [number, number, number],
+  
+  // Text (--foreground: 220 15% 12%)
+  foreground:   [26, 28, 34]    as [number, number, number],   // #1A1C22
+  muted:        [107, 114, 128] as [number, number, number],   // muted-foreground
+  subtle:       [156, 163, 175] as [number, number, number],   // lighter muted
 
-  // Accents
-  teal:       [20, 184, 166]  as [number, number, number],   // #14B8A6
-  coral:      [251, 113, 91]  as [number, number, number],   // #FB715B
-  sky:        [56, 189, 248]  as [number, number, number],   // #38BDF8
-  violet:     [139, 92, 246]  as [number, number, number],   // #8B5CF6
-  rose:       [244, 63, 94]   as [number, number, number],   // #F43F5E
-  emerald:    [16, 185, 129]  as [number, number, number],   // #10B981
+  // Borders
+  border:       [229, 231, 235] as [number, number, number],   // #E5E7EB
+
+  // Category accents
+  blue:         [59, 130, 246]  as [number, number, number],
+  emerald:      [16, 185, 129]  as [number, number, number],   // --success
+  amber:        [245, 158, 11]  as [number, number, number],   // --warning
+  violet:       [139, 92, 246]  as [number, number, number],
+  rose:         [244, 63, 94]   as [number, number, number],   // --destructive
+  teal:         [20, 184, 166]  as [number, number, number],
+  orange:       [249, 115, 22]  as [number, number, number],   // --urgent
+  sky:          [56, 189, 248]  as [number, number, number],
 };
 
 const CAT_COLOURS: Record<string, [number, number, number]> = {
-  services: B.honey,
-  pricing:  B.emerald,
-  booking:  B.violet,
-  policies: B.coral,
-  coverage: B.sky,
-  process:  B.honeyDark,
-  trust:    B.rose,
-  contact:  B.teal,
+  services: C.primary,
+  pricing:  C.emerald,
+  booking:  C.violet,
+  policies: C.rose,
+  coverage: C.sky,
+  process:  C.amber,
+  trust:    C.teal,
+  contact:  C.orange,
 };
 
 function catColour(cat: string): [number, number, number] {
@@ -58,15 +64,15 @@ function catColour(cat: string): [number, number, number] {
   for (const [key, col] of Object.entries(CAT_COLOURS)) {
     if (k.includes(key)) return col;
   }
-  return B.honey;
+  return C.primary;
 }
 
 export async function generateKnowledgeBasePDF(workspaceId: string, companyName?: string): Promise<void> {
   const doc = new jsPDF();
   const pw = doc.internal.pageSize.getWidth();
   const ph = doc.internal.pageSize.getHeight();
-  const mx = 16;                // side margin
-  const cw = pw - mx * 2;      // content width
+  const mx = 18;
+  const cw = pw - mx * 2;
   let y = mx;
 
   const sb: any = supabase as any;
@@ -92,8 +98,8 @@ export async function generateKnowledgeBasePDF(workspaceId: string, companyName?
   const rRect = (x: number, ry: number, w: number, h: number, r: number, fill: [number, number, number]) => {
     doc.setFillColor(...fill); doc.roundedRect(x, ry, w, h, r, r, 'F');
   };
-  const hLine = (x1: number, ly: number, x2: number, col: [number, number, number], w = 0.4) => {
-    doc.setDrawColor(...col); doc.setLineWidth(w); doc.line(x1, ly, x2, ly);
+  const hLine = (ly: number, col: [number, number, number] = C.border, w = 0.3) => {
+    doc.setDrawColor(...col); doc.setLineWidth(w); doc.line(mx, ly, pw - mx, ly);
   };
 
   // ── fetch data ──
@@ -118,30 +124,23 @@ export async function generateKnowledgeBasePDF(workspaceId: string, companyName?
   facts.forEach(f => { (factsByCat[f.category] ??= []).push(f); });
 
   // ════════════════════════════════════════
-  //  COVER PAGE
+  //  COVER PAGE — Clean, light, modern
   // ════════════════════════════════════════
 
-  // Warm honey gradient background
-  doc.setFillColor(...B.charcoal);
+  // White background (default)
+  doc.setFillColor(...C.white);
   doc.rect(0, 0, pw, ph, 'F');
 
-  // Decorative honeycomb-inspired top stripe
-  doc.setFillColor(...B.honey);
-  doc.rect(0, 0, pw, 5, 'F');
-  // Secondary thin stripe
-  doc.setFillColor(...B.honeyDark);
-  doc.rect(0, 5, pw, 1.5, 'F');
-
-  // Subtle warm glow behind logo area
-  doc.setFillColor(60, 50, 30);
-  doc.roundedRect(pw / 2 - 32, 48, 64, 64, 32, 32, 'F');
+  // Top accent bar — primary blue
+  doc.setFillColor(...C.primary);
+  doc.rect(0, 0, pw, 4, 'F');
 
   // Logo
   try {
     const img = new Image();
     img.crossOrigin = 'anonymous';
     await new Promise<void>((resolve) => {
-      img.onload = () => { doc.addImage(img, 'PNG', pw / 2 - 22, 56, 44, 44); resolve(); };
+      img.onload = () => { doc.addImage(img, 'PNG', pw / 2 - 20, 50, 40, 40); resolve(); };
       img.onerror = () => resolve();
       img.src = bizzybeeLogoSrc;
     });
@@ -150,99 +149,95 @@ export async function generateKnowledgeBasePDF(workspaceId: string, companyName?
   // Title
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(28);
-  doc.setTextColor(...B.honeyLight);
-  doc.text('Knowledge Base', pw / 2, 122, { align: 'center' });
+  doc.setTextColor(...C.foreground);
+  doc.text('Knowledge Base', pw / 2, 110, { align: 'center' });
 
-  // Decorative divider
-  const divW = 40;
-  doc.setFillColor(...B.honey);
-  doc.roundedRect(pw / 2 - divW / 2, 128, divW, 2, 1, 1, 'F');
+  // Subtle divider
+  doc.setFillColor(...C.primary);
+  doc.roundedRect(pw / 2 - 20, 116, 40, 2, 1, 1, 'F');
 
   // Company name
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(13);
-  doc.setTextColor(...B.honey);
-  doc.text(`Prepared for ${companyName || 'Your Business'}`, pw / 2, 140, { align: 'center' });
+  doc.setTextColor(...C.muted);
+  doc.text(`Prepared for ${companyName || 'Your Business'}`, pw / 2, 128, { align: 'center' });
 
   // Date
   doc.setFontSize(10);
-  doc.setTextColor(...B.grey);
-  doc.text(new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }), pw / 2, 150, { align: 'center' });
+  doc.setTextColor(...C.subtle);
+  doc.text(new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }), pw / 2, 138, { align: 'center' });
 
-  // ── Stats cards ──
-  const sY = 170;
-  const cardW = 44;
-  const gap = 10;
+  // ── Stats cards — light cards with blue accent ──
+  const sY = 160;
+  const cardW = 48;
+  const gap = 8;
   const totalW = cardW * 3 + gap * 2;
   const sX = (pw - totalW) / 2;
   const stats = [
-    { label: 'FAQs', value: String(faqs.length), accent: B.honey },
-    { label: 'Categories', value: String(catOrder.length), accent: B.teal },
-    { label: 'Pages Scraped', value: String(scrapingJob?.pages_processed || 0), accent: B.emerald },
+    { label: 'FAQs', value: String(faqs.length), accent: C.primary },
+    { label: 'Categories', value: String(catOrder.length), accent: C.emerald },
+    { label: 'Pages Scraped', value: String(scrapingJob?.pages_processed || 0), accent: C.amber },
   ];
 
   stats.forEach((s, i) => {
     const cx = sX + i * (cardW + gap);
-    // Card bg
-    rRect(cx, sY, cardW, 38, 5, [50, 48, 42]);
-    // Top accent bar
+    // Card background
+    rRect(cx, sY, cardW, 42, 4, C.background);
+    // Top accent line
     doc.setFillColor(...s.accent);
-    doc.roundedRect(cx, sY, cardW, 4, 5, 5, 'F');
-    doc.setFillColor(50, 48, 42);
-    doc.rect(cx, sY + 3, cardW, 3, 'F');
+    doc.roundedRect(cx + 8, sY + 2, cardW - 16, 2, 1, 1, 'F');
     // Value
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(24);
-    doc.setTextColor(...B.white);
-    doc.text(s.value, cx + cardW / 2, sY + 22, { align: 'center' });
+    doc.setFontSize(26);
+    doc.setTextColor(...C.foreground);
+    doc.text(s.value, cx + cardW / 2, sY + 24, { align: 'center' });
     // Label
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
-    doc.setTextColor(...B.grey);
-    doc.text(s.label, cx + cardW / 2, sY + 31, { align: 'center' });
+    doc.setTextColor(...C.muted);
+    doc.text(s.label, cx + cardW / 2, sY + 34, { align: 'center' });
   });
 
   // Website URL
   if (scrapingJob?.website_url) {
     doc.setFontSize(9);
-    doc.setTextColor(...B.grey);
+    doc.setTextColor(...C.subtle);
     doc.text(scrapingJob.website_url, pw / 2, ph - 32, { align: 'center' });
   }
 
   // Footer
   doc.setFontSize(7);
-  doc.setTextColor(100, 100, 90);
-  doc.text('Powered by BizzyBee AI  🐝', pw / 2, ph - 16, { align: 'center' });
+  doc.setTextColor(...C.subtle);
+  doc.text('Powered by BizzyBee AI', pw / 2, ph - 16, { align: 'center' });
 
   // ════════════════════════════════════════
-  //  PAGE HEADER
+  //  PAGE HEADER — light bar with blue accent
   // ════════════════════════════════════════
   const pageHeader = () => {
-    // Warm top bar
-    doc.setFillColor(...B.honeyCream);
-    doc.rect(0, 0, pw, 13, 'F');
-    doc.setFillColor(...B.honey);
-    doc.rect(0, 12.5, pw, 0.8, 'F');
+    doc.setFillColor(...C.white);
+    doc.rect(0, 0, pw, 14, 'F');
+    doc.setFillColor(...C.primary);
+    doc.rect(0, 13, pw, 0.5, 'F');
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(7);
-    doc.setTextColor(...B.honeyDark);
-    doc.text('🐝  BizzyBee Knowledge Base', mx, 8.5);
+    doc.setTextColor(...C.primary);
+    doc.text('BizzyBee Knowledge Base', mx, 9);
     doc.setFont('helvetica', 'normal');
-    doc.setTextColor(...B.grey);
-    doc.text(companyName || '', pw - mx, 8.5, { align: 'right' });
-    y = 20;
+    doc.setTextColor(...C.muted);
+    doc.text(companyName || '', pw - mx, 9, { align: 'right' });
+    y = 22;
   };
 
   // ── section title ──
-  const sectionTitle = (text: string, colour: [number, number, number] = B.honey) => {
+  const sectionTitle = (text: string, colour: [number, number, number] = C.primary) => {
     ensureSpace(18);
     doc.setFillColor(...colour);
-    doc.roundedRect(mx, y, 3, 13, 1.5, 1.5, 'F');
+    doc.roundedRect(mx, y, 3, 12, 1.5, 1.5, 'F');
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(16);
-    doc.setTextColor(...B.charcoal);
-    doc.text(text, mx + 8, y + 10);
-    y += 18;
+    doc.setFontSize(15);
+    doc.setTextColor(...C.foreground);
+    doc.text(text, mx + 8, y + 9);
+    y += 16;
   };
 
   // ════════════════════════════════════════
@@ -253,7 +248,7 @@ export async function generateKnowledgeBasePDF(workspaceId: string, companyName?
 
   if (scrapingJob) {
     sectionTitle('Website Analysis Summary');
-    rRect(mx, y, cw, 44, 5, B.honeyCream);
+    rRect(mx, y, cw, 44, 4, C.primaryPale);
     doc.setFontSize(10);
     const info = [
       ['Website', scrapingJob.website_url || 'N/A'],
@@ -264,10 +259,10 @@ export async function generateKnowledgeBasePDF(workspaceId: string, companyName?
     let iy = y + 10;
     info.forEach(([label, value]) => {
       doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5);
-      doc.setTextColor(...B.grey);
+      doc.setTextColor(...C.muted);
       doc.text(label.toUpperCase(), mx + 8, iy);
       doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
-      doc.setTextColor(...B.charcoal);
+      doc.setTextColor(...C.foreground);
       doc.text(value, mx + 55, iy);
       iy += 9;
     });
@@ -277,7 +272,7 @@ export async function generateKnowledgeBasePDF(workspaceId: string, companyName?
   // ════════════════════════════════════════
   //  CATEGORY OVERVIEW
   // ════════════════════════════════════════
-  sectionTitle('Category Overview', B.teal);
+  sectionTitle('Category Overview', C.emerald);
 
   catOrder.forEach(([cat, items]) => {
     ensureSpace(11);
@@ -285,11 +280,11 @@ export async function generateKnowledgeBasePDF(workspaceId: string, companyName?
     doc.setFillColor(...col);
     doc.roundedRect(mx + 4, y - 2.5, 3, 8, 1, 1, 'F');
     doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
-    doc.setTextColor(...B.charcoal);
+    doc.setTextColor(...C.foreground);
     const label = cat.charAt(0).toUpperCase() + cat.slice(1).replace(/_/g, ' ');
     doc.text(label, mx + 11, y + 3);
     doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
-    doc.setTextColor(...B.grey);
+    doc.setTextColor(...C.muted);
     doc.text(`${items.length} FAQs`, mx + 11 + doc.getTextWidth(label) + 4, y + 3);
     y += 10;
   });
@@ -305,45 +300,45 @@ export async function generateKnowledgeBasePDF(workspaceId: string, companyName?
     const col = catColour(cat);
     const label = cat.charAt(0).toUpperCase() + cat.slice(1).replace(/_/g, ' ');
 
-    // Category header band
-    rRect(mx, y, cw, 16, 5, col);
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(13);
-    doc.setTextColor(...B.white);
-    doc.text(label, mx + 8, y + 11);
+    // Category header — clean pill
+    rRect(mx, y, cw, 14, 4, col);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
+    doc.setTextColor(...C.white);
+    doc.text(label, mx + 8, y + 10);
     doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
-    doc.text(`${items.length} questions`, pw - mx - 8, y + 11, { align: 'right' });
-    y += 22;
+    doc.text(`${items.length} questions`, pw - mx - 8, y + 10, { align: 'right' });
+    y += 20;
 
     items.forEach((faq, idx) => {
-      const qLines = doc.splitTextToSize(faq.question, cw - 26);
-      const aLines = doc.splitTextToSize(faq.answer, cw - 26);
-      const itemH = (qLines.length + aLines.length) * 5 + 16;
+      const qLines = doc.splitTextToSize(faq.question, cw - 24);
+      const aLines = doc.splitTextToSize(faq.answer, cw - 24);
+      const itemH = (qLines.length + aLines.length) * 5 + 14;
 
       ensureSpace(itemH + 4);
-      if (y < 20) pageHeader();
+      if (y < 22) pageHeader();
 
-      // Alternating warm background
+      // Alternating subtle background
       if (idx % 2 === 0) {
-        rRect(mx, y - 2, cw, itemH, 4, B.honeyCream);
+        rRect(mx, y - 2, cw, itemH, 3, C.background);
       }
 
       // Question number badge
       doc.setFillColor(...col);
-      doc.roundedRect(mx + 4, y + 1, 14, 6, 2, 2, 'F');
+      doc.roundedRect(mx + 4, y + 1, 13, 6, 2, 2, 'F');
       doc.setFont('helvetica', 'bold'); doc.setFontSize(7);
-      doc.setTextColor(...B.white);
-      doc.text(`Q${idx + 1}`, mx + 11, y + 5.5, { align: 'center' });
+      doc.setTextColor(...C.white);
+      doc.text(`Q${idx + 1}`, mx + 10.5, y + 5.5, { align: 'center' });
 
       // Question
       doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
-      doc.setTextColor(...B.charcoal);
-      doc.text(qLines, mx + 22, y + 6);
+      doc.setTextColor(...C.foreground);
+      doc.text(qLines, mx + 20, y + 6);
       y += qLines.length * 5 + 6;
 
       // Answer
       doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5);
-      doc.setTextColor(...B.slate);
-      doc.text(aLines, mx + 22, y);
+      doc.setTextColor(...C.muted);
+      doc.text(aLines, mx + 20, y);
       y += aLines.length * 5 + 8;
     });
   });
@@ -354,25 +349,25 @@ export async function generateKnowledgeBasePDF(workspaceId: string, companyName?
   if (facts.length > 0) {
     doc.addPage();
     pageHeader();
-    sectionTitle('Business Facts', B.emerald);
+    sectionTitle('Business Facts', C.emerald);
 
     Object.entries(factsByCat).forEach(([cat, items]) => {
       ensureSpace(16);
       doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
-      doc.setTextColor(...B.charcoal);
+      doc.setTextColor(...C.foreground);
       doc.text(cat.charAt(0).toUpperCase() + cat.slice(1).replace(/_/g, ' '), mx + 4, y + 4);
       y += 10;
 
       items.forEach(f => {
         ensureSpace(12);
-        doc.setFillColor(...B.honey);
-        doc.circle(mx + 6, y + 1.5, 1.5, 'F');
+        doc.setFillColor(...C.primary);
+        doc.circle(mx + 6, y + 1.5, 1.2, 'F');
         doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
-        doc.setTextColor(...B.slate);
+        doc.setTextColor(...C.foreground);
         const keyText = f.fact_key.replace(/_/g, ' ');
         doc.text(keyText, mx + 11, y + 3);
         doc.setFont('helvetica', 'normal');
-        doc.setTextColor(...B.grey);
+        doc.setTextColor(...C.muted);
         const valLines = doc.splitTextToSize(f.fact_value, cw - 15 - doc.getTextWidth(keyText) - 6);
         if (valLines.length === 1) {
           doc.text(`: ${f.fact_value}`, mx + 11 + doc.getTextWidth(keyText), y + 3);
@@ -394,11 +389,11 @@ export async function generateKnowledgeBasePDF(workspaceId: string, companyName?
   const pc = doc.getNumberOfPages();
   for (let i = 2; i <= pc; i++) {
     doc.setPage(i);
-    hLine(mx, ph - 16, pw - mx, [230, 220, 200], 0.3);
+    hLine(ph - 16);
     doc.setFontSize(7);
-    doc.setTextColor(...B.grey);
-    doc.text('Generated by BizzyBee AI  🐝', mx, ph - 10);
-    doc.setTextColor(...B.honeyDark);
+    doc.setTextColor(...C.subtle);
+    doc.text('Generated by BizzyBee AI', mx, ph - 10);
+    doc.setTextColor(...C.primary);
     doc.text(`Page ${i - 1} of ${pc - 1}`, pw - mx, ph - 10, { align: 'right' });
   }
 
