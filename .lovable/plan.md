@@ -1,62 +1,69 @@
 
-# Complete Data Wipe + FAQ Voice Fix
+
+# Fix Website FAQ Extraction Quality
 
 ## Problem Summary
-1. **Stale data accumulated** across multiple test runs - 1,058 "own" FAQs, 2,354 competitor FAQs, 17,100 email queue entries, 273 competitor sites, 10 scraping jobs
-2. **PDF voice is wrong** - FAQs say "MAC Cleaning uses..." (third person) instead of "We use..." (first person). BizzyBee should represent the business, so all knowledge should read as if the business itself is speaking.
 
-## Part 1: Complete Data Wipe
+The website knowledge extraction pipeline has several critical issues causing 185 duplicate/contradictory FAQs instead of ~30-40 clean ones:
 
-Wipe all accumulated test data for workspace `681ad707-3105-4238-a552-f5346577810f`:
+1. **Deduplication is broken** - The `match_faqs` database function queries the `faqs` table, but `process-own-website-scrape` inserts into `faq_database`. Every similarity check returns zero matches, so nothing is ever deduplicated.
 
-| Table | Records | Action |
-|-------|---------|--------|
-| faq_database | 3,774 | DELETE all |
-| email_import_queue | 17,100 | DELETE all |
-| competitor_sites | 273 | DELETE all |
-| scraping_jobs | 10 | DELETE all |
-| conversations | 3 | DELETE all |
-| messages (via conversations) | 3 | DELETE all |
-| customers | 3 | DELETE all |
-| example_responses | 29 | DELETE all |
-| voice_profiles | 1 | DELETE all |
-| n8n_workflow_progress | 3 | RESET to pending |
-| email_import_progress | 1 | DELETE all |
-| users (onboarding flags) | 1 | Reset onboarding_completed=false, onboarding_step='welcome' |
+2. **No location page awareness** - Your site has ~20 location pages (e.g., `/window-cleaning-dunstable`, `/window-cleaning-flitwick`) that all contain the same core content with the town name swapped. Each page generates 8 near-identical FAQs independently.
 
-This gives a completely fresh slate for re-testing onboarding end-to-end.
+3. **No contradiction detection** - Conflicting facts (cash vs card-only, different price ranges, different service frequencies) all get stored as equally valid.
 
-## Part 2: Fix FAQ Voice (Third Person to First Person)
+4. **No post-extraction consolidation** - Unlike the competitor pipeline which has a dedicated `competitor-dedupe-faqs` step with embeddings, the own-website pipeline has no equivalent.
 
-The root cause is the AI extraction prompt in the edge functions. When Apify scrapes the website, the content naturally says "MAC Cleaning does X". The AI extraction step should be rewriting these into first-person voice ("We do X") since BizzyBee represents the business.
+## Solution: Three-Phase Fix
 
-### Changes needed:
+### Phase 1: Fix the broken dedup function
 
-**File: `supabase/functions/process-own-website-scrape/index.ts`** (or whichever function contains the FAQ extraction prompt)
-- Update the AI system prompt to instruct it to write all FAQs in first-person voice
-- Example instruction: "Write all answers in first person ('we', 'our', 'us') as if you ARE the business. Never refer to the business by name in the third person."
+Update the `match_faqs` database function to query `faq_database` instead of `faqs`, so the existing per-FAQ similarity check actually works.
 
-This ensures that when the website is re-scraped from fresh, every FAQ naturally reads: "We use the reach and wash system..." instead of "MAC Cleaning uses the reach and wash system..."
+### Phase 2: Add location page detection and skipping
+
+In `process-own-website-scrape`, detect location/area pages by URL pattern (e.g., URLs containing town names, `/area/`, or matching a pattern like `/service-location`). Group them and only process 1-2 representative location pages instead of all 20+. The rest get marked as `skipped_duplicate_location`.
+
+### Phase 3: Add a post-extraction consolidation pass
+
+After all pages are processed, run a consolidation step (similar to what `competitor-dedupe-faqs` does):
+
+1. Fetch all FAQs just stored for this job
+2. Generate embeddings (already done during storage)
+3. Find clusters of similar FAQs (similarity > 0.90)
+4. For each cluster, keep the highest-quality entry and soft-delete the rest
+5. Flag any contradictions (same topic, conflicting answers) for review
+
+This brings the own-website pipeline to parity with the competitor pipeline's quality.
 
 ## Technical Details
 
-### Data wipe SQL (executed in order to respect foreign keys):
-```text
-1. DELETE messages (via conversation join)
-2. DELETE conversations
-3. DELETE customers
-4. DELETE faq_database
-5. DELETE email_import_queue
-6. DELETE competitor_sites
-7. DELETE scraping_jobs
-8. DELETE example_responses
-9. DELETE voice_profiles
-10. DELETE email_import_progress
-11. UPDATE n8n_workflow_progress (reset statuses)
-12. UPDATE users (reset onboarding)
-```
+### Database Migration
 
-### FAQ extraction prompt update:
-- Locate the system prompt that instructs the AI to extract FAQs from scraped website content
-- Add explicit first-person voice instructions
-- This affects future scrapes only (which is fine since we're wiping all data)
+- Update `match_faqs` function to query `faq_database` table instead of `faqs`
+
+### Edge Function: `process-own-website-scrape/index.ts`
+
+**Location page detection** (in both `processDataset` and `processFirecrawl`):
+- After storing page records, identify location pages by URL patterns
+- Group them and keep only 2 representative pages; skip the rest
+- Add `location_group` page type
+
+**Post-extraction consolidation** (new function at end of processing):
+- Query all FAQs with `workspace_id` and `is_own_content = true` that were just stored
+- Use existing embeddings to find clusters with similarity > 0.90
+- Merge clusters: keep highest quality_score entry, delete others
+- Log dedup stats (e.g., "Consolidated 185 FAQs down to 34")
+
+### Expected Outcome
+
+- Location pages: ~20 pages skipped, saving API calls and preventing bulk duplication
+- Dedup actually works: catches the remaining near-duplicates across non-location pages
+- Post-consolidation: final count should land at 25-40 unique, high-quality FAQs
+- Contradictions: flagged in logs for future review capability
+
+### Files Changed
+
+1. **New SQL migration** - Fix `match_faqs` to query correct table
+2. **`supabase/functions/process-own-website-scrape/index.ts`** - Add location detection + consolidation pass
+
