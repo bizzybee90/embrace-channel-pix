@@ -15,6 +15,9 @@ import {
   Search
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { generateKnowledgeBasePDF } from '@/components/settings/knowledge-base/generateKnowledgeBasePDF';
+import { toast } from 'sonner';
+import { Download } from 'lucide-react';
 
 interface WebsitePipelineProgressProps {
   workspaceId: string;
@@ -188,6 +191,19 @@ export function WebsitePipelineProgress({
   });
 
   const [didAutoResume, setDidAutoResume] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+
+  const handleDownloadPDF = async () => {
+    setDownloadingPdf(true);
+    try {
+      await generateKnowledgeBasePDF(workspaceId);
+      toast.success('PDF downloaded!');
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to generate PDF');
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
 
   // Subscribe to job updates via realtime - now using scraping_jobs table
   useEffect(() => {
@@ -494,12 +510,26 @@ export function WebsitePipelineProgress({
 
       {/* Completion Message */}
       {isComplete && (
-        <div className="p-3 bg-success/10 border border-success/30 rounded-lg text-center">
-          <CheckCircle2 className="h-6 w-6 text-success mx-auto mb-2" />
+        <div className="p-4 bg-success/10 border border-success/30 rounded-lg text-center space-y-3">
+          <CheckCircle2 className="h-6 w-6 text-success mx-auto" />
           <p className="text-sm font-medium text-success">Website Analysed!</p>
-          <p className="text-xs text-muted-foreground mt-1">
+          <p className="text-xs text-muted-foreground">
             {stats.faqsExtracted} FAQs extracted from {stats.pagesScraped} pages.
           </p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleDownloadPDF}
+            disabled={downloadingPdf}
+            className="gap-2"
+          >
+            {downloadingPdf ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+            Download Knowledge Base PDF
+          </Button>
         </div>
       )}
 
