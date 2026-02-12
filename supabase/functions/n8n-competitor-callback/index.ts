@@ -208,9 +208,24 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Bug 10 Fix: Idempotency guard — only trigger FAQ workflow if not already running
     if (status === 'discovery_complete') {
-      const callbackUrl = body.callback_url || `${supabaseUrl}/functions/v1/n8n-competitor-callback`;
-      await triggerFaqWorkflow(supabase, workspace_id, callbackUrl, details);
+      const { data: existingScrape } = await supabase
+        .from('n8n_workflow_progress')
+        .select('status')
+        .eq('workspace_id', workspace_id)
+        .eq('workflow_type', 'competitor_scrape')
+        .maybeSingle();
+
+      const alreadyRunning = existingScrape?.status && 
+        !['waiting', 'failed'].includes(existingScrape.status as string);
+
+      if (alreadyRunning) {
+        console.log(`[n8n-callback] Skipping FAQ trigger — scrape already in status: ${existingScrape.status}`);
+      } else {
+        const callbackUrl = body.callback_url || `${supabaseUrl}/functions/v1/n8n-competitor-callback`;
+        await triggerFaqWorkflow(supabase, workspace_id, callbackUrl, details);
+      }
     }
 
     return new Response(
