@@ -325,6 +325,9 @@ export function OnboardingWizard({ workspaceId, onComplete }: OnboardingWizardPr
                   <BookOpen className="h-4 w-4" />
                   View Knowledge Base
                 </Button>
+                <Button variant="ghost" size="sm" onClick={handleBack} className="text-muted-foreground">
+                  ← Back
+                </Button>
               </div>
             </div>
           )}
