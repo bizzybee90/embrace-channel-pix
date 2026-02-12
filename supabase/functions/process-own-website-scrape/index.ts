@@ -658,6 +658,8 @@ async function storeFaqsWithDedup(
         quality_score: qualityScore,
         confidence: faq.confidence,
         priority: 10, // Own website = highest priority
+        is_own_content: true,
+        is_active: true,
         embedding: fullEmbedding
       });
       
