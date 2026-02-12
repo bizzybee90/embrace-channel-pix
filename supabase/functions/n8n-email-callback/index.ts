@@ -12,7 +12,6 @@ async function verifyN8nSignature(payload: string, signature: string, secret: st
   );
   const sig = await crypto.subtle.sign('HMAC', key, encoder.encode(payload));
   const computed = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, '0')).join('');
-  // Constant-time comparison
   if (computed.length !== signature.length) return false;
   let result = 0;
   for (let i = 0; i < computed.length; i++) {
@@ -31,21 +30,21 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const n8nSecret = Deno.env.get('N8N_WEBHOOK_SECRET');
 
-    // Read raw body for signature verification
     const rawBody = await req.text();
 
-    // Verify HMAC signature if secret is configured
-    if (n8nSecret) {
-      const signature = req.headers.get('x-n8n-signature') || '';
-      if (!signature || !(await verifyN8nSignature(rawBody, signature, n8nSecret))) {
-        console.error('[n8n-email-callback] Invalid or missing webhook signature');
+    // Bug 1 Fix: Only verify signature if BOTH the secret is configured AND the header is present
+    const signature = req.headers.get('x-n8n-signature') || '';
+    if (n8nSecret && signature) {
+      if (!(await verifyN8nSignature(rawBody, signature, n8nSecret))) {
+        console.error('[n8n-email-callback] Invalid webhook signature');
         return new Response(
           JSON.stringify({ error: 'Unauthorized: invalid signature' }),
           { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
+      console.log('[n8n-email-callback] Signature verified successfully');
     } else {
-      console.warn('[n8n-email-callback] N8N_WEBHOOK_SECRET not configured - skipping signature verification');
+      console.log('[n8n-email-callback] Skipping signature verification (no secret or no header)');
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);

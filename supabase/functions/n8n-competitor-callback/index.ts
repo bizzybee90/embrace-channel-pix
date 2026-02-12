@@ -30,7 +30,6 @@ async function triggerFaqWorkflow(
 ) {
   console.log(`[n8n-callback] discovery_complete for workspace=${workspaceId}, triggering FAQ workflow`);
 
-  // Fetch validated competitors saved by Workflow 1
   const { data: competitors, error: fetchError } = await supabase
     .from('competitor_sites')
     .select('id, business_name, domain, url, address, rating, reviews_count, phone')
@@ -46,7 +45,6 @@ async function triggerFaqWorkflow(
 
   if (!competitors || competitors.length === 0) {
     console.warn('[n8n-callback] No competitors found to scrape');
-    // Update progress to reflect this
     await supabase.from('n8n_workflow_progress').upsert({
       workspace_id: workspaceId,
       workflow_type: 'competitor_scrape',
@@ -58,14 +56,12 @@ async function triggerFaqWorkflow(
     return;
   }
 
-  // Fetch business context for the FAQ extraction prompt
   const { data: context } = await supabase
     .from('business_context')
     .select('business_type, company_name')
     .eq('workspace_id', workspaceId)
     .maybeSingle();
 
-  // Initialize the scrape progress track
   await supabase.from('n8n_workflow_progress').upsert({
     workspace_id: workspaceId,
     workflow_type: 'competitor_scrape',
@@ -78,7 +74,6 @@ async function triggerFaqWorkflow(
     updated_at: new Date().toISOString(),
   }, { onConflict: 'workspace_id,workflow_type' });
 
-  // Trigger Workflow 2
   const payload = {
     workspace_id: workspaceId,
     business_type: context?.business_type || '',
@@ -102,7 +97,6 @@ async function triggerFaqWorkflow(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-
     console.log(`[n8n-callback] FAQ workflow triggered: status=${response.status}, competitors=${competitors.length}`);
   } catch (err) {
     console.error('[n8n-callback] Failed to trigger FAQ workflow:', err);
@@ -128,17 +122,19 @@ Deno.serve(async (req) => {
 
     const rawBody = await req.text();
 
-    if (n8nSecret) {
-      const signature = req.headers.get('x-n8n-signature') || '';
-      if (!signature || !(await verifyN8nSignature(rawBody, signature, n8nSecret))) {
-        console.error('[n8n-callback] Invalid or missing webhook signature');
+    // Bug 1 Fix: Only verify signature if BOTH the secret is configured AND the header is present
+    const signature = req.headers.get('x-n8n-signature') || '';
+    if (n8nSecret && signature) {
+      if (!(await verifyN8nSignature(rawBody, signature, n8nSecret))) {
+        console.error('[n8n-callback] Invalid webhook signature');
         return new Response(
           JSON.stringify({ error: 'Unauthorized: invalid signature' }),
           { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
+      console.log('[n8n-callback] Signature verified successfully');
     } else {
-      console.warn('[n8n-callback] N8N_WEBHOOK_SECRET not configured - skipping signature verification');
+      console.log('[n8n-callback] Skipping signature verification (no secret or no header)');
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -162,8 +158,6 @@ Deno.serve(async (req) => {
 
     console.log(`[n8n-callback] workspace=${workspace_id} status=${status} message=${message}`);
 
-    // Determine which workflow_type this callback belongs to
-    // "scraping"/"extracting"/"scrape_complete" statuses come from Workflow 2 (FAQ generation)
     const scrapeStatuses = ['scraping', 'extracting', 'scrape_processing', 'scrape_complete'];
     const workflowType = scrapeStatuses.includes(status) ? 'competitor_scrape' : 'competitor_discovery';
 
@@ -190,7 +184,6 @@ Deno.serve(async (req) => {
     if (current_competitor !== undefined) details.current_competitor = current_competitor;
     if (errorMsg) details.error = errorMsg;
 
-    // Map status for DB storage
     const isComplete = status === 'discovery_complete' || status === 'complete' || status === 'scrape_complete';
     const dbStatus = isComplete ? 'complete' : (status || 'in_progress');
 
@@ -215,7 +208,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Chain: when discovery is complete, trigger the FAQ generation workflow
     if (status === 'discovery_complete') {
       const callbackUrl = body.callback_url || `${supabaseUrl}/functions/v1/n8n-competitor-callback`;
       await triggerFaqWorkflow(supabase, workspace_id, callbackUrl, details);
