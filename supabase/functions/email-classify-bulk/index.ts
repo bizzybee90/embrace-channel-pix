@@ -373,6 +373,17 @@ async function handlePartitionComplete(
       updated_at: new Date().toISOString(),
     }, { onConflict: 'workspace_id' });
 
+  // Mark email_import as complete in n8n_workflow_progress
+  await supabase
+    .from('n8n_workflow_progress')
+    .upsert({
+      workspace_id,
+      workflow_type: 'email_import',
+      status: 'complete',
+      details: { total_classified: totalClassified || 0 },
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'workspace_id,workflow_type' });
+
   // Trigger voice learning
   await triggerVoiceLearning(supabaseUrl, supabaseServiceKey, workspace_id);
 
