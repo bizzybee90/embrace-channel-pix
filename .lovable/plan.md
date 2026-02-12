@@ -1,41 +1,62 @@
 
+# Complete Data Wipe + FAQ Voice Fix
 
-# Fix: Email Track Never Completes (Bug 11)
+## Problem Summary
+1. **Stale data accumulated** across multiple test runs - 1,058 "own" FAQs, 2,354 competitor FAQs, 17,100 email queue entries, 273 competitor sites, 10 scraping jobs
+2. **PDF voice is wrong** - FAQs say "MAC Cleaning uses..." (third person) instead of "We use..." (first person). BizzyBee should represent the business, so all knowledge should read as if the business itself is speaking.
 
-## Problem
+## Part 1: Complete Data Wipe
 
-The email classification track on the Progress Screen stays stuck at "pending" forever because of two compounding issues:
+Wipe all accumulated test data for workspace `681ad707-3105-4238-a552-f5346577810f`:
 
-1. **Field name mismatch**: The ProgressScreen reads `emailProgress?.total_emails` and `emailProgress?.classified_count`, but the actual database columns are `estimated_total_emails` and `emails_classified`. Since the field names don't match, the counts are always 0.
+| Table | Records | Action |
+|-------|---------|--------|
+| faq_database | 3,774 | DELETE all |
+| email_import_queue | 17,100 | DELETE all |
+| competitor_sites | 273 | DELETE all |
+| scraping_jobs | 10 | DELETE all |
+| conversations | 3 | DELETE all |
+| messages (via conversations) | 3 | DELETE all |
+| customers | 3 | DELETE all |
+| example_responses | 29 | DELETE all |
+| voice_profiles | 1 | DELETE all |
+| n8n_workflow_progress | 3 | RESET to pending |
+| email_import_progress | 1 | DELETE all |
+| users (onboarding flags) | 1 | Reset onboarding_completed=false, onboarding_step='welcome' |
 
-2. **No `n8n_workflow_progress` update**: The `email-classify-bulk` edge function never writes to the `n8n_workflow_progress` table. It only updates `email_import_progress`. When classification finishes, the email track in `n8n_workflow_progress` stays at `pending`.
+This gives a completely fresh slate for re-testing onboarding end-to-end.
 
-Together, these mean the auto-advance logic (`if totalEmails > 0`) never fires, and the primary status source (`n8n_workflow_progress.email_import`) never changes from `pending`.
+## Part 2: Fix FAQ Voice (Third Person to First Person)
 
-## Fix (2 changes)
+The root cause is the AI extraction prompt in the edge functions. When Apify scrapes the website, the content naturally says "MAC Cleaning does X". The AI extraction step should be rewriting these into first-person voice ("We do X") since BizzyBee represents the business.
 
-### 1. Fix field names in ProgressScreen.tsx
+### Changes needed:
 
-Update the `email_import_progress` field references to match actual column names:
+**File: `supabase/functions/process-own-website-scrape/index.ts`** (or whichever function contains the FAQ extraction prompt)
+- Update the AI system prompt to instruct it to write all FAQs in first-person voice
+- Example instruction: "Write all answers in first person ('we', 'our', 'us') as if you ARE the business. Never refer to the business by name in the third person."
 
-- `emailProgress?.total_emails` becomes `emailProgress?.estimated_total_emails`
-- `emailProgress?.classified_count` becomes `emailProgress?.emails_classified`
+This ensures that when the website is re-scraped from fresh, every FAQ naturally reads: "We use the reach and wash system..." instead of "MAC Cleaning uses the reach and wash system..."
 
-This alone gets the auto-advance logic working: the ProgressScreen will detect classification progress from the `email_import_progress` table and override the stuck `pending` status automatically.
+## Technical Details
 
-### 2. Update `n8n_workflow_progress` when classification completes
+### Data wipe SQL (executed in order to respect foreign keys):
+```text
+1. DELETE messages (via conversation join)
+2. DELETE conversations
+3. DELETE customers
+4. DELETE faq_database
+5. DELETE email_import_queue
+6. DELETE competitor_sites
+7. DELETE scraping_jobs
+8. DELETE example_responses
+9. DELETE voice_profiles
+10. DELETE email_import_progress
+11. UPDATE n8n_workflow_progress (reset statuses)
+12. UPDATE users (reset onboarding)
+```
 
-In `email-classify-bulk/index.ts`, inside the `handlePartitionComplete` function (after the last worker finishes), add an upsert to `n8n_workflow_progress` marking the `email_import` workflow as `complete`. This ensures the primary status source also reflects completion, rather than relying solely on the auto-advance fallback.
-
-## Expected outcome
-
-- Email track will show real-time classification counts during processing
-- Email track will auto-advance to "complete" when classification finishes
-- The "Continue" button will enable once all 3 tracks are done
-
-## Impact on success probability
-
-This fix closes the last known gap in the Lovable-side code. Combined with the n8n-side fixes (Bugs 2 and 3, already done), expected success probability rises from ~92% to **~95-97%**.
-
-The remaining 3-5% risk is operational: Apify actor timeouts, Aurinko sync delays, or edge function cold starts -- not code bugs.
-
+### FAQ extraction prompt update:
+- Locate the system prompt that instructs the AI to extract FAQs from scraped website content
+- Add explicit first-person voice instructions
+- This affects future scrapes only (which is fine since we're wiping all data)
