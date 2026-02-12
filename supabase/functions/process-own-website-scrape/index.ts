@@ -500,6 +500,9 @@ async function extractFaqsWithClaude(
   pageUrl: string
 ): Promise<any[]> {
   
+  // Determine max FAQs based on page type
+  const maxFaqs = pageType === 'faq' ? 20 : pageType === 'pricing' ? 10 : 8;
+
   const systemPrompt = `You are an expert Content Analyst for BizzyBee, extracting a Knowledge Base from UK service business websites.
 
 CRITICAL VOICE RULE:
@@ -517,6 +520,7 @@ RULES:
 - All answers should use British English spelling
 - Keep questions concise (max 15 words)
 - Keep answers direct and useful
+- IMPORTANT: Extract AT MOST ${maxFaqs} high-quality FAQs from this page. Quality over quantity. Skip generic or repetitive content.
 
 PAGE TYPE: ${pageType}
 PAGE URL: ${pageUrl}`;
@@ -536,7 +540,7 @@ PAGE URL: ${pageUrl}`;
       tool_choice: { type: 'tool', name: 'extract_faqs' },
       messages: [{
         role: 'user',
-        content: `Extract FAQs from this page content:\n\n${content.substring(0, 8000)}`
+      content: `Extract up to ${maxFaqs} high-quality FAQs from this page content. Focus on unique, factual information:\n\n${content.substring(0, 8000)}`
       }]
     })
   });
