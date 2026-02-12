@@ -17,23 +17,48 @@ interface BusinessFact {
   category: string;
 }
 
-const PRIORITY_LABELS: Record<number, string> = {
-  10: '★ Your Website',
-  9: '★ Manual',
-  8: '★ Document',
-  5: 'Competitor',
-  3: 'Template',
+// BizzyBee brand colours
+const BRAND = {
+  primary: [59, 130, 246] as [number, number, number],       // #3B82F6
+  primaryDark: [37, 99, 235] as [number, number, number],    // #2563EB
+  dark: [30, 41, 59] as [number, number, number],            // #1E293B
+  text: [51, 65, 85] as [number, number, number],            // #334155
+  textLight: [100, 116, 139] as [number, number, number],    // #64748B
+  surface: [248, 250, 252] as [number, number, number],      // #F8FAFC
+  surfaceAlt: [241, 245, 249] as [number, number, number],   // #F1F5F9
+  white: [255, 255, 255] as [number, number, number],
+  amber: [245, 158, 11] as [number, number, number],         // #F59E0B
+  green: [34, 197, 94] as [number, number, number],          // #22C55E
+  border: [226, 232, 240] as [number, number, number],       // #E2E8F0
 };
+
+const CATEGORY_COLOURS: Record<string, [number, number, number]> = {
+  services: [59, 130, 246],
+  pricing: [34, 197, 94],
+  booking: [168, 85, 247],
+  policies: [239, 68, 68],
+  coverage: [14, 165, 233],
+  process: [245, 158, 11],
+  trust: [236, 72, 153],
+  contact: [99, 102, 241],
+};
+
+function getCategoryColour(cat: string): [number, number, number] {
+  const key = cat.toLowerCase().replace(/[^a-z]/g, '');
+  for (const [k, v] of Object.entries(CATEGORY_COLOURS)) {
+    if (key.includes(k)) return v;
+  }
+  return BRAND.primary;
+}
 
 export async function generateKnowledgeBasePDF(workspaceId: string, companyName?: string): Promise<void> {
   const doc = new jsPDF();
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const pageHeight = doc.internal.pageSize.getHeight();
-  const margin = 20;
-  const contentWidth = pageWidth - margin * 2;
+  const pw = doc.internal.pageSize.getWidth();
+  const ph = doc.internal.pageSize.getHeight();
+  const margin = 18;
+  const cw = pw - margin * 2;
   let y = margin;
 
-  // Use `any` to avoid deep-instantiation type errors on dynamic queries
   const sb: any = supabase as any;
 
   const fetchAll = async <T,>(table: string, select: string, build?: (q: any) => any): Promise<T[]> => {
@@ -53,58 +78,42 @@ export async function generateKnowledgeBasePDF(workspaceId: string, companyName?
     return rows;
   };
 
-  // --- Helpers ---
-  const addTitle = (text: string, size = 18) => {
-    doc.setFontSize(size);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(0, 0, 0);
-    doc.text(text, margin, y);
-    y += size * 0.5 + 4;
-  };
-
-  const addSubtitle = (text: string) => {
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(80, 80, 80);
-    doc.text(text, margin, y);
-    doc.setTextColor(0, 0, 0);
-    y += 8;
-  };
-
-  const addText = (text: string, indent = 0) => {
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    const lines = doc.splitTextToSize(text, contentWidth - indent);
-    doc.text(lines, margin + indent, y);
-    y += lines.length * 5 + 2;
-  };
-
-  const addBullet = (text: string) => {
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.text('•', margin + 5, y);
-    const lines = doc.splitTextToSize(text, contentWidth - 15);
-    doc.text(lines, margin + 12, y);
-    y += lines.length * 5 + 2;
-  };
-
-  const checkPageBreak = (needed: number) => {
-    if (y + needed > pageHeight - margin) {
+  // ---------- helpers ----------
+  const ensureSpace = (needed: number) => {
+    if (y + needed > ph - 24) {
       doc.addPage();
-      y = margin;
+      y = margin + 4;
     }
   };
 
-  const addSpacer = (h = 8) => { y += h; };
+  const drawRoundedRect = (x: number, ry: number, w: number, h: number, r: number, fill: [number, number, number]) => {
+    doc.setFillColor(...fill);
+    doc.roundedRect(x, ry, w, h, r, r, 'F');
+  };
 
-  // --- Fetch data ---
+  const drawLine = (x1: number, y1: number, x2: number, colour: [number, number, number], width = 0.5) => {
+    doc.setDrawColor(...colour);
+    doc.setLineWidth(width);
+    doc.line(x1, y1, x2, y1);
+  };
+
+  // ---------- fetch data ----------
   const [faqs, facts, scrapingJob] = await Promise.all([
-    fetchAll<FAQItem>('faq_database', 'question, answer, category, priority, is_own_content, source_type', q => q.eq('is_active', true).eq('is_own_content', true).order('priority', { ascending: false })),
+    fetchAll<FAQItem>('faq_database', 'question, answer, category, priority, is_own_content, source_type', q =>
+      q.eq('is_active', true).eq('is_own_content', true).order('priority', { ascending: false })
+    ),
     fetchAll<BusinessFact>('business_facts', 'fact_key, fact_value, category'),
-    sb.from('scraping_jobs').select('website_url, total_pages_found, pages_processed, faqs_found, completed_at').eq('workspace_id', workspaceId).eq('status', 'completed').order('completed_at', { ascending: false }).limit(1).maybeSingle().then((r: any) => r.data),
+    sb.from('scraping_jobs')
+      .select('website_url, total_pages_found, pages_processed, faqs_found, completed_at')
+      .eq('workspace_id', workspaceId)
+      .eq('status', 'completed')
+      .order('completed_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .then((r: any) => r.data),
   ]);
 
-  // Group FAQs by category
+  // Group FAQs
   const faqsByCategory: Record<string, FAQItem[]> = {};
   faqs.forEach(faq => {
     const cat = faq.category || 'General';
@@ -113,140 +122,312 @@ export async function generateKnowledgeBasePDF(workspaceId: string, companyName?
   });
   const categoryOrder = Object.entries(faqsByCategory).sort((a, b) => b[1].length - a[1].length);
 
-  // Group facts by category
+  // Group facts
   const factsByCategory: Record<string, BusinessFact[]> = {};
   facts.forEach(f => {
     if (!factsByCategory[f.category]) factsByCategory[f.category] = [];
     factsByCategory[f.category].push(f);
   });
 
-  // ===== HEADER with logo =====
-  doc.setFillColor(245, 245, 250);
-  doc.rect(0, 0, pageWidth, 50, 'F');
+  // ===================================================
+  //  COVER PAGE
+  // ===================================================
+  // Full-page dark background
+  doc.setFillColor(...BRAND.dark);
+  doc.rect(0, 0, pw, ph, 'F');
 
-  // Try to add BizzyBee logo
+  // Accent stripe at top
+  doc.setFillColor(...BRAND.primary);
+  doc.rect(0, 0, pw, 6, 'F');
+
+  // BizzyBee logo
   try {
     const img = new Image();
     img.crossOrigin = 'anonymous';
     await new Promise<void>((resolve) => {
       img.onload = () => {
-        doc.addImage(img, 'PNG', margin, 10, 12, 12);
+        doc.addImage(img, 'PNG', pw / 2 - 20, 60, 40, 40);
         resolve();
       };
       img.onerror = () => resolve();
       img.src = bizzybeeLogoSrc;
     });
-  } catch { /* skip logo if it fails */ }
+  } catch { /* skip */ }
 
-  doc.setFontSize(20);
+  // Title
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(0, 0, 0);
-  doc.text('BizzyBee Knowledge Base', margin + 16, 20);
-  doc.setFontSize(11);
+  doc.setFontSize(32);
+  doc.setTextColor(...BRAND.white);
+  doc.text('Knowledge Base', pw / 2, 120, { align: 'center' });
+
+  // Subtitle
+  doc.setFontSize(14);
   doc.setFont('helvetica', 'normal');
-  doc.setTextColor(100, 100, 100);
-  doc.text(`Prepared for ${companyName || 'Your Business'}`, margin + 16, 28);
-  doc.text(new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }), pageWidth - margin - 50, 28);
-  
-  // Accent line
-  doc.setDrawColor(59, 130, 246);
-  doc.setLineWidth(1.5);
-  doc.line(margin, 45, pageWidth - margin, 45);
-  
-  doc.setTextColor(0, 0, 0);
-  y = 58;
+  doc.setTextColor(...BRAND.primary);
+  doc.text(`Prepared for ${companyName || 'Your Business'}`, pw / 2, 132, { align: 'center' });
 
-  // ===== SUMMARY =====
-  addTitle('Summary', 14);
-  const summaryParts: string[] = [];
-  summaryParts.push(`${faqs.length} active FAQs across ${categoryOrder.length} categories.`);
-  if (facts.length > 0) summaryParts.push(`${facts.length} business facts stored.`);
-  if (scrapingJob) {
-    summaryParts.push(`Website scraped: ${scrapingJob.website_url || 'N/A'} — ${scrapingJob.pages_processed || 0} pages processed, ${scrapingJob.faqs_found || 0} FAQs extracted.`);
-  }
-  addText(summaryParts.join(' '));
-  addSpacer();
+  // Date
+  doc.setFontSize(11);
+  doc.setTextColor(...BRAND.textLight);
+  doc.text(new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }), pw / 2, 142, { align: 'center' });
 
-  // ===== WEBSITE SCRAPING SUMMARY =====
-  if (scrapingJob) {
-    addTitle('Website Scraping Results', 14);
-    addBullet(`URL: ${scrapingJob.website_url}`);
-    addBullet(`Pages discovered: ${scrapingJob.total_pages_found || 0}`);
-    addBullet(`Pages processed: ${scrapingJob.pages_processed || 0}`);
-    addBullet(`FAQs extracted: ${scrapingJob.faqs_found || 0}`);
-    if (scrapingJob.completed_at) {
-      addBullet(`Completed: ${new Date(scrapingJob.completed_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}`);
-    }
-    addSpacer();
-  }
+  // Stats cards row
+  const statsY = 165;
+  const cardW = 42;
+  const gap = 8;
+  const totalCardsW = cardW * 3 + gap * 2;
+  const startX = (pw - totalCardsW) / 2;
 
-  // ===== FAQ OVERVIEW =====
-  addTitle('FAQ Overview by Category', 14);
-  categoryOrder.forEach(([cat, items]) => {
-    const ownCount = items.filter(i => i.is_own_content).length;
-    const label = ownCount > 0 ? `${cat} — ${items.length} FAQs (${ownCount} from your website)` : `${cat} — ${items.length} FAQs`;
-    addBullet(label);
+  const statsData = [
+    { label: 'FAQs', value: String(faqs.length), colour: BRAND.primary },
+    { label: 'Categories', value: String(categoryOrder.length), colour: BRAND.amber },
+    { label: 'Pages Scraped', value: String(scrapingJob?.pages_processed || 0), colour: BRAND.green },
+  ];
+
+  statsData.forEach((stat, i) => {
+    const cx = startX + i * (cardW + gap);
+    // Card background
+    drawRoundedRect(cx, statsY, cardW, 36, 4, [41, 55, 78]);
+    // Accent top bar
+    doc.setFillColor(...stat.colour);
+    doc.roundedRect(cx, statsY, cardW, 4, 4, 4, 'F');
+    doc.setFillColor(41, 55, 78);
+    doc.rect(cx, statsY + 3, cardW, 3, 'F');
+    // Value
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(22);
+    doc.setTextColor(...BRAND.white);
+    doc.text(stat.value, cx + cardW / 2, statsY + 20, { align: 'center' });
+    // Label
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(...BRAND.textLight);
+    doc.text(stat.label, cx + cardW / 2, statsY + 29, { align: 'center' });
   });
-  addSpacer();
 
-  // ===== FULL FAQ LISTING =====
+  // Website URL at bottom
+  if (scrapingJob?.website_url) {
+    doc.setFontSize(9);
+    doc.setTextColor(...BRAND.textLight);
+    doc.text(scrapingJob.website_url, pw / 2, ph - 30, { align: 'center' });
+  }
+
+  // Powered by line
+  doc.setFontSize(8);
+  doc.setTextColor(100, 116, 139);
+  doc.text('Powered by BizzyBee AI', pw / 2, ph - 18, { align: 'center' });
+
+  // ===================================================
+  //  PAGE HEADER HELPER (for subsequent pages)
+  // ===================================================
+  const addPageHeader = () => {
+    // Subtle top bar
+    doc.setFillColor(...BRAND.surface);
+    doc.rect(0, 0, pw, 14, 'F');
+    drawLine(0, 14, pw, BRAND.border, 0.3);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(...BRAND.textLight);
+    doc.text('BizzyBee Knowledge Base', margin, 9);
+    doc.text(companyName || '', pw - margin, 9, { align: 'right' });
+    y = 22;
+  };
+
+  // ===================================================
+  //  SCRAPING SUMMARY PAGE
+  // ===================================================
+  doc.addPage();
+  addPageHeader();
+
+  // Section title
+  const sectionTitle = (text: string, colour: [number, number, number] = BRAND.primary) => {
+    ensureSpace(18);
+    doc.setFillColor(...colour);
+    doc.roundedRect(margin, y, 3, 12, 1.5, 1.5, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(15);
+    doc.setTextColor(...BRAND.dark);
+    doc.text(text, margin + 8, y + 9);
+    y += 18;
+  };
+
+  if (scrapingJob) {
+    sectionTitle('Website Analysis Summary');
+    
+    // Info card
+    drawRoundedRect(margin, y, cw, 42, 4, BRAND.surfaceAlt);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...BRAND.text);
+    
+    const infoItems = [
+      ['Website', scrapingJob.website_url || 'N/A'],
+      ['Pages Discovered', String(scrapingJob.total_pages_found || 0)],
+      ['Pages Processed', String(scrapingJob.pages_processed || 0)],
+      ['FAQs Extracted', String(scrapingJob.faqs_found || 0)],
+    ];
+    
+    let iy = y + 10;
+    infoItems.forEach(([label, value]) => {
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...BRAND.textLight);
+      doc.setFontSize(8);
+      doc.text(label.toUpperCase(), margin + 8, iy);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(...BRAND.dark);
+      doc.setFontSize(10);
+      doc.text(value, margin + 55, iy);
+      iy += 9;
+    });
+    y += 50;
+  }
+
+  // ===================================================
+  //  CATEGORY OVERVIEW
+  // ===================================================
+  sectionTitle('Category Overview', BRAND.amber);
+
   categoryOrder.forEach(([cat, items]) => {
-    checkPageBreak(30);
-    addTitle(cat, 13);
+    ensureSpace(12);
+    const colour = getCategoryColour(cat);
+    
+    // Category pill
+    doc.setFillColor(...colour);
+    doc.roundedRect(margin + 4, y - 3, 3, 8, 1, 1, 'F');
+    
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(...BRAND.dark);
+    const catLabel = cat.charAt(0).toUpperCase() + cat.slice(1).replace(/_/g, ' ');
+    doc.text(catLabel, margin + 11, y + 3);
+    
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(...BRAND.textLight);
+    doc.text(`${items.length} FAQs`, margin + 11 + doc.getTextWidth(catLabel) + 4, y + 3);
+    
+    y += 10;
+  });
+
+  y += 6;
+
+  // ===================================================
+  //  FAQ SECTIONS
+  // ===================================================
+  categoryOrder.forEach(([cat, items]) => {
+    doc.addPage();
+    addPageHeader();
+
+    const colour = getCategoryColour(cat);
+    const catLabel = cat.charAt(0).toUpperCase() + cat.slice(1).replace(/_/g, ' ');
+
+    // Category header band
+    drawRoundedRect(margin, y, cw, 16, 4, colour);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(...BRAND.white);
+    doc.text(catLabel, margin + 8, y + 11);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.text(`${items.length} questions`, pw - margin - 8, y + 11, { align: 'right' });
+    y += 22;
 
     items.forEach((faq, idx) => {
-      checkPageBreak(35);
-      const priorityLabel = PRIORITY_LABELS[faq.priority || 5] || `P${faq.priority}`;
+      // Estimate height needed
+      const qLines = doc.splitTextToSize(faq.question, cw - 24);
+      const aLines = doc.splitTextToSize(faq.answer, cw - 24);
+      const itemHeight = (qLines.length + aLines.length) * 5 + 16;
+      
+      ensureSpace(itemHeight + 4);
+      if (y < 22) addPageHeader();
 
-      doc.setFontSize(10);
+      // Alternating background
+      if (idx % 2 === 0) {
+        drawRoundedRect(margin, y - 2, cw, itemHeight, 3, BRAND.surfaceAlt);
+      }
+
+      // Question number badge
+      doc.setFillColor(...colour);
+      doc.roundedRect(margin + 4, y + 1, 14, 6, 2, 2, 'F');
       doc.setFont('helvetica', 'bold');
-      doc.setTextColor(50, 50, 50);
-      doc.text(`Q${idx + 1}: `, margin + 2, y);
-      doc.setFont('helvetica', 'normal');
-      const qLines = doc.splitTextToSize(faq.question, contentWidth - 15);
-      doc.text(qLines, margin + 14, y);
-      y += qLines.length * 5 + 2;
+      doc.setFontSize(7);
+      doc.setTextColor(...BRAND.white);
+      doc.text(`Q${idx + 1}`, margin + 11, y + 5.5, { align: 'center' });
 
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(0, 0, 0);
-      const aLines = doc.splitTextToSize(`A: ${faq.answer}`, contentWidth - 10);
-      doc.text(aLines, margin + 5, y);
-      y += aLines.length * 5 + 2;
+      // Question text
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(...BRAND.dark);
+      doc.text(qLines, margin + 22, y + 6);
+      y += qLines.length * 5 + 6;
 
-      // Source tag
-      doc.setFontSize(8);
-      doc.setTextColor(130, 130, 130);
-      doc.text(`[${priorityLabel}]`, margin + 5, y);
-      doc.setTextColor(0, 0, 0);
-      y += 6;
+      // Answer text
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9.5);
+      doc.setTextColor(...BRAND.text);
+      doc.text(aLines, margin + 22, y);
+      y += aLines.length * 5 + 8;
     });
-
-    addSpacer(4);
   });
 
-  // ===== BUSINESS FACTS =====
+  // ===================================================
+  //  BUSINESS FACTS
+  // ===================================================
   if (facts.length > 0) {
-    checkPageBreak(30);
-    addTitle('Business Facts', 14);
+    doc.addPage();
+    addPageHeader();
+    sectionTitle('Business Facts', BRAND.green);
 
     Object.entries(factsByCategory).forEach(([cat, items]) => {
-      checkPageBreak(20);
-      addSubtitle(cat);
+      ensureSpace(16);
+      
+      // Category label
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.setTextColor(...BRAND.dark);
+      doc.text(cat.charAt(0).toUpperCase() + cat.slice(1).replace(/_/g, ' '), margin + 4, y + 4);
+      y += 10;
+
       items.forEach(f => {
-        checkPageBreak(12);
-        addBullet(`${f.fact_key}: ${f.fact_value}`);
+        ensureSpace(12);
+        doc.setFillColor(...BRAND.primary);
+        doc.circle(margin + 6, y + 1.5, 1.5, 'F');
+        
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9);
+        doc.setTextColor(...BRAND.text);
+        const keyText = f.fact_key.replace(/_/g, ' ');
+        doc.text(keyText, margin + 11, y + 3);
+        
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(...BRAND.textLight);
+        const valLines = doc.splitTextToSize(f.fact_value, cw - 15 - doc.getTextWidth(keyText) - 6);
+        if (valLines.length === 1) {
+          doc.text(`: ${f.fact_value}`, margin + 11 + doc.getTextWidth(keyText), y + 3);
+          y += 7;
+        } else {
+          y += 5;
+          const fullLines = doc.splitTextToSize(f.fact_value, cw - 15);
+          doc.text(fullLines, margin + 11, y);
+          y += fullLines.length * 4.5 + 3;
+        }
       });
-      addSpacer(4);
+      y += 6;
     });
   }
 
-  // ===== FOOTER =====
+  // ===================================================
+  //  FOOTER on all pages
+  // ===================================================
   const pageCount = doc.getNumberOfPages();
-  for (let i = 1; i <= pageCount; i++) {
+  for (let i = 2; i <= pageCount; i++) {
     doc.setPage(i);
-    doc.setFontSize(8);
-    doc.setTextColor(150, 150, 150);
-    doc.text(`Generated by BizzyBee • Page ${i} of ${pageCount}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+    // Bottom line
+    drawLine(margin, ph - 16, pw - margin, BRAND.border, 0.3);
+    doc.setFontSize(7);
+    doc.setTextColor(...BRAND.textLight);
+    doc.text('Generated by BizzyBee AI', margin, ph - 10);
+    doc.text(`Page ${i - 1} of ${pageCount - 1}`, pw - margin, ph - 10, { align: 'right' });
   }
 
   const filename = `BizzyBee-Knowledge-Base-${new Date().toISOString().split('T')[0]}.pdf`;
