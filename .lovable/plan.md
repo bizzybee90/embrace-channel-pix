@@ -1,143 +1,105 @@
 
 
-# Consolidate n8n Competitor Workflow and Clean Up Deprecated Edge Functions
+# Parallel Classification + Aurinko Cost Fix
 
-## Overview
+## Part 1: Stop the Aurinko Webhook Drain (Immediate)
 
-Now that n8n handles the full competitor pipeline (discovery, scraping, FAQ extraction, and Supabase upsert), several edge functions are redundant. This plan removes them and updates any code that references them.
+The `aurinko-webhook` function is being called by Aurinko every time an email arrives for michael@maccleaning.uk. Each call costs cloud credits even though it fails HMAC verification and does nothing useful.
 
-## Part 1: n8n Workflow Changes (Manual — User Actions in n8n)
+**Fix**: Add an early-exit "kill switch" at the very top of `aurinko-webhook/index.ts` -- before ANY processing (before rate limiting, before reading the body, before creating a Supabase client). This makes each unwanted invocation cost almost nothing.
 
-These are instructions for you to apply in the n8n workflow editor. No code changes from Lovable.
+The kill switch checks an environment variable `AURINKO_WEBHOOK_ENABLED`. If not set to `"true"`, the function returns 200 immediately. When you're ready to enable live email sync later, you just set that secret to `"true"`.
 
-### 1A. Replace "Generate FAQs" + "Parse FAQs" with a Single AI Agent
+**File**: `supabase/functions/aurinko-webhook/index.ts` -- add 5 lines at the top of the serve handler, before line 82.
 
-- Delete the "Generate FAQs" and "Parse FAQs" nodes
-- Add a new **AI Agent** node called **"Extract and Validate FAQs"**
-- LLM: Anthropic Chat Model (`claude-sonnet-4-20250514`)
-- No tools needed
-- System Prompt:
+---
+
+## Part 2: Fix Database RPCs (Migration)
+
+The RPCs created earlier target the wrong table (`raw_emails` with `status = 'pending'`). They need to target `email_import_queue` with `status = 'scanned'` and `category IS NULL`.
+
+**Migration will**:
+1. Drop the existing `get_partitioned_unclassified_batch` function
+2. Recreate it to query `email_import_queue` where `status = 'scanned' AND category IS NULL`
+3. Drop the existing `count_unclassified_emails` function
+4. Recreate it against `email_import_queue`
+5. Drop the old index on `raw_emails`, create a new one on `email_import_queue`
+
+---
+
+## Part 3: Create `classify-emails-dispatcher` Edge Function
+
+A thin orchestrator that:
+1. Accepts `workspace_id` and optional `callback_url` (for n8n)
+2. Counts unclassified emails via the `count_unclassified_emails` RPC
+3. Calculates worker count: `min(ceil(count / 2500), 10)`
+4. Fires N parallel `fetch()` calls to `email-classify-bulk` -- fire-and-forget
+5. Each call receives `partition_id`, `total_partitions`, and `callback_url`
+6. Returns immediately with `{ status: "dispatched", workers: N, total_emails: count }`
+
+**New file**: `supabase/functions/classify-emails-dispatcher/index.ts`
+
+---
+
+## Part 4: Update `email-classify-bulk` for Partition Support
+
+Modify the existing function to:
+- Accept optional `partition_id`, `total_partitions`, and `callback_url` parameters
+- When partitioned: use the `get_partitioned_unclassified_batch` RPC to fetch only this worker's slice
+- When not partitioned: use existing direct query (backward compatible)
+- Tag all log messages with worker ID (e.g., `[Worker 3/10]`)
+- When self-chaining: pass the same partition params forward
+- When partition is empty: check global remaining via `count_unclassified_emails`
+  - If global > 0: exit silently (other workers still running)
+  - If global = 0: trigger voice-learning AND send callback to `callback_url` if provided
+
+**Modified file**: `supabase/functions/email-classify-bulk/index.ts`
+
+---
+
+## Part 5: Register Dispatcher in config.toml
+
+Add `[functions.classify-emails-dispatcher]` with `verify_jwt = false`.
+
+Also add `[functions.email-classify-bulk]` if not already present.
+
+---
+
+## What You Do (n8n Side)
+
+Your n8n workflow becomes very simple:
 
 ```text
-You are a strict FAQ extraction and validation agent for a {{ $('Passthrough Data').first().json.business_type }} business.
+Webhook (receives workspace_id)
+  --> HTTP Request: POST classify-emails-dispatcher
+      Body: { workspace_id, callback_url: "your-n8n-webhook-url" }
+  --> (dispatcher handles everything from here)
 
-SCRAPED COMPETITOR CONTENT:
-{{ $('Parse Scraped Content').first().json.website_content }}
-
-COMPETITOR: {{ $('Parse Scraped Content').first().json.business_name }}
-DOMAIN: {{ $('Parse Scraped Content').first().json.domain }}
-
-YOUR TASKS:
-1. Extract genuine FAQ-worthy questions from the scraped content
-2. ONLY include facts directly supported by the source material - zero hallucination
-3. Flag questions where the client could differentiate (competitor weakness = opportunity)
-4. Categorize each FAQ
-
-Return ONLY valid JSON array:
-[
-  {
-    "question": "...",
-    "answer": "...",
-    "category": "Services|Pricing|Policies|Process|Coverage|Contact|General",
-    "confidence": "high|medium|low",
-    "opportunity": true or false,
-    "opportunity_note": "Client could highlight X here" or null
-  }
-]
-
-RULES:
-- Extract ALL relevant FAQs the content supports - no arbitrary limit
-- Skip generic/obvious questions
-- Answers must reflect what the competitor ACTUALLY says, not assumptions
-- Mark confidence "low" if the answer is inferred rather than explicit
-- Be exhaustive with services, areas covered, pricing details
+Separate webhook: receives completion callback
+  --> Update status / trigger next steps
 ```
 
-- Connect: `Parse Scraped Content` -> `Extract and Validate FAQs` -> `Upsert Competitor`
+---
 
-### 1B. Add "Status: Processing" Callback Inside the Loop
+## Files Summary
 
-- Add an **HTTP Request** node inside the loop called **"Status: Processing"**
-- Place it after the loop start, before "Apify Website Scraper"
-- Method: `POST`
-- URL: `{{ $('Passthrough Data').first().json.callback_url }}`
-- Body:
-```json
-{
-  "type": "competitor_discovery_status",
-  "workspace_id": "{{ $('Passthrough Data').first().json.workspace_id }}",
-  "status": "processing",
-  "message": "Processing competitor {{ $runIndex + 1 }} of {{ $('Parse Agent Results').first().json.total_found }}: {{ $json.business_name }}",
-  "current": "{{ $runIndex + 1 }}",
-  "total": "{{ $('Parse Agent Results').first().json.total_found }}",
-  "current_competitor": "{{ $json.domain }}",
-  "timestamp": "{{ new Date().toISOString() }}"
-}
-```
-- Enable **"Continue on Fail"** so callback errors do not stop the workflow
+| File | Action | Purpose |
+|------|--------|---------|
+| `supabase/functions/aurinko-webhook/index.ts` | Modify | Add kill switch to stop cost drain |
+| Database migration | Create | Fix RPCs to target `email_import_queue` |
+| `supabase/functions/classify-emails-dispatcher/index.ts` | Create | Parallel orchestrator |
+| `supabase/functions/email-classify-bulk/index.ts` | Modify | Add partition support |
+| `supabase/config.toml` | Modify | Register new functions |
 
-## Part 2: Edge Function Cleanup (Lovable Code Changes)
+---
 
-### 2A. Delete Deprecated Edge Functions
+## How Aurinko Works (Reference)
 
-These functions are fully replaced by the n8n workflow:
+**Onboarding**: When you connect email via OAuth, the callback creates an Aurinko "subscription" -- telling Aurinko to POST to your webhook URL every time a new email arrives.
 
-| Function | Reason for Removal |
-|---|---|
-| `handle-scrape-complete` | n8n does scraping + page storage directly |
-| `extract-competitor-faqs` | n8n AI Agent extracts FAQs |
-| `competitor-extract-faqs` | Duplicate of above (Anthropic version) |
-| `competitor-scrape-worker` | n8n handles Apify scraping |
-| `kb-mine-site` | n8n AI Agent validates + extracts |
+**Ongoing sync**: Aurinko sends a webhook for each new email. Your `aurinko-webhook` function fetches the full email, creates a conversation, and can trigger AI drafting. This is how new emails appear in BizzyBee after the initial import.
 
-Files to delete:
-- `supabase/functions/handle-scrape-complete/index.ts`
-- `supabase/functions/extract-competitor-faqs/index.ts`
-- `supabase/functions/competitor-extract-faqs/index.ts`
-- `supabase/functions/competitor-scrape-worker/index.ts`
-- `supabase/functions/kb-mine-site/index.ts`
+**The subscription renews** via `refresh-aurinko-subscriptions` (every 7 days). The kill switch stops processing without deleting the subscription, so you can re-enable it instantly when ready.
 
-### 2B. Update References to Deleted Functions
-
-**`supabase/functions/competitor-research-watchdog/index.ts`** — Remove cases that invoke `competitor-scrape-worker` and `extract-competitor-faqs`. These statuses (`scraping`, `extracting`) are now managed by n8n and reported via callbacks.
-
-**`supabase/functions/competitor-scrape-start/index.ts`** — Remove the reference to `handle-scrape-complete` webhook URL. This function may itself be unnecessary if n8n handles scraping, but it is also used from the `CompetitorPipelineProgress` review flow. Needs review to determine if it should be kept or removed.
-
-**`supabase/functions/recover-competitor-job/index.ts`** — Remove the invoke of `competitor-extract-faqs`. The recovery flow should instead re-trigger the n8n workflow.
-
-**`supabase/functions/competitor-discover-smart/index.ts`** — Remove the invoke of `competitor-scrape-worker`. This function may also be fully replaced by the n8n AI Agent discovery step.
-
-**`src/components/onboarding/CompetitorMiningLoop.tsx`** — Remove or deprecate the `kb-mine-site` invocation. This component calls `kb-mine-site` in a client-side loop. Since n8n now handles this, the component may no longer be needed, or it should be updated to show progress from `n8n_workflow_progress` instead.
-
-### 2C. Update `n8n-competitor-callback` to Handle "processing" Status
-
-The callback edge function already accepts arbitrary fields and stores them in `details`. The new `current`, `total`, and `current_competitor` fields will be stored automatically. No code change is needed for the callback itself.
-
-However, the **ProgressScreen UI** (`src/components/onboarding/ProgressScreen.tsx`) should be updated to display the new real-time progress info:
-- Show `"Processing competitor X of Y: domain.com"` from the `message` field
-- Display `current`/`total` as a progress bar or fraction
-
-### 2D. Functions to KEEP
-
-| Function | Reason |
-|---|---|
-| `trigger-n8n-workflows` | Kicks off n8n workflows |
-| `n8n-competitor-callback` | Receives status updates from n8n |
-| `competitor-dedupe-faqs` | May still be useful if n8n does not deduplicate |
-| `competitor-refine-faqs` | May still be useful depending on n8n pipeline |
-
-## Part 3: UI Enhancement for Real-Time Progress
-
-Update `ProgressScreen.tsx` to show the `current`/`total` competitor progress and the `current_competitor` domain when the status is `"processing"`. This gives users live feedback like:
-
-```
-Processing competitor 5 of 47: cleanwindows.co.uk
-[===========                              ] 11%
-```
-
-## Technical Notes
-
-- The `faq_database` table mapping stays the same — n8n upserts with `priority: 5` and `is_own_content: false`
-- The `competitor_research_jobs` table status lifecycle remains valid; n8n callbacks update `n8n_workflow_progress` (not the jobs table directly), so the watchdog may need adjustment
-- Edge function deletion will also require calling the `delete_edge_functions` tool to remove deployed versions
+**Current drain**: Even failed HMAC checks cost credits because the function still boots and executes code. The kill switch returns before any of that happens.
 
