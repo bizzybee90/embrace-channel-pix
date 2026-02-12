@@ -24,10 +24,20 @@ export function OnboardingTriggerPanel({ workspaceId }: OnboardingTriggerPanelPr
         .from('users')
         .update({
           onboarding_completed: false,
-          onboarding_step: 'business_context',
+          onboarding_step: 'welcome',
           updated_at: new Date().toISOString(),
         })
         .eq('id', user.id);
+
+      // Clear localStorage draft so wizard doesn't resume from old step
+      try {
+        const keys = Object.keys(localStorage);
+        keys.forEach(key => {
+          if (key.startsWith('bizzybee:onboarding:')) {
+            localStorage.removeItem(key);
+          }
+        });
+      } catch { /* ignore */ }
 
       toast.success('Redirecting to onboarding...');
       navigate('/onboarding');
