@@ -239,9 +239,9 @@ export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenPr
 
         if (emailProgress || emailRecord) {
           const totalEmails = (emailDetails.total_emails as number) || 
-                             (emailProgress?.total_emails as number) || 0;
+                             (emailProgress?.estimated_total_emails as number) || 0;
           const classifiedEmails = (emailDetails.emails_classified as number) || 
-                                   (emailProgress?.classified_count as number) || 0;
+                                   (emailProgress?.emails_classified as number) || 0;
 
           let effectiveEmailStatus = emailStatus;
           // Auto-advance from pending if we can see classification is happening
