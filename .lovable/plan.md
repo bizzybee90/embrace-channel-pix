@@ -1,69 +1,78 @@
 
 
-# Fix Website FAQ Extraction Quality
+# Improve Own-Website FAQ Quality with AI Consolidation
 
-## Problem Summary
+## What Changes
 
-The website knowledge extraction pipeline has several critical issues causing 185 duplicate/contradictory FAQs instead of ~30-40 clean ones:
+Two targeted improvements to the `process-own-website-scrape` edge function:
 
-1. **Deduplication is broken** - The `match_faqs` database function queries the `faqs` table, but `process-own-website-scrape` inserts into `faq_database`. Every similarity check returns zero matches, so nothing is ever deduplicated.
+### Part 1: Smarter Extraction Prompt
 
-2. **No location page awareness** - Your site has ~20 location pages (e.g., `/window-cleaning-dunstable`, `/window-cleaning-flitwick`) that all contain the same core content with the town name swapped. Each page generates 8 near-identical FAQs independently.
+Update the `extractFaqsWithClaude` system prompt (line 563-582) to add strict topic-scoping rules that prevent cross-page duplication at the source. Key additions:
 
-3. **No contradiction detection** - Conflicting facts (cash vs card-only, different price ranges, different service frequencies) all get stored as equally valid.
+- Do NOT generate coverage/area FAQs unless the page is specifically a locations or coverage page
+- Do NOT generate payment, cancellation, or scheduling FAQs unless it is the FAQ page, Terms page, or a dedicated policy page
+- Do NOT generate contact FAQs unless on the Contact page
+- Do NOT generate pricing FAQs unless on a Pricing or FAQ page
+- Focus only on what is unique to THIS page
+- Quality gate: "Would a real customer actually ask this?"
+- Reject marketing fluff reworded as questions
 
-4. **No post-extraction consolidation** - Unlike the competitor pipeline which has a dedicated `competitor-dedupe-faqs` step with embeddings, the own-website pipeline has no equivalent.
+This alone should cut the raw extraction from ~35 down to ~25 per run, with far fewer semantic duplicates reaching the consolidation step.
 
-## Solution: Three-Phase Fix
+### Part 2: AI-Powered Consolidation Pass
 
-### Phase 1: Fix the broken dedup function
+Replace the current lightweight `consolidateFaqs` function (lines 130-216) with a new version that calls the Lovable AI Gateway to semantically deduplicate the full FAQ set.
 
-Update the `match_faqs` database function to query `faq_database` instead of `faqs`, so the existing per-FAQ similarity check actually works.
+**How it works:**
+1. Fetch all active own-content FAQs for the workspace
+2. If 25 or fewer, skip (already lean)
+3. Send all FAQs to `google/gemini-2.5-flash` via the Lovable AI Gateway with a detailed consolidation prompt
+4. The AI merges semantic duplicates, resolves contradictions (FAQ page wins over location pages), removes marketing fluff, and returns the canonical set
+5. Deactivate all FAQs not in the keep list; update rewritten ones
+6. Safety checks: abort if AI returns fewer than 10 or more than input count
 
-### Phase 2: Add location page detection and skipping
+**Consolidation priority order:**
+- HIGHEST: FAQ page content (the business owner's deliberate answers)
+- HIGH: Terms/policy pages
+- MEDIUM: Dedicated service pages, homepage
+- LOW: Location/SEO pages
 
-In `process-own-website-scrape`, detect location/area pages by URL pattern (e.g., URLs containing town names, `/area/`, or matching a pattern like `/service-location`). Group them and only process 1-2 representative location pages instead of all 20+. The rest get marked as `skipped_duplicate_location`.
+**Safety measures:**
+- Minimum floor of 10 FAQs (aborts if AI over-reduces)
+- No-op if AI returns same or more than input
+- Skips entirely if already at 25 or fewer
+- Low temperature (0.1) for deterministic output
+- Audit logging of every merge
 
-### Phase 3: Add a post-extraction consolidation pass
+### No Database Changes Required
 
-After all pages are processed, run a consolidation step (similar to what `competitor-dedupe-faqs` does):
-
-1. Fetch all FAQs just stored for this job
-2. Generate embeddings (already done during storage)
-3. Find clusters of similar FAQs (similarity > 0.90)
-4. For each cluster, keep the highest-quality entry and soft-delete the rest
-5. Flag any contradictions (same topic, conflicting answers) for review
-
-This brings the own-website pipeline to parity with the competitor pipeline's quality.
+The existing `faq_database` schema with `is_active` flag handles everything.
 
 ## Technical Details
 
-### Database Migration
+### File Changed
 
-- Update `match_faqs` function to query `faq_database` table instead of `faqs`
+`supabase/functions/process-own-website-scrape/index.ts`
 
-### Edge Function: `process-own-website-scrape/index.ts`
+**Extraction prompt update** (lines 563-582):
+- Add topic-scoping rules at the end of the system prompt
+- Prevent redundant coverage, payment, contact, and pricing FAQs from non-authoritative pages
 
-**Location page detection** (in both `processDataset` and `processFirecrawl`):
-- After storing page records, identify location pages by URL patterns
-- Group them and keep only 2 representative pages; skip the rest
-- Add `location_group` page type
+**Replace consolidateFaqs** (lines 130-216):
+- New function fetches all active own-content FAQs
+- Calls `https://ai.gateway.lovable.dev/v1/chat/completions` with `LOVABLE_API_KEY` (already configured as a secret)
+- Uses `google/gemini-2.5-flash` model
+- Parses JSON response, deactivates removed FAQs, updates rewritten ones
+- Column mapping: uses `workspace_id` (not business_id), `is_own_content` (not content_type)
 
-**Post-extraction consolidation** (new function at end of processing):
-- Query all FAQs with `workspace_id` and `is_own_content = true` that were just stored
-- Use existing embeddings to find clusters with similarity > 0.90
-- Merge clusters: keep highest quality_score entry, delete others
-- Log dedup stats (e.g., "Consolidated 185 FAQs down to 34")
+**The `hasContradiction` helper** (lines 199-216) is removed since the AI handles contradiction resolution natively.
 
 ### Expected Outcome
 
-- Location pages: ~20 pages skipped, saving API calls and preventing bulk duplication
-- Dedup actually works: catches the remaining near-duplicates across non-location pages
-- Post-consolidation: final count should land at 25-40 unique, high-quality FAQs
-- Contradictions: flagged in logs for future review capability
-
-### Files Changed
-
-1. **New SQL migration** - Fix `match_faqs` to query correct table
-2. **`supabase/functions/process-own-website-scrape/index.ts`** - Add location detection + consolidation pass
+- Before: 34 FAQs with 5+ coverage duplicates, contradictory answers, repeated method explanations
+- After: 20-25 unique, high-quality FAQs with no duplicates or contradictions
+- The actual FAQ page questions (cancellation, payment, scheduling) get priority
+- Coverage consolidated to a single canonical answer
+- Works for any business type (plumber, mechanic, electrician, etc.)
 
