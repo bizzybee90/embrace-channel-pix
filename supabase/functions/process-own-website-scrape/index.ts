@@ -132,16 +132,15 @@ async function consolidateFaqs(
   workspaceId: string,
   jobId: string
 ): Promise<{ before: number; after: number; contradictions: number }> {
-  console.log(`[${FUNCTION_NAME}] Starting post-extraction consolidation...`);
+  console.log(`[${FUNCTION_NAME}] Starting lightweight post-extraction consolidation...`);
 
-  // Fetch all FAQs just created for this workspace with own content
+  // Get count and basic info (NO embeddings - those are huge and cause CPU timeout)
   const { data: faqs, error } = await supabase
     .from('faq_database')
-    .select('id, question, answer, category, quality_score, embedding, source_page_url, confidence')
+    .select('id, question, answer, category, quality_score, source_page_url')
     .eq('workspace_id', workspaceId)
     .eq('is_own_content', true)
     .eq('is_active', true)
-    .not('embedding', 'is', null)
     .order('quality_score', { ascending: false });
 
   if (error || !faqs || faqs.length < 2) {
@@ -150,55 +149,35 @@ async function consolidateFaqs(
   }
 
   const beforeCount = faqs.length;
-  const SIMILARITY_THRESHOLD = 0.90;
   const idsToDeactivate: string[] = [];
-  const processed = new Set<string>();
   let contradictions = 0;
 
-  // Compare each pair using embeddings
-  for (let i = 0; i < faqs.length; i++) {
-    if (processed.has(faqs[i].id)) continue;
+  // Lightweight text-based dedup: normalize questions and find exact/near matches
+  const seen = new Map<string, typeof faqs[0]>();
+  
+  for (const faq of faqs) {
+    // Normalize: lowercase, strip punctuation, collapse whitespace
+    const normalized = faq.question.toLowerCase()
+      .replace(/[?!.,'"]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
 
-    const cluster: typeof faqs = [faqs[i]];
-
-    for (let j = i + 1; j < faqs.length; j++) {
-      if (processed.has(faqs[j].id)) continue;
-
-      // Calculate cosine similarity
-      const similarity = cosineSimilarity(faqs[i].embedding, faqs[j].embedding);
-
-      if (similarity >= SIMILARITY_THRESHOLD) {
-        cluster.push(faqs[j]);
-        processed.add(faqs[j].id);
-      }
-    }
-
-    if (cluster.length > 1) {
-      // Keep the one with highest quality_score (already sorted)
-      const keeper = cluster[0];
-      const duplicates = cluster.slice(1);
-
-      // Check for contradictions within cluster
-      const hasContradiction = detectContradiction(cluster);
-      if (hasContradiction) {
+    const existing = seen.get(normalized);
+    if (existing) {
+      // Duplicate found - keep the one already in `seen` (higher quality_score due to sort)
+      // Check for contradiction before deactivating
+      if (hasContradiction(existing.answer, faq.answer)) {
         contradictions++;
-        console.log(`[${FUNCTION_NAME}] Contradiction detected in cluster: "${keeper.question}"`);
-        for (const dup of duplicates) {
-          console.log(`  - Conflicting answer from: ${dup.source_page_url}`);
-        }
+        console.log(`[${FUNCTION_NAME}] Contradiction: "${faq.question}" from ${faq.source_page_url} vs ${existing.source_page_url}`);
       }
-
-      for (const dup of duplicates) {
-        idsToDeactivate.push(dup.id);
-      }
+      idsToDeactivate.push(faq.id);
+    } else {
+      seen.set(normalized, faq);
     }
-
-    processed.add(faqs[i].id);
   }
 
   // Deactivate duplicates
   if (idsToDeactivate.length > 0) {
-    // Batch deactivate in chunks of 50
     for (let i = 0; i < idsToDeactivate.length; i += 50) {
       const batch = idsToDeactivate.slice(i, i + 50);
       await supabase
@@ -209,59 +188,29 @@ async function consolidateFaqs(
   }
 
   const afterCount = beforeCount - idsToDeactivate.length;
-  console.log(`[${FUNCTION_NAME}] Consolidation complete: ${beforeCount} → ${afterCount} FAQs (removed ${idsToDeactivate.length} duplicates, ${contradictions} contradictions flagged)`);
+  console.log(`[${FUNCTION_NAME}] Consolidation: ${beforeCount} → ${afterCount} FAQs (${idsToDeactivate.length} removed, ${contradictions} contradictions)`);
 
-  // Update job with final count
-  await supabase.from('scraping_jobs').update({
-    faqs_stored: afterCount,
-  }).eq('id', jobId);
-
-  // Update business_context with FAQ count
-  await supabase.from('business_context').update({
-    website_faqs_generated: afterCount,
-  }).eq('workspace_id', workspaceId);
+  await supabase.from('scraping_jobs').update({ faqs_stored: afterCount }).eq('id', jobId);
+  await supabase.from('business_context').update({ website_faqs_generated: afterCount }).eq('workspace_id', workspaceId);
 
   return { before: beforeCount, after: afterCount, contradictions };
 }
 
-function cosineSimilarity(a: number[] | string, b: number[] | string): number {
-  // Embeddings may come as JSON strings from DB
-  const vecA = typeof a === 'string' ? JSON.parse(a) : a;
-  const vecB = typeof b === 'string' ? JSON.parse(b) : b;
-  
-  if (!vecA || !vecB || vecA.length !== vecB.length) return 0;
+function hasContradiction(answerA: string, answerB: string): boolean {
+  const a = answerA.toLowerCase();
+  const b = answerB.toLowerCase();
 
-  let dot = 0, magA = 0, magB = 0;
-  for (let i = 0; i < vecA.length; i++) {
-    dot += vecA[i] * vecB[i];
-    magA += vecA[i] * vecA[i];
-    magB += vecB[i] * vecB[i];
-  }
-  
-  const magnitude = Math.sqrt(magA) * Math.sqrt(magB);
-  return magnitude === 0 ? 0 : dot / magnitude;
-}
+  // Different prices
+  const pricesA = a.match(/£\d+/g)?.sort().join(',');
+  const pricesB = b.match(/£\d+/g)?.sort().join(',');
+  if (pricesA && pricesB && pricesA !== pricesB) return true;
 
-function detectContradiction(cluster: Array<{ answer: string; question: string }>): boolean {
-  // Simple heuristic: check for conflicting monetary values or opposing statements
-  const answers = cluster.map(c => c.answer.toLowerCase());
-  
-  // Check for different £ amounts for the same question
-  const pricePattern = /£\d+/g;
-  const prices = answers.map(a => {
-    const matches = a.match(pricePattern);
-    return matches ? matches.sort().join(',') : null;
-  }).filter(Boolean);
-  
-  if (prices.length > 1) {
-    const uniquePrices = new Set(prices);
-    if (uniquePrices.size > 1) return true;
-  }
-
-  // Check for opposing payment methods
-  const hasCash = answers.some(a => a.includes('cash'));
-  const hasCardOnly = answers.some(a => a.includes('card only') || a.includes('card-only'));
-  if (hasCash && hasCardOnly) return true;
+  // Opposing payment methods
+  const cashA = a.includes('cash');
+  const cashB = b.includes('cash');
+  const cardOnlyA = a.includes('card only') || a.includes('card-only');
+  const cardOnlyB = b.includes('card only') || b.includes('card-only');
+  if ((cashA && cardOnlyB) || (cashB && cardOnlyA)) return true;
 
   return false;
 }
