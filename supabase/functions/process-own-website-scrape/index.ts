@@ -132,12 +132,14 @@ async function consolidateFaqs(
   workspaceId: string,
   jobId: string
 ): Promise<{ before: number; after: number; contradictions: number }> {
-  console.log(`[${FUNCTION_NAME}] Starting lightweight post-extraction consolidation...`);
+  console.log(`[${FUNCTION_NAME}] Starting AI-powered post-extraction consolidation...`);
 
-  // Get count and basic info (NO embeddings - those are huge and cause CPU timeout)
+  const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+
+  // Fetch all active own-content FAQs
   const { data: faqs, error } = await supabase
     .from('faq_database')
-    .select('id, question, answer, category, quality_score, source_page_url')
+    .select('id, question, answer, category, quality_score, source_type, source_page_url')
     .eq('workspace_id', workspaceId)
     .eq('is_own_content', true)
     .eq('is_active', true)
@@ -149,70 +151,230 @@ async function consolidateFaqs(
   }
 
   const beforeCount = faqs.length;
-  const idsToDeactivate: string[] = [];
-  let contradictions = 0;
 
-  // Lightweight text-based dedup: normalize questions and find exact/near matches
-  const seen = new Map<string, typeof faqs[0]>();
-  
-  for (const faq of faqs) {
-    // Normalize: lowercase, strip punctuation, collapse whitespace
-    const normalized = faq.question.toLowerCase()
-      .replace(/[?!.,'"]/g, '')
-      .replace(/\s+/g, ' ')
-      .trim();
+  // If 25 or fewer, skip AI consolidation (already lean)
+  if (faqs.length <= 25) {
+    console.log(`[${FUNCTION_NAME}] FAQ count already lean (${faqs.length}), skipping AI consolidation`);
+    await supabase.from('scraping_jobs').update({ faqs_stored: faqs.length }).eq('id', jobId);
+    await supabase.from('business_context').update({ website_faqs_generated: faqs.length }).eq('workspace_id', workspaceId);
+    return { before: beforeCount, after: beforeCount, contradictions: 0 };
+  }
 
-    const existing = seen.get(normalized);
-    if (existing) {
-      // Duplicate found - keep the one already in `seen` (higher quality_score due to sort)
-      // Check for contradiction before deactivating
-      if (hasContradiction(existing.answer, faq.answer)) {
-        contradictions++;
-        console.log(`[${FUNCTION_NAME}] Contradiction: "${faq.question}" from ${faq.source_page_url} vs ${existing.source_page_url}`);
+  // If no LOVABLE_API_KEY, fall back to lightweight text dedup
+  if (!LOVABLE_API_KEY) {
+    console.log(`[${FUNCTION_NAME}] No LOVABLE_API_KEY, falling back to text-based dedup`);
+    return fallbackTextDedup(supabase, faqs, workspaceId, jobId);
+  }
+
+  // Build FAQ list for AI
+  const faqList = faqs.map((faq: any) =>
+    `[ID: ${faq.id}] [Source: ${faq.source_type}] [Page: ${faq.source_page_url || 'unknown'}] [Category: ${faq.category}]\nQ: ${faq.question}\nA: ${faq.answer}`
+  ).join('\n\n---\n\n');
+
+  const consolidationPrompt = `You are a knowledge base editor for a service business. You have ${faqs.length} FAQs extracted from the business's own website. Many are semantic duplicates extracted from different pages.
+
+Produce the FINAL, CANONICAL set of FAQs following these rules:
+
+## 1. MERGE SEMANTIC DUPLICATES
+Group questions that ask the same thing in different words. Examples:
+- "What areas do you cover?" / "What is your service area?" / "Where do you operate?"
+- "How much does it cost?" / "What are your prices?"
+- "Do you cover [Town A]?" / "Do you serve [Town B]?" (same question, different location)
+For each group, produce ONE FAQ with the clearest question and most accurate answer.
+
+## 2. PRIORITISE AUTHORITY
+When answers conflict, use this priority:
+- HIGHEST: FAQ page (/faq, /faqs) — the business owner's deliberate answers
+- HIGH: Terms/policy pages
+- MEDIUM: Dedicated service pages, homepage
+- LOW: Location/area pages — often generic SEO content
+
+## 3. RESOLVE CONTRADICTIONS
+- PREFER SPECIFIC over VAGUE: "15-mile radius of Birmingham" beats "West Midlands" beats "across the UK"
+- PREFER RESTRICTIVE over PERMISSIVE: "Card payments only" beats "all payment methods"
+- PREFER FAQ PAGE over ALL OTHERS
+
+## 4. ENRICH WHERE VALUABLE
+If a non-FAQ page adds genuinely useful specific detail, merge it INTO the canonical answer. Don't keep both.
+
+## 5. REMOVE LOW-VALUE FAQs
+Delete any FAQ that: is marketing fluff as a question, is location-specific but contains zero location-specific info, would never be asked by a real customer, or restates another FAQ.
+
+## 6. CATEGORY ASSIGNMENT
+Assign each to: Services, Process, Pricing, Coverage, Booking, Policies, Trust, or Contact
+
+## 7. TARGET
+Aim for 20-25 final FAQs. Every FAQ must pass: "Is this a distinct question a real customer would actually ask?"
+
+## OUTPUT FORMAT
+Return ONLY a valid JSON array. No markdown, no explanation.
+Each object: {"keep_id": "original ID or null", "question": "text", "answer": "text", "category": "Category", "action": "keep|rewrite", "merged_from_ids": ["id1","id2"]}
+
+Here are all ${faqs.length} FAQs:
+
+${faqList}`;
+
+  try {
+    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash',
+        messages: [
+          { role: 'system', content: 'You are a precise knowledge base editor. Return only valid JSON arrays. No markdown formatting, no code fences, no explanation.' },
+          { role: 'user', content: consolidationPrompt }
+        ],
+        temperature: 0.1,
+        max_tokens: 8000
+      })
+    });
+
+    if (!aiResponse.ok) {
+      console.error(`[${FUNCTION_NAME}] AI consolidation failed: ${aiResponse.status}`);
+      return fallbackTextDedup(supabase, faqs, workspaceId, jobId);
+    }
+
+    const aiResult = await aiResponse.json();
+    const responseText = aiResult.choices?.[0]?.message?.content || '';
+
+    // Parse response
+    let consolidatedFaqs;
+    try {
+      const cleanJson = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      consolidatedFaqs = JSON.parse(cleanJson);
+    } catch {
+      console.error(`[${FUNCTION_NAME}] Failed to parse AI response, falling back`);
+      return fallbackTextDedup(supabase, faqs, workspaceId, jobId);
+    }
+
+    // Safety checks
+    if (!Array.isArray(consolidatedFaqs) || consolidatedFaqs.length === 0) {
+      console.error(`[${FUNCTION_NAME}] AI returned empty result, aborting`);
+      return fallbackTextDedup(supabase, faqs, workspaceId, jobId);
+    }
+    if (consolidatedFaqs.length < 10) {
+      console.warn(`[${FUNCTION_NAME}] AI returned only ${consolidatedFaqs.length} FAQs — too few, aborting`);
+      return fallbackTextDedup(supabase, faqs, workspaceId, jobId);
+    }
+    if (consolidatedFaqs.length >= faqs.length) {
+      console.warn(`[${FUNCTION_NAME}] AI returned ${consolidatedFaqs.length} from ${faqs.length} — no reduction, skipping`);
+      await supabase.from('scraping_jobs').update({ faqs_stored: faqs.length }).eq('id', jobId);
+      await supabase.from('business_context').update({ website_faqs_generated: faqs.length }).eq('workspace_id', workspaceId);
+      return { before: beforeCount, after: beforeCount, contradictions: 0 };
+    }
+
+    console.log(`[${FUNCTION_NAME}] AI consolidated ${faqs.length} → ${consolidatedFaqs.length} FAQs`);
+
+    // Collect IDs to keep and items to rewrite
+    const keepIds = new Set<string>();
+    const rewriteItems: any[] = [];
+
+    for (const item of consolidatedFaqs) {
+      if (item.keep_id && item.action === 'keep') {
+        keepIds.add(item.keep_id);
+      } else if (item.action === 'rewrite') {
+        rewriteItems.push(item);
+        if (item.keep_id) keepIds.add(item.keep_id);
       }
-      idsToDeactivate.push(faq.id);
-    } else {
-      seen.set(normalized, faq);
+      if (item.merged_from_ids?.length > 1) {
+        console.log(`[${FUNCTION_NAME}] Merged ${item.merged_from_ids.length} FAQs → "${item.question}"`);
+      }
     }
-  }
 
-  // Deactivate duplicates
-  if (idsToDeactivate.length > 0) {
-    for (let i = 0; i < idsToDeactivate.length; i += 50) {
-      const batch = idsToDeactivate.slice(i, i + 50);
-      await supabase
-        .from('faq_database')
-        .update({ is_active: false })
-        .in('id', batch);
+    // Deactivate FAQs not in keep list
+    const deactivateIds = faqs
+      .map((f: any) => f.id)
+      .filter((id: string) => !keepIds.has(id));
+
+    if (deactivateIds.length > 0) {
+      for (let i = 0; i < deactivateIds.length; i += 50) {
+        const batch = deactivateIds.slice(i, i + 50);
+        await supabase.from('faq_database').update({ is_active: false }).in('id', batch);
+      }
+      console.log(`[${FUNCTION_NAME}] Deactivated ${deactivateIds.length} duplicate/low-quality FAQs`);
     }
+
+    // Update rewritten/merged FAQs
+    for (const item of rewriteItems) {
+      if (item.keep_id) {
+        await supabase.from('faq_database').update({
+          question: item.question,
+          answer: item.answer,
+          category: item.category
+        }).eq('id', item.keep_id);
+      } else {
+        await supabase.from('faq_database').insert({
+          workspace_id: workspaceId,
+          question: item.question,
+          answer: item.answer,
+          category: item.category,
+          generation_source: 'own_website',
+          source_type: 'merged',
+          is_own_content: true,
+          is_active: true,
+          quality_score: 90,
+          priority: 10
+        });
+      }
+    }
+
+    const afterCount = consolidatedFaqs.length;
+    console.log(`[${FUNCTION_NAME}] AI consolidation complete: ${beforeCount} → ${afterCount} FAQs`);
+
+    await supabase.from('scraping_jobs').update({ faqs_stored: afterCount }).eq('id', jobId);
+    await supabase.from('business_context').update({ website_faqs_generated: afterCount }).eq('workspace_id', workspaceId);
+
+    return { before: beforeCount, after: afterCount, contradictions: 0 };
+
+  } catch (e: any) {
+    console.error(`[${FUNCTION_NAME}] AI consolidation error:`, e.message);
+    return fallbackTextDedup(supabase, faqs, workspaceId, jobId);
   }
-
-  const afterCount = beforeCount - idsToDeactivate.length;
-  console.log(`[${FUNCTION_NAME}] Consolidation: ${beforeCount} → ${afterCount} FAQs (${idsToDeactivate.length} removed, ${contradictions} contradictions)`);
-
-  await supabase.from('scraping_jobs').update({ faqs_stored: afterCount }).eq('id', jobId);
-  await supabase.from('business_context').update({ website_faqs_generated: afterCount }).eq('workspace_id', workspaceId);
-
-  return { before: beforeCount, after: afterCount, contradictions };
 }
 
-function hasContradiction(answerA: string, answerB: string): boolean {
-  const a = answerA.toLowerCase();
-  const b = answerB.toLowerCase();
+// Lightweight text-based fallback dedup (used when AI is unavailable)
+function fallbackTextDedup(
+  supabase: any,
+  faqs: any[],
+  workspaceId: string,
+  jobId: string
+): Promise<{ before: number; after: number; contradictions: number }> {
+  return (async () => {
+    const beforeCount = faqs.length;
+    const idsToDeactivate: string[] = [];
+    const seen = new Map<string, typeof faqs[0]>();
 
-  // Different prices
-  const pricesA = a.match(/£\d+/g)?.sort().join(',');
-  const pricesB = b.match(/£\d+/g)?.sort().join(',');
-  if (pricesA && pricesB && pricesA !== pricesB) return true;
+    for (const faq of faqs) {
+      const normalized = faq.question.toLowerCase()
+        .replace(/[?!.,'"]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
 
-  // Opposing payment methods
-  const cashA = a.includes('cash');
-  const cashB = b.includes('cash');
-  const cardOnlyA = a.includes('card only') || a.includes('card-only');
-  const cardOnlyB = b.includes('card only') || b.includes('card-only');
-  if ((cashA && cardOnlyB) || (cashB && cardOnlyA)) return true;
+      if (seen.has(normalized)) {
+        idsToDeactivate.push(faq.id);
+      } else {
+        seen.set(normalized, faq);
+      }
+    }
 
-  return false;
+    if (idsToDeactivate.length > 0) {
+      for (let i = 0; i < idsToDeactivate.length; i += 50) {
+        const batch = idsToDeactivate.slice(i, i + 50);
+        await supabase.from('faq_database').update({ is_active: false }).in('id', batch);
+      }
+    }
+
+    const afterCount = beforeCount - idsToDeactivate.length;
+    console.log(`[${FUNCTION_NAME}] Fallback dedup: ${beforeCount} → ${afterCount} FAQs`);
+
+    await supabase.from('scraping_jobs').update({ faqs_stored: afterCount }).eq('id', jobId);
+    await supabase.from('business_context').update({ website_faqs_generated: afterCount }).eq('workspace_id', workspaceId);
+
+    return { before: beforeCount, after: afterCount, contradictions: 0 };
+  })();
 }
 
 // =========================================
@@ -574,9 +736,26 @@ RULES:
 - British English spelling
 - Questions: max 15 words. Answers: direct and useful.
 - IMPORTANT: Extract AT MOST ${maxFaqs} high-quality FAQs. Quality over quantity.
-- DO NOT generate FAQs about geographic coverage unless this page has SPECIFIC area information different from other pages.
-- If the page is a location/area page, only extract FAQs about information UNIQUE to that specific location.
 - DO NOT fabricate prices, coverage areas, or payment methods not explicitly stated on this page.
+
+IMPORTANT EXTRACTION RULES — APPLY TO ALL BUSINESS TYPES:
+
+1. AVOID CROSS-PAGE TOPIC DUPLICATION:
+   - Do NOT generate FAQs about "coverage area", "what areas do you serve", or "do you cover [location]" unless this page is specifically a locations/coverage page (e.g. /locations, /areas-we-cover, /service-areas, /areas, /coverage).
+   - Do NOT generate FAQs about payment methods, cancellation policies, scheduling, or appointment/booking processes unless this page is specifically the FAQ page, Terms page, or a dedicated policy page.
+   - Do NOT generate FAQs about contact details (phone, email, address) unless this page is specifically the Contact page.
+   - Do NOT generate FAQs about pricing/costs unless this page is specifically a pricing page or the FAQ page.
+   - These topics have authoritative answers on dedicated pages. Extracting them from every page creates contradictions.
+
+2. FOCUS ON WHAT'S UNIQUE TO THIS PAGE:
+   - Extract FAQs about the specific service, product, or topic THIS page is about.
+   - If this is a location page (e.g. /locations/luton, /areas/manchester), ONLY extract FAQs about genuinely location-specific facts (e.g. local regulations, area-specific pricing, local conditions). Do NOT extract generic service descriptions with the town name inserted.
+   - If a page mostly repeats information from other pages with just the town/area name swapped, extract ONLY the genuinely unique facts — or nothing at all.
+
+3. QUALITY THRESHOLD:
+   - Every FAQ you extract should pass this test: "Would a real customer actually ask this specific question?"
+   - Do NOT extract marketing statements reworded as questions (e.g. "Why is [service] essential in [town]?" with generic marketing copy as the answer).
+   - Do NOT extract questions where the answer is just a rephrasing of the question.
 
 PAGE TYPE: ${pageType}
 PAGE URL: ${pageUrl}`;
