@@ -116,7 +116,12 @@ export async function generateKnowledgeBasePDF(workspaceId: string, companyName?
   ]);
 
   const faqsByCat: Record<string, FAQItem[]> = {};
-  faqs.forEach(f => { const c = f.category || 'General'; (faqsByCat[c] ??= []).push(f); });
+  faqs.forEach(f => {
+    // Normalize category to Title Case to prevent "Pricing" vs "pricing" duplication
+    const raw = f.category || 'General';
+    const c = raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
+    (faqsByCat[c] ??= []).push(f);
+  });
   const catOrder = Object.entries(faqsByCat).sort((a, b) => b[1].length - a[1].length);
 
   const factsByCat: Record<string, BusinessFact[]> = {};
