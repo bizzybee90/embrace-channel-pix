@@ -100,15 +100,16 @@ export async function generateCompetitorResearchPDF(workspaceId: string, company
       q.eq('is_active', true).eq('is_own_content', false).order('category').order('source_business')
     ),
     fetchAll<RefinedFaq & { id: string }>('faq_database', 'id, question, answer, category, original_faq_id', q =>
-      q.eq('is_active', true).eq('is_own_content', true).not('original_faq_id', 'is', null)
+      q.eq('is_active', true).eq('generation_source', 'competitor_adapted').not('original_faq_id', 'is', null)
     ),
   ]);
 
   // Build lookup: original competitor FAQ id → refined version
   const refinedMap = new Map<string, RefinedFaq>();
-  adaptedFaqs.forEach(faq => {
+    adaptedFaqs.forEach(faq => {
     if (faq.original_faq_id) refinedMap.set(faq.original_faq_id, faq);
   });
+  console.log(`[PDF] Found ${competitorFaqs.length} competitor FAQs, ${adaptedFaqs.length} adapted FAQs, refinedMap size: ${refinedMap.size}`);
 
   // Group by source business
   const bySource: Record<string, CompetitorFaq[]> = {};
