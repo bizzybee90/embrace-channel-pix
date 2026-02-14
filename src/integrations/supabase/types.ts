@@ -2170,6 +2170,7 @@ export type Database = {
       email_import_progress: {
         Row: {
           aurinko_next_page_token: string | null
+          backfill_status: string | null
           conversations_found: number | null
           conversations_with_replies: number | null
           created_at: string | null
@@ -2208,6 +2209,7 @@ export type Database = {
         }
         Insert: {
           aurinko_next_page_token?: string | null
+          backfill_status?: string | null
           conversations_found?: number | null
           conversations_with_replies?: number | null
           created_at?: string | null
@@ -2246,6 +2248,7 @@ export type Database = {
         }
         Update: {
           aurinko_next_page_token?: string | null
+          backfill_status?: string | null
           conversations_found?: number | null
           conversations_with_replies?: number | null
           created_at?: string | null

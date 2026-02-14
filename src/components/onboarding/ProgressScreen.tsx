@@ -641,8 +641,8 @@ export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenPr
 
       {!allComplete && (
         <div className="text-center text-sm text-muted-foreground p-4 bg-muted/30 rounded-lg">
-          <p>This typically takes 5-20 minutes depending on the research scope.</p>
-          <p className="mt-1">You can leave this page and come back — progress will continue.</p>
+          <p>This typically takes 3-5 minutes for the initial setup.</p>
+          <p className="mt-1">Deep learning from your full email history will continue in the background.</p>
         </div>
       )}
 

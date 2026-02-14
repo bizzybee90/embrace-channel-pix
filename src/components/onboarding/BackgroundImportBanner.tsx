@@ -14,6 +14,7 @@ interface ImportProgress {
   emails_received: number | null;
   emails_classified: number | null;
   last_error: string | null;
+  backfill_status: string | null;
 }
 
 // Clear 3-stage progress mapping
@@ -86,7 +87,7 @@ export function BackgroundImportBanner({ workspaceId, className }: BackgroundImp
     const fetchInitial = async () => {
       const { data } = await supabase
         .from('email_import_progress')
-        .select('current_phase, emails_received, emails_classified, last_error')
+        .select('current_phase, emails_received, emails_classified, last_error, backfill_status')
         .eq('workspace_id', workspaceId)
         .maybeSingle();
 
@@ -111,26 +112,50 @@ export function BackgroundImportBanner({ workspaceId, className }: BackgroundImp
     };
   }, [workspaceId]);
 
-  // Don't show banner if no progress, idle, or already complete
+  // Don't show banner if no progress, idle, or already complete (and no backfill running)
   if (!progress) return null;
   const phase = progress.current_phase;
-  if (!phase || phase === 'idle' || phase === 'complete') return null;
+  const backfillStatus = progress.backfill_status;
   
-  // Also hide if learning is done (phase might be stale but data shows completion)
+  // Show backfill banner if backfill is running, even if main phase is complete
+  const isBackfillActive = backfillStatus === 'pending' || backfillStatus === 'running';
+  
+  if (!phase || phase === 'idle') return null;
+  if (phase === 'complete' && !isBackfillActive) return null;
+  if (backfillStatus === 'complete' && (phase === 'complete' || !phase)) return null;
+  
+  // Hide if 99%+ classified AND no backfill running
   const emailsReceived = progress.emails_received || 0;
   const emailsClassified = progress.emails_classified || 0;
-  // Hide if 99%+ classified (accounts for minor failures) OR if phase statuses indicate completion
-  if (emailsReceived > 0 && emailsClassified >= emailsReceived * 0.99) return null;
+  if (emailsReceived > 0 && emailsClassified >= emailsReceived * 0.99 && !isBackfillActive) return null;
+
+  // Backfill active: show a dedicated banner
+  if (isBackfillActive && (phase === 'complete' || phase === 'learning' || phase === 'classifying' || phase === 'importing')) {
+    const backfillLabel = backfillStatus === 'pending' 
+      ? 'Preparing to learn from your older emails...'
+      : 'BizzyBee is still learning from your older emails...';
+    
+    return (
+      <div className={cn('flex items-center gap-3 px-4 py-2.5 rounded-lg bg-primary/5 border border-primary/20 text-sm', className)}>
+        <div className="relative flex-shrink-0">
+          <Brain className="h-4 w-4 text-primary" />
+          <span className="absolute -top-0.5 -right-0.5 h-2 w-2 bg-primary rounded-full animate-pulse" />
+        </div>
+        <span className="flex-1 text-foreground">{backfillLabel}</span>
+        <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   const config = getPhaseConfig(phase);
   const Icon = config.icon;
 
-  // Complete state
+  // Complete state (no backfill)
   if (phase === 'complete') {
     return (
       <div
         className={cn(
-          'flex items-center gap-3 px-4 py-2.5 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800/50 text-green-700 dark:text-green-300 text-sm',
+          'flex items-center gap-3 px-4 py-2.5 rounded-lg bg-success/10 border border-success/30 text-success text-sm',
           className
         )}
       >

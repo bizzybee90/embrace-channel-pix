@@ -96,27 +96,27 @@ const importModes = [
     value: 'all_history' as ImportMode, 
     label: 'Entire email history', 
     description: 'Import everything — best for maximum AI accuracy',
-    timeEstimate: '~90 mins',
+    timeEstimate: '~5 mins setup, deep learning continues in background',
     recommended: false
   },
   { 
     value: 'last_30000' as ImportMode, 
     label: 'Last 30,000 emails', 
     description: 'Comprehensive learning with great coverage',
-    timeEstimate: '~65 mins',
+    timeEstimate: '~5 mins setup, deep learning continues in background',
     recommended: true
   },
   { 
     value: 'last_10000' as ImportMode, 
     label: 'Last 10,000 emails', 
     description: 'Strong learning data with faster import',
-    timeEstimate: '~25 mins'
+    timeEstimate: '~5 mins setup, continues in background'
   },
   { 
     value: 'last_1000' as ImportMode, 
     label: 'Last 1,000 emails', 
     description: 'Quick start with decent learning data',
-    timeEstimate: '~10 mins'
+    timeEstimate: '~3 mins'
   },
   { 
     value: 'new_only' as ImportMode, 
