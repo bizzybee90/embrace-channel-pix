@@ -180,13 +180,46 @@ export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenPr
   const [emailTrack, setEmailTrack] = useState<TrackState>({ status: 'pending', counts: [] });
   const [isLoading, setIsLoading] = useState(true);
   const [elapsedTime, setElapsedTime] = useState(0);
+  const [liveFaqCount, setLiveFaqCount] = useState(0);
   const startTimeRef = useRef<number>(Date.now());
+
+  // Realtime subscription for live FAQ count
+  useEffect(() => {
+    // Initial count
+    const fetchCount = async () => {
+      const { count } = await supabase
+        .from('faq_database')
+        .select('id', { count: 'exact', head: true })
+        .eq('workspace_id', workspaceId)
+        .eq('is_own_content', false);
+      setLiveFaqCount(count || 0);
+    };
+    fetchCount();
+
+    const channel = supabase
+      .channel('faq-progress')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'faq_database',
+          filter: `workspace_id=eq.${workspaceId}`,
+        },
+        () => {
+          setLiveFaqCount(prev => prev + 1);
+        }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [workspaceId]);
 
   useEffect(() => {
     const pollProgress = async () => {
       try {
         // Bug 5 Fix: Poll n8n_workflow_progress for ALL tracks + email_import_progress for email counts
-        const [workflowRes, emailProgressRes, faqCountRes] = await Promise.all([
+        const [workflowRes, emailProgressRes] = await Promise.all([
           supabase
             .from('n8n_workflow_progress' as 'allowed_webhook_ips')
             .select('*')
@@ -196,11 +229,6 @@ export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenPr
             .select('*')
             .eq('workspace_id', workspaceId)
             .maybeSingle(),
-          supabase
-            .from('faq_database')
-            .select('id', { count: 'exact', head: true })
-            .eq('workspace_id', workspaceId)
-            .eq('is_own_content', false),
         ]);
 
         const records = ((workflowRes.data || []) as unknown as Array<{
@@ -245,7 +273,7 @@ export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenPr
           status: scrapeStatus,
           counts: scrapeRecord ? [
             { label: 'scraped', value: (scrapeDetails.competitors_scraped as number) || 0 },
-            { label: 'FAQs generated', value: (scrapeDetails.faqs_generated as number) || faqCountRes.count || 0 },
+            { label: 'FAQs generated', value: liveFaqCount },
           ] : [],
           error: scrapeDetails.error as string | undefined,
           currentCompetitor: scrapeDetails.current_competitor as string | undefined,
