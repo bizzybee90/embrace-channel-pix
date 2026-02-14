@@ -1,78 +1,67 @@
 
 
-# Improve Own-Website FAQ Quality with AI Consolidation
+# Replace Competitor Count Selector with Smart Default of 15
+
+## Summary
+
+Remove the 50/100/250 competitor radio selectors from both onboarding screens and hardcode a fixed default of **15 competitors**. Replace the selector UI with a brief explainer paragraph that communicates value instead of asking users to guess a number.
 
 ## What Changes
 
-Two targeted improvements to the `process-own-website-scrape` edge function:
+### 1. CompetitorResearchStep.tsx
 
-### Part 1: Smarter Extraction Prompt
+**Remove:**
+- `targetCountOptions` array (lines 138-142)
+- `targetCount` state -- currently defaults to `draft.targetCount ?? 100` (line 184). Replaced with a constant `const targetCount = 15`
+- `targetCount` from localStorage draft save/restore (lines 168, 388, 391)
+- The RadioGroup UI block "How many competitors to analyze?" (lines 752-784)
+- `RadioGroup` and `RadioGroupItem` imports (line 6) -- no longer used in this file
 
-Update the `extractFaqsWithClaude` system prompt (line 563-582) to add strict topic-scoping rules that prevent cross-page duplication at the source. Key additions:
+**Update:**
+- `maxCompetitors: targetCount` in the `startResearch` function (line 499) will now send `15`
+- `targetCount` prop on `CompetitorPipelineProgress` (line 572) will now pass `15`
+- The "What happens" explainer box (lines 787-793) updated to:
+  > "We discover real [business type] businesses near you, scrape their websites, and extract FAQ gaps -- questions customers ask them that your site doesn't answer yet."
 
-- Do NOT generate coverage/area FAQs unless the page is specifically a locations or coverage page
-- Do NOT generate payment, cancellation, or scheduling FAQs unless it is the FAQ page, Terms page, or a dedicated policy page
-- Do NOT generate contact FAQs unless on the Contact page
-- Do NOT generate pricing FAQs unless on a Pricing or FAQ page
-- Focus only on what is unique to THIS page
-- Quality gate: "Would a real customer actually ask this?"
-- Reject marketing fluff reworded as questions
+**Add (where the RadioGroup was):**
+- A short explainer paragraph styled as `text-sm text-muted-foreground`:
+  > "We'll find and deeply analyse your top 15 local competitors -- extracting every FAQ, pricing detail, and service they offer that your site doesn't cover yet."
 
-This alone should cut the raw extraction from ~35 down to ~25 per run, with far fewer semantic duplicates reaching the consolidation step.
+### 2. SearchTermsStep.tsx
 
-### Part 2: AI-Powered Consolidation Pass
+**Remove:**
+- `TargetCount` type (line 24) and `TARGET_OPTIONS` array (lines 26-30)
+- `targetCount` state (line 84)
+- The RadioGroup block "How many competitors to research?" (lines 302-330)
+- The `targetCount` badge from the footer summary (line 336)
+- `RadioGroup` and `RadioGroupItem` imports (line 11)
 
-Replace the current lightweight `consolidateFaqs` function (lines 130-216) with a new version that calls the Lovable AI Gateway to semantically deduplicate the full FAQ set.
+**Update:**
+- Hardcode `target_count: 15` in the save payload (line 183 area)
 
-**How it works:**
-1. Fetch all active own-content FAQs for the workspace
-2. If 25 or fewer, skip (already lean)
-3. Send all FAQs to `google/gemini-2.5-flash` via the Lovable AI Gateway with a detailed consolidation prompt
-4. The AI merges semantic duplicates, resolves contradictions (FAQ page wins over location pages), removes marketing fluff, and returns the canonical set
-5. Deactivate all FAQs not in the keep list; update rewritten ones
-6. Safety checks: abort if AI returns fewer than 10 or more than input count
+**Add (where the RadioGroup was):**
+- Same explainer paragraph as above, styled as `text-sm text-muted-foreground`
 
-**Consolidation priority order:**
-- HIGHEST: FAQ page content (the business owner's deliberate answers)
-- HIGH: Terms/policy pages
-- MEDIUM: Dedicated service pages, homepage
-- LOW: Location/SEO pages
+### 3. No Backend Changes
 
-**Safety measures:**
-- Minimum floor of 10 FAQs (aborts if AI over-reduces)
-- No-op if AI returns same or more than input
-- Skips entirely if already at 25 or fewer
-- Low temperature (0.1) for deterministic output
-- Audit logging of every merge
-
-### No Database Changes Required
-
-The existing `faq_database` schema with `is_active` flag handles everything.
+The `maxCompetitors` / `target_count` parameters already flow through as plain integers. The value `15` works identically to `100` in:
+- `competitor-hybrid-discovery` edge function
+- `trigger-n8n-workflows` edge function
+- n8n discovery workflow
+- `competitor_research_jobs` table (`target_count` column)
 
 ## Technical Details
 
-### File Changed
+| File | Key Lines | Change |
+|---|---|---|
+| `CompetitorResearchStep.tsx` | 6, 138-142, 168, 184, 388, 391, 499, 520, 572, 752-784, 787-793 | Remove imports, options array, state, draft persistence, RadioGroup; hardcode 15; update copy |
+| `SearchTermsStep.tsx` | 11, 24-30, 84, 183, 302-330, 336 | Remove imports, type, options, state, RadioGroup, badge; hardcode 15 in payload |
 
-`supabase/functions/process-own-website-scrape/index.ts`
+### What Stays the Same
 
-**Extraction prompt update** (lines 563-582):
-- Add topic-scoping rules at the end of the system prompt
-- Prevent redundant coverage, payment, contact, and pricing FAQs from non-authoritative pages
-
-**Replace consolidateFaqs** (lines 130-216):
-- New function fetches all active own-content FAQs
-- Calls `https://ai.gateway.lovable.dev/v1/chat/completions` with `LOVABLE_API_KEY` (already configured as a secret)
-- Uses `google/gemini-2.5-flash` model
-- Parses JSON response, deactivates removed FAQs, updates rewritten ones
-- Column mapping: uses `workspace_id` (not business_id), `is_own_content` (not content_type)
-
-**The `hasContradiction` helper** (lines 199-216) is removed since the AI handles contradiction resolution natively.
-
-### Expected Outcome
-
-- Before: 34 FAQs with 5+ coverage duplicates, contradictory answers, repeated method explanations
-- After: 20-25 unique, high-quality FAQs with no duplicates or contradictions
-- The actual FAQ page questions (cancellation, payment, scheduling) get priority
-- Coverage consolidated to a single canonical answer
-- Works for any business type (plumber, mechanic, electrician, etc.)
+- Search terms customisation (toggle, add, remove queries) -- untouched
+- n8n discovery workflow, Apify actors, edge functions -- all accept any integer
+- Competitor review screen, scraping pipeline, FAQ extraction -- unchanged
+- `competitor_research_jobs.target_count` column still stores 15 for audit
+- `CompetitorPipelineProgress` component -- receives 15 instead of 100
 
