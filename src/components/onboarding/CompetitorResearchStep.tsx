@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
@@ -135,11 +135,6 @@ const BUSINESS_TYPES = [
   { value: 'other', label: 'Other' },
 ];
 
-const targetCountOptions = [
-  { value: 50, label: '50 competitors', description: 'Quick research (5-10 min)' },
-  { value: 100, label: '100 competitors', description: 'Recommended balance (10-20 min)', recommended: true },
-  { value: 250, label: '250 competitors', description: 'Comprehensive (30-45 min)' },
-];
 
 // Extract clean service area name (first location without radius)
 const parseServiceArea = (serviceArea?: string): string => {
@@ -165,7 +160,7 @@ export function CompetitorResearchStep({
     try {
       const raw = localStorage.getItem(draftKey);
       return raw
-        ? (JSON.parse(raw) as { nicheQuery?: string; serviceArea?: string; targetCount?: number })
+        ? (JSON.parse(raw) as { nicheQuery?: string; serviceArea?: string })
         : {};
     } catch {
       return {};
@@ -181,7 +176,7 @@ export function CompetitorResearchStep({
   const [status, setStatus] = useState<Status>('idle');
   const [nicheQuery, setNicheQuery] = useState(draft.nicheQuery ?? businessContext.businessType ?? '');
   const [serviceArea, setServiceArea] = useState(draft.serviceArea ?? parseServiceArea(businessContext.serviceArea) ?? '');
-  const [targetCount, setTargetCount] = useState(draft.targetCount ?? 100);
+  const targetCount = 15;
   const [jobId, setJobId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoadingContext, setIsLoadingContext] = useState(!hasInitialNiche);
@@ -385,10 +380,10 @@ export function CompetitorResearchStep({
     try {
       localStorage.setItem(
         draftKey,
-        JSON.stringify({ nicheQuery, serviceArea, targetCount, updatedAt: Date.now() })
+        JSON.stringify({ nicheQuery, serviceArea, updatedAt: Date.now() })
       );
     } catch { /* ignore */ }
-  }, [draftKey, nicheQuery, serviceArea, targetCount, status]);
+  }, [draftKey, nicheQuery, serviceArea, status]);
 
   // Generate search queries when industry or location changes
   useEffect(() => {
@@ -517,7 +512,7 @@ export function CompetitorResearchStep({
       setError(err instanceof Error ? err.message : 'Failed to start competitor research');
       toast.error('Failed to start research');
     }
-  }, [nicheQuery, serviceArea, targetCount, workspaceId]);
+  }, [nicheQuery, serviceArea, workspaceId]);
 
   const handleStart = startResearch;
 
@@ -749,46 +744,16 @@ export function CompetitorResearchStep({
             </p>
           </div>
 
-          <div className="space-y-2">
-            <Label>How many competitors to analyze?</Label>
-            <RadioGroup
-              value={targetCount.toString()}
-              onValueChange={(v) => setTargetCount(parseInt(v))}
-              className="space-y-2"
-            >
-              {targetCountOptions.map((option) => (
-                <div
-                  key={option.value}
-                  className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                    targetCount === option.value
-                      ? 'border-primary/50 bg-primary/5'
-                      : 'hover:bg-accent/50'
-                  } ${option.recommended ? 'ring-1 ring-primary/30' : ''}`}
-                  onClick={() => setTargetCount(option.value)}
-                >
-                  <RadioGroupItem value={option.value.toString()} />
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{option.label}</span>
-                      {option.recommended && (
-                        <span className="text-[10px] font-medium text-primary bg-primary/10 px-1.5 py-0.5 rounded">
-                          Recommended
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-muted-foreground">{option.description}</p>
-                  </div>
-                </div>
-              ))}
-            </RadioGroup>
-          </div>
         </div>
+
+        <p className="text-sm text-muted-foreground">
+          We'll find and deeply analyse your top 15 local competitors — extracting every FAQ, pricing detail, and service they offer that your site doesn't cover yet.
+        </p>
 
         <div className="bg-primary/5 rounded-lg p-3 text-sm border border-primary/20">
           <p className="text-foreground">
-            <strong>What happens:</strong> We discover real {nicheQuery || 'businesses'} via Google Places, 
-            scrape their websites, extract FAQs, remove duplicates, then refine each FAQ 
-            to match YOUR business voice.
+            <strong>What happens:</strong> We discover real {nicheQuery || 'businesses'} businesses near you, 
+            scrape their websites, and extract FAQ gaps — questions customers ask them that your site doesn't answer yet.
           </p>
         </div>
 
