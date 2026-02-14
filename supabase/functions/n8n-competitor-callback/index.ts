@@ -218,7 +218,7 @@ Deno.serve(async (req) => {
         .maybeSingle();
 
       const alreadyRunning = existingScrape?.status && 
-        !['waiting', 'failed'].includes(existingScrape.status as string);
+        !['waiting', 'failed', 'complete'].includes(existingScrape.status as string);
 
       if (alreadyRunning) {
         console.log(`[n8n-callback] Skipping FAQ trigger — scrape already in status: ${existingScrape.status}`);
