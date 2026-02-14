@@ -63,19 +63,38 @@ async function callGemini(apiKey: string, prompt: string): Promise<string> {
 }
 
 function extractJsonArray(text: string): unknown[] {
-  const trimmed = text.trim();
-  if (trimmed.startsWith('[')) {
-    try { return JSON.parse(trimmed); } catch (e) {
-      console.warn('[consolidate] Direct parse failed, trying regex:', (e as Error).message);
+  // Strip markdown code fences if present
+  let cleaned = text.trim();
+  cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
+
+  // Try direct parse
+  if (cleaned.startsWith('[')) {
+    try { return JSON.parse(cleaned); } catch (e) {
+      console.warn('[consolidate] Direct parse failed:', (e as Error).message);
     }
   }
-  const match = text.match(/\[[\s\S]*\]/);
+
+  // Try extracting array with greedy regex
+  const match = cleaned.match(/\[[\s\S]*\]/);
   if (match) {
     try { return JSON.parse(match[0]); } catch (e) {
-      console.error('[consolidate] Regex match parse failed:', (e as Error).message);
+      console.warn('[consolidate] Regex parse failed:', (e as Error).message);
     }
   }
-  console.error('[consolidate] No JSON array. Raw (first 500):', text.slice(0, 500));
+
+  // Last resort: try parsing as individual objects and wrapping
+  const objMatches = [...cleaned.matchAll(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g)];
+  if (objMatches.length > 0) {
+    try {
+      const arr = objMatches.map(m => JSON.parse(m[0]));
+      console.log(`[consolidate] Recovered ${arr.length} objects from loose JSON`);
+      return arr;
+    } catch (e) {
+      console.warn('[consolidate] Object recovery failed:', (e as Error).message);
+    }
+  }
+
+  console.error('[consolidate] No JSON array. Raw (first 500):', cleaned.slice(0, 500));
   throw new Error('No JSON array found in AI response');
 }
 
