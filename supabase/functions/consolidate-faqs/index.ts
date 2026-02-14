@@ -5,7 +5,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const CHUNK_SIZE = 80;
+const CHUNK_SIZE = 30;
 const GEMINI_MODEL = 'gemini-2.5-flash';
 
 interface FaqRow {
@@ -18,7 +18,6 @@ interface FaqRow {
 
 interface DedupedTopic {
   question: string;
-  answer: string;
   category: string | null;
   source_business: string | null;
   source_faq_id: string;
@@ -41,7 +40,7 @@ async function callGemini(apiKey: string, prompt: string): Promise<string> {
       contents: [{ parts: [{ text: prompt }] }],
       generationConfig: { 
         temperature: 0.3, 
-        maxOutputTokens: 8192,
+        maxOutputTokens: 16384,
         responseMimeType: 'application/json',
       },
     }),
@@ -63,41 +62,38 @@ async function callGemini(apiKey: string, prompt: string): Promise<string> {
 }
 
 function extractJsonArray(text: string): unknown[] {
-  // If the entire response is already a JSON array, parse directly
   const trimmed = text.trim();
+  // Direct parse if it's already a clean JSON array
   if (trimmed.startsWith('[')) {
-    try { return JSON.parse(trimmed); } catch (_) { /* fall through */ }
+    try { return JSON.parse(trimmed); } catch (e) {
+      console.warn('[consolidate] Direct parse failed, trying regex. Error:', (e as Error).message);
+    }
   }
-  // Try to find a JSON array in the response
+  // Try to find a JSON array in the response (handles markdown fences etc)
   const match = text.match(/\[[\s\S]*\]/);
-  if (!match) throw new Error('No JSON array found in AI response');
-  return JSON.parse(match[0]);
+  if (match) {
+    try { return JSON.parse(match[0]); } catch (e) {
+      console.error('[consolidate] Regex match found but parse failed:', (e as Error).message);
+      console.error('[consolidate] Raw text (first 500):', text.slice(0, 500));
+    }
+  }
+  console.error('[consolidate] No parseable JSON array. Raw text (first 500):', text.slice(0, 500));
+  throw new Error('No JSON array found in AI response');
 }
 
 async function deduplicateChunk(apiKey: string, faqs: FaqRow[]): Promise<DedupedTopic[]> {
   const faqList = faqs.map((f, i) => 
-    `${i + 1}. [ID: ${f.id}] [Source: ${f.source_business || 'unknown'}] Q: ${f.question}\nA: ${f.answer}`
-  ).join('\n\n');
+    `${i + 1}. [ID: ${f.id}] [Source: ${f.source_business || 'unknown'}] Q: ${f.question}`
+  ).join('\n');
 
-  const prompt = `You are deduplicating FAQ entries from multiple competitor businesses.
-
-Here are ${faqs.length} FAQ entries:
+  const prompt = `Deduplicate these ${faqs.length} FAQ questions from competitor businesses. Group by topic, keep one representative per unique topic. Return ONLY unique topic questions (no answers needed yet).
 
 ${faqList}
 
-Group these by topic. For groups of duplicates/near-duplicates, keep only the single best representative (most complete, most useful answer). Return ONLY a JSON array of unique topics:
+Return a JSON array:
+[{"question":"representative question","category":"short label","source_business":"name","source_faq_id":"the ID"}]
 
-[
-  {
-    "question": "the best version of the question",
-    "answer": "the best version of the answer",
-    "category": "a short category label or null",
-    "source_business": "business name from the best entry",
-    "source_faq_id": "the ID of the best entry"
-  }
-]
-
-Return ONLY the JSON array, no other text.`;
+Be concise. Only return unique topics, not duplicates.`;
 
   const response = await callGemini(apiKey, prompt);
   const parsed = extractJsonArray(response) as DedupedTopic[];
@@ -121,11 +117,10 @@ async function deduplicateFaqs(apiKey: string, faqs: FaqRow[]): Promise<DedupedT
   // If we had multiple chunks, do a final cross-chunk dedup pass
   if (allDeduped.length > CHUNK_SIZE) {
     console.log(`[consolidate] Cross-chunk dedup pass, ${allDeduped.length} topics`);
-    // Convert DedupedTopic[] to FaqRow[] format for the dedup function
     const asFaqRows: FaqRow[] = allDeduped.map(t => ({
       id: t.source_faq_id,
       question: t.question,
-      answer: t.answer,
+      answer: '', // Not used in dedup pass
       category: t.category,
       source_business: t.source_business,
     }));
@@ -138,44 +133,38 @@ async function deduplicateFaqs(apiKey: string, faqs: FaqRow[]): Promise<DedupedT
 async function adaptGaps(
   apiKey: string,
   dedupedTopics: DedupedTopic[],
-  ownerFaqs: { question: string; answer: string }[],
+  ownerFaqs: { question: string }[],
+  competitorFaqMap: Map<string, { question: string; answer: string }>,
   businessInfo: string
 ): Promise<AdaptedFaq[]> {
-  const ownerList = ownerFaqs.map((f, i) =>
-    `${i + 1}. Q: ${f.question}\nA: ${f.answer}`
-  ).join('\n\n');
+  // Send only owner questions (not full answers) to keep within token limits
+  const ownerList = ownerFaqs.map((f, i) => `${i + 1}. ${f.question}`).join('\n');
 
-  const competitorList = dedupedTopics.map((t, i) =>
-    `${i + 1}. [ID: ${t.source_faq_id}] [Source: ${t.source_business || 'unknown'}] Q: ${t.question}\nA: ${t.answer}`
-  ).join('\n\n');
+  // Include competitor answers from the original data for context
+  const competitorList = dedupedTopics.map((t, i) => {
+    const original = competitorFaqMap.get(t.source_faq_id);
+    const answer = original?.answer || '';
+    // Truncate long answers to 150 chars
+    const shortAnswer = answer.length > 150 ? answer.slice(0, 150) + '...' : answer;
+    return `${i + 1}. [ID: ${t.source_faq_id}] [Source: ${t.source_business || 'unknown'}] Q: ${t.question}\nA: ${shortAnswer}`;
+  }).join('\n\n');
 
   const prompt = `You are adapting competitor knowledge for a business. ${businessInfo}
 
-Here are the owner's existing FAQs (AUTHORITATIVE — these topics are already covered, do NOT duplicate them):
+Here are the owner's existing FAQ topics (AUTHORITATIVE — do NOT duplicate these):
 
 ${ownerList}
 
-Here are deduplicated competitor FAQ topics from other businesses in the same industry:
+Here are deduplicated competitor FAQ topics:
 
 ${competitorList}
 
 For each topic NOT already covered by the owner's FAQs, produce an adapted version using the owner's business context. Do NOT produce adapted versions for topics the owner already covers.
 
-Write in first person ('we', 'our'). Replace competitor names, addresses, phone numbers, and specific prices with the owner's details or 'contact us for a quote' where appropriate.
+Write in first person ('we', 'our'). Replace competitor names, addresses, phone numbers, and specific prices with the owner's details or 'contact us for a quote' where appropriate. Keep answers concise (2-3 sentences max).
 
-Return ONLY a JSON array of adapted FAQs (empty array [] if all topics are already covered):
-
-[
-  {
-    "question": "adapted question in first person",
-    "answer": "adapted answer using the owner's business details, first person voice",
-    "category": "a short category label or null",
-    "source_business": "original competitor business name",
-    "source_faq_id": "the ID from the competitor topic"
-  }
-]
-
-Return ONLY the JSON array, no other text.`;
+Return a JSON array of adapted FAQs (empty array [] if all topics are already covered):
+[{"question":"adapted question","answer":"adapted answer","category":"label","source_business":"competitor name","source_faq_id":"ID"}]`;
 
   const response = await callGemini(apiKey, prompt);
   const parsed = extractJsonArray(response) as AdaptedFaq[];
@@ -284,6 +273,12 @@ Deno.serve(async (req) => {
 
     console.log(`[consolidate] Found ${competitorFaqs.length} competitor FAQs to deduplicate`);
 
+    // Build a lookup map for competitor FAQ answers (needed in pass 2)
+    const competitorFaqMap = new Map<string, { question: string; answer: string }>();
+    for (const f of competitorFaqs) {
+      competitorFaqMap.set(f.id, { question: f.question, answer: f.answer });
+    }
+
     // Pass 1: Deduplicate
     const dedupedTopics = await deduplicateFaqs(googleApiKey, competitorFaqs as FaqRow[]);
     console.log(`[consolidate] Deduplication complete: ${competitorFaqs.length} → ${dedupedTopics.length} unique topics`);
@@ -304,7 +299,7 @@ Deno.serve(async (req) => {
     // Fetch owner FAQs (only authoritative sources, NOT our own previous adapted output)
     const { data: ownerFaqs, error: ownerErr } = await supabase
       .from('faq_database')
-      .select('question, answer')
+      .select('question')
       .eq('workspace_id', workspace_id)
       .eq('is_active', true)
       .neq('generation_source', 'competitor_adapted');
@@ -318,6 +313,7 @@ Deno.serve(async (req) => {
       googleApiKey,
       dedupedTopics,
       ownerFaqs || [],
+      competitorFaqMap,
       businessInfo
     );
 
