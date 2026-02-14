@@ -181,7 +181,7 @@ export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenPr
     const pollProgress = async () => {
       try {
         // Bug 5 Fix: Poll n8n_workflow_progress for ALL tracks + email_import_progress for email counts
-        const [workflowRes, emailProgressRes] = await Promise.all([
+        const [workflowRes, emailProgressRes, faqCountRes] = await Promise.all([
           supabase
             .from('n8n_workflow_progress' as 'allowed_webhook_ips')
             .select('*')
@@ -191,6 +191,11 @@ export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenPr
             .select('*')
             .eq('workspace_id', workspaceId)
             .maybeSingle(),
+          supabase
+            .from('faq_database')
+            .select('id', { count: 'exact', head: true })
+            .eq('workspace_id', workspaceId)
+            .eq('is_own_content', false),
         ]);
 
         const records = ((workflowRes.data || []) as unknown as Array<{
@@ -235,7 +240,7 @@ export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenPr
           status: scrapeStatus,
           counts: scrapeRecord ? [
             { label: 'scraped', value: (scrapeDetails.competitors_scraped as number) || 0 },
-            { label: 'FAQs generated', value: (scrapeDetails.faqs_generated as number) || 0 },
+            { label: 'FAQs generated', value: (scrapeDetails.faqs_generated as number) || faqCountRes.count || 0 },
           ] : [],
           error: scrapeDetails.error as string | undefined,
           currentCompetitor: scrapeDetails.current_competitor as string | undefined,
