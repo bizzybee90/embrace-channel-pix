@@ -8,7 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { ChevronLeft, ChevronRight, Plus, X, Search, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { CardTitle, CardDescription } from '@/components/ui/card';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+
 
 interface SearchTermsStepProps {
   workspaceId: string;
@@ -21,13 +21,6 @@ interface SearchTerm {
   enabled: boolean;
 }
 
-type TargetCount = 50 | 100 | 250;
-
-const TARGET_OPTIONS: { value: TargetCount; label: string; description: string }[] = [
-  { value: 50, label: '50 competitors', description: 'Quick research (~5 mins)' },
-  { value: 100, label: '100 competitors', description: 'Standard coverage (~10 mins)' },
-  { value: 250, label: '250 competitors', description: 'Deep research (~20 mins)' },
-];
 
 function generateSearchTerms(businessType: string, location: string): string[] {
   // Clean up business type (convert from label or value format)
@@ -81,7 +74,7 @@ function generateSearchTerms(businessType: string, location: string): string[] {
 export function SearchTermsStep({ workspaceId, onNext, onBack }: SearchTermsStepProps) {
   const [searchTerms, setSearchTerms] = useState<SearchTerm[]>([]);
   const [customTerm, setCustomTerm] = useState('');
-  const [targetCount, setTargetCount] = useState<TargetCount>(100);
+  
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [businessContext, setBusinessContext] = useState<{
@@ -180,7 +173,7 @@ export function SearchTermsStep({ workspaceId, onNext, onBack }: SearchTermsStep
           status: 'completed',
           details: {
             search_queries: enabledTerms,
-            target_count: targetCount,
+            target_count: 15,
             all_terms: searchTerms,
           },
           completed_at: new Date().toISOString(),
@@ -299,41 +292,14 @@ export function SearchTermsStep({ workspaceId, onNext, onBack }: SearchTermsStep
         </div>
       </div>
 
-      {/* Target count selection */}
-      <div className="space-y-3">
-        <Label className="text-sm font-medium">How many competitors to research?</Label>
-        <RadioGroup
-          value={String(targetCount)}
-          onValueChange={(v) => setTargetCount(Number(v) as TargetCount)}
-          className="space-y-2"
-        >
-          {TARGET_OPTIONS.map((option) => (
-            <div
-              key={option.value}
-              className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                targetCount === option.value
-                  ? 'border-primary bg-primary/5'
-                  : 'border-border hover:border-muted-foreground/50'
-              }`}
-              onClick={() => setTargetCount(option.value)}
-            >
-              <RadioGroupItem value={String(option.value)} id={`target-${option.value}`} />
-              <div className="flex-1">
-                <Label htmlFor={`target-${option.value}`} className="font-medium cursor-pointer">
-                  {option.label}
-                </Label>
-                <p className="text-sm text-muted-foreground">{option.description}</p>
-              </div>
-            </div>
-          ))}
-        </RadioGroup>
-      </div>
+      {/* Explainer */}
+      <p className="text-sm text-muted-foreground">
+        We'll find and deeply analyse your top 15 local competitors — extracting every FAQ, pricing detail, and service they offer that your site doesn't cover yet.
+      </p>
 
       {/* Summary */}
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <Badge variant="secondary">{enabledTerms.length} terms enabled</Badge>
-        <span>•</span>
-        <Badge variant="secondary">{targetCount} competitors target</Badge>
       </div>
 
       {/* Navigation */}
