@@ -1,6 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
 import { 
   CheckCircle2, 
@@ -11,7 +14,10 @@ import {
   AlertCircle,
   ChevronRight,
   FileSearch,
-  Download
+  Download,
+  Plus,
+  Globe,
+  Play
 } from 'lucide-react';
 import { generateCompetitorResearchPDF } from '@/components/settings/knowledge-base/generateCompetitorResearchPDF';
 import { toast } from 'sonner';
@@ -48,6 +54,7 @@ const DISCOVERY_PHASES = [
 // FAQ scrape phases (Workflow 2)
 const SCRAPE_PHASES = [
   { key: 'waiting', label: 'Waiting for discovery...', icon: Loader2 },
+  { key: 'review_ready', label: 'Ready for review', icon: CheckCircle2 },
   { key: 'pending', label: 'Queued for scraping', icon: Loader2 },
   { key: 'scraping', label: 'Scraping competitor websites...', icon: Search },
   { key: 'extracting', label: 'Extracting FAQs...', icon: Sparkles },
@@ -173,6 +180,194 @@ function TrackProgress({
   );
 }
 
+interface CompetitorItem {
+  id: string;
+  business_name: string | null;
+  domain: string;
+  url: string;
+  is_selected: boolean;
+}
+
+function InlineCompetitorReview({ 
+  workspaceId, 
+  onStartAnalysis 
+}: { 
+  workspaceId: string; 
+  onStartAnalysis: () => void;
+}) {
+  const [competitors, setCompetitors] = useState<CompetitorItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [manualUrl, setManualUrl] = useState('');
+  const [isAdding, setIsAdding] = useState(false);
+  const [isStarting, setIsStarting] = useState(false);
+
+  useEffect(() => {
+    const fetch = async () => {
+      setIsLoading(true);
+      const { data } = await supabase
+        .from('competitor_sites')
+        .select('id, business_name, domain, url, is_selected')
+        .eq('workspace_id', workspaceId)
+        .in('status', ['discovered', 'validated', 'approved'])
+        .order('relevance_score', { ascending: false, nullsFirst: false });
+      setCompetitors((data || []).map(c => ({ ...c, is_selected: c.is_selected ?? true })));
+      setIsLoading(false);
+    };
+    fetch();
+  }, [workspaceId]);
+
+  const selectedCount = competitors.filter(c => c.is_selected).length;
+
+  const toggleSelection = async (id: string, value: boolean) => {
+    setCompetitors(prev => prev.map(c => c.id === id ? { ...c, is_selected: value } : c));
+    await supabase.from('competitor_sites').update({ is_selected: value }).eq('id', id);
+  };
+
+  const addManualUrl = async () => {
+    if (!manualUrl.trim()) return;
+    let cleanUrl = manualUrl.trim();
+    if (!cleanUrl.startsWith('http')) cleanUrl = 'https://' + cleanUrl;
+    let hostname: string;
+    try { hostname = new URL(cleanUrl).hostname.replace(/^www\./, '').toLowerCase(); }
+    catch { toast.error('Invalid URL'); return; }
+
+    if (competitors.some(c => c.domain === hostname)) {
+      toast.error('Already in the list');
+      return;
+    }
+
+    setIsAdding(true);
+    // Get latest job_id
+    const { data: job } = await supabase
+      .from('competitor_research_jobs')
+      .select('id')
+      .eq('workspace_id', workspaceId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    const { data, error } = await supabase
+      .from('competitor_sites')
+      .insert({
+        job_id: job?.id || workspaceId,
+        workspace_id: workspaceId,
+        business_name: hostname,
+        url: cleanUrl,
+        domain: hostname,
+        discovery_source: 'manual',
+        status: 'approved',
+        is_selected: true,
+        relevance_score: 100,
+      })
+      .select('id, business_name, domain, url, is_selected')
+      .single();
+
+    if (error) { toast.error('Failed to add'); }
+    else if (data) {
+      setCompetitors(prev => [data as CompetitorItem, ...prev]);
+      setManualUrl('');
+      toast.success('Competitor added');
+    }
+    setIsAdding(false);
+  };
+
+  const handleStart = async () => {
+    if (selectedCount === 0) { toast.error('Select at least one competitor'); return; }
+    setIsStarting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('start-competitor-analysis', {
+        body: { workspace_id: workspaceId }
+      });
+      if (error) throw error;
+      toast.success(`Analysis started for ${data.competitors_count} competitors`);
+      onStartAnalysis();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to start');
+      setIsStarting(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-4">
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3 mt-3 p-3 rounded-lg border border-primary/20 bg-primary/5">
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-medium">
+          Review your competitors
+          <span className="text-muted-foreground font-normal ml-1">
+            ({selectedCount} selected)
+          </span>
+        </p>
+      </div>
+
+      {/* Add custom competitor */}
+      <div className="flex gap-2">
+        <Input
+          placeholder="Add a competitor URL..."
+          value={manualUrl}
+          onChange={e => setManualUrl(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && addManualUrl()}
+          className="h-8 text-sm"
+        />
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={addManualUrl}
+          disabled={isAdding || !manualUrl.trim()}
+          className="h-8 px-3"
+        >
+          {isAdding ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
+        </Button>
+      </div>
+
+      {/* Compact competitor list */}
+      <ScrollArea className="max-h-48">
+        <div className="space-y-1">
+          {competitors.map(c => (
+            <label
+              key={c.id}
+              className="flex items-center gap-2 p-1.5 rounded hover:bg-accent/50 cursor-pointer text-sm"
+            >
+              <Checkbox
+                checked={c.is_selected}
+                onCheckedChange={(v) => toggleSelection(c.id, !!v)}
+              />
+              <Globe className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+              <span className="truncate flex-1">
+                {c.business_name || c.domain}
+              </span>
+              <span className="text-xs text-muted-foreground truncate max-w-[120px]">
+                {c.domain}
+              </span>
+            </label>
+          ))}
+        </div>
+      </ScrollArea>
+
+      {/* Start analysis button */}
+      <Button
+        onClick={handleStart}
+        disabled={isStarting || selectedCount === 0}
+        className="w-full gap-2"
+        size="sm"
+      >
+        {isStarting ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <Play className="h-4 w-4" />
+        )}
+        Start Analysis ({selectedCount} competitors)
+      </Button>
+    </div>
+  );
+}
+
 export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenProps) {
   const [discoveryTrack, setDiscoveryTrack] = useState<TrackState>({ status: 'pending', counts: [] });
   const [scrapeTrack, setScrapeTrack] = useState<TrackState>({ status: 'waiting', counts: [] });
@@ -181,6 +376,7 @@ export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenPr
   const [isLoading, setIsLoading] = useState(true);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [liveFaqCount, setLiveFaqCount] = useState(0);
+  const [reviewDismissed, setReviewDismissed] = useState(false);
   const startTimeRef = useRef<number>(Date.now());
 
   // Realtime subscription for live FAQ count
@@ -385,6 +581,13 @@ export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenPr
           counts={discoveryTrack.counts}
           error={discoveryTrack.error}
         />
+        {/* Inline review gate — shown when discovery is done but scrape hasn't started */}
+        {scrapeTrack.status === 'review_ready' && !reviewDismissed && (
+          <InlineCompetitorReview
+            workspaceId={workspaceId}
+            onStartAnalysis={() => setReviewDismissed(true)}
+          />
+        )}
         <TrackProgress
           title="Analysing Competitors"
           phases={SCRAPE_PHASES}
