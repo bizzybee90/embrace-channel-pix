@@ -208,24 +208,20 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Bug 10 Fix: Idempotency guard — only trigger FAQ workflow if not already running
+    // When discovery completes, set status to review_ready so the user can
+    // review/edit the competitor list before the FAQ workflow starts.
+    // The UI will call start-competitor-analysis when the user confirms.
     if (status === 'discovery_complete') {
-      const { data: existingScrape } = await supabase
-        .from('n8n_workflow_progress')
-        .select('status')
-        .eq('workspace_id', workspace_id)
-        .eq('workflow_type', 'competitor_scrape')
-        .maybeSingle();
-
-      const alreadyRunning = existingScrape?.status && 
-        !['waiting', 'failed', 'complete'].includes(existingScrape.status as string);
-
-      if (alreadyRunning) {
-        console.log(`[n8n-callback] Skipping FAQ trigger — scrape already in status: ${existingScrape.status}`);
-      } else {
-        const callbackUrl = body.callback_url || `${supabaseUrl}/functions/v1/n8n-competitor-callback`;
-        await triggerFaqWorkflow(supabase, workspace_id, callbackUrl, details);
-      }
+      await supabase.from('n8n_workflow_progress').upsert({
+        workspace_id,
+        workflow_type: 'competitor_scrape',
+        status: 'review_ready',
+        details: {
+          message: `${details.competitors_found || 0} competitors ready for review`,
+          competitors_found: details.competitors_found || 0,
+        },
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'workspace_id,workflow_type' });
     }
 
     return new Response(
