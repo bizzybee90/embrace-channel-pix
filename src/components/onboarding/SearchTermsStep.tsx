@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { ChevronLeft, ChevronRight, Plus, X, Search, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { CardTitle, CardDescription } from '@/components/ui/card';
+import { generateSearchTerms } from '@/lib/generateSearchTerms';
 
 
 interface SearchTermsStepProps {
@@ -22,54 +23,7 @@ interface SearchTerm {
 }
 
 
-function generateSearchTerms(businessType: string, location: string): string[] {
-  // Clean up business type (convert from label or value format)
-  const cleanType = businessType
-    .split(',')[0] // Take first if multiple
-    .trim()
-    .toLowerCase()
-    .replace(/_/g, ' ');
-  
-  // Clean up location (take first area if multiple, remove radius)
-  const cleanLocation = location
-    .split('|')[0]
-    .replace(/\s*\(\d+\s*miles?\)/i, '')
-    .trim()
-    .toLowerCase();
-  
-  if (!cleanType || !cleanLocation) return [];
-  
-  // Generate variations
-  const terms: string[] = [];
-  
-  // Basic combinations
-  terms.push(`${cleanType} ${cleanLocation}`);
-  terms.push(`${cleanType}s ${cleanLocation}`); // Plural
-  terms.push(`best ${cleanType} ${cleanLocation}`);
-  terms.push(`${cleanType} near ${cleanLocation}`);
-  terms.push(`${cleanType} in ${cleanLocation}`);
-  terms.push(`local ${cleanType} ${cleanLocation}`);
-  terms.push(`professional ${cleanType} ${cleanLocation}`);
-  terms.push(`affordable ${cleanType} ${cleanLocation}`);
-  
-  // Service-specific variations
-  if (cleanType.includes('cleaning')) {
-    const shortType = cleanType.replace(' cleaning', '').replace('cleaning ', '');
-    terms.push(`${shortType} cleaner ${cleanLocation}`);
-    terms.push(`${shortType} cleaners ${cleanLocation}`);
-  } else if (cleanType.endsWith('er')) {
-    // Already ends in -er (plumber, builder, etc)
-    terms.push(`${cleanType}s ${cleanLocation}`);
-  } else if (cleanType.endsWith('ing')) {
-    // Convert -ing to -er (roofing -> roofer)
-    const baseWord = cleanType.replace(/ing$/, 'er');
-    terms.push(`${baseWord} ${cleanLocation}`);
-    terms.push(`${baseWord}s ${cleanLocation}`);
-  }
-  
-  // Deduplicate and return
-  return [...new Set(terms)].slice(0, 12);
-}
+// generateSearchTerms is now imported from @/lib/generateSearchTerms
 
 export function SearchTermsStep({ workspaceId, onNext, onBack }: SearchTermsStepProps) {
   const [searchTerms, setSearchTerms] = useState<SearchTerm[]>([]);

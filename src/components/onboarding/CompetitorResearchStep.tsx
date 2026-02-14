@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { generateSearchTerms } from '@/lib/generateSearchTerms';
 import { Button } from '@/components/ui/button';
 import { CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -391,24 +392,9 @@ export function CompetitorResearchStep({
       const industry = nicheQuery.toLowerCase();
       const location = serviceArea.toLowerCase();
       
-      // Generate variants based on industry type
-      const variants: {query: string; enabled: boolean}[] = [
-        { query: `${industry} ${location}`, enabled: true },
-        { query: `${industry} near ${location}`, enabled: true },
-        { query: `best ${industry} ${location}`, enabled: true },
-      ];
-      
-      // Add singular/plural variants for cleaning services
-      if (industry.includes('cleaning')) {
-        const cleanerVariant = industry.replace('cleaning', 'cleaner');
-        variants.push({ query: `${cleanerVariant} ${location}`, enabled: true });
-      }
-      
-      // Add common variants
-      variants.push(
-        { query: `local ${industry} ${location}`, enabled: false },
-        { query: `${location} ${industry} services`, enabled: false }
-      );
+      // Generate high-quality, distinct search terms
+      const generated = generateSearchTerms(industry, location);
+      const variants = generated.map(q => ({ query: q, enabled: true }));
       
       setSearchQueries(variants);
     }
@@ -434,7 +420,7 @@ export function CompetitorResearchStep({
 
   const enabledQueries = searchQueries.filter(sq => sq.enabled).map(sq => sq.query);
 
-  // Quick-add suggestions - common patterns not already in the list
+  // Quick-add suggestions - useful patterns not already in the list
   const quickSuggestions = useMemo(() => {
     if (!nicheQuery || !serviceArea) return [];
     
@@ -443,13 +429,11 @@ export function CompetitorResearchStep({
     
     const patterns = [
       `professional ${industry} ${location}`,
-      `${industry} near me ${location}`,
       `affordable ${industry} ${location}`,
       `top rated ${industry} ${location}`,
-      `cheap ${industry} ${location}`,
-      `${industry} company ${location}`,
-      `${industry} services ${location}`,
       `trusted ${industry} ${location}`,
+      `emergency ${industry} ${location}`,
+      `${industry} company ${location}`,
     ];
     
     const existingQueries = searchQueries.map(sq => sq.query.toLowerCase());
