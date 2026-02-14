@@ -68,8 +68,15 @@ serve(async (req) => {
         details: { message: 'Workflow triggered, waiting for n8n...', job_id: jobId },
         updated_at: new Date().toISOString(),
       }, { onConflict: 'workspace_id,workflow_type' }),
+      // Reset scrape track so it doesn't show stale "Complete" from a previous run
+      supabase.from('n8n_workflow_progress').upsert({
+        workspace_id: workspaceId,
+        workflow_type: 'competitor_scrape',
+        status: 'waiting',
+        details: { message: 'Waiting for discovery to complete...' },
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'workspace_id,workflow_type' }),
       // Bug 9 Fix: Only init email track status — don't trigger email classification from here.
-      // Email classification is already chained from the email-import-v2 pipeline when import completes.
       supabase.from('n8n_workflow_progress').upsert({
         workspace_id: workspaceId,
         workflow_type: 'email_import',
