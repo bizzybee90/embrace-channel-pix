@@ -358,6 +358,17 @@ export async function generateCompetitorResearchPDF(workspaceId: string, company
       doc.setTextColor(...C.foreground);
       doc.text(aLinesLeft, leftX + 4, y);
 
+      // Source URL
+      if (faq.source_url) {
+        const srcY = startY + leftHeight - 4;
+        doc.setFontSize(6.5);
+        doc.setFont('helvetica', 'italic');
+        doc.setTextColor(...C.subtle);
+        const srcText = doc.splitTextToSize(`Source: ${faq.source_url}`, colWidth - 8);
+        doc.text(srcText[0], leftX + 4, srcY);
+        doc.setFont('helvetica', 'normal');
+      }
+
       // Right column — adapted
       let ry = startY;
       if (refined) {
