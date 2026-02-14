@@ -406,6 +406,26 @@ async function handlePartitionComplete(
     }
   }
 
+  // After classification completes, check if backfill is pending and update progress accordingly
+  // (The actual backfill trigger happens after voice-learning completes)
+  const { data: backfillProgress } = await supabase
+    .from('email_import_progress')
+    .select('backfill_status')
+    .eq('workspace_id', workspace_id)
+    .maybeSingle();
+
+  // If backfill just completed (this was the backfill classification run), mark it complete
+  if (backfillProgress?.backfill_status === 'running') {
+    await supabase
+      .from('email_import_progress')
+      .update({
+        backfill_status: 'complete',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('workspace_id', workspace_id);
+    console.log(`${workerTag} Backfill classification complete, marked backfill_status = 'complete'`);
+  }
+
   return new Response(JSON.stringify({
     success: true,
     status: 'complete',

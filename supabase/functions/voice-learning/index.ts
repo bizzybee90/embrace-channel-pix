@@ -599,6 +599,31 @@ Output ONLY valid JSON, nothing else.`
     })
 
     // =========================================
+    // STEP 6: Trigger background backfill if pending
+    // =========================================
+    try {
+      const { data: progressRow } = await supabase
+        .from('email_import_progress')
+        .select('backfill_status')
+        .eq('workspace_id', workspace_id)
+        .maybeSingle()
+
+      if (progressRow?.backfill_status === 'pending') {
+        console.log('[voice-learning] Triggering background backfill (fire-and-forget)')
+        fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/backfill-classify`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
+          },
+          body: JSON.stringify({ workspace_id })
+        }).catch(e => console.error('[voice-learning] Backfill trigger failed:', e))
+      }
+    } catch (e) {
+      console.warn('[voice-learning] Backfill check failed:', e)
+    }
+
+    // =========================================
     // DONE
     // =========================================
     

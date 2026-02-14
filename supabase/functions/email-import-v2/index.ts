@@ -175,6 +175,7 @@ serve(async (req) => {
 			workspace_id,
 			job_id,
 			import_mode = 'full',
+			speed_phase = false,
 			_relay_depth = 0,
 			_last_progress = 0,
 			_stalled_count = 0,
@@ -265,8 +266,10 @@ serve(async (req) => {
         console.log(`[${FUNCTION_NAME}] Resuming existing job ${job.id}, status: ${job.status}`);
       } else {
       // Create new job - use minimal insert, let DB defaults handle the rest
-      const totalTarget = import_mode === 'last_100' ? 100 : 
-                         import_mode === 'last_1000' ? 1000 : 30000;
+      // Speed phase: cap at 2,500 regardless of import_mode for fast onboarding
+      const totalTarget = speed_phase ? 2500 :
+                          import_mode === 'last_100' ? 100 : 
+                          import_mode === 'last_1000' ? 1000 : 30000;
 
       console.log(`[${FUNCTION_NAME}] Creating new job for config_id: ${emailConfig.id}, mode: ${import_mode}, target: ${totalTarget}`);
 
@@ -532,6 +535,18 @@ serve(async (req) => {
       // Update progress phase
       await updateProgress(supabase, workspace_id, 'classifying', totalImported);
 
+      // If this was a speed phase, mark backfill as pending for later
+      if (speed_phase) {
+        await supabase
+          .from('email_import_progress')
+          .upsert({
+            workspace_id,
+            backfill_status: 'pending',
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'workspace_id' });
+        console.log(`[${FUNCTION_NAME}] Speed phase complete, backfill_status set to 'pending'`);
+      }
+
       // Release lock before chaining
       await releaseLock(supabase, workspace_id, FUNCTION_NAME);
 
@@ -587,6 +602,7 @@ serve(async (req) => {
       workspace_id,
       job_id: job.id,
       import_mode,
+      speed_phase,
       _relay_depth: _relay_depth + 1,
       _last_progress: totalImported,
       _stalled_count: newStalledCount,

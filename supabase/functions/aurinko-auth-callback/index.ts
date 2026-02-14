@@ -298,9 +298,11 @@ Deno.serve(async (req) => {
         .eq('id', configData.id);
 
       // Fire the relay race - chainNextBatch is fire-and-forget
+      // Use speed_phase: true during onboarding to cap at 2,500 emails for fast start
       chainNextBatch(SUPABASE_URL!, 'email-import-v2', {
         workspace_id: workspaceId,
         import_mode: importMode,
+        speed_phase: true,
         _relay_depth: 0,
       }, SUPABASE_SERVICE_ROLE_KEY!);
 
