@@ -9,8 +9,12 @@ import {
   FileCheck, 
   Sparkles,
   AlertCircle,
-  ChevronRight
+  ChevronRight,
+  FileSearch,
+  Download
 } from 'lucide-react';
+import { generateCompetitorResearchPDF } from '@/components/settings/knowledge-base/generateCompetitorResearchPDF';
+import { toast } from 'sonner';
 import { CardTitle, CardDescription } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
@@ -172,6 +176,7 @@ function TrackProgress({
 export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenProps) {
   const [discoveryTrack, setDiscoveryTrack] = useState<TrackState>({ status: 'pending', counts: [] });
   const [scrapeTrack, setScrapeTrack] = useState<TrackState>({ status: 'waiting', counts: [] });
+  const [downloadingPDF, setDownloadingPDF] = useState(false);
   const [emailTrack, setEmailTrack] = useState<TrackState>({ status: 'pending', counts: [] });
   const [isLoading, setIsLoading] = useState(true);
   const [elapsedTime, setElapsedTime] = useState(0);
@@ -362,6 +367,31 @@ export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenPr
           current={scrapeTrack.current}
           total={scrapeTrack.total}
         />
+        {scrapeTrack.status === 'complete' && (
+          <div className="flex justify-center pt-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                setDownloadingPDF(true);
+                try {
+                  await generateCompetitorResearchPDF(workspaceId);
+                  toast.success('Competitor Research PDF downloaded!');
+                } catch (err) {
+                  console.error('PDF error:', err);
+                  toast.error('Failed to generate PDF');
+                } finally {
+                  setDownloadingPDF(false);
+                }
+              }}
+              disabled={downloadingPDF}
+              className="gap-2"
+            >
+              {downloadingPDF ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+              Download Competitor Report
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Email Classification */}
