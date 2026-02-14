@@ -197,7 +197,18 @@ export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenPr
           workflow_type: string;
           status: string;
           details: Record<string, unknown>;
+          updated_at: string;
         }>);
+
+        // Stale detection: if a non-terminal track hasn't updated in 10 min, mark as failed
+        const STALE_THRESHOLD_MS = 10 * 60 * 1000;
+        const now = Date.now();
+        const isStale = (record: typeof records[0] | undefined) => {
+          if (!record?.updated_at) return false;
+          const terminal = ['complete', 'failed', 'classification_complete'];
+          if (terminal.includes(record.status)) return false;
+          return now - new Date(record.updated_at).getTime() > STALE_THRESHOLD_MS;
+        };
 
         // Bug 4 Fix: Track all three workflow types
         const discoveryRecord = records.find(r => r.workflow_type === 'competitor_discovery');
@@ -206,14 +217,14 @@ export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenPr
 
         // Discovery track (Workflow 1)
         const discoveryDetails = (discoveryRecord?.details || {}) as Record<string, unknown>;
-        const discoveryStatus = discoveryRecord?.status || 'pending';
+        const discoveryStatus = isStale(discoveryRecord) ? 'failed' : (discoveryRecord?.status || 'pending');
 
         setDiscoveryTrack({
           status: discoveryStatus,
           counts: discoveryRecord ? [
             { label: 'competitors found', value: (discoveryDetails.competitors_found as number) || 0 },
           ] : [],
-          error: discoveryDetails.error as string | undefined,
+          error: isStale(discoveryRecord) ? 'Timed out — the workflow may have failed. Please retry.' : (discoveryDetails.error as string | undefined),
         });
 
         // Scrape track (Workflow 2) — stays 'waiting' until discovery completes
