@@ -287,3 +287,6 @@ verify_jwt = false
 [functions.email-classify-bulk]
 verify_jwt = false
 
+[functions.consolidate-faqs]
+verify_jwt = false
+
