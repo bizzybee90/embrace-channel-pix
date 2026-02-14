@@ -1009,13 +1009,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "competitor_sites_job_id_fkey"
-            columns: ["job_id"]
-            isOneToOne: false
-            referencedRelation: "competitor_research_jobs"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "competitor_sites_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
@@ -5938,15 +5931,7 @@ export type Database = {
           total_competitors: number | null
           verified_count: number | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "competitor_sites_job_id_fkey"
-            columns: ["job_id"]
-            isOneToOne: false
-            referencedRelation: "competitor_research_jobs"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       training_pairs: {
         Row: {
