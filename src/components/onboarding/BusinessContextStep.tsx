@@ -581,32 +581,37 @@ export function BusinessContextStep({ workspaceId, value, onChange, onNext, onBa
           {selectedAreas.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-2">
               {selectedAreas.map((area) => (
-                <div key={area.name} className="flex items-center gap-1 bg-secondary rounded-md pl-2 pr-1 py-1">
-                  <MapPin className="h-3 w-3 text-muted-foreground" />
-                  <span className="text-sm">{area.name}</span>
+                <div key={area.name} className="flex items-center gap-0 rounded-lg border border-border overflow-hidden bg-background">
+                  {/* Location name */}
+                  <div className="flex items-center gap-1.5 px-2.5 py-1.5">
+                    <MapPin className="h-3.5 w-3.5 text-primary" />
+                    <span className="text-sm font-medium">{area.name}</span>
+                  </div>
+                  {/* Radius selector - visually separated */}
                   <Select
                     value={area.radius?.toString() || 'exact'}
                     onValueChange={(val) => handleUpdateRadius(area.name, val === 'exact' ? undefined : parseInt(val, 10))}
                   >
-                    <SelectTrigger className="h-6 w-auto min-w-[70px] text-xs border-0 bg-transparent px-1">
+                    <SelectTrigger className="h-auto min-w-[80px] text-xs font-medium border-0 border-l border-border rounded-none bg-muted/50 px-2.5 py-1.5 hover:bg-muted transition-colors">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="exact">exact</SelectItem>
-                      <SelectItem value="5">+5 mi</SelectItem>
-                      <SelectItem value="10">+10 mi</SelectItem>
-                      <SelectItem value="15">+15 mi</SelectItem>
-                      <SelectItem value="20">+20 mi</SelectItem>
-                      <SelectItem value="30">+30 mi</SelectItem>
-                      <SelectItem value="50">+50 mi</SelectItem>
+                      <SelectItem value="exact">Exact area</SelectItem>
+                      <SelectItem value="5">+5 miles</SelectItem>
+                      <SelectItem value="10">+10 miles</SelectItem>
+                      <SelectItem value="15">+15 miles</SelectItem>
+                      <SelectItem value="20">+20 miles</SelectItem>
+                      <SelectItem value="30">+30 miles</SelectItem>
+                      <SelectItem value="50">+50 miles</SelectItem>
                     </SelectContent>
                   </Select>
+                  {/* Remove button */}
                   <button
                     type="button"
                     onClick={() => handleRemoveLocation(area.name)}
-                    className="hover:bg-muted rounded-full p-0.5"
+                    className="px-2 py-1.5 border-l border-border hover:bg-destructive/10 transition-colors"
                   >
-                    <X className="h-3 w-3" />
+                    <X className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
                   </button>
                 </div>
               ))}
