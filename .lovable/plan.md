@@ -1,88 +1,82 @@
 
+# Phase 1: Instant Onboarding with Background Deep Backfill
 
-# Build `consolidate-faqs` Edge Function
+## Problem
+When a user connects their email, the `email-import-v2` function imports ALL emails (up to 30,000) before chaining to classification. This means the user waits 30-60+ minutes on the Progress Screen before classification even begins, let alone voice learning.
 
-## Summary
+## Solution: Two-Stage Import
 
-Create a new backend function that takes the 219 raw competitor FAQs already in the database, deduplicates them, identifies topics not covered by MAC Cleaning's own 151 FAQs, and produces adapted versions written in MAC Cleaning's voice with their actual business details substituted in.
+Split the import into a **Speed Phase** (during onboarding) and a **Deep Backfill** (after onboarding completes).
 
-## Current State
+```text
+CURRENT FLOW:
+  Email Connect --> Import 30,000 --> Classify 30,000 --> Voice Learn --> Done (60+ min)
 
-| Source | Count | Priority | is_own_content |
-|--------|-------|----------|----------------|
-| Own website (`own_website`) | 151 | 10 | true |
-| Competitor research (`competitor_research`) | 219 | 5 | false |
-| Adapted (missing -- to be built) | 0 | 8 | false |
+NEW FLOW:
+  Email Connect --> Import 2,500 --> Classify 2,500 --> Voice Learn --> Continue (3-5 min)
+                         |
+                    [User proceeds through onboarding]
+                         |
+                    Background: Import remaining 27,500 --> Classify --> Re-learn (silent)
+```
 
-## Two-Pass Architecture
+## Changes
 
-**Pass 1 -- Deduplication** (keeps token count manageable)
-- Fetch all 219 competitor FAQs for the workspace
-- Send to Gemini Flash with instruction: "Group these by topic, merge duplicates, return one representative Q&A per unique topic with the source_business preserved"
-- Chunks of ~80 FAQs per call if needed (219 / 3 batches)
-- Expected output: ~60-80 unique topics
+### 1. Database Migration
+Add a `backfill_status` column to `email_import_progress` to track the background import state:
+- `'pending'` -- backfill hasn't started yet
+- `'running'` -- background import + classify in progress
+- `'complete'` -- all historical emails processed
 
-**Pass 2 -- Gap-Only Adaptation**
-- Fetch owner FAQs filtered by `generation_source NOT IN ('competitor_adapted')` -- only treats actual own-website content as authoritative
-- Send deduplicated topics + owner FAQ list to Gemini Flash with this prompt:
+### 2. Edge Function: `email-import-v2` (modify)
+- Accept a new `speed_phase` boolean parameter (default: `false`)
+- When `speed_phase: true`:
+  - Set `total_target` to **2,500** (1,250 SENT + 1,250 INBOX) regardless of `import_mode`
+  - On completion, chain to `email-classify-bulk` as normal (this triggers voice learning when done)
+  - Set `backfill_status = 'pending'` in `email_import_progress`
+- When `speed_phase: false` (default / backfill mode): behaves exactly as today
 
-> "You are adapting competitor knowledge for MAC Cleaning, based in Luton covering a 10-mile radius. Phone: [from business_context]. Services: Window Cleaning, Gutter Cleaning.
->
-> Here are the owner's existing FAQs (AUTHORITATIVE -- these topics are already covered, do NOT duplicate them).
->
-> Here are deduplicated competitor FAQ topics from other cleaning businesses.
->
-> For each topic NOT already covered by the owner's FAQs, produce an adapted version using the owner's business context. Do NOT produce adapted versions for topics the owner already covers.
->
-> Write in first person ('we', 'our'). Replace competitor names, addresses, phone numbers, and specific prices with the owner's details or 'contact us for a quote' where appropriate."
+### 3. Edge Function: `email-import-v2` completion chain (modify)
+When the speed phase completes and chains to classification, also write `backfill_status: 'pending'` to `email_import_progress`. The actual backfill is triggered later.
 
-The prompt dynamically substitutes actual values from `business_context` (company_name, business_type, service_area) and `business_profile` (phone, services, address) if available.
+### 4. New Edge Function: `backfill-classify`
+A thin orchestrator that:
+1. Reads the `email_import_jobs` record to get the original `import_mode` / `total_target`
+2. Creates a new `email_import_jobs` record with `import_mode: 'backfill'` and the full target (e.g., 30,000)
+3. Updates `email_import_progress.backfill_status = 'running'`
+4. Invokes `email-import-v2` with the new job (non-speed-phase), which will skip already-imported emails (upsert with `ignoreDuplicates`)
+5. The existing chain (`email-import-v2` --> `email-classify-bulk` --> `voice-learning`) handles the rest automatically
+6. On completion, updates `backfill_status = 'complete'`
 
-## Data Model for Adapted FAQs
+### 5. Trigger the Backfill
+Modify the `voice-learning` completion path (or the `handlePartitionComplete` in `email-classify-bulk`) to fire-and-forget invoke `backfill-classify` when `backfill_status = 'pending'`. This means the backfill starts silently right after the speed phase's voice learning completes.
 
-Each adapted FAQ is inserted with:
-- `is_own_content: false` (clearly not owner-authored)
-- `priority: 8` (below owner's 10, above raw competitor's 5)
-- `generation_source: 'competitor_adapted'`
-- `original_faq_id` pointing to the source competitor FAQ
-- `source_business` preserved for traceability
-- `is_active: true`
+### 6. Edge Function: `trigger-n8n-workflows` (modify)
+Currently this only triggers competitor discovery (email classification chains from `email-import-v2`). No changes needed here -- the import was already triggered during the Email Connection step.
 
-## Idempotency
+### 7. `EmailConnectionStep.tsx` (modify)
+When starting the import, pass `speed_phase: true` to `email-import-v2` so it only imports 2,500 emails. The `importMode` selection from the UI will be saved to `email_provider_configs` for the backfill to read later.
 
-Before inserting, delete any existing rows where `generation_source = 'competitor_adapted'` for this workspace. This handles:
-- Callback retries
-- Manual backfill after auto-run
-- Re-running after pipeline updates
+The import mode selector UI stays as-is -- the user still chooses how much history they want. The difference is that onboarding only processes 2,500 immediately, and the rest happens in the background.
 
-## Trigger Point
+### 8. `ProgressScreen.tsx` (modify)
+- The email track will complete much faster (3-5 min instead of 30-60 min)
+- Add a subtle "Deep learning will continue in the background" note when email track completes
+- No blocking change -- the Continue button logic stays the same (all 3 tracks must complete)
 
-Update `n8n-competitor-callback` so when `status === 'scrape_complete'`, after updating progress, it invokes `consolidate-faqs` in the background.
+### 9. `BackgroundImportBanner.tsx` (modify)
+After onboarding, show a non-intrusive banner on the main app indicating background backfill progress:
+- "BizzyBee is still learning from your older emails (45% complete)"
+- Auto-dismiss when `backfill_status = 'complete'`
 
-## Files to Create/Edit
+## What Stays the Same
+- The parallel relay-race dispatcher and bulk classification logic
+- The voice learning pipeline
+- The competitor discovery/scrape pipeline
+- The Progress Screen's 3-track model (discovery, scrape, email)
+- All existing import modes and database tables
 
-1. **New:** `supabase/functions/consolidate-faqs/index.ts`
-   - Accepts `{ workspace_id }`
-   - Fetches business context from `business_context` table
-   - Fetches business profile from `business_profile` table (phone, services, address)
-   - Pass 1: Dedup competitor FAQs via Gemini Flash (chunked if > 80)
-   - Pass 2: Gap-only adaptation via Gemini Flash
-   - Deletes previous `competitor_adapted` rows, inserts new ones
-   - Updates `n8n_workflow_progress` with `workflow_type: 'consolidation'`
-   - Uses `GOOGLE_API_KEY` (already configured) for Gemini Flash calls
-
-2. **Edit:** `supabase/functions/n8n-competitor-callback/index.ts`
-   - Add background invocation of `consolidate-faqs` when `status === 'scrape_complete'`
-   - Uses `fetch()` to the function URL with service role key
-
-3. **Edit:** `supabase/config.toml`
-   - Add `[functions.consolidate-faqs]` with `verify_jwt = false`
-
-## PDF Impact
-
-The existing `generateCompetitorResearchPDF.ts` already queries for rows where `original_faq_id` is populated. Once adapted rows exist with `original_faq_id` linking to competitor sources, the "Adapted" column populates automatically. No PDF code changes needed.
-
-## Backfill
-
-The function is callable directly to process the 219 existing competitor FAQs without re-running the pipeline. After deployment, a single curl call or UI trigger runs the consolidation on existing data.
-
+## Expected Impact
+- **Onboarding time**: 30-60 min --> **3-5 min**
+- **Voice learning quality**: Good from 2,500 emails, then improves silently with backfill
+- **User experience**: No waiting, no blocking -- they can start using the app immediately
