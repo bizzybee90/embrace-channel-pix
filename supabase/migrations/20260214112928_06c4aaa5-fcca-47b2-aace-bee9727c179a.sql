@@ -1,0 +1,1 @@
+ALTER TABLE competitor_sites DROP CONSTRAINT IF EXISTS competitor_sites_job_id_fkey;
