@@ -29,7 +29,7 @@ const corsHeaders = {
 
 const LOVABLE_AI_GATEWAY = 'https://ai.gateway.lovable.dev/v1/chat/completions';
 const MODEL = 'google/gemini-2.5-flash';
-const BATCH_SIZE = 5000;
+const BATCH_SIZE = 100;
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -206,15 +206,37 @@ serve(async (req) => {
       const aiData = await response.json();
       const responseText = aiData.choices?.[0]?.message?.content || '';
 
-      // Parse classifications
-      const jsonMatch = responseText.match(/\[[\s\S]*\]/);
-      if (!jsonMatch) throw new Error('No JSON array in AI response');
-
+      // Parse classifications - robust extraction
       let classifications: Array<{ i: number; c: string; r: boolean; conf?: number; ent?: Record<string, string> }>;
       try {
-        classifications = JSON.parse(jsonMatch[0]);
-      } catch {
-        throw new Error('Failed to parse AI response as JSON');
+        // Strip markdown fences
+        let cleaned = responseText.replace(/```(?:json)?\s*/gi, '').replace(/```/g, '').trim();
+        // Try greedy array match first
+        const jsonMatch = cleaned.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+          classifications = JSON.parse(jsonMatch[0]);
+        } else {
+          // Fallback: collect individual objects via bracket matching
+          const objects: any[] = [];
+          let idx = 0;
+          while (idx < cleaned.length) {
+            const start = cleaned.indexOf('{', idx);
+            if (start === -1) break;
+            let depth = 0; let end = start;
+            for (let j = start; j < cleaned.length; j++) {
+              if (cleaned[j] === '{') depth++;
+              if (cleaned[j] === '}') depth--;
+              if (depth === 0) { end = j; break; }
+            }
+            try { objects.push(JSON.parse(cleaned.substring(start, end + 1))); } catch { /* skip */ }
+            idx = end + 1;
+          }
+          if (objects.length === 0) throw new Error('No JSON found');
+          classifications = objects;
+        }
+      } catch (e) {
+        console.error(`${workerTag} Failed to parse AI response:`, responseText.substring(0, 500));
+        throw new Error(`Failed to parse AI response: ${e instanceof Error ? e.message : 'unknown'}`);
       }
 
       console.log(`${workerTag} Parsed ${classifications.length} AI classifications`);
