@@ -37,6 +37,7 @@ interface TrackState {
   currentCompetitor?: string | null;
   current?: number;
   total?: number;
+  actualPercent?: number;
 }
 
 // Discovery phases (Workflow 1)
@@ -87,7 +88,8 @@ function TrackProgress({
   currentCompetitor,
   current,
   total,
-}: { 
+  actualPercent,
+}: {
   title: string;
   phases: typeof DISCOVERY_PHASES;
   currentStatus: string;
@@ -96,6 +98,7 @@ function TrackProgress({
   currentCompetitor?: string | null;
   current?: number;
   total?: number;
+  actualPercent?: number;
 }) {
   const currentIndex = getPhaseIndex(phases, currentStatus);
   const isComplete = currentStatus === 'complete' || currentStatus === 'classification_complete';
@@ -104,7 +107,9 @@ function TrackProgress({
   const totalPhases = phases.length - 1; // exclude 'failed'
   
   let progressPercent: number;
-  if (currentStatus === 'scraping' && current && total && total > 0) {
+  if (actualPercent !== undefined) {
+    progressPercent = isComplete ? 100 : actualPercent;
+  } else if (currentStatus === 'scraping' && current && total && total > 0) {
     const processingProgress = (current / total) * 60;
     progressPercent = 20 + processingProgress;
   } else {
@@ -524,6 +529,7 @@ export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenPr
               { label: `classified (${percentage}%)`, value: classifiedEmails },
             ] : [],
             error: emailDetails.error as string | undefined,
+            actualPercent: percentage,
           });
         } else {
           setEmailTrack({ status: 'pending', counts: [] });
