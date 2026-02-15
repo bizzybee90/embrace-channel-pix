@@ -1,13 +1,25 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  fetchBusinessContext,
+  fetchSenderRules,
+  fetchCorrections,
+  fetchFAQs,
+  matchSenderRule,
+  buildEnrichedPrompt,
+} from "./context.ts";
 
 /**
- * BULK EMAIL CLASSIFIER - Parallel Relay-Race Edition
+ * BULK EMAIL CLASSIFIER - Phase 2: Context-Enriched
  * 
  * Supports two modes:
- * 1. Partitioned (called by dispatcher): receives partition_id & total_partitions,
- *    uses RPC to fetch only its slice of emails. Last worker standing triggers voice-learning.
- * 2. Legacy (direct call): fetches all unclassified emails sequentially. Backward compatible.
+ * 1. Partitioned (called by dispatcher): receives partition_id & total_partitions
+ * 2. Legacy (direct call): fetches all unclassified emails sequentially
+ * 
+ * Phase 2 additions:
+ * - Sender rule pre-triage gate (skip LLM for matched emails)
+ * - Business context, corrections, FAQs injected into prompt
+ * - Confidence scores in output
  */
 
 const corsHeaders = {
@@ -69,7 +81,19 @@ serve(async (req) => {
       }, { onConflict: 'workspace_id' });
 
     // ==========================================================================
-    // STEP 1: Fetch emails (partitioned or legacy)
+    // STEP 1: Fetch context (business profile, sender rules, corrections, FAQs)
+    // ==========================================================================
+    const [bizCtx, senderRules, corrections, faqs] = await Promise.all([
+      fetchBusinessContext(supabase, workspace_id),
+      fetchSenderRules(supabase, workspace_id),
+      fetchCorrections(supabase, workspace_id),
+      fetchFAQs(supabase, workspace_id),
+    ]);
+
+    console.log(`${workerTag} Context: biz=${!!bizCtx}, rules=${senderRules.length}, corrections=${corrections.length}, faqs=${faqs.length}`);
+
+    // ==========================================================================
+    // STEP 2: Fetch emails (partitioned or legacy)
     // ==========================================================================
     let emails: any[] | null = null;
     let fetchError: any = null;
@@ -105,127 +129,134 @@ serve(async (req) => {
     console.log(`${workerTag} Found ${emails.length} emails in batch ${_batch_number}`);
 
     // ==========================================================================
-    // STEP 2: Build prompt
+    // STEP 3: Sender rule pre-triage gate
     // ==========================================================================
-    const emailLines = emails.map((e: any, i: number) => {
-      const dir = e.direction === 'outbound' ? 'OUT' : 'IN';
-      const subject = (e.subject || '(none)').substring(0, 100).replace(/[\n\r|]/g, ' ');
-      const snippet = (e.body || '').substring(0, 150).replace(/[\n\r|]/g, ' ');
-      const from = (e.from_email || 'unknown').substring(0, 50);
-      return `${i}|${dir}|${from}|${subject}|${snippet}`;
-    }).join('\n');
+    const ruleMatched: Array<{ email: any; rule: any }> = [];
+    const needsAI: any[] = [];
 
-    const prompt = `You are classifying emails for a small business. Classify each email into ONE category.
-
-Categories:
-- inquiry: Questions about services/products/availability
-- booking: Appointment/booking/scheduling requests
-- quote: Price/quote/estimate requests
-- complaint: Issues/problems/negative feedback
-- follow_up: Replies to previous conversations
-- spam: Marketing, promotions, newsletters, unwanted mass emails
-- notification: Automated system notifications (receipts, confirmations, shipping alerts, calendar invites)
-- personal: Personal/social messages from friends/family
-
-Return ONLY a JSON array. Format: [{"i":0,"c":"inquiry","r":true},{"i":1,"c":"spam","r":false}]
-Where: i=index (integer), c=category (string), r=requires_reply (boolean)
-
-Rules for requires_reply:
-- spam, notification: ALWAYS false
-- complaint, inquiry, quote, booking: ALWAYS true (customer needs response)
-- follow_up: true if asking a question, false if just acknowledging/thanking
-- personal: true if asking something, false otherwise
-- outbound emails (OUT): ALWAYS false (you sent it, no need to reply to yourself)
-
-Return ONLY valid JSON. No markdown. No explanation. Just the array.
-
-EMAILS (${emails.length} total, format: index|direction|from|subject|snippet):
-${emailLines}`;
-
-    console.log(`${workerTag} Prompt: ${prompt.length} chars, ~${Math.ceil(prompt.length / 4)} tokens`);
-
-    // ==========================================================================
-    // STEP 3: Call Lovable AI Gateway
-    // ==========================================================================
-    const response = await fetch(LOVABLE_AI_GATEWAY, {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${lovableApiKey}`,
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.1,
-        max_tokens: 65536,
-      })
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`${workerTag} AI Gateway error:`, errorText);
-      throw new Error(`AI Gateway error: ${response.status} - ${errorText}`);
+    for (const email of emails) {
+      const rule = matchSenderRule(email.from_email, senderRules);
+      if (rule) {
+        ruleMatched.push({ email, rule });
+      } else {
+        needsAI.push(email);
+      }
     }
 
-    const aiData = await response.json();
-    const responseText = aiData.choices?.[0]?.message?.content || '';
+    console.log(`${workerTag} Pre-triage: ${ruleMatched.length} rule-matched, ${needsAI.length} need AI`);
 
-    // ==========================================================================
-    // STEP 4: Parse classifications
-    // ==========================================================================
-    const jsonMatch = responseText.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) throw new Error('No JSON array in AI response');
-
-    let classifications: Array<{ i: number; c: string; r: boolean }>;
-    try {
-      classifications = JSON.parse(jsonMatch[0]);
-    } catch {
-      throw new Error('Failed to parse AI response as JSON');
-    }
-
-    console.log(`${workerTag} Parsed ${classifications.length} classifications`);
-
-    // ==========================================================================
-    // STEP 5: Bulk update emails
-    // ==========================================================================
-    const classMap = new Map<number, { c: string; r: boolean }>();
-    for (const cl of classifications) {
-      classMap.set(cl.i, { c: cl.c, r: cl.r });
-    }
-
+    // Instantly classify rule-matched emails
     const now = new Date().toISOString();
     let updated = 0;
     let failed = 0;
 
-    const PARALLEL_BATCH = 50;
-    for (let i = 0; i < emails.length; i += PARALLEL_BATCH) {
-      const batch = emails.slice(i, i + PARALLEL_BATCH);
-      const results = await Promise.all(batch.map(async (email: any, batchIdx: number) => {
-        const globalIdx = i + batchIdx;
-        const classification = classMap.get(globalIdx);
-        const { error } = await supabase
-          .from('email_import_queue')
-          .update({
-            category: classification?.c || 'unknown',
-            requires_reply: classification?.r || false,
-            classified_at: now,
-            status: 'processed',
-            processed_at: now,
-          })
-          .eq('id', email.id);
-        return !error;
-      }));
-      updated += results.filter(Boolean).length;
-      failed += results.filter(r => !r).length;
+    if (ruleMatched.length > 0) {
+      const PARALLEL_BATCH = 50;
+      for (let i = 0; i < ruleMatched.length; i += PARALLEL_BATCH) {
+        const batch = ruleMatched.slice(i, i + PARALLEL_BATCH);
+        const results = await Promise.all(batch.map(async ({ email, rule }) => {
+          const { error } = await supabase
+            .from('email_import_queue')
+            .update({
+              category: rule.default_classification,
+              requires_reply: rule.default_requires_reply ?? false,
+              confidence: 1.0,
+              needs_review: false,
+              classified_at: now,
+              status: 'processed',
+              processed_at: now,
+            })
+            .eq('id', email.id);
+          return !error;
+        }));
+        updated += results.filter(Boolean).length;
+        failed += results.filter(r => !r).length;
+      }
+      console.log(`${workerTag} Rule-classified: ${updated} updated, ${failed} failed`);
+    }
+
+    // ==========================================================================
+    // STEP 4: AI classification for remaining emails
+    // ==========================================================================
+    if (needsAI.length > 0) {
+      const prompt = buildEnrichedPrompt(needsAI, bizCtx, corrections, faqs);
+
+      console.log(`${workerTag} Prompt: ${prompt.length} chars, ~${Math.ceil(prompt.length / 4)} tokens`);
+
+      const response = await fetch(LOVABLE_AI_GATEWAY, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${lovableApiKey}`,
+        },
+        body: JSON.stringify({
+          model: MODEL,
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.1,
+          max_tokens: 65536,
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`${workerTag} AI Gateway error:`, errorText);
+        throw new Error(`AI Gateway error: ${response.status} - ${errorText}`);
+      }
+
+      const aiData = await response.json();
+      const responseText = aiData.choices?.[0]?.message?.content || '';
+
+      // Parse classifications
+      const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+      if (!jsonMatch) throw new Error('No JSON array in AI response');
+
+      let classifications: Array<{ i: number; c: string; r: boolean; conf?: number }>;
+      try {
+        classifications = JSON.parse(jsonMatch[0]);
+      } catch {
+        throw new Error('Failed to parse AI response as JSON');
+      }
+
+      console.log(`${workerTag} Parsed ${classifications.length} AI classifications`);
+
+      // Build map and update
+      const classMap = new Map<number, { c: string; r: boolean; conf: number }>();
+      for (const cl of classifications) {
+        classMap.set(cl.i, { c: cl.c, r: cl.r, conf: cl.conf ?? 0.5 });
+      }
+
+      const PARALLEL_BATCH = 50;
+      for (let i = 0; i < needsAI.length; i += PARALLEL_BATCH) {
+        const batch = needsAI.slice(i, i + PARALLEL_BATCH);
+        const results = await Promise.all(batch.map(async (email: any, batchIdx: number) => {
+          const globalIdx = i + batchIdx;
+          const classification = classMap.get(globalIdx);
+          const conf = classification?.conf ?? 0.5;
+          const { error } = await supabase
+            .from('email_import_queue')
+            .update({
+              category: classification?.c || 'unknown',
+              requires_reply: classification?.r || false,
+              confidence: conf,
+              needs_review: conf < 0.6,
+              classified_at: now,
+              status: 'processed',
+              processed_at: now,
+            })
+            .eq('id', email.id);
+          return !error;
+        }));
+        updated += results.filter(Boolean).length;
+        failed += results.filter(r => !r).length;
+      }
     }
 
     const elapsed = Date.now() - startTime;
     console.log(`${workerTag} Batch ${_batch_number}: ${updated} updated, ${failed} failed in ${elapsed}ms`);
 
     // ==========================================================================
-    // STEP 6: Self-chain if more emails in partition
+    // STEP 5: Self-chain if more emails in partition
     // ==========================================================================
-    // Check if there are more in THIS worker's partition
     let moreInPartition = false;
     if (isPartitioned) {
       const { data: nextBatch } = await supabase.rpc('get_partitioned_unclassified_batch', {
@@ -247,7 +278,6 @@ ${emailLines}`;
     if (moreInPartition) {
       console.log(`${workerTag} More emails remain, self-chaining batch ${_batch_number + 1}`);
 
-      // Update progress count
       const { count: totalClassified } = await supabase
         .from('email_import_queue')
         .select('id', { count: 'exact', head: true })
@@ -284,6 +314,8 @@ ${emailLines}`;
         worker: workerTag,
         batch: _batch_number,
         emails_classified: updated,
+        rule_matched: ruleMatched.length,
+        ai_classified: needsAI.length,
         elapsed_ms: elapsed,
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -291,7 +323,7 @@ ${emailLines}`;
     }
 
     // ==========================================================================
-    // STEP 7: Partition empty → check global remaining
+    // STEP 6: Partition empty → check global remaining
     // ==========================================================================
     return await handlePartitionComplete(supabase, supabaseUrl, supabaseServiceKey, workspace_id, workerTag, callback_url, isPartitioned);
 
@@ -337,7 +369,6 @@ async function handlePartitionComplete(
   callback_url: string | null,
   isPartitioned: boolean,
 ) {
-  // Check global remaining
   const { data: globalRemaining } = await supabase
     .rpc('count_unclassified_emails', { p_workspace_id: workspace_id });
 
@@ -355,7 +386,6 @@ async function handlePartitionComplete(
     });
   }
 
-  // This is the last worker! Trigger voice-learning and callback.
   console.log(`${workerTag} ALL DONE - triggering voice-learning`);
 
   const { count: totalClassified } = await supabase
@@ -406,15 +436,13 @@ async function handlePartitionComplete(
     }
   }
 
-  // After classification completes, check if backfill is pending and update progress accordingly
-  // (The actual backfill trigger happens after voice-learning completes)
+  // Check if backfill is pending and update progress
   const { data: backfillProgress } = await supabase
     .from('email_import_progress')
     .select('backfill_status')
     .eq('workspace_id', workspace_id)
     .maybeSingle();
 
-  // If backfill just completed (this was the backfill classification run), mark it complete
   if (backfillProgress?.backfill_status === 'running') {
     await supabase
       .from('email_import_progress')
