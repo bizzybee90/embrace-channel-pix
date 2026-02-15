@@ -29,6 +29,7 @@ import EmailOAuthCallback from "./pages/EmailOAuthCallback";
 import KnowledgeBase from "./pages/KnowledgeBase";
 import TestDashboard from "./pages/TestDashboard";
 import DevOpsDashboard from "./pages/admin/DevOpsDashboard";
+import Inbox from "./pages/Inbox";
 
 
 const queryClient = new QueryClient();
@@ -49,6 +50,16 @@ const RouterContent = () => {
             <Home />
           </AuthGuard>
         } 
+      />
+
+      {/* Email Inbox - reads from email_import_queue */}
+      <Route
+        path="/inbox"
+        element={
+          <AuthGuard>
+            <Inbox />
+          </AuthGuard>
+        }
       />
       
       {/* To Reply - Primary view */}
