@@ -659,6 +659,7 @@ export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenPr
           currentStatus={emailTrack.status}
           counts={emailTrack.counts}
           error={emailTrack.error}
+          actualPercent={emailTrack.actualPercent}
         />
       </div>
 
