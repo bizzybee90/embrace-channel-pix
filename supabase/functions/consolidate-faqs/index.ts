@@ -406,7 +406,6 @@ Return a JSON array of adapted FAQs (empty array [] if all topics are already co
           question: faq.question,
           answer: faq.answer,
           category: faq.category || 'general',
-          source: 'competitor_adapted',
           generation_source: 'competitor_adapted',
           source_business: faq.source_business,
           original_faq_id: faq.source_faq_id || null,
