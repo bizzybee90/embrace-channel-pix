@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -72,6 +72,20 @@ export function OnboardingWizard({ workspaceId, onComplete }: OnboardingWizardPr
   });
   const [knowledgeResults, setKnowledgeResults] = useState({ industryFaqs: 0, websiteFaqs: 0 });
   const [connectedEmail, setConnectedEmail] = useState<string | null>(null);
+  const [liveFaqCount, setLiveFaqCount] = useState<number | null>(null);
+
+  // Fetch live FAQ count when reaching the complete step
+  useEffect(() => {
+    if (currentStep !== 'complete') return;
+    const fetchCount = async () => {
+      const { count } = await supabase
+        .from('faq_database')
+        .select('id', { count: 'exact', head: true })
+        .eq('workspace_id', workspaceId);
+      setLiveFaqCount(count || 0);
+    };
+    fetchCount();
+  }, [currentStep, workspaceId]);
 
   useEffect(() => {
     writeStored({ businessContext });
@@ -284,7 +298,7 @@ export function OnboardingWizard({ workspaceId, onComplete }: OnboardingWizardPr
               
               <div className="grid grid-cols-2 gap-3 max-w-sm mx-auto">
                 <div className="bg-muted/30 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-primary">{knowledgeResults.websiteFaqs + knowledgeResults.industryFaqs}</div>
+                  <div className="text-2xl font-bold text-primary">{liveFaqCount ?? (knowledgeResults.websiteFaqs + knowledgeResults.industryFaqs)}</div>
                   <div className="text-xs text-muted-foreground">FAQs ready</div>
                 </div>
                 <div className="bg-muted/30 rounded-lg p-4 text-center">
