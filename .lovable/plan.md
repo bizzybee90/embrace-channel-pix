@@ -1,108 +1,96 @@
 
 
-# Phase 2: Context-Enriched Classification
+# Superhuman-Style Email Client for BizzyBee
 
-## What This Does
-Right now, the bulk classifier (`email-classify-bulk`) uses a generic prompt with no knowledge of the business. It doesn't know what services you offer, what corrections you've made, or what sender rules exist. This phase injects all that context to dramatically improve classification accuracy.
+## Problem Summary
 
-## Changes
+1. **"To Reply" shows 67 instead of ~89**: The filter only includes `act_now` (18) + `quick_win` (49) = 67. But there are 59 more conversations in the `wait` bucket that have `requires_reply = true` (follow-ups, inquiries, personal emails). These are real emails needing attention but are hidden.
 
-### 1. Enrich `email-classify-bulk` Prompt with Business Context
+2. **No proper email client experience**: The current UI is a task-queue, not an inbox. There's no way to browse all emails, see sent mail, or work through messages the way you would in Gmail or Superhuman.
 
-Before building the classification prompt, fetch three context sources and inject them:
+---
 
-**a) Business Profile** -- from `business_context` table:
-- Company name, business type, service area
-- Tells the AI "this is a gutter cleaning company in Manchester" so it can distinguish a "quote request" from a "general inquiry" correctly
+## What Will Change
 
-**b) Sender Rules** -- from `sender_rules` table (active rules with `skip_llm = true`):
-- Apply deterministic rules BEFORE sending to the AI (just like `classify-emails` already does)
-- Emails matching sender rules skip the LLM entirely, saving tokens and improving speed
-- Remaining emails go to the AI with a note about what rules exist
+### Fix 1: Correct the "To Reply" Count
+Include all conversations where `requires_reply = true` (regardless of decision bucket) in the "To Reply" count and inbox view. This should bring it to ~126, which is closer to reality. The `wait` bucket emails with `requires_reply = true` are genuinely actionable.
 
-**c) Classification Corrections** -- from `classification_corrections` table:
-- Fetch the 20 most recent corrections as few-shot examples
-- Inject them into the prompt: "Previously, an email about X was incorrectly classified as Y -- the correct category is Z"
-- This teaches the AI from past mistakes without any model fine-tuning
+### Fix 2: Build a Superhuman-Inspired Inbox
 
-### 2. Add Pre-Triage Rule Gate to Bulk Classifier
+The current "JaceStyleInbox" will be upgraded into a proper email client layout:
 
-The single-email classifier (`classify-emails`) already has a rule gate that skips the LLM for known senders. The bulk classifier doesn't. Adding this:
-- Fetches all active `sender_rules` for the workspace
-- Before sending emails to the AI, matches each against sender rules
-- Matched emails get classified instantly (confidence: 1.0, no AI cost)
-- Only unmatched emails go to the LLM prompt
+**Sidebar Categories** (already partially exists, will be enhanced):
+- **Inbox** -- all inbound, unresolved conversations (replaces "To Reply")
+- **Unread** -- conversations not yet opened/viewed
+- **Drafts** -- conversations with AI-generated draft responses ready to review
+- **Sent** -- outbound threads (already exists as a route)
+- **Done/Archive** -- resolved/auto-handled (already exists)
+- AI Category filters: Quote Requests, Bookings, Complaints, Inquiries, Follow-ups, Personal
 
-### 3. Add Confidence Score to Output
+**Message List (center panel)**:
+- Dense, scannable rows: Sender, Subject, Snippet, Time
+- Category badge with color coding per classification
+- Confidence score indicator (small percentage or colored dot)
+- Hover quick-actions: Archive, Snooze, Mark Read
+- Keyboard shortcuts: `j`/`k` navigation, `e` archive, `r` reply
 
-Expand the AI output schema from `{"i":0,"c":"inquiry","r":true}` to `{"i":0,"c":"inquiry","r":true,"conf":0.92}` and store the confidence value.
+**Detail View (right panel)** -- already exists via `ConversationThread`, will get:
+- "Draft with AI" button in the reply area (hook into existing `ai-draft` edge function)
+- Confidence score display in the header
 
-### 4. FAQ Context Injection
-
-Fetch the top 15 FAQs from `faq_database` (where `is_own_content = true`) and include them as business context. This helps the AI understand what topics the business handles.
+**Search** -- already exists, will be enhanced to command-bar style (Cmd+K)
 
 ---
 
 ## Technical Details
 
-### Files Modified
+### Files to Modify
 
-**`supabase/functions/email-classify-bulk/index.ts`**
-- Add context-fetching block before prompt construction (business_context, sender_rules, classification_corrections, faq_database)
-- Add sender rule pre-triage gate to skip LLM for matched emails
-- Update prompt template with "Business Context", "Known Corrections", and "Business Topics" sections
-- Add `conf` field to output schema and store it in the `confidence` column
+1. **`src/pages/Home.tsx`** -- Fix the "To Reply" query to include `wait` bucket where `requires_reply = true`
+2. **`src/components/sidebar/Sidebar.tsx`** -- Add "Inbox", "Unread", "Drafts" nav items; add AI category section with counts
+3. **`src/components/conversations/JaceStyleInbox.tsx`** -- Major upgrade:
+   - Add `all-inbox`, `unread`, `sent` filter modes
+   - Add hover quick-actions (archive, snooze, mark read)
+   - Add keyboard navigation (`j`/`k`/`e`/`r`)
+   - Show confidence score indicator next to category badge
+   - Add category filter chips at the top
+4. **`src/App.tsx`** -- Add routes for `/inbox`, `/unread`, `/drafts`
+5. **`src/pages/EscalationHub.tsx`** -- Add new filter types
+6. **`src/components/conversations/ConversationHeader.tsx`** -- Show confidence score badge
 
-### Database Migration
-- Add `confidence` (FLOAT, nullable) column to `email_import_queue`
-- Add `needs_review` (BOOLEAN, default false) column to `email_import_queue`
-- Add `entities` (JSONB, nullable) column to `email_import_queue` (for future entity extraction)
+### New Files
 
-### Updated Prompt Structure
-```text
-You are classifying emails for [Company Name], a [business_type] business in [service_area].
+7. **`src/hooks/useKeyboardNavigation.tsx`** -- Hook for `j`/`k`/`e`/`r` keyboard shortcuts in inbox
+8. **`src/components/conversations/InboxQuickActions.tsx`** -- Hover overlay with Archive, Snooze, Mark Read buttons
 
-Business topics they handle:
-- [FAQ question 1]
-- [FAQ question 2]
-...
+### Database
 
-Previous corrections (learn from these):
-- "Subject about X" was wrongly classified as "spam" -> correct: "inquiry"
-- ...
+No schema changes needed -- all required fields (`email_classification`, `ai_confidence`, `requires_reply`, `decision_bucket`) already exist on the `conversations` table.
 
-Categories: inquiry, booking, quote, complaint, follow_up, spam, notification, personal
+### Query Logic Changes
 
-Return JSON: [{"i":0,"c":"inquiry","r":true,"conf":0.92}]
-Where conf = your confidence (0.0-1.0). Use lower values when unsure.
-
-EMAILS:
-...
+Current "To Reply":
+```
+decision_bucket IN ('act_now', 'quick_win') AND status IN ('new', 'open', ...)
 ```
 
-### Processing Flow
-```text
-Fetch 5000 emails
-    |
-    v
-Apply sender_rules (deterministic) --> instant classify matched emails
-    |
-    v
-Remaining emails --> Build enriched prompt with business context
-    |
-    v
-AI classifies with confidence scores
-    |
-    v
-Store results (category, requires_reply, confidence, needs_review)
-    |
-    v
-Self-chain if more remain
+New "Inbox" (all actionable):
+```
+requires_reply = true AND status IN ('new', 'open', 'waiting_internal', 'ai_handling', 'escalated')
 ```
 
-### What Stays the Same
-- The relay-race dispatcher and parallel worker pattern
-- The voice learning pipeline
-- The backfill system from Phase 1
-- All existing categories and the overall flow
+New "Unread" (subset):
+```
+requires_reply = true AND status = 'new'
+```
+
+---
+
+## Implementation Order
+
+1. Fix "To Reply" count across Home, Sidebar, and JaceStyleInbox (quick win)
+2. Add sidebar navigation items (Inbox, Unread, Drafts, category filters)
+3. Upgrade inbox list with hover actions, confidence scores, category badges
+4. Add keyboard navigation
+5. Style polish -- Superhuman-inspired clean aesthetic with Inter font, Slate palette
 
