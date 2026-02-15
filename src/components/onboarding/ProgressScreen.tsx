@@ -381,21 +381,31 @@ export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenPr
   const [isLoading, setIsLoading] = useState(true);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [liveFaqCount, setLiveFaqCount] = useState(0);
+  const liveFaqCountRef = useRef(0);
   const [reviewDismissed, setReviewDismissed] = useState(false);
   const startTimeRef = useRef<number>(Date.now());
 
-  // Realtime subscription for live FAQ count
+  // Realtime subscription for live FAQ count + keep ref in sync
   useEffect(() => {
-    // Initial count
+    liveFaqCountRef.current = liveFaqCount;
+  }, [liveFaqCount]);
+
+  useEffect(() => {
+    // Initial count + periodic re-fetch to catch batch inserts
     const fetchCount = async () => {
       const { count } = await supabase
         .from('faq_database')
         .select('id', { count: 'exact', head: true })
         .eq('workspace_id', workspaceId)
         .eq('is_own_content', false);
-      setLiveFaqCount(count || 0);
+      const newCount = count || 0;
+      setLiveFaqCount(newCount);
+      liveFaqCountRef.current = newCount;
     };
     fetchCount();
+
+    // Re-fetch every 5s to catch batch inserts from consolidation
+    const countInterval = window.setInterval(fetchCount, 5000);
 
     const channel = supabase
       .channel('faq-progress')
@@ -413,7 +423,10 @@ export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenPr
       )
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      window.clearInterval(countInterval);
+      supabase.removeChannel(channel);
+    };
   }, [workspaceId]);
 
   useEffect(() => {
@@ -474,7 +487,7 @@ export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenPr
           status: scrapeStatus,
           counts: scrapeRecord ? [
             { label: 'scraped', value: (scrapeDetails.competitors_scraped as number) || 0 },
-            { label: 'FAQs generated', value: liveFaqCount },
+            { label: 'FAQs generated', value: liveFaqCountRef.current },
           ] : [],
           error: scrapeDetails.error as string | undefined,
           currentCompetitor: scrapeDetails.current_competitor as string | undefined,
