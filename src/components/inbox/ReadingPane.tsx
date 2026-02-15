@@ -43,9 +43,8 @@ const EmailBody = ({ email, fetchedHtml }: { email: InboxEmail; fetchedHtml?: st
       <iframe
         srcDoc={styledHtml}
         sandbox="allow-same-origin"
-        className="w-full min-h-[300px] border-0 bg-white rounded"
+        className="w-full border-0 bg-white rounded h-full"
         title="Email content"
-        style={{ height: '60vh' }}
       />
     );
   }

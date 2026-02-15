@@ -51,7 +51,7 @@ export const QuickActionsBar = ({ emailId, workspaceId }: QuickActionsBarProps) 
   };
 
   return (
-    <div className="flex items-center gap-2 p-3 border-t border-border bg-card flex-wrap">
+    <div className="flex items-center gap-2 p-3 border-t border-border bg-card flex-nowrap overflow-x-auto">
       <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => toast.info('Reply coming soon')}>
         <Reply className="h-3.5 w-3.5" />
         Reply
