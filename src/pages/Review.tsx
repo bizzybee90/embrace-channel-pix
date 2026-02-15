@@ -94,6 +94,18 @@ const bucketColors: Record<string, string> = {
 
 type AutomationLevel = 'auto' | 'draft_first' | 'always_review';
 type TonePreference = 'keep_current' | 'more_formal' | 'more_brief';
+type ReviewTab = 'triage' | 'low_confidence';
+
+interface LowConfidenceEmail {
+  id: string;
+  from_email: string;
+  subject: string;
+  body: string;
+  category: string;
+  confidence: number;
+  direction: string;
+  received_at: string;
+}
 
 export default function Review() {
   const navigate = useNavigate();
@@ -111,6 +123,8 @@ export default function Review() {
   const [lastClickedIndex, setLastClickedIndex] = useState<number | null>(null);
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
   const [mobileShowDetail, setMobileShowDetail] = useState(false);
+  const [activeTab, setActiveTab] = useState<ReviewTab>('triage');
+  const [lcIndex, setLcIndex] = useState(0);
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { celebrateConfirmation, celebratePatternLearned, celebrateQueueComplete } = useReviewFeedback();
@@ -161,6 +175,98 @@ export default function Review() {
       })) as ReviewConversation[];
     },
     staleTime: 30000,
+  });
+
+  // Fetch low-confidence bulk-classified emails
+  const { data: lowConfidenceEmails = [], isLoading: lcLoading } = useQuery({
+    queryKey: ['low-confidence-emails'],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return [];
+
+      const { data: userData } = await supabase
+        .from('users')
+        .select('workspace_id')
+        .eq('id', user.id)
+        .single();
+
+      if (!userData?.workspace_id) return [];
+
+      const { data, error } = await supabase
+        .from('email_import_queue')
+        .select('id, from_email, subject, body, category, confidence, direction, received_at')
+        .eq('workspace_id', userData.workspace_id)
+        .eq('needs_review', true)
+        .not('category', 'is', null)
+        .order('confidence', { ascending: true })
+        .limit(50);
+
+      if (error) throw error;
+      return (data || []) as LowConfidenceEmail[];
+    },
+    staleTime: 30000,
+  });
+
+  // Low-confidence correction mutation
+  const lcCorrectionMutation = useMutation({
+    mutationFn: async ({ emailId, correctedCategory, correctedRequiresReply }: {
+      emailId: string;
+      correctedCategory: string;
+      correctedRequiresReply: boolean;
+    }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { data: userData } = await supabase
+        .from('users')
+        .select('workspace_id')
+        .eq('id', user.id)
+        .single();
+
+      if (!userData?.workspace_id) throw new Error('No workspace');
+
+      const email = lowConfidenceEmails.find(e => e.id === emailId);
+      
+      const response = await supabase.functions.invoke('save-classification-correction', {
+        body: {
+          workspace_id: userData.workspace_id,
+          email_id: emailId,
+          original_category: email?.category,
+          corrected_category: correctedCategory,
+          corrected_requires_reply: correctedRequiresReply,
+          source_table: 'email_import_queue',
+        }
+      });
+
+      if (response.error) throw response.error;
+      return response.data;
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['low-confidence-emails'] });
+      const msg = result?.siblings_updated > 0
+        ? `Corrected! Also fixed ${result.siblings_updated} similar emails.${result.rule_created ? ` Auto-rule created for @${result.sender_domain}.` : ''}`
+        : `Correction saved.${result?.rule_created ? ` Auto-rule created for @${result.sender_domain}.` : ''}`;
+      toast({ title: '✅ Learned', description: msg });
+      setLcIndex(prev => Math.min(prev, lowConfidenceEmails.length - 2));
+    },
+    onError: () => {
+      toast({ title: 'Error', description: 'Failed to save correction.', variant: 'destructive' });
+    },
+  });
+
+  const lcConfirmMutation = useMutation({
+    mutationFn: async (emailId: string) => {
+      const { error } = await supabase
+        .from('email_import_queue')
+        .update({ needs_review: false, confidence: 0.85 })
+        .eq('id', emailId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['low-confidence-emails'] });
+      toast({ title: '✅ Confirmed', description: 'Classification confirmed.' });
+      setLcIndex(prev => Math.min(prev, lowConfidenceEmails.length - 2));
+    },
   });
 
   // Keyboard navigation
@@ -921,15 +1027,155 @@ export default function Review() {
             </div>
           </div>
           <div className="flex items-center gap-4 mt-3">
-            <Progress value={progress} className="flex-1 h-2" />
+            <Progress value={activeTab === 'triage' ? progress : 0} className="flex-1 h-2" />
             <span className="text-sm text-muted-foreground whitespace-nowrap">
-              {totalCount - reviewedCount} training examples remaining
+              {activeTab === 'triage' 
+                ? `${totalCount - reviewedCount} training examples remaining`
+                : `${lowConfidenceEmails.length} low-confidence items`
+              }
             </span>
+          </div>
+          {/* Tabs */}
+          <div className="flex gap-1 mt-3">
+            <Button
+              variant={activeTab === 'triage' ? 'default' : 'ghost'}
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => setActiveTab('triage')}
+            >
+              <Eye className="h-3 w-3 mr-1" />
+              Triage Review
+              {reviewQueue.length > 0 && (
+                <Badge variant="secondary" className="ml-1.5 h-4 px-1 text-[10px]">{reviewQueue.length}</Badge>
+              )}
+            </Button>
+            <Button
+              variant={activeTab === 'low_confidence' ? 'default' : 'ghost'}
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => setActiveTab('low_confidence')}
+            >
+              <Bot className="h-3 w-3 mr-1" />
+              Low Confidence
+              {lowConfidenceEmails.length > 0 && (
+                <Badge variant="secondary" className="ml-1.5 h-4 px-1 text-[10px]">{lowConfidenceEmails.length}</Badge>
+              )}
+            </Button>
           </div>
         </div>
 
-        {/* Split panel layout */}
-        <div className="flex-1 flex overflow-hidden">
+        {/* Low Confidence Tab */}
+        {activeTab === 'low_confidence' && (
+          <div className="flex-1 flex overflow-hidden">
+            {/* Left: Low-confidence list */}
+            <div className="w-72 border-r flex-shrink-0 flex flex-col bg-muted/20">
+              <div className="px-3 py-2 border-b bg-muted/30">
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  Low Confidence Emails
+                </span>
+              </div>
+              <ScrollArea className="flex-1">
+                {lcLoading ? (
+                  <div className="p-4 text-center text-muted-foreground animate-pulse">Loading...</div>
+                ) : lowConfidenceEmails.length === 0 ? (
+                  <div className="p-4 text-center text-muted-foreground text-sm">
+                    No low-confidence emails to review
+                  </div>
+                ) : (
+                  lowConfidenceEmails.map((email, idx) => (
+                    <div
+                      key={email.id}
+                      className={cn(
+                        "px-3 py-2.5 border-b cursor-pointer transition-colors",
+                        idx === lcIndex ? "bg-accent" : "hover:bg-muted/50"
+                      )}
+                      onClick={() => setLcIndex(idx)}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-medium truncate max-w-[160px]">
+                          {email.from_email || 'Unknown'}
+                        </span>
+                        <Badge variant="outline" className="text-[10px] px-1 h-4">
+                          {Math.round((email.confidence || 0) * 100)}%
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground truncate">{email.subject || '(no subject)'}</p>
+                      <Badge variant="secondary" className="text-[10px] mt-1">{email.category}</Badge>
+                    </div>
+                  ))
+                )}
+              </ScrollArea>
+            </div>
+
+            {/* Right: Detail + actions */}
+            <div className="flex-1 flex flex-col overflow-hidden">
+              {lowConfidenceEmails[lcIndex] ? (() => {
+                const lcEmail = lowConfidenceEmails[lcIndex];
+                return (
+                  <>
+                    <div className="p-6 border-b">
+                      <div className="flex items-center justify-between mb-2">
+                        <div>
+                          <h2 className="font-semibold text-lg">{lcEmail.subject || '(no subject)'}</h2>
+                          <p className="text-sm text-muted-foreground">From: {lcEmail.from_email}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline">
+                            AI classified: <span className="font-semibold ml-1">{lcEmail.category}</span>
+                          </Badge>
+                          <Badge variant="secondary">
+                            {Math.round((lcEmail.confidence || 0) * 100)}% confident
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                    <ScrollArea className="flex-1 p-6">
+                      <div className="max-w-2xl">
+                        <p className="text-sm whitespace-pre-wrap">{(lcEmail.body || '').substring(0, 1000)}</p>
+                      </div>
+                    </ScrollArea>
+                    <div className="border-t p-4 flex items-center gap-3">
+                      <Button
+                        onClick={() => lcConfirmMutation.mutate(lcEmail.id)}
+                        disabled={lcConfirmMutation.isPending}
+                        className="gap-1.5"
+                      >
+                        <Check className="h-4 w-4" />
+                        Looks right
+                      </Button>
+                      <div className="flex items-center gap-1.5 ml-2">
+                        <span className="text-sm text-muted-foreground">Change to:</span>
+                        {['inquiry', 'booking', 'quote', 'complaint', 'follow_up', 'spam', 'notification', 'personal'].filter(c => c !== lcEmail.category).map(cat => (
+                          <Button
+                            key={cat}
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs"
+                            onClick={() => lcCorrectionMutation.mutate({
+                              emailId: lcEmail.id,
+                              correctedCategory: cat,
+                              correctedRequiresReply: !['spam', 'notification'].includes(cat),
+                            })}
+                            disabled={lcCorrectionMutation.isPending}
+                          >
+                            {cat.replace('_', ' ')}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                );
+              })() : (
+                <div className="flex-1 flex items-center justify-center text-muted-foreground">
+                  No low-confidence emails to review
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Triage Review - Split panel layout */}
+        {activeTab === 'triage' && <div className="flex-1 flex overflow-hidden">
           {/* Left: Queue list */}
           <div className="w-72 border-r flex-shrink-0 flex flex-col bg-muted/20">
             {/* Queue header with batch actions */}
@@ -1330,7 +1576,7 @@ export default function Review() {
               </div>
             ) : null}
           </div>
-        </div>
+        </div>}
       </div>
 
       {/* Draft Reply Editor Sheet */}
