@@ -74,7 +74,7 @@ export function OnboardingWizard({ workspaceId, onComplete }: OnboardingWizardPr
   const [connectedEmail, setConnectedEmail] = useState<string | null>(null);
   const [liveFaqCount, setLiveFaqCount] = useState<number | null>(null);
 
-  // Fetch live FAQ count when reaching the complete step
+  // Fetch live FAQ count and trigger inbox hydration when reaching complete step
   useEffect(() => {
     if (currentStep !== 'complete') return;
     const fetchCount = async () => {
@@ -85,6 +85,14 @@ export function OnboardingWizard({ workspaceId, onComplete }: OnboardingWizardPr
       setLiveFaqCount(count || 0);
     };
     fetchCount();
+
+    // Trigger inbox hydration in background (converts classified emails → conversations)
+    supabase.functions.invoke('hydrate-inbox', {
+      body: { workspaceId, daysBack: 90, limit: 200 },
+    }).then(({ data, error }) => {
+      if (error) console.error('Hydration error:', error);
+      else console.log('Inbox hydration result:', data);
+    });
   }, [currentStep, workspaceId]);
 
   useEffect(() => {
