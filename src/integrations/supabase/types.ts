@@ -5314,6 +5314,47 @@ export type Database = {
           },
         ]
       }
+      voice_drift_log: {
+        Row: {
+          checked_at: string
+          drift_score: number
+          emails_sampled: number | null
+          id: string
+          refresh_triggered: boolean
+          status: string
+          traits_changed: Json | null
+          workspace_id: string
+        }
+        Insert: {
+          checked_at?: string
+          drift_score?: number
+          emails_sampled?: number | null
+          id?: string
+          refresh_triggered?: boolean
+          status?: string
+          traits_changed?: Json | null
+          workspace_id: string
+        }
+        Update: {
+          checked_at?: string
+          drift_score?: number
+          emails_sampled?: number | null
+          id?: string
+          refresh_triggered?: boolean
+          status?: string
+          traits_changed?: Json | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "voice_drift_log_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       voice_profiles: {
         Row: {
           analysis_status: string | null
