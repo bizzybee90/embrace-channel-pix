@@ -1,7 +1,8 @@
-import { Inbox, Send, Mail, Sparkles, Ban, Archive, Tag } from 'lucide-react';
+import { Inbox, Send, Mail, Sparkles, Ban, Archive, Tag, Home } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { type InboxFolder, CATEGORY_GROUPS } from '@/lib/emailDirection';
 import { useInboxCounts } from '@/hooks/useInboxEmails';
+import { useNavigate } from 'react-router-dom';
 
 interface InboxSidebarProps {
   activeFolder: InboxFolder;
@@ -16,15 +17,23 @@ const FOLDER_ITEMS: { key: InboxFolder; label: string; icon: React.ReactNode; co
   { key: 'ai-review', label: 'AI Review', icon: <Sparkles className="h-4 w-4" />, countKey: 'aiReview' },
   { key: 'sent', label: 'Sent', icon: <Send className="h-4 w-4" /> },
   { key: 'noise', label: 'Spam & Noise', icon: <Ban className="h-4 w-4" /> },
-  { key: 'all', label: 'All Mail', icon: <Archive className="h-4 w-4" />, countKey: 'total' },
+  { key: 'all', label: 'All Mail', icon: <Archive className="h-4 w-4" /> },
 ];
 
 export const InboxSidebar = ({ activeFolder, onFolderChange, activeCategoryFilter, onCategoryFilterChange }: InboxSidebarProps) => {
   const { data: counts } = useInboxCounts();
+  const navigate = useNavigate();
 
   return (
     <div className="w-[220px] flex-shrink-0 border-r border-border bg-card flex flex-col h-full overflow-y-auto">
-      <div className="p-3 border-b border-border">
+      <div className="p-3 border-b border-border flex items-center gap-2">
+        <button
+          onClick={() => navigate('/')}
+          className="p-1 rounded hover:bg-accent/50 text-muted-foreground hover:text-foreground transition-colors"
+          title="Back to Home"
+        >
+          <Home className="h-4 w-4" />
+        </button>
         <h2 className="text-sm font-semibold text-foreground">Mail</h2>
       </div>
 

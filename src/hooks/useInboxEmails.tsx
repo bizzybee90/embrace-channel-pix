@@ -142,28 +142,32 @@ export const useEmailThread = (threadId: string | null) => {
   });
 };
 
-// Folder counts
+// Folder counts - scoped to last 30 days for accuracy
 export const useInboxCounts = () => {
   const { workspace } = useWorkspace();
 
   return useQuery({
     queryKey: ['inbox-counts', workspace?.id],
     queryFn: async () => {
-      if (!workspace?.id) return { inbox: 0, needsReply: 0, aiReview: 0, total: 0 };
+      if (!workspace?.id) return { inbox: 0, needsReply: 0, aiReview: 0, unread: 0 };
 
-      const [inboxResult, needsReplyResult, aiReviewResult, totalResult] = await Promise.all([
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+      const [inboxResult, needsReplyResult, aiReviewResult, unreadResult] = await Promise.all([
         supabase
           .from('email_import_queue')
           .select('id', { count: 'exact', head: true })
           .eq('workspace_id', workspace.id)
           .not('from_email', 'ilike', '%maccleaning%')
-          .or('is_noise.is.null,is_noise.eq.false'),
+          .or('is_noise.is.null,is_noise.eq.false')
+          .gte('received_at', thirtyDaysAgo),
         supabase
           .from('email_import_queue')
           .select('id', { count: 'exact', head: true })
           .eq('workspace_id', workspace.id)
           .eq('requires_reply', true)
-          .not('from_email', 'ilike', '%maccleaning%'),
+          .not('from_email', 'ilike', '%maccleaning%')
+          .gte('received_at', thirtyDaysAgo),
         supabase
           .from('email_import_queue')
           .select('id', { count: 'exact', head: true })
@@ -172,18 +176,34 @@ export const useInboxCounts = () => {
         supabase
           .from('email_import_queue')
           .select('id', { count: 'exact', head: true })
-          .eq('workspace_id', workspace.id),
+          .eq('workspace_id', workspace.id)
+          .not('from_email', 'ilike', '%maccleaning%')
+          .or('is_noise.is.null,is_noise.eq.false')
+          .neq('status', 'processed')
+          .gte('received_at', thirtyDaysAgo),
       ]);
 
       return {
         inbox: inboxResult.count || 0,
         needsReply: needsReplyResult.count || 0,
         aiReview: aiReviewResult.count || 0,
-        total: totalResult.count || 0,
+        unread: unreadResult.count || 0,
       };
     },
     enabled: !!workspace?.id,
     staleTime: 30000,
     refetchInterval: 60000,
   });
+};
+
+// Fetch HTML body on demand via edge function
+export const useFetchEmailBody = () => {
+  const fetchBody = async (emailId: string): Promise<string | null> => {
+    const { data, error } = await supabase.functions.invoke('fetch-email-body', {
+      body: { email_id: emailId },
+    });
+    if (error) throw error;
+    return data?.body_html || null;
+  };
+  return { fetchBody };
 };
