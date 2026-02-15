@@ -1,82 +1,108 @@
 
-# Phase 1: Instant Onboarding with Background Deep Backfill
 
-## Problem
-When a user connects their email, the `email-import-v2` function imports ALL emails (up to 30,000) before chaining to classification. This means the user waits 30-60+ minutes on the Progress Screen before classification even begins, let alone voice learning.
+# Phase 2: Context-Enriched Classification
 
-## Solution: Two-Stage Import
-
-Split the import into a **Speed Phase** (during onboarding) and a **Deep Backfill** (after onboarding completes).
-
-```text
-CURRENT FLOW:
-  Email Connect --> Import 30,000 --> Classify 30,000 --> Voice Learn --> Done (60+ min)
-
-NEW FLOW:
-  Email Connect --> Import 2,500 --> Classify 2,500 --> Voice Learn --> Continue (3-5 min)
-                         |
-                    [User proceeds through onboarding]
-                         |
-                    Background: Import remaining 27,500 --> Classify --> Re-learn (silent)
-```
+## What This Does
+Right now, the bulk classifier (`email-classify-bulk`) uses a generic prompt with no knowledge of the business. It doesn't know what services you offer, what corrections you've made, or what sender rules exist. This phase injects all that context to dramatically improve classification accuracy.
 
 ## Changes
 
-### 1. Database Migration
-Add a `backfill_status` column to `email_import_progress` to track the background import state:
-- `'pending'` -- backfill hasn't started yet
-- `'running'` -- background import + classify in progress
-- `'complete'` -- all historical emails processed
+### 1. Enrich `email-classify-bulk` Prompt with Business Context
 
-### 2. Edge Function: `email-import-v2` (modify)
-- Accept a new `speed_phase` boolean parameter (default: `false`)
-- When `speed_phase: true`:
-  - Set `total_target` to **2,500** (1,250 SENT + 1,250 INBOX) regardless of `import_mode`
-  - On completion, chain to `email-classify-bulk` as normal (this triggers voice learning when done)
-  - Set `backfill_status = 'pending'` in `email_import_progress`
-- When `speed_phase: false` (default / backfill mode): behaves exactly as today
+Before building the classification prompt, fetch three context sources and inject them:
 
-### 3. Edge Function: `email-import-v2` completion chain (modify)
-When the speed phase completes and chains to classification, also write `backfill_status: 'pending'` to `email_import_progress`. The actual backfill is triggered later.
+**a) Business Profile** -- from `business_context` table:
+- Company name, business type, service area
+- Tells the AI "this is a gutter cleaning company in Manchester" so it can distinguish a "quote request" from a "general inquiry" correctly
 
-### 4. New Edge Function: `backfill-classify`
-A thin orchestrator that:
-1. Reads the `email_import_jobs` record to get the original `import_mode` / `total_target`
-2. Creates a new `email_import_jobs` record with `import_mode: 'backfill'` and the full target (e.g., 30,000)
-3. Updates `email_import_progress.backfill_status = 'running'`
-4. Invokes `email-import-v2` with the new job (non-speed-phase), which will skip already-imported emails (upsert with `ignoreDuplicates`)
-5. The existing chain (`email-import-v2` --> `email-classify-bulk` --> `voice-learning`) handles the rest automatically
-6. On completion, updates `backfill_status = 'complete'`
+**b) Sender Rules** -- from `sender_rules` table (active rules with `skip_llm = true`):
+- Apply deterministic rules BEFORE sending to the AI (just like `classify-emails` already does)
+- Emails matching sender rules skip the LLM entirely, saving tokens and improving speed
+- Remaining emails go to the AI with a note about what rules exist
 
-### 5. Trigger the Backfill
-Modify the `voice-learning` completion path (or the `handlePartitionComplete` in `email-classify-bulk`) to fire-and-forget invoke `backfill-classify` when `backfill_status = 'pending'`. This means the backfill starts silently right after the speed phase's voice learning completes.
+**c) Classification Corrections** -- from `classification_corrections` table:
+- Fetch the 20 most recent corrections as few-shot examples
+- Inject them into the prompt: "Previously, an email about X was incorrectly classified as Y -- the correct category is Z"
+- This teaches the AI from past mistakes without any model fine-tuning
 
-### 6. Edge Function: `trigger-n8n-workflows` (modify)
-Currently this only triggers competitor discovery (email classification chains from `email-import-v2`). No changes needed here -- the import was already triggered during the Email Connection step.
+### 2. Add Pre-Triage Rule Gate to Bulk Classifier
 
-### 7. `EmailConnectionStep.tsx` (modify)
-When starting the import, pass `speed_phase: true` to `email-import-v2` so it only imports 2,500 emails. The `importMode` selection from the UI will be saved to `email_provider_configs` for the backfill to read later.
+The single-email classifier (`classify-emails`) already has a rule gate that skips the LLM for known senders. The bulk classifier doesn't. Adding this:
+- Fetches all active `sender_rules` for the workspace
+- Before sending emails to the AI, matches each against sender rules
+- Matched emails get classified instantly (confidence: 1.0, no AI cost)
+- Only unmatched emails go to the LLM prompt
 
-The import mode selector UI stays as-is -- the user still chooses how much history they want. The difference is that onboarding only processes 2,500 immediately, and the rest happens in the background.
+### 3. Add Confidence Score to Output
 
-### 8. `ProgressScreen.tsx` (modify)
-- The email track will complete much faster (3-5 min instead of 30-60 min)
-- Add a subtle "Deep learning will continue in the background" note when email track completes
-- No blocking change -- the Continue button logic stays the same (all 3 tracks must complete)
+Expand the AI output schema from `{"i":0,"c":"inquiry","r":true}` to `{"i":0,"c":"inquiry","r":true,"conf":0.92}` and store the confidence value.
 
-### 9. `BackgroundImportBanner.tsx` (modify)
-After onboarding, show a non-intrusive banner on the main app indicating background backfill progress:
-- "BizzyBee is still learning from your older emails (45% complete)"
-- Auto-dismiss when `backfill_status = 'complete'`
+### 4. FAQ Context Injection
 
-## What Stays the Same
-- The parallel relay-race dispatcher and bulk classification logic
+Fetch the top 15 FAQs from `faq_database` (where `is_own_content = true`) and include them as business context. This helps the AI understand what topics the business handles.
+
+---
+
+## Technical Details
+
+### Files Modified
+
+**`supabase/functions/email-classify-bulk/index.ts`**
+- Add context-fetching block before prompt construction (business_context, sender_rules, classification_corrections, faq_database)
+- Add sender rule pre-triage gate to skip LLM for matched emails
+- Update prompt template with "Business Context", "Known Corrections", and "Business Topics" sections
+- Add `conf` field to output schema and store it in the `confidence` column
+
+### Database Migration
+- Add `confidence` (FLOAT, nullable) column to `email_import_queue`
+- Add `needs_review` (BOOLEAN, default false) column to `email_import_queue`
+- Add `entities` (JSONB, nullable) column to `email_import_queue` (for future entity extraction)
+
+### Updated Prompt Structure
+```text
+You are classifying emails for [Company Name], a [business_type] business in [service_area].
+
+Business topics they handle:
+- [FAQ question 1]
+- [FAQ question 2]
+...
+
+Previous corrections (learn from these):
+- "Subject about X" was wrongly classified as "spam" -> correct: "inquiry"
+- ...
+
+Categories: inquiry, booking, quote, complaint, follow_up, spam, notification, personal
+
+Return JSON: [{"i":0,"c":"inquiry","r":true,"conf":0.92}]
+Where conf = your confidence (0.0-1.0). Use lower values when unsure.
+
+EMAILS:
+...
+```
+
+### Processing Flow
+```text
+Fetch 5000 emails
+    |
+    v
+Apply sender_rules (deterministic) --> instant classify matched emails
+    |
+    v
+Remaining emails --> Build enriched prompt with business context
+    |
+    v
+AI classifies with confidence scores
+    |
+    v
+Store results (category, requires_reply, confidence, needs_review)
+    |
+    v
+Self-chain if more remain
+```
+
+### What Stays the Same
+- The relay-race dispatcher and parallel worker pattern
 - The voice learning pipeline
-- The competitor discovery/scrape pipeline
-- The Progress Screen's 3-track model (discovery, scrape, email)
-- All existing import modes and database tables
+- The backfill system from Phase 1
+- All existing categories and the overall flow
 
-## Expected Impact
-- **Onboarding time**: 30-60 min --> **3-5 min**
-- **Voice learning quality**: Good from 2,500 emails, then improves silently with backfill
-- **User experience**: No waiting, no blocking -- they can start using the app immediately
