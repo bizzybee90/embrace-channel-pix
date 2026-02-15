@@ -1,201 +1,128 @@
 
 
-# Build a Proper Email Inbox from `email_import_queue`
+# Fix Email Inbox: Full Email Rendering, Accurate Counts, Navigation, and Categories
 
-## The Core Problem
+## Problems Identified
 
-The current inbox reads from the `conversations` table (hydrated data), but the actual email data lives in `email_import_queue` (18,400 emails). The hydration process introduced direction detection bugs and count mismatches. The uploaded prompt from Claude nails the solution: **build the inbox directly from `email_import_queue`**, eliminating the middleman entirely.
+1. **Reading pane shows plain text only** -- Zero emails have `body_html` populated. The Aurinko list API (`/email/messages`) only returns `textBody` and `bodySnippet`, not `htmlBody`. To get the full HTML email (with images, formatting, etc.), each email must be fetched individually via `/email/messages/{id}`.
 
-Additionally, the `direction` field in `email_import_queue` is unreliable -- emails FROM customers TO `hello@maccleaning.uk` are incorrectly marked as `outbound`. We need to detect direction by checking the `from_email` domain instead.
+2. **"Needs Reply" shows 2,857** -- This is the all-time count. Your actual inbox has ~89 because most of those 2,857 are from months ago and have already been dealt with. We need to scope the count to recent emails (~30 days) to match reality.
 
-## Data Reality
+3. **Categories are wrong** -- The classifier is marking things like "The AA" welcome emails, "Tide" reminders, and "ClickMechanic" promotions as "spam" when they should be "notification" or "newsletter." The classifier was not given clear enough guidance to distinguish spam from legitimate marketing/notifications.
 
-- 18,400 total emails in `email_import_queue`
-- ~3,190 flagged `requires_reply = true`
-- Filtering to non-owner emails (`from_email NOT LIKE '%maccleaning%'`) from Jan 20 onward gives **86 emails** -- matching the user's reported ~89
-- RLS policy already exists on `email_import_queue` for SELECT
+4. **No navigation back** from `/inbox` -- The inbox page renders standalone without the main app sidebar, so there's no way to get back to the rest of the app.
 
-## What Will Be Built
+5. **Stats bar shows "total"** -- Should show "unread" count instead.
 
-### 1. New Inbox Page (`/inbox`)
+---
 
-A dedicated three-column email client page reading **directly from `email_import_queue`**:
+## What Will Change
 
-```text
-+------------+--------------------+------------------------------+
-|            |                    |                              |
-|  Sidebar   |   Email List       |   Reading Pane               |
-|  (220px)   |   (350px)          |   (remaining)                |
-|            |                    |                              |
-|  Inbox     |   Sender name      |   Full email header          |
-|  Sent      |   Subject preview  |   From / To / Date           |
-|  Needs     |   Time + category  |   Category badge + confidence|
-|  Reply     |   badge            |   Email body (HTML/text)     |
-|  AI Review |                    |   Thread view                |
-|  Noise     |                    |   Quick actions bar          |
-|  All Mail  |                    |                              |
-+------------+--------------------+------------------------------+
+### 1. Fetch Full HTML Email on Demand
+
+When a user clicks an email in the reading pane, if `body_html` is null, fetch the full email from Aurinko's individual message endpoint (`/email/messages/{externalId}`) and cache the HTML body back to the database.
+
+**New edge function: `fetch-email-body`**
+- Takes an `email_id` from `email_import_queue`
+- Looks up the `external_id` and workspace's Aurinko `access_token`
+- Calls `GET /v1/email/messages/{externalId}` which returns `htmlBody`
+- Updates `body_html` in `email_import_queue`
+- Returns the HTML body
+
+**Reading pane change**: When `body_html` is null, call this edge function on first view. Show a brief loading state ("Loading full email...") then render the HTML in the iframe.
+
+### 2. Fix "Needs Reply" Count -- Scope to Recent
+
+Change the inbox and sidebar counts to only count emails from the last 30 days:
+
+```
+requires_reply = true 
+AND from_email NOT LIKE '%maccleaning%' 
+AND received_at >= NOW() - 30 days
 ```
 
-### 2. Sidebar Folders (Virtual Filtered Views)
+This should bring the "Needs Reply" count from 2,857 down to ~96, matching the user's real inbox.
 
-| Folder | Filter |
-|--------|--------|
-| Inbox | `from_email NOT LIKE '%maccleaning%' AND is_noise = false` |
-| Sent | `from_email LIKE '%maccleaning%'` |
-| Needs Reply | `requires_reply = true AND from_email NOT LIKE '%maccleaning%'` |
-| AI Review | `needs_review = true` |
-| Spam and Noise | `is_noise = true OR category = 'spam'` |
-| All Mail | No filter |
+### 3. Fix Categories via Reclassification
 
-Direction is determined by `from_email` domain, not the unreliable `direction` column.
+The bulk classifier needs better prompt guidance. Specifically:
+- Emails from known service providers (Stripe, CircleLoop, Lovable, etc.) should be "notification" not "spam"
+- Marketing emails from companies you have accounts with should be "newsletter" not "spam"
+- Only unsolicited, unwanted commercial email should be "spam"
 
-### 3. Category Filters
+**Action**: Update the `email-classify-bulk` edge function's system prompt to add clear examples and rules distinguishing notification/newsletter from spam. Then trigger a reclassification of emails currently marked as "spam" that come from legitimate sender domains.
 
-Below folders, clickable category labels with counts:
-- New Leads (`lead_new`)
-- Customer Inquiries (`customer_inquiry`, `inquiry`)
-- Quote Follow-ups (`lead_followup`, `quote`)
-- Complaints (`customer_complaint`, `complaint`)
-- Bookings (`booking`)
-- Notifications (`automated_notification`, `notification`, `receipt_confirmation`)
-- Newsletters (`marketing_newsletter`)
+### 4. Add Navigation -- Wrap in App Layout
 
-Clicking a category combines with the active folder filter.
+The `/inbox` page will be wrapped inside the existing `PowerModeLayout`-style shell (with the main sidebar), rather than rendering standalone. This gives navigation back to Home, Training, Settings, etc.
 
-### 4. Email List (Center Column)
+Alternatively, add a simple back button/home link at the top of the inbox sidebar that navigates to `/`.
 
-Dense, scannable rows queried from `email_import_queue`:
-- Sender name (from `from_name`, fallback to `from_email`)
-- Subject line (truncated)
-- Body preview (~80 chars, muted)
-- Category badge with color coding
-- Confidence score (shown if below 0.7)
-- Time (relative: "2:34 PM" for today, "Yesterday", "12 Feb" for older)
-- Colored dot if `requires_reply = true`
-- 50 items per page with "Load more"
+### 5. Fix Stats Bar
 
-Search bar at top filtering across `from_email`, `from_name`, `subject`, `body` with 300ms debounce.
+Replace "18,400 total" with an "Unread" count (emails received in last 30 days that haven't been opened/handled).
 
-### 5. Reading Pane (Right Column)
-
-When an email is selected:
-- Full header: From, To, Date, Subject
-- Category badge + AI confidence score + "Requires Reply" indicator
-- Email body: render `body_html` via sanitized iframe (using existing DOMPurify setup), fall back to `body` with `whitespace-pre-wrap`
-- Thread view: fetch all emails with same `thread_id`, display as collapsible conversation cards (newest expanded, older collapsed)
-- Outbound emails get a different background tint
-
-### 6. Quick Actions Bar
-
-At bottom of reading pane:
-- **Draft Reply**: Opens textarea placeholder ("AI-assisted replies coming soon")
-- **Mark Handled**: Sets `requires_reply = false, status = 'processed'`
-- **Change Category**: Dropdown calling `save-classification-correction` edge function (triggers auto-learning)
-- **Mark as Spam**: Sets `category = 'spam'`, `is_noise = true`
-
-### 7. Stats Bar
-
-Thin bar above the three columns:
-```text
-142 in inbox  |  86 need reply  |  4 need AI review  |  18,400 total
-```
-
-### 8. Keyboard Shortcuts
-
-| Key | Action |
-|-----|--------|
-| `j` / Down | Next email |
-| `k` / Up | Previous email |
-| `Enter` | Open selected email |
-| `Escape` | Deselect / back to list |
-| `e` | Mark as handled |
-| `#` | Mark as spam |
-| `/` | Focus search |
-| `r` | Open draft reply |
-
-Small keyboard shortcut tooltip in bottom-right corner.
+---
 
 ## Technical Details
 
 ### New Files
 
-1. **`src/pages/Inbox.tsx`** -- Main inbox page with three-column layout, stats bar, and state management for folder/category/selected email
-2. **`src/components/inbox/InboxSidebar.tsx`** -- Folder list + category filters with counts, all querying `email_import_queue`
-3. **`src/components/inbox/EmailList.tsx`** -- Dense email list with search, sorting, pagination, keyboard navigation
-4. **`src/components/inbox/EmailListItem.tsx`** -- Single email row with category badge, confidence, time, hover actions
-5. **`src/components/inbox/ReadingPane.tsx`** -- Email detail view with header, HTML body rendering, thread view, quick actions
-6. **`src/components/inbox/EmailThreadView.tsx`** -- Thread grouping by `thread_id` with collapsible cards
-7. **`src/components/inbox/QuickActionsBar.tsx`** -- Draft Reply, Mark Handled, Change Category, Mark as Spam buttons
+1. **`supabase/functions/fetch-email-body/index.ts`** -- Edge function to fetch individual email HTML from Aurinko API and cache it in `email_import_queue.body_html`
 
 ### Files to Modify
 
-8. **`src/App.tsx`** -- Add `/inbox` route
-9. **`src/components/sidebar/Sidebar.tsx`** -- Add "Inbox" link pointing to `/inbox` (the new email client), update counts to query `email_import_queue` directly
-10. **`src/pages/Home.tsx`** -- Update "To Reply" card to use `email_import_queue` count and link to `/inbox?folder=needs-reply`
+2. **`src/components/inbox/ReadingPane.tsx`**
+   - When `body_html` is null, call the `fetch-email-body` edge function
+   - Show loading state while fetching
+   - Render full HTML email in iframe once loaded (images, tables, formatting all preserved)
+   - Add Reply/Forward button placeholders in the quick actions bar
+
+3. **`src/hooks/useInboxEmails.tsx`**
+   - Add `received_at >= 30 days ago` filter to the "Needs Reply" count query
+   - Add `received_at >= 30 days ago` filter to the "Inbox" count query
+   - Add an "Unread" count (recent emails not yet handled)
+   - Remove "total" count from stats
+
+4. **`src/pages/Inbox.tsx`**
+   - Replace "total" in stats bar with "Unread" count
+   - Add a Home/back navigation link in the top stats bar
+   - Or wrap in a layout that includes the main sidebar
+
+5. **`src/components/inbox/InboxSidebar.tsx`**
+   - Add a back-to-home link at the top
+   - Update counts to use the 30-day scoped queries
+
+6. **`supabase/functions/email-classify-bulk/index.ts`** (or the context file)
+   - Update the classification prompt to:
+     - Define "spam" as unsolicited commercial email from unknown senders
+     - Define "notification" as transactional/service emails (receipts, alerts, missed calls)
+     - Define "newsletter" as marketing from companies the user has a relationship with
+     - Add explicit examples: Stripe = notification, CircleLoop = notification, Lovable = notification, marketing emails from known vendors = newsletter
+
+7. **`src/components/inbox/QuickActionsBar.tsx`**
+   - Add Reply and Forward buttons (Reply opens compose area, Forward opens with "Fwd:" prefix)
+   - These can be placeholder UI for now with toast "Coming soon"
 
 ### Database
 
-No schema changes needed. The `email_import_queue` table already has all required columns and an existing RLS SELECT policy. We will need one UPDATE policy for the quick actions (mark handled, change category, mark as spam):
+No schema changes. The `body_html` column already exists on `email_import_queue`.
 
-```sql
-CREATE POLICY "Users can update their workspace email queue"
-  ON email_import_queue FOR UPDATE
-  USING (workspace_id = get_my_workspace_id())
-  WITH CHECK (workspace_id = get_my_workspace_id());
-```
+### Reclassification Strategy
 
-### Direction Detection
+After updating the classifier prompt, trigger a targeted reclassification:
+- Select all emails where `category = 'spam'` and `confidence < 0.98`
+- Re-run classification on these ~2,390 emails
+- This will correctly reclassify "The AA", "Tide", "ClickMechanic" etc. as notification/newsletter
 
-Instead of trusting the `direction` column, we determine direction in the query/component by checking `from_email`:
+This can be done via the existing `email-classify-bulk` edge function with a filter for spam-classified emails.
 
-```typescript
-const ownerDomains = ['maccleaning.uk', 'maccleaning.co.uk'];
-const isOutbound = (email: string) =>
-  ownerDomains.some(d => email?.toLowerCase().endsWith(`@${d}`));
-```
+### Implementation Order
 
-This is used for folder filtering and visual styling (sent vs received tint in threads).
-
-### Query Pattern
-
-All queries use React Query with `useQuery` against `email_import_queue`:
-
-```typescript
-const { data: emails } = useQuery({
-  queryKey: ['inbox-emails', folder, category, search, page],
-  queryFn: async () => {
-    let query = supabase
-      .from('email_import_queue')
-      .select('id, from_email, from_name, to_emails, subject, body, received_at, category, confidence, needs_review, is_noise, requires_reply, thread_id, status')
-      .eq('workspace_id', workspaceId)
-      .order('received_at', { ascending: false })
-      .range(page * 50, (page + 1) * 50 - 1);
-    // Apply folder + category filters...
-    return query;
-  },
-  staleTime: 30000,
-});
-```
-
-Full `body_html` is only fetched when an email is selected (on-demand).
-
-### What NOT to Build
-
-- No email sending/composing (future feature)
-- No folder management (virtual views only)
-- No email deletion (reclassify only)
-- No contact management (separate page)
-- No new database tables
-
-## Implementation Order
-
-1. Create the RLS UPDATE policy on `email_import_queue`
-2. Build `Inbox.tsx` page shell with three-column layout
-3. Build `InboxSidebar.tsx` with folder/category filters and counts
-4. Build `EmailList.tsx` + `EmailListItem.tsx` with search, pagination, keyboard nav
-5. Build `ReadingPane.tsx` with HTML rendering, thread view, quick actions
-6. Add `/inbox` route and update sidebar navigation
-7. Update Home.tsx counts to use `email_import_queue`
-8. Style polish -- clean Slate palette, Inter font, subtle transitions
+1. Fix navigation (add back button to inbox, wrap with sidebar)
+2. Fix counts (scope to 30 days, replace "total" with "unread")
+3. Create `fetch-email-body` edge function for on-demand HTML fetching
+4. Update ReadingPane to fetch and render full HTML emails
+5. Update classifier prompt and trigger spam reclassification
+6. Add Reply/Forward button placeholders
 
