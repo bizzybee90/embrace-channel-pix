@@ -290,3 +290,9 @@ verify_jwt = false
 [functions.consolidate-faqs]
 verify_jwt = false
 
+[functions.detect-style-drift]
+verify_jwt = false
+
+[functions.save-classification-correction]
+verify_jwt = false
+

@@ -5,7 +5,8 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Loader2, Sparkles, RefreshCw, User, BookOpen } from 'lucide-react';
+import { Loader2, Sparkles, RefreshCw, User, BookOpen, Activity } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
 
 interface VoiceProfileCardProps {
   workspaceId: string;
@@ -42,14 +43,25 @@ interface VoiceProfile {
   examples_stored: number | null;
 }
 
+interface DriftLog {
+  drift_score: number;
+  checked_at: string;
+  status: string;
+  refresh_triggered: boolean;
+  traits_changed: any[];
+}
+
 export const VoiceProfileCard = ({ workspaceId }: VoiceProfileCardProps) => {
   const [profile, setProfile] = useState<VoiceProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
   const [showPlaybook, setShowPlaybook] = useState(false);
+  const [driftLog, setDriftLog] = useState<DriftLog | null>(null);
+  const [checkingDrift, setCheckingDrift] = useState(false);
 
   useEffect(() => {
     fetchProfile();
+    fetchDriftLog();
   }, [workspaceId]);
 
   const fetchProfile = async () => {
@@ -61,12 +73,55 @@ export const VoiceProfileCard = ({ workspaceId }: VoiceProfileCardProps) => {
         .maybeSingle();
 
       if (error) throw error;
-      // Cast the data to handle Json types
       setProfile(data as unknown as VoiceProfile);
     } catch (e) {
       console.error('Error fetching profile:', e);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchDriftLog = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('voice_drift_log')
+        .select('drift_score, checked_at, status, refresh_triggered, traits_changed')
+        .eq('workspace_id', workspaceId)
+        .order('checked_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!error && data) {
+        setDriftLog(data as unknown as DriftLog);
+      }
+    } catch (e) {
+      console.error('Error fetching drift log:', e);
+    }
+  };
+
+  const checkDrift = async () => {
+    setCheckingDrift(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('detect-style-drift', {
+        body: { workspace_id: workspaceId }
+      });
+
+      if (error) throw error;
+
+      if (data?.refresh_triggered) {
+        toast.success(`Style drift detected (${(data.drift_score * 100).toFixed(0)}%) — voice profile is being refreshed!`);
+        // Re-fetch profile after a delay to get the updated one
+        setTimeout(() => fetchProfile(), 5000);
+      } else if (data?.drift_score > 0) {
+        toast.info(`Minor drift detected (${(data.drift_score * 100).toFixed(0)}%) — no refresh needed.`);
+      } else {
+        toast.success('No style drift detected — your voice profile is up to date!');
+      }
+      fetchDriftLog();
+    } catch (e: any) {
+      toast.error(e.message || 'Drift check failed');
+    } finally {
+      setCheckingDrift(false);
     }
   };
 
@@ -112,13 +167,50 @@ export const VoiceProfileCard = ({ workspaceId }: VoiceProfileCardProps) => {
   const voiceDna = profile?.voice_dna;
   const playbook = profile?.playbook;
 
+  const getDriftBadge = () => {
+    if (!driftLog) return null;
+    const score = driftLog.drift_score;
+    const timeAgo = formatDistanceToNow(new Date(driftLog.checked_at), { addSuffix: true });
+    
+    if (driftLog.refresh_triggered) {
+      return (
+        <Badge variant="default" className="text-xs">
+          <Activity className="h-3 w-3 mr-1" />
+          Refreshed {timeAgo}
+        </Badge>
+      );
+    }
+    if (score < 0.1) {
+      return (
+        <Badge variant="outline" className="text-xs bg-accent text-accent-foreground">
+          Stable — checked {timeAgo}
+        </Badge>
+      );
+    }
+    if (score < 0.3) {
+      return (
+        <Badge variant="secondary" className="text-xs">
+          Minor drift ({(score * 100).toFixed(0)}%) — {timeAgo}
+        </Badge>
+      );
+    }
+    return (
+      <Badge variant="destructive" className="text-xs">
+        Drift detected ({(score * 100).toFixed(0)}%) — {timeAgo}
+      </Badge>
+    );
+  };
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <User className="h-5 w-5" />
-          Your Writing Voice
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <User className="h-5 w-5" />
+            Your Writing Voice
+          </CardTitle>
+          {getDriftBadge()}
+        </div>
         <CardDescription>
           BizzyBee learns your style from sent emails to draft replies that sound like you
         </CardDescription>
@@ -144,7 +236,6 @@ export const VoiceProfileCard = ({ workspaceId }: VoiceProfileCardProps) => {
             {/* Voice DNA display */}
             {voiceDna && (
               <div className="space-y-3">
-                {/* Tone keywords */}
                 {voiceDna.tone_keywords && voiceDna.tone_keywords.length > 0 && (
                   <div className="flex flex-wrap gap-1">
                     {voiceDna.tone_keywords.map((keyword, i) => (
@@ -155,7 +246,6 @@ export const VoiceProfileCard = ({ workspaceId }: VoiceProfileCardProps) => {
                   </div>
                 )}
 
-                {/* Greetings and sign-offs */}
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
                     <span className="font-medium text-muted-foreground">Greeting:</span>
@@ -171,7 +261,6 @@ export const VoiceProfileCard = ({ workspaceId }: VoiceProfileCardProps) => {
                   </div>
                 </div>
 
-                {/* Verbal tics */}
                 {voiceDna.tics && voiceDna.tics.length > 0 && (
                   <div className="bg-muted rounded-lg p-3">
                     <p className="text-xs font-medium text-muted-foreground mb-1">Your writing habits:</p>
@@ -183,7 +272,6 @@ export const VoiceProfileCard = ({ workspaceId }: VoiceProfileCardProps) => {
               </div>
             )}
 
-            {/* Legacy tone descriptors fallback */}
             {!voiceDna && profile.tone_descriptors && profile.tone_descriptors.length > 0 && (
               <div className="bg-muted rounded-lg p-4">
                 <p className="text-sm text-muted-foreground">
@@ -232,19 +320,35 @@ export const VoiceProfileCard = ({ workspaceId }: VoiceProfileCardProps) => {
               </div>
             )}
 
-            <Button
-              variant="outline"
-              onClick={() => analyzeVoice(true)}
-              disabled={analyzing}
-              className="w-full"
-            >
-              {analyzing ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <RefreshCw className="h-4 w-4 mr-2" />
-              )}
-              Re-analyze Writing Style
-            </Button>
+            {/* Action buttons */}
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => analyzeVoice(true)}
+                disabled={analyzing || checkingDrift}
+                className="flex-1"
+              >
+                {analyzing ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                )}
+                Re-analyze Style
+              </Button>
+              <Button
+                variant="outline"
+                onClick={checkDrift}
+                disabled={checkingDrift || analyzing}
+                className="flex-1"
+              >
+                {checkingDrift ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Activity className="h-4 w-4 mr-2" />
+                )}
+                Check for Drift
+              </Button>
+            </div>
           </div>
         ) : (
           <div className="text-center py-6 space-y-4">
