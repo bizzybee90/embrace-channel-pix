@@ -332,7 +332,7 @@ export function OnboardingWizard({ workspaceId, onComplete }: OnboardingWizardPr
                         })
                         .eq('id', user.id);
                     }
-                    window.location.href = '/settings?tab=knowledge';
+                    window.location.href = '/knowledge-base';
                   }}
                   className="gap-2"
                 >
