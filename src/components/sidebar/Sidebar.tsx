@@ -1,4 +1,4 @@
-import { Home, Mail, CheckCircle2, Clock, ChevronDown, ChevronRight, ChevronLeft, Send, Inbox, BarChart3, MessageSquare, Settings, ClipboardCheck, BookOpen } from 'lucide-react';
+import { Home, Mail, CheckCircle2, Clock, ChevronDown, ChevronRight, ChevronLeft, Send, Inbox, BarChart3, MessageSquare, Settings, ClipboardCheck, BookOpen, Eye, FileEdit } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
@@ -40,13 +40,13 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      const [toReplyResult, doneResult, snoozedResult, reviewResult] = await Promise.all([
-        // To Reply: act_now + quick_win
+      const [toReplyResult, doneResult, snoozedResult, reviewResult, unreadResult, draftsResult] = await Promise.all([
+        // To Reply: all requiring reply
         supabase
           .from('conversations')
           .select('id', { count: 'exact', head: true })
           .eq('workspace_id', userData.workspace_id)
-          .in('decision_bucket', ['act_now', 'quick_win'])
+          .eq('requires_reply', true)
           .in('status', ['new', 'open', 'waiting_internal', 'ai_handling', 'escalated']),
         // Done: auto_handled or resolved (last 24h)
         supabase
@@ -69,6 +69,22 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
           .eq('workspace_id', userData.workspace_id)
           .eq('needs_review', true)
           .is('reviewed_at', null),
+        // Unread: status = new
+        supabase
+          .from('conversations')
+          .select('id', { count: 'exact', head: true })
+          .eq('workspace_id', userData.workspace_id)
+          .eq('requires_reply', true)
+          .eq('status', 'new'),
+        // Drafts: has AI draft, no final response
+        supabase
+          .from('conversations')
+          .select('id', { count: 'exact', head: true })
+          .eq('workspace_id', userData.workspace_id)
+          .not('ai_draft_response', 'is', null)
+          .is('final_response', null)
+          .in('status', ['new', 'open', 'ai_handling'])
+          .eq('requires_reply', true),
       ]);
 
       return {
@@ -76,6 +92,8 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
         done: doneResult.count || 0,
         snoozed: snoozedResult.count || 0,
         review: reviewResult.count || 0,
+        unread: unreadResult.count || 0,
+        drafts: draftsResult.count || 0,
         workspaceId: userData.workspace_id,
       };
     },
@@ -151,7 +169,7 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
             )}
           </Tooltip>
 
-          {/* To Reply (Primary) */}
+          {/* Inbox (To Reply) */}
           <Tooltip>
             <TooltipTrigger asChild>
               <div>
@@ -161,10 +179,10 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
                   className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all`}
                   activeClassName="bg-accent text-accent-foreground font-medium"
                 >
-                  <Mail className="h-5 w-5 text-destructive" />
+                  <Inbox className="h-5 w-5 text-destructive" />
                   {!isCollapsed && (
                     <span className="flex-1 flex items-center justify-between">
-                      <span>To Reply</span>
+                      <span>Inbox</span>
                       {viewCounts?.toReply ? (
                         <span className="text-xs font-semibold text-destructive">{viewCounts.toReply}</span>
                       ) : null}
@@ -175,7 +193,65 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
             </TooltipTrigger>
             {isCollapsed && (
               <TooltipContent side="right">
-                <p>To Reply {viewCounts?.toReply ? `(${viewCounts.toReply})` : ''}</p>
+                <p>Inbox {viewCounts?.toReply ? `(${viewCounts.toReply})` : ''}</p>
+              </TooltipContent>
+            )}
+          </Tooltip>
+
+          {/* Unread */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div>
+                <NavLink
+                  to="/unread"
+                  onClick={onNavigate}
+                  className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all`}
+                  activeClassName="bg-accent text-accent-foreground font-medium"
+                >
+                  <Eye className="h-5 w-5 text-blue-500" />
+                  {!isCollapsed && (
+                    <span className="flex-1 flex items-center justify-between">
+                      <span>Unread</span>
+                      {viewCounts?.unread ? (
+                        <span className="text-xs font-semibold text-blue-500">{viewCounts.unread}</span>
+                      ) : null}
+                    </span>
+                  )}
+                </NavLink>
+              </div>
+            </TooltipTrigger>
+            {isCollapsed && (
+              <TooltipContent side="right">
+                <p>Unread {viewCounts?.unread ? `(${viewCounts.unread})` : ''}</p>
+              </TooltipContent>
+            )}
+          </Tooltip>
+
+          {/* Drafts */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div>
+                <NavLink
+                  to="/drafts"
+                  onClick={onNavigate}
+                  className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all`}
+                  activeClassName="bg-accent text-accent-foreground font-medium"
+                >
+                  <FileEdit className="h-5 w-5 text-amber-500" />
+                  {!isCollapsed && (
+                    <span className="flex-1 flex items-center justify-between">
+                      <span>Drafts</span>
+                      {viewCounts?.drafts ? (
+                        <span className="text-xs font-semibold text-amber-500">{viewCounts.drafts}</span>
+                      ) : null}
+                    </span>
+                  )}
+                </NavLink>
+              </div>
+            </TooltipTrigger>
+            {isCollapsed && (
+              <TooltipContent side="right">
+                <p>Drafts {viewCounts?.drafts ? `(${viewCounts.drafts})` : ''}</p>
               </TooltipContent>
             )}
           </Tooltip>

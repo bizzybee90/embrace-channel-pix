@@ -54,6 +54,15 @@ export const ConversationHeader = ({ conversation, onUpdate, onBack, hideBackBut
           </div>
           
           <div className="flex items-center gap-2">
+            {(conversation as any).ai_confidence != null && (
+              <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                (conversation as any).ai_confidence >= 0.9 ? 'text-green-600 bg-green-100 dark:bg-green-900/30 dark:text-green-400' :
+                (conversation as any).ai_confidence >= 0.7 ? 'text-amber-600 bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400' :
+                'text-red-600 bg-red-100 dark:bg-red-900/30 dark:text-red-400'
+              }`}>
+                AI {Math.round((conversation as any).ai_confidence * 100)}%
+              </span>
+            )}
             <Button
               variant="ghost"
               size="sm"

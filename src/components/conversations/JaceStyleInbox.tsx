@@ -12,11 +12,13 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChannelIcon } from '@/components/shared/ChannelIcon';
 import { CategoryLabel } from '@/components/shared/CategoryLabel';
 import { TriageCorrectionFlow } from './TriageCorrectionFlow';
+import { InboxQuickActions } from './InboxQuickActions';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useKeyboardNavigation } from '@/hooks/useKeyboardNavigation';
 
 interface JaceStyleInboxProps {
   onSelect: (conversation: Conversation) => void;
-  filter?: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'awaiting-reply' | 'completed' | 'sent' | 'high-priority' | 'vip-customers' | 'escalations' | 'triaged' | 'needs-me' | 'snoozed' | 'cleared' | 'fyi';
+  filter?: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'awaiting-reply' | 'completed' | 'sent' | 'high-priority' | 'vip-customers' | 'escalations' | 'triaged' | 'needs-me' | 'snoozed' | 'cleared' | 'fyi' | 'unread' | 'drafts-ready';
 }
 
 interface GroupedConversations {
@@ -36,6 +38,7 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
   const [selectedForCorrection, setSelectedForCorrection] = useState<Conversation | null>(null);
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
+  const [keyboardIndex, setKeyboardIndex] = useState(0);
   const PAGE_SIZE = 50;
 
   // Debounce search to avoid spamming requests while typing
@@ -86,10 +89,22 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
         .in('decision_bucket', ['act_now', 'quick_win'])
         .in('status', ['new', 'open', 'waiting_internal', 'ai_handling', 'escalated']);
     } else if (filter === 'needs-me') {
-      // Default needs-me filter (no sub-filter)
+      // Inbox: all requiring reply
       query = query
-        .in('decision_bucket', ['act_now', 'quick_win'])
+        .eq('requires_reply', true)
         .in('status', ['new', 'open', 'waiting_internal', 'ai_handling', 'escalated']);
+    } else if (filter === 'unread') {
+      // Unread: requires reply + status new
+      query = query
+        .eq('requires_reply', true)
+        .eq('status', 'new');
+    } else if (filter === 'drafts-ready') {
+      // Drafts: has AI draft, no final response
+      query = query
+        .not('ai_draft_response', 'is', null)
+        .is('final_response', null)
+        .in('status', ['new', 'open', 'ai_handling'])
+        .eq('requires_reply', true);
     } else if (filter === 'fyi') {
       query = query
         .eq('decision_bucket', 'wait')
@@ -166,6 +181,15 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
     } else {
       groupedConversations.older.push(conv as Conversation);
     }
+  });
+
+  // Keyboard navigation (j/k/Enter/e)
+  useKeyboardNavigation({
+    conversations: filteredConversations as Conversation[],
+    selectedIndex: keyboardIndex,
+    onSelectIndex: setKeyboardIndex,
+    onSelect,
+    enabled: !isMobile,
   });
 
   const handleRefresh = async () => {
@@ -291,12 +315,12 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
       );
     }
 
-    // Desktop: Single-line layout
+    // Desktop: Single-line layout with hover quick-actions
     return (
       <div
         onClick={() => onSelect(conversation)}
         className={cn(
-          "flex items-center gap-2 px-3 py-2.5 cursor-pointer border-b border-border/30 transition-all",
+          "group flex items-center gap-2 px-3 py-2.5 cursor-pointer border-b border-border/30 transition-all",
           "border-l-4 hover:bg-muted/50",
           stateConfig.border,
           stateConfig.rowClass
@@ -325,7 +349,7 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
           </p>
         </div>
 
-        {/* Category + State badge */}
+        {/* Category + Confidence + State badge */}
         <div className="flex items-center gap-1.5 flex-shrink-0">
           <CategoryLabel 
             classification={conv.email_classification} 
@@ -333,11 +357,22 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
             editable={true}
             onClick={(e) => handleCategoryClick(conversation, e)}
           />
+          {conv.ai_confidence != null && (
+            <span className={cn(
+              "text-[10px] font-medium px-1.5 py-0.5 rounded-full",
+              conv.ai_confidence >= 0.9 ? "text-green-600 bg-green-100 dark:bg-green-900/30 dark:text-green-400" :
+              conv.ai_confidence >= 0.7 ? "text-amber-600 bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400" :
+              "text-red-600 bg-red-100 dark:bg-red-900/30 dark:text-red-400"
+            )}>
+              {Math.round(conv.ai_confidence * 100)}%
+            </span>
+          )}
           {stateConfig.badge}
         </div>
 
-        {/* Thread Count + Time - compact */}
+        {/* Hover Quick Actions + Thread Count + Time */}
         <div className="flex items-center gap-2 flex-shrink-0">
+          <InboxQuickActions conversation={conversation} />
           {messageCount > 1 && (
             <span className="text-[10px] font-medium text-muted-foreground bg-muted rounded-full h-4 min-w-4 px-1 flex items-center justify-center">
               {messageCount}
@@ -384,7 +419,9 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
     if (filter === 'cleared') return 'Done';
     if (filter === 'snoozed') return 'Snoozed';
     if (filter === 'sent') return 'Sent';
-    return 'To Reply';
+    if (filter === 'unread') return 'Unread';
+    if (filter === 'drafts-ready') return 'Drafts';
+    return 'Inbox';
   };
 
   const clearSubFilter = () => {
