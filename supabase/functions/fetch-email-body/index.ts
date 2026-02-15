@@ -57,7 +57,6 @@ serve(async (req) => {
       .from('email_provider_configs')
       .select('id')
       .eq('workspace_id', email.workspace_id)
-      .eq('provider', 'aurinko')
       .maybeSingle();
 
     if (configError || !config) {
