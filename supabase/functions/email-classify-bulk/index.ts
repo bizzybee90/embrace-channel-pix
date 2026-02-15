@@ -210,7 +210,7 @@ serve(async (req) => {
       const jsonMatch = responseText.match(/\[[\s\S]*\]/);
       if (!jsonMatch) throw new Error('No JSON array in AI response');
 
-      let classifications: Array<{ i: number; c: string; r: boolean; conf?: number }>;
+      let classifications: Array<{ i: number; c: string; r: boolean; conf?: number; ent?: Record<string, string> }>;
       try {
         classifications = JSON.parse(jsonMatch[0]);
       } catch {
@@ -220,9 +220,9 @@ serve(async (req) => {
       console.log(`${workerTag} Parsed ${classifications.length} AI classifications`);
 
       // Build map and update
-      const classMap = new Map<number, { c: string; r: boolean; conf: number }>();
+      const classMap = new Map<number, { c: string; r: boolean; conf: number; ent?: Record<string, string> }>();
       for (const cl of classifications) {
-        classMap.set(cl.i, { c: cl.c, r: cl.r, conf: cl.conf ?? 0.5 });
+        classMap.set(cl.i, { c: cl.c, r: cl.r, conf: cl.conf ?? 0.5, ent: cl.ent });
       }
 
       const PARALLEL_BATCH = 50;
@@ -232,6 +232,9 @@ serve(async (req) => {
           const globalIdx = i + batchIdx;
           const classification = classMap.get(globalIdx);
           const conf = classification?.conf ?? 0.5;
+          const entities = classification?.ent && Object.keys(classification.ent).length > 0
+            ? classification.ent
+            : null;
           const { error } = await supabase
             .from('email_import_queue')
             .update({
@@ -239,6 +242,7 @@ serve(async (req) => {
               requires_reply: classification?.r || false,
               confidence: conf,
               needs_review: conf < 0.6,
+              entities,
               classified_at: now,
               status: 'processed',
               processed_at: now,

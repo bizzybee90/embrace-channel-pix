@@ -139,7 +139,7 @@ export function buildEnrichedPrompt(
 
   // Categories and rules
   parts.push(`
-Classify each email into ONE category.
+Classify each email into ONE category AND extract any entities found.
 
 Categories:
 - inquiry: Questions about services/products/availability
@@ -151,8 +151,20 @@ Categories:
 - notification: Automated system notifications (receipts, confirmations, shipping alerts, calendar invites)
 - personal: Personal/social messages from friends/family
 
-Return ONLY a JSON array. Format: [{"i":0,"c":"inquiry","r":true,"conf":0.92}]
-Where: i=index (integer), c=category (string), r=requires_reply (boolean), conf=confidence (0.0-1.0, lower when unsure)
+Return ONLY a JSON array. Format: [{"i":0,"c":"inquiry","r":true,"conf":0.92,"ent":{}}]
+Where:
+  i = index (integer)
+  c = category (string)
+  r = requires_reply (boolean)
+  conf = confidence (0.0-1.0, lower when unsure)
+  ent = extracted entities object (include ONLY fields that are present):
+    name: customer's full name
+    email: customer's email (if different from sender)
+    phone: phone number
+    address: street address or postcode
+    amount: monetary amount mentioned (e.g. "£250")
+    date: any date/time mentioned (e.g. "next Tuesday", "15th March")
+    service: specific service requested (e.g. "gutter cleaning", "3-bed semi")
 
 Rules for requires_reply:
 - spam, notification: ALWAYS false
