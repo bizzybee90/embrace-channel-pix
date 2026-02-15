@@ -9,19 +9,27 @@ import {
   Bot, 
   User, 
   AlertCircle,
-  FileEdit
+  FileEdit,
+  Mail
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CategoryLabel } from '@/components/shared/CategoryLabel';
 
 interface ActivityItem {
   id: string;
-  type: 'auto_handled' | 'sent' | 'draft_ready' | 'escalated' | 'reviewed';
+  type: 'auto_handled' | 'sent' | 'draft_ready' | 'escalated' | 'reviewed' | 'inbox';
   title: string;
   description: string;
   timestamp: Date;
   conversationId?: string;
   category?: string;
+}
+
+// Decode HTML entities like &#39; &#x27; &amp; etc.
+function decodeHtmlEntities(text: string | null | undefined): string {
+  if (!text) return '';
+  const doc = new DOMParser().parseFromString(text, 'text/html');
+  return doc.documentElement.textContent || '';
 }
 
 interface ActivityFeedProps {
@@ -88,6 +96,16 @@ export function ActivityFeed({ onNavigate, maxItems = 10 }: ActivityFeedProps) {
           .order('reviewed_at', { ascending: false })
           .limit(3);
 
+        // Get recent inbox emails
+        const { data: recentEmails } = await supabase
+          .from('email_import_queue')
+          .select('id, from_name, from_email, subject, body, received_at, category, direction')
+          .eq('workspace_id', workspace.id)
+          .or('is_noise.is.null,is_noise.eq.false')
+          .not('from_email', 'ilike', '%maccleaning%')
+          .order('received_at', { ascending: false })
+          .limit(5);
+
         // Combine into activities
         const allActivities: ActivityItem[] = [];
 
@@ -95,7 +113,7 @@ export function ActivityFeed({ onNavigate, maxItems = 10 }: ActivityFeedProps) {
           allActivities.push({
             id: `auto-${c.id}`,
             type: 'auto_handled',
-            title: c.title || 'Auto-handled',
+            title: decodeHtmlEntities(c.title) || 'Auto-handled',
             description: c.email_classification?.replace(/_/g, ' ') || 'Notification',
             timestamp: new Date(c.auto_handled_at!),
             conversationId: c.id,
@@ -108,8 +126,8 @@ export function ActivityFeed({ onNavigate, maxItems = 10 }: ActivityFeedProps) {
             allActivities.push({
               id: `sent-${m.id}`,
               type: 'sent',
-              title: (m.conversations as any)?.title || 'Message sent',
-              description: m.body?.substring(0, 60) + (m.body && m.body.length > 60 ? '...' : ''),
+              title: decodeHtmlEntities((m.conversations as any)?.title) || 'Message sent',
+              description: decodeHtmlEntities(m.body?.substring(0, 60) + (m.body && m.body.length > 60 ? '...' : '')),
               timestamp: new Date(m.created_at!),
               conversationId: m.conversation_id || undefined,
             });
@@ -120,7 +138,7 @@ export function ActivityFeed({ onNavigate, maxItems = 10 }: ActivityFeedProps) {
           allActivities.push({
             id: `draft-${c.id}`,
             type: 'draft_ready',
-            title: c.title || 'Draft ready',
+            title: decodeHtmlEntities(c.title) || 'Draft ready',
             description: 'AI response pending review',
             timestamp: new Date(c.updated_at!),
             conversationId: c.id,
@@ -131,10 +149,21 @@ export function ActivityFeed({ onNavigate, maxItems = 10 }: ActivityFeedProps) {
           allActivities.push({
             id: `review-${c.id}`,
             type: 'reviewed',
-            title: c.title || 'Reviewed',
+            title: decodeHtmlEntities(c.title) || 'Reviewed',
             description: c.review_outcome === 'confirmed' ? 'AI confirmed' : 'AI corrected',
             timestamp: new Date(c.reviewed_at!),
             conversationId: c.id,
+          });
+        });
+
+        recentEmails?.forEach(e => {
+          allActivities.push({
+            id: `inbox-${e.id}`,
+            type: 'inbox',
+            title: decodeHtmlEntities(e.subject) || 'No subject',
+            description: decodeHtmlEntities(e.from_name || e.from_email || 'Unknown sender'),
+            timestamp: new Date(e.received_at!),
+            category: e.category,
           });
         });
 
@@ -182,6 +211,8 @@ export function ActivityFeed({ onNavigate, maxItems = 10 }: ActivityFeedProps) {
         return <AlertCircle className="h-4 w-4 text-destructive" />;
       case 'reviewed':
         return <CheckCircle2 className="h-4 w-4 text-purple-500" />;
+      case 'inbox':
+        return <Mail className="h-4 w-4 text-blue-500" />;
       default:
         return <Clock className="h-4 w-4 text-muted-foreground" />;
     }
@@ -199,6 +230,8 @@ export function ActivityFeed({ onNavigate, maxItems = 10 }: ActivityFeedProps) {
         return 'Escalated';
       case 'reviewed':
         return 'Reviewed';
+      case 'inbox':
+        return 'Received';
       default:
         return 'Activity';
     }
@@ -244,8 +277,10 @@ export function ActivityFeed({ onNavigate, maxItems = 10 }: ActivityFeedProps) {
             if (activity.conversationId && onNavigate) {
               if (activity.type === 'draft_ready') {
                 onNavigate(`/to-reply?id=${activity.conversationId}`);
+              } else if (activity.type === 'inbox') {
+                onNavigate(`/inbox`);
               } else {
-                onNavigate(`/done?id=${activity.conversationId}`);
+                onNavigate(`/to-reply?id=${activity.conversationId}`);
               }
             }
           }}
