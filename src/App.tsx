@@ -97,6 +97,26 @@ const RouterContent = () => {
         } 
       />
       
+      {/* Unread */}
+      <Route 
+        path="/unread" 
+        element={
+          <AuthGuard>
+            <EscalationHub filter="unread" />
+          </AuthGuard>
+        } 
+      />
+      
+      {/* Drafts */}
+      <Route 
+        path="/drafts" 
+        element={
+          <AuthGuard>
+            <EscalationHub filter="drafts-ready" />
+          </AuthGuard>
+        } 
+      />
+      
       {/* Sent */}
       <Route 
         path="/sent" 

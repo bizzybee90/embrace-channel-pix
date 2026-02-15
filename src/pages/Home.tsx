@@ -75,12 +75,12 @@ export const Home = () => {
             .eq('workspace_id', workspace.id)
             .or('decision_bucket.eq.auto_handled,status.eq.resolved')
             .gte('updated_at', today.toISOString()),
-          // To Reply count
+          // To Reply count - all conversations requiring reply
           supabase
             .from('conversations')
             .select('id', { count: 'exact', head: true })
             .eq('workspace_id', workspace.id)
-            .in('decision_bucket', ['act_now', 'quick_win'])
+            .eq('requires_reply', true)
             .in('status', ['new', 'open', 'waiting_internal', 'ai_handling', 'escalated']),
           // At Risk (SLA breached or warning)
           supabase

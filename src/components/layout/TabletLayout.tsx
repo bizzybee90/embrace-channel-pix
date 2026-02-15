@@ -40,7 +40,9 @@ interface TabletLayoutProps {
     | "needs-me"
     | "snoozed"
     | "cleared"
-    | "fyi";
+    | "fyi"
+    | "unread"
+    | "drafts-ready";
 }
 
 export const TabletLayout = ({ filter = "all-open" }: TabletLayoutProps) => {
