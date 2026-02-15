@@ -1,15 +1,17 @@
 import { format } from 'date-fns';
-import { Mail, ArrowLeft } from 'lucide-react';
+import { Mail, ArrowLeft, Reply, Forward, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
 import { getCategoryInfo, isOutbound } from '@/lib/emailDirection';
-import { useEmailDetail, useEmailThread, type InboxEmail } from '@/hooks/useInboxEmails';
+import { useEmailDetail, useEmailThread, useFetchEmailBody, type InboxEmail } from '@/hooks/useInboxEmails';
 import { useWorkspace } from '@/hooks/useWorkspace';
 import { QuickActionsBar } from './QuickActionsBar';
 import DOMPurify from 'dompurify';
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface ReadingPaneProps {
   selectedEmailId: string | null;
@@ -25,9 +27,11 @@ const sanitizeHtml = (html: string): string => {
   });
 };
 
-const EmailBody = ({ email }: { email: InboxEmail }) => {
-  if (email.body_html) {
-    const sanitized = sanitizeHtml(email.body_html);
+const EmailBody = ({ email, fetchedHtml }: { email: InboxEmail; fetchedHtml?: string | null }) => {
+  const html = fetchedHtml || email.body_html;
+  
+  if (html) {
+    const sanitized = sanitizeHtml(html);
     const styledHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
       body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; line-height: 1.6; color: #1a1a1a; background: #fff; padding: 16px; margin: 0; max-width: 100%; overflow-x: hidden; }
       img { max-width: 100%; height: auto; }
@@ -41,7 +45,7 @@ const EmailBody = ({ email }: { email: InboxEmail }) => {
         sandbox="allow-same-origin"
         className="w-full min-h-[300px] border-0 bg-white rounded"
         title="Email content"
-        style={{ height: '50vh' }}
+        style={{ height: '60vh' }}
       />
     );
   }
@@ -53,7 +57,7 @@ const EmailBody = ({ email }: { email: InboxEmail }) => {
   );
 };
 
-const ThreadEmail = ({ email, isExpanded }: { email: InboxEmail; isExpanded: boolean }) => {
+const ThreadEmail = ({ email, isExpanded, fetchedHtml }: { email: InboxEmail; isExpanded: boolean; fetchedHtml?: string | null }) => {
   const [open, setOpen] = useState(isExpanded);
   const outbound = isOutbound(email.from_email);
 
@@ -81,7 +85,7 @@ const ThreadEmail = ({ email, isExpanded }: { email: InboxEmail; isExpanded: boo
         </button>
       </CollapsibleTrigger>
       <CollapsibleContent className={cn(outbound ? 'bg-primary/5' : 'bg-card')}>
-        <EmailBody email={email} />
+        <EmailBody email={email} fetchedHtml={fetchedHtml} />
       </CollapsibleContent>
     </Collapsible>
   );
@@ -91,10 +95,37 @@ export const ReadingPane = ({ selectedEmailId, onBack }: ReadingPaneProps) => {
   const { workspace } = useWorkspace();
   const { data: email, isLoading } = useEmailDetail(selectedEmailId);
   const { data: threadEmails } = useEmailThread(email?.thread_id ?? null);
+  const { fetchBody } = useFetchEmailBody();
+  const queryClient = useQueryClient();
   const hasThread = (threadEmails?.length ?? 0) > 1;
 
-  // Keyboard: Escape to deselect
-  // (handled by parent)
+  // On-demand HTML body fetching
+  const [fetchingBody, setFetchingBody] = useState(false);
+  const [fetchedHtml, setFetchedHtml] = useState<string | null>(null);
+
+  // Reset fetched html when email changes
+  useEffect(() => {
+    setFetchedHtml(null);
+  }, [selectedEmailId]);
+
+  // Auto-fetch HTML body if not available
+  useEffect(() => {
+    if (!email || email.body_html || fetchedHtml || fetchingBody) return;
+    
+    setFetchingBody(true);
+    fetchBody(email.id)
+      .then((html) => {
+        if (html) {
+          setFetchedHtml(html);
+          // Update the cache so it persists
+          queryClient.invalidateQueries({ queryKey: ['inbox-email-detail', email.id] });
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to fetch email body:', err);
+      })
+      .finally(() => setFetchingBody(false));
+  }, [email?.id, email?.body_html, fetchedHtml, fetchingBody]);
 
   if (!selectedEmailId) {
     return (
@@ -164,16 +195,29 @@ export const ReadingPane = ({ selectedEmailId, onBack }: ReadingPaneProps) => {
         </div>
       </div>
 
+      {/* Loading indicator for HTML body fetch */}
+      {fetchingBody && (
+        <div className="flex items-center gap-2 px-4 py-2 bg-muted/50 text-xs text-muted-foreground">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          Loading full email...
+        </div>
+      )}
+
       {/* Body / Thread */}
       <div className="flex-1 overflow-y-auto">
         {hasThread ? (
           <div>
             {threadEmails?.map((te, i) => (
-              <ThreadEmail key={te.id} email={te} isExpanded={i === (threadEmails.length - 1)} />
+              <ThreadEmail
+                key={te.id}
+                email={te}
+                isExpanded={i === (threadEmails.length - 1)}
+                fetchedHtml={te.id === email.id ? fetchedHtml : undefined}
+              />
             ))}
           </div>
         ) : (
-          <EmailBody email={email} />
+          <EmailBody email={email} fetchedHtml={fetchedHtml} />
         )}
       </div>
 

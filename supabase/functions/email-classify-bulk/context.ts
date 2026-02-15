@@ -142,14 +142,21 @@ export function buildEnrichedPrompt(
 Classify each email into ONE category AND extract any entities found.
 
 Categories:
-- inquiry: Questions about services/products/availability
-- booking: Appointment/booking/scheduling requests
-- quote: Price/quote/estimate requests
-- complaint: Issues/problems/negative feedback
-- follow_up: Replies to previous conversations
-- spam: Marketing, promotions, newsletters, unwanted mass emails
-- notification: Automated system notifications (receipts, confirmations, shipping alerts, calendar invites)
+- inquiry: Questions about services/products/availability from potential or existing customers
+- booking: Appointment/booking/scheduling requests from customers
+- quote: Price/quote/estimate requests from customers
+- complaint: Issues/problems/negative feedback from customers
+- follow_up: Replies to previous conversations, ongoing threads
+- notification: Automated transactional emails from services/platforms the business uses. This includes: payment receipts (Stripe, PayPal, Tide), missed call alerts (CircleLoop), shipping notifications, calendar invites, account alerts, service status updates, build notifications (Lovable, GitHub), subscription confirmations, password resets, verification emails. Emails from noreply@ addresses are almost always notifications.
+- newsletter: Marketing emails from companies the business has a relationship with. This includes: product updates, promotional offers, feature announcements, industry news digests, blog roundups from tools/platforms/services the business subscribes to (e.g. ClickMechanic promotions, The AA membership updates, Checkatrade updates).
+- spam: ONLY truly unsolicited commercial email from unknown senders with no prior relationship. Cold outreach from unknown companies, phishing attempts, mass marketing from companies never interacted with. If in doubt between spam and newsletter/notification, choose newsletter or notification.
 - personal: Personal/social messages from friends/family
+
+IMPORTANT CLASSIFICATION RULES:
+- Emails from well-known service providers (Stripe, PayPal, Tide, CircleLoop, Lovable, GitHub, Google, Apple, Amazon, Microsoft, Xero, QuickBooks, etc.) are ALWAYS "notification", never "spam"
+- Emails from companies the business has accounts with (The AA, ClickMechanic, Checkatrade, TrustPilot, Indeed, etc.) are "newsletter" if marketing, "notification" if transactional — never "spam"
+- The key distinction: spam = unsolicited from UNKNOWN senders. notification/newsletter = from KNOWN services/companies
+- Welcome emails, account setup emails, and onboarding emails from any service are "notification"
 
 Return ONLY a JSON array. Format: [{"i":0,"c":"inquiry","r":true,"conf":0.92,"ent":{}}]
 Where:
@@ -167,7 +174,7 @@ Where:
     service: specific service requested (e.g. "gutter cleaning", "3-bed semi")
 
 Rules for requires_reply:
-- spam, notification: ALWAYS false
+- spam, notification, newsletter: ALWAYS false
 - complaint, inquiry, quote, booking: ALWAYS true (customer needs response)
 - follow_up: true if asking a question, false if just acknowledging/thanking
 - personal: true if asking something, false otherwise

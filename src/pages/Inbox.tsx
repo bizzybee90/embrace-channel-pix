@@ -1,15 +1,18 @@
 import { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { InboxSidebar } from '@/components/inbox/InboxSidebar';
 import { EmailList } from '@/components/inbox/EmailList';
 import { ReadingPane } from '@/components/inbox/ReadingPane';
 import { useInboxCounts, type InboxEmail } from '@/hooks/useInboxEmails';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { type InboxFolder } from '@/lib/emailDirection';
+import { ArrowLeft } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 const Inbox = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const isMobile = useIsMobile();
+  const navigate = useNavigate();
   
   const initialFolder = (searchParams.get('folder') as InboxFolder) || 'inbox';
   const [folder, setFolder] = useState<InboxFolder>(initialFolder);
@@ -58,13 +61,18 @@ const Inbox = () => {
     <div className="flex h-screen w-full bg-background overflow-hidden">
       {/* Stats Bar */}
       <div className="absolute top-0 left-0 right-0 h-8 bg-card border-b border-border flex items-center px-4 gap-4 text-xs text-muted-foreground z-10">
+        <Button variant="ghost" size="sm" className="h-6 px-2 gap-1 text-xs" onClick={() => navigate('/')}>
+          <ArrowLeft className="h-3.5 w-3.5" />
+          Home
+        </Button>
+        <span className="text-border">|</span>
         <span><strong className="text-foreground">{counts?.inbox?.toLocaleString() || 0}</strong> in inbox</span>
         <span className="text-border">|</span>
         <span><strong className="text-foreground">{counts?.needsReply?.toLocaleString() || 0}</strong> need reply</span>
         <span className="text-border">|</span>
         <span><strong className="text-foreground">{counts?.aiReview?.toLocaleString() || 0}</strong> AI review</span>
         <span className="text-border">|</span>
-        <span><strong className="text-foreground">{counts?.total?.toLocaleString() || 0}</strong> total</span>
+        <span><strong className="text-foreground">{counts?.unread?.toLocaleString() || 0}</strong> unread</span>
       </div>
 
       {/* Main Layout below stats bar */}
