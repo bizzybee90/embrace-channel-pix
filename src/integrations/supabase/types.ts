@@ -2302,9 +2302,11 @@ export type Database = {
           body_html: string | null
           category: string | null
           classified_at: string | null
+          confidence: number | null
           config_id: string
           created_at: string | null
           direction: string
+          entities: Json | null
           error_message: string | null
           external_id: string
           fetched_at: string | null
@@ -2314,6 +2316,7 @@ export type Database = {
           id: string
           is_noise: boolean | null
           job_id: string | null
+          needs_review: boolean | null
           noise_reason: string | null
           processed_at: string | null
           received_at: string | null
@@ -2330,9 +2333,11 @@ export type Database = {
           body_html?: string | null
           category?: string | null
           classified_at?: string | null
+          confidence?: number | null
           config_id: string
           created_at?: string | null
           direction: string
+          entities?: Json | null
           error_message?: string | null
           external_id: string
           fetched_at?: string | null
@@ -2342,6 +2347,7 @@ export type Database = {
           id?: string
           is_noise?: boolean | null
           job_id?: string | null
+          needs_review?: boolean | null
           noise_reason?: string | null
           processed_at?: string | null
           received_at?: string | null
@@ -2358,9 +2364,11 @@ export type Database = {
           body_html?: string | null
           category?: string | null
           classified_at?: string | null
+          confidence?: number | null
           config_id?: string
           created_at?: string | null
           direction?: string
+          entities?: Json | null
           error_message?: string | null
           external_id?: string
           fetched_at?: string | null
@@ -2370,6 +2378,7 @@ export type Database = {
           id?: string
           is_noise?: boolean | null
           job_id?: string | null
+          needs_review?: boolean | null
           noise_reason?: string | null
           processed_at?: string | null
           received_at?: string | null
