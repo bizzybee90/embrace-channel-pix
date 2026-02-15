@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { workspaceId, daysBack = 90, limit = 500 } = await req.json();
+    const { workspaceId, daysBack = 90, limit = 500, force = false } = await req.json();
     if (!workspaceId) throw new Error('workspaceId is required');
 
     const supabase = createClient(
@@ -20,29 +20,45 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    console.log(`[hydrate-inbox] Starting for workspace ${workspaceId}, daysBack=${daysBack}, limit=${limit}`);
+    console.log(`[hydrate-inbox] Starting for workspace ${workspaceId}, daysBack=${daysBack}, limit=${limit}, force=${force}`);
+
+    // Get the user's own email domain to determine direction
+    const { data: emailConfig } = await supabase
+      .from('email_provider_configs')
+      .select('email_address')
+      .eq('workspace_id', workspaceId)
+      .limit(1)
+      .single();
+
+    const ownerEmail = emailConfig?.email_address?.toLowerCase() || '';
+    const ownerDomain = ownerEmail.split('@')[1] || '';
+    console.log(`[hydrate-inbox] Owner email: ${ownerEmail}, domain: ${ownerDomain}`);
+
+    if (!ownerDomain) {
+      throw new Error('No email provider configured - cannot determine owner domain');
+    }
 
     // Check if conversations already exist (avoid duplicate hydration)
-    const { count: existingConvos } = await supabase
-      .from('conversations')
-      .select('id', { count: 'exact', head: true })
-      .eq('workspace_id', workspaceId);
+    if (!force) {
+      const { count: existingConvos } = await supabase
+        .from('conversations')
+        .select('id', { count: 'exact', head: true })
+        .eq('workspace_id', workspaceId);
 
-    if ((existingConvos || 0) > 10) {
-      console.log(`[hydrate-inbox] Already have ${existingConvos} conversations, skipping full hydration`);
-      return new Response(JSON.stringify({ 
-        success: true, 
-        skipped: true, 
-        existing: existingConvos 
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      if ((existingConvos || 0) > 10) {
+        console.log(`[hydrate-inbox] Already have ${existingConvos} conversations, skipping (use force=true to override)`);
+        return new Response(JSON.stringify({ 
+          success: true, skipped: true, existing: existingConvos 
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
     }
 
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - daysBack);
 
-    // Get all inbound emails that need replies, grouped by thread
+    // Get all non-noise, non-spam emails
     const { data: emails, error: emailError } = await supabase
       .from('email_import_queue')
       .select('*')
@@ -57,13 +73,19 @@ serve(async (req) => {
 
     if (emailError) throw emailError;
     if (!emails || emails.length === 0) {
-      console.log('[hydrate-inbox] No emails to hydrate');
       return new Response(JSON.stringify({ success: true, created: 0 }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    console.log(`[hydrate-inbox] Found ${emails.length} emails to hydrate`);
+    console.log(`[hydrate-inbox] Found ${emails.length} emails to process`);
+
+    // Determine true direction based on from_email domain
+    function isOwnEmail(fromEmail: string): boolean {
+      if (!fromEmail) return false;
+      const normalized = fromEmail.toLowerCase().trim();
+      return normalized === ownerEmail || normalized.endsWith(`@${ownerDomain}`);
+    }
 
     // Group emails by thread_id
     const threadMap = new Map<string, typeof emails>();
@@ -83,16 +105,13 @@ serve(async (req) => {
     let messagesCreated = 0;
     let customersCreated = 0;
 
-    // Helper: find or create customer by email
+    // Customer cache
     const customerCache = new Map<string, string>();
     
     async function getOrCreateCustomer(email: string, name: string | null): Promise<string> {
       const normalizedEmail = email.toLowerCase().trim();
-      if (customerCache.has(normalizedEmail)) {
-        return customerCache.get(normalizedEmail)!;
-      }
+      if (customerCache.has(normalizedEmail)) return customerCache.get(normalizedEmail)!;
 
-      // Check existing
       const { data: existing } = await supabase
         .from('customers')
         .select('id')
@@ -106,7 +125,6 @@ serve(async (req) => {
         return existing.id;
       }
 
-      // Create new
       const { data: newCustomer, error: custError } = await supabase
         .from('customers')
         .insert({
@@ -119,133 +137,126 @@ serve(async (req) => {
         .select('id')
         .single();
 
-      if (custError) {
-        console.error('[hydrate-inbox] Customer creation error:', custError);
-        throw custError;
-      }
-
+      if (custError) throw custError;
       customerCache.set(normalizedEmail, newCustomer.id);
       customersCreated++;
       return newCustomer.id;
     }
 
-    // Helper: determine decision bucket from classification
-    function getDecisionBucket(email: any): string {
-      if (!email.requires_reply) return 'auto_handled';
-      if (email.category === 'complaint') return 'act_now';
-      if (email.category === 'quote' || email.category === 'booking') return 'quick_win';
+    function getDecisionBucket(category: string, needsReply: boolean): string {
+      if (!needsReply) return 'auto_handled';
+      if (category === 'complaint') return 'act_now';
+      if (category === 'quote' || category === 'booking') return 'quick_win';
       return 'wait';
     }
 
-    function getPriority(email: any): string {
-      if (email.category === 'complaint') return 'high';
-      if (email.category === 'quote' || email.category === 'booking') return 'medium';
+    function getPriority(category: string): string {
+      if (category === 'complaint') return 'high';
+      if (category === 'quote' || category === 'booking') return 'medium';
       return 'low';
     }
 
-    function getStatus(email: any): string {
-      if (!email.requires_reply) return 'resolved';
-      return 'new';
-    }
-
-    // Process thread groups
+    // Process threads
     for (const [threadId, threadEmails] of threadMap.entries()) {
       try {
-        // Sort by date ascending within thread
         threadEmails.sort((a, b) => new Date(a.received_at).getTime() - new Date(b.received_at).getTime());
         
-        // Find the primary inbound email (most recent inbound)
-        const inboundEmails = threadEmails.filter(e => e.direction === 'inbound');
-        const latestInbound = inboundEmails[inboundEmails.length - 1] || threadEmails[0];
-        const primaryEmail = latestInbound;
+        // Determine the customer (first non-owner sender)
+        const customerEmail = threadEmails.find(e => !isOwnEmail(e.from_email))?.from_email;
+        const customerName = threadEmails.find(e => !isOwnEmail(e.from_email))?.from_name;
         
-        // Skip if no from_email or it's the user's own email
-        if (!primaryEmail.from_email) continue;
+        if (!customerEmail) continue; // Skip threads with only own emails
 
-        const customerId = await getOrCreateCustomer(
-          primaryEmail.from_email,
-          primaryEmail.from_name
-        );
+        const customerId = await getOrCreateCustomer(customerEmail, customerName);
+        
+        // Check if the latest message is from a customer (meaning WE need to reply)
+        const latestEmail = threadEmails[threadEmails.length - 1];
+        const latestIsInbound = !isOwnEmail(latestEmail.from_email);
+        
+        // Thread needs reply if latest message is from customer AND classified as requiring reply
+        const needsReply = latestIsInbound && (latestEmail.requires_reply !== false);
+        const latestCategory = threadEmails.find(e => e.category)?.category || 'other';
 
-        const needsReply = threadEmails.some(e => e.requires_reply);
-        const latestClassified = threadEmails.find(e => e.category) || primaryEmail;
+        // Determine conversation status
+        const status = needsReply ? 'new' : 'resolved';
 
-        // Create conversation
         const { data: convo, error: convoError } = await supabase
           .from('conversations')
           .insert({
             workspace_id: workspaceId,
             customer_id: customerId,
             external_conversation_id: threadId,
-            title: primaryEmail.subject || 'No subject',
+            title: latestEmail.subject || 'No subject',
             channel: 'email',
-            category: latestClassified.category || 'other',
-            priority: getPriority(latestClassified),
-            status: getStatus(latestClassified),
+            category: latestCategory,
+            priority: getPriority(latestCategory),
+            status,
             requires_reply: needsReply,
-            email_classification: latestClassified.category,
-            decision_bucket: getDecisionBucket(latestClassified),
-            cognitive_load: latestClassified.category === 'complaint' ? 'high' : 'low',
-            risk_level: latestClassified.category === 'complaint' ? 'retention' : 'none',
+            email_classification: latestCategory,
+            decision_bucket: getDecisionBucket(latestCategory, needsReply),
+            cognitive_load: latestCategory === 'complaint' ? 'high' : 'low',
+            risk_level: latestCategory === 'complaint' ? 'retention' : 'none',
             message_count: threadEmails.length,
-            confidence: latestClassified.confidence,
-            triage_confidence: latestClassified.confidence,
-            extracted_entities: latestClassified.entities || {},
+            confidence: latestEmail.confidence,
+            triage_confidence: latestEmail.confidence,
+            extracted_entities: latestEmail.entities || {},
             created_at: threadEmails[0].received_at,
-            updated_at: threadEmails[threadEmails.length - 1].received_at,
+            updated_at: latestEmail.received_at,
           })
           .select('id')
           .single();
 
-        if (convoError) {
-          console.error('[hydrate-inbox] Conversation error:', convoError);
-          continue;
-        }
-
+        if (convoError) { console.error('Convo error:', convoError); continue; }
         conversationsCreated++;
 
-        // Create messages for each email in thread
-        const messagesToInsert = threadEmails.map(email => ({
-          conversation_id: convo.id,
-          actor_type: email.direction === 'inbound' ? 'customer' : 'human_agent',
-          actor_name: email.from_name || email.from_email,
-          direction: email.direction,
-          channel: 'email',
-          body: email.body || email.subject || '(empty)',
-          is_internal: false,
-          external_id: email.external_id,
-          created_at: email.received_at,
-          raw_payload: {
-            from_email: email.from_email,
-            to_emails: email.to_emails,
-            subject: email.subject,
-            has_html: !!email.body_html,
-          },
-        }));
+        // Create messages
+        const msgs = threadEmails.map(email => {
+          const isSent = isOwnEmail(email.from_email);
+          return {
+            conversation_id: convo.id,
+            actor_type: isSent ? 'human_agent' : 'customer',
+            actor_name: email.from_name || email.from_email,
+            direction: isSent ? 'outbound' : 'inbound',
+            channel: 'email',
+            body: email.body || email.subject || '(empty)',
+            is_internal: false,
+            external_id: email.external_id,
+            created_at: email.received_at,
+            raw_payload: {
+              from_email: email.from_email,
+              to_emails: email.to_emails,
+              subject: email.subject,
+              has_html: !!email.body_html,
+            },
+          };
+        });
 
-        const { error: msgError } = await supabase
-          .from('messages')
-          .insert(messagesToInsert);
-
-        if (msgError) {
-          console.error('[hydrate-inbox] Messages error:', msgError);
-        } else {
-          messagesCreated += messagesToInsert.length;
-        }
+        const { error: msgError } = await supabase.from('messages').insert(msgs);
+        if (!msgError) messagesCreated += msgs.length;
       } catch (err) {
-        console.error(`[hydrate-inbox] Thread ${threadId} error:`, err);
+        console.error(`Thread ${threadId} error:`, err);
       }
     }
 
-    // Process standalone emails (no thread_id)
+    // Process standalone emails
     for (const email of standaloneEmails) {
       try {
-        if (!email.from_email) continue;
+        const isSent = isOwnEmail(email.from_email);
+        
+        // For sent emails, try to find recipient as customer
+        const customerEmailAddr = isSent 
+          ? (email.to_emails?.[0] || null)
+          : email.from_email;
+        
+        if (!customerEmailAddr) continue;
 
         const customerId = await getOrCreateCustomer(
-          email.from_email,
-          email.from_name
+          customerEmailAddr,
+          isSent ? null : email.from_name
         );
+
+        const needsReply = !isSent && (email.requires_reply !== false);
+        const category = email.category || 'other';
 
         const { data: convo, error: convoError } = await supabase
           .from('conversations')
@@ -254,14 +265,14 @@ serve(async (req) => {
             customer_id: customerId,
             title: email.subject || 'No subject',
             channel: 'email',
-            category: email.category || 'other',
-            priority: getPriority(email),
-            status: getStatus(email),
-            requires_reply: email.requires_reply || false,
-            email_classification: email.category,
-            decision_bucket: getDecisionBucket(email),
-            cognitive_load: email.category === 'complaint' ? 'high' : 'low',
-            risk_level: email.category === 'complaint' ? 'retention' : 'none',
+            category,
+            priority: getPriority(category),
+            status: needsReply ? 'new' : 'resolved',
+            requires_reply: needsReply,
+            email_classification: category,
+            decision_bucket: getDecisionBucket(category, needsReply),
+            cognitive_load: category === 'complaint' ? 'high' : 'low',
+            risk_level: category === 'complaint' ? 'retention' : 'none',
             message_count: 1,
             confidence: email.confidence,
             triage_confidence: email.confidence,
@@ -272,39 +283,32 @@ serve(async (req) => {
           .select('id')
           .single();
 
-        if (convoError) {
-          console.error('[hydrate-inbox] Standalone convo error:', convoError);
-          continue;
-        }
-
+        if (convoError) { console.error('Standalone error:', convoError); continue; }
         conversationsCreated++;
 
-        const { error: msgError } = await supabase
-          .from('messages')
-          .insert({
-            conversation_id: convo.id,
-            actor_type: email.direction === 'inbound' ? 'customer' : 'human_agent',
-            actor_name: email.from_name || email.from_email,
-            direction: email.direction || 'inbound',
-            channel: 'email',
-            body: email.body || email.subject || '(empty)',
-            is_internal: false,
-            external_id: email.external_id,
-            created_at: email.received_at,
-            raw_payload: {
-              from_email: email.from_email,
-              to_emails: email.to_emails,
-              subject: email.subject,
-            },
-          });
-
+        const { error: msgError } = await supabase.from('messages').insert({
+          conversation_id: convo.id,
+          actor_type: isSent ? 'human_agent' : 'customer',
+          actor_name: email.from_name || email.from_email,
+          direction: isSent ? 'outbound' : 'inbound',
+          channel: 'email',
+          body: email.body || email.subject || '(empty)',
+          is_internal: false,
+          external_id: email.external_id,
+          created_at: email.received_at,
+          raw_payload: {
+            from_email: email.from_email,
+            to_emails: email.to_emails,
+            subject: email.subject,
+          },
+        });
         if (!msgError) messagesCreated++;
       } catch (err) {
-        console.error('[hydrate-inbox] Standalone error:', err);
+        console.error('Standalone error:', err);
       }
     }
 
-    console.log(`[hydrate-inbox] Done: ${conversationsCreated} conversations, ${messagesCreated} messages, ${customersCreated} customers`);
+    console.log(`[hydrate-inbox] Done: ${conversationsCreated} convos, ${messagesCreated} msgs, ${customersCreated} customers`);
 
     return new Response(JSON.stringify({
       success: true,
