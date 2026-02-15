@@ -484,18 +484,35 @@ export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenPr
 
         if (emailProgress || emailRecord) {
           const totalEmails = (emailDetails.total_emails as number) || 
-                             (emailProgress?.estimated_total_emails as number) || 0;
+                             (emailProgress?.estimated_total_emails as number) || 
+                             (emailProgress?.emails_received as number) || 0;
           const classifiedEmails = (emailDetails.emails_classified as number) || 
                                    (emailProgress?.emails_classified as number) || 0;
 
           let effectiveEmailStatus = emailStatus;
+
+          // Detect learning/voice phase as complete for the progress screen
+          const currentPhase = emailProgress?.current_phase as string | undefined;
+          const voiceComplete = emailProgress?.voice_profile_complete as boolean | undefined;
+          const phase1Done = emailProgress?.phase1_status === 'complete';
+          
+          if (currentPhase === 'learning' || currentPhase === 'complete' || voiceComplete || phase1Done) {
+            effectiveEmailStatus = 'complete';
+          }
+
           // Auto-advance from pending if we can see classification is happening
-          if (totalEmails > 0 && classifiedEmails < totalEmails && emailStatus === 'pending') {
+          if (totalEmails > 0 && classifiedEmails > 0 && classifiedEmails < totalEmails && effectiveEmailStatus === 'pending') {
             effectiveEmailStatus = 'classifying';
           }
           // 99% threshold to handle stragglers
           if (totalEmails > 0 && classifiedEmails >= totalEmails * 0.99) {
             effectiveEmailStatus = 'complete';
+          }
+
+          // If emails were received but classification never started, 
+          // check if the phase is stuck on 'importing' with no classification progress
+          if (effectiveEmailStatus === 'pending' && totalEmails > 0 && classifiedEmails === 0 && currentPhase === 'importing') {
+            effectiveEmailStatus = 'pending'; // Keep pending but show the count
           }
 
           const percentage = totalEmails > 0 ? Math.round((classifiedEmails / totalEmails) * 100) : 0;
