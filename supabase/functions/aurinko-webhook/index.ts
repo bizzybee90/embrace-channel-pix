@@ -79,16 +79,36 @@ async function verifyAurinkoRequest(supabase: any, accountId: string): Promise<b
 }
 
 serve(async (req) => {
-  // ===== KILL SWITCH: Return immediately if webhook processing is disabled =====
-  // This prevents cloud balance drain from frequent Aurinko webhook calls.
-  // Set AURINKO_WEBHOOK_ENABLED=true in secrets to re-enable processing.
-  if (Deno.env.get('AURINKO_WEBHOOK_ENABLED') !== 'true') {
-    return new Response('OK', { status: 200 });
-  }
-
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  const url = new URL(req.url);
+
+  // Handle Aurinko URL verification (GET request with challenge) - MUST be before kill switch
+  if (req.method === 'GET') {
+    const challenge = url.searchParams.get('validationToken') || url.searchParams.get('challenge');
+    console.log('Aurinko verification GET request, challenge:', challenge);
+    return new Response(challenge || 'OK', {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'text/plain' }
+    });
+  }
+
+  // Check for validation token in query params (POST verification) - MUST be before kill switch
+  const validationToken = url.searchParams.get('validationToken');
+  if (validationToken) {
+    console.log('Aurinko verification POST with token:', validationToken);
+    return new Response(validationToken, {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'text/plain' }
+    });
+  }
+
+  // ===== KILL SWITCH: Return immediately if webhook processing is disabled =====
+  if (Deno.env.get('AURINKO_WEBHOOK_ENABLED') !== 'true') {
+    return new Response('OK', { status: 200 });
   }
 
   // Rate limiting
@@ -98,29 +118,6 @@ serve(async (req) => {
     return new Response(JSON.stringify({ error: 'Too many requests' }), {
       status: 429,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
-  }
-
-  const url = new URL(req.url);
-  
-  // Handle Aurinko URL verification (GET request with challenge)
-  if (req.method === 'GET') {
-    const challenge = url.searchParams.get('validationToken') || url.searchParams.get('challenge');
-    console.log('Aurinko verification GET request, challenge:', challenge);
-    
-    return new Response(challenge || 'OK', {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'text/plain' }
-    });
-  }
-
-  // Check for validation token in query params (POST verification)
-  const validationToken = url.searchParams.get('validationToken');
-  if (validationToken) {
-    console.log('Aurinko verification POST with token:', validationToken);
-    return new Response(validationToken, {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'text/plain' }
     });
   }
 
