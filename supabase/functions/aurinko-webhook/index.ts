@@ -221,7 +221,7 @@ serve(async (req) => {
     // Find the email config for this account
     const { data: emailConfig, error: configError } = await supabase
       .from('email_provider_configs')
-      .select('id, workspace_id, email_address, account_id, aliases')
+      .select('id, workspace_id, email_address, account_id, aliases, subscription_expires_at')
       .eq('account_id', accountId.toString())
       .single();
 
@@ -266,6 +266,24 @@ serve(async (req) => {
       .from('email_provider_configs')
       .update({ last_sync_at: new Date().toISOString() })
       .eq('id', emailConfig.id);
+
+    // Auto-renew subscription if expiring within 2 days
+    if (emailConfig.subscription_expires_at) {
+      const expiresAt = new Date(emailConfig.subscription_expires_at);
+      const twoDaysFromNow = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000);
+      if (expiresAt < twoDaysFromNow) {
+        console.log('Subscription expiring soon, triggering renewal...');
+        const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+        fetch(`${SUPABASE_URL}/functions/v1/refresh-aurinko-subscriptions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
+          },
+          body: JSON.stringify({ configId: emailConfig.id })
+        }).catch(err => console.error('Auto-renewal trigger failed:', err));
+      }
+    }
 
     return new Response(JSON.stringify({ success: true, processed: notifications.length }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
