@@ -73,7 +73,7 @@ serve(async (req) => {
 
         // Get decrypted access token securely
         const { data: accessToken, error: tokenError } = await supabase
-          .rpc('get_decrypted_access_token', { config_id: config.id });
+          .rpc('get_decrypted_access_token', { p_config_id: config.id });
 
         if (tokenError || !accessToken) {
           console.error(`❌ Failed to get access token for ${config.email_address}:`, tokenError);
