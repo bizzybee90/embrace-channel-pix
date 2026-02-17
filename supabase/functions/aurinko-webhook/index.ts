@@ -295,9 +295,9 @@ async function processNewEmail(supabase: any, emailConfig: any, emailData: any) 
   const messageId = emailData.id || emailData.messageId;
   console.log('Processing new email notification, messageId:', messageId);
 
-  // Fetch full message details from Aurinko API with body content
-  // The bodyType=full parameter is required to get the actual email body
-  const messageUrl = `https://api.aurinko.io/v1/email/messages/${messageId}?bodyType=full`;
+  // Fetch full message details from Aurinko API
+  const messageUrl = `https://api.aurinko.io/v1/email/messages/${messageId}`;
+  console.log('Fetching message from:', messageUrl);
   console.log('Fetching message from:', messageUrl);
   
   const messageResponse = await fetch(messageUrl, {
