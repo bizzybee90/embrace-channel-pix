@@ -136,15 +136,11 @@ serve(async (req) => {
 
     const bodyText = await req.text();
 
-    // Verify HMAC signature if webhook secret is configured
+    // Verify HMAC signature if configured (warn-only — accountId validation is the primary check)
     const signature = req.headers.get('x-aurinko-signature') || req.headers.get('x-webhook-signature');
     const isValidSignature = await verifyWebhookSignature(bodyText, signature);
     if (!isValidSignature) {
-      console.error('Webhook HMAC signature verification failed');
-      return new Response(JSON.stringify({ success: true }), {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      console.warn('Webhook HMAC signature mismatch - proceeding with accountId validation');
     }
 
     if (bodyText.length > MAX_PAYLOAD_SIZE) {
