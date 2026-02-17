@@ -121,7 +121,7 @@ serve(async (req) => {
             received_at: receivedAt,
             thread_id: threadId,
             direction,
-            status: 'imported',
+            status: 'processed',
           });
 
         if (insertErr) {
