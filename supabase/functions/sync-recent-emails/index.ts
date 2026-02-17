@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { workspaceId, maxPages = 5 } = await req.json();
+    const { workspaceId, maxPages = 5, sinceDays = 7 } = await req.json();
     if (!workspaceId) throw new Error('workspaceId required');
 
     const supabase = createClient(
@@ -43,9 +43,16 @@ serve(async (req) => {
     let totalInserted = 0;
     let pageToken: string | null = null;
 
-    // Fetch recent emails page by page (newest first)
+    // Calculate date filter using Aurinko's q parameter
+    const sinceDate = new Date();
+    sinceDate.setDate(sinceDate.getDate() - sinceDays);
+    const dateStr = `${sinceDate.getFullYear()}/${String(sinceDate.getMonth() + 1).padStart(2, '0')}/${String(sinceDate.getDate()).padStart(2, '0')}`;
+    const qFilter = `after:${dateStr}`;
+    console.log(`[sync-recent] Using date filter: ${qFilter}`);
+
+    // Fetch recent emails page by page (newest first) with date filter
     for (let page = 0; page < maxPages; page++) {
-      let url = `https://api.aurinko.io/v1/email/messages?limit=50`;
+      let url = `https://api.aurinko.io/v1/email/messages?limit=50&q=${encodeURIComponent(qFilter)}`;
       if (pageToken) url += `&pageToken=${pageToken}`;
 
       const resp = await fetch(url, {
