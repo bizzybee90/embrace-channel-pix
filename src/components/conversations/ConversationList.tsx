@@ -128,10 +128,12 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
         query = query.order('priority', { ascending: true }).order('created_at', { ascending: false });
         break;
       case 'sla_urgent':
-      default:
         query = query
           .order('sla_due_at', { ascending: true, nullsFirst: false })
           .order('updated_at', { ascending: false });
+        break;
+      default:
+        query = query.order('updated_at', { ascending: false });
         break;
     }
 
