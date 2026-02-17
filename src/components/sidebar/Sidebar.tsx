@@ -1,4 +1,4 @@
-import { Home, Mail, CheckCircle2, Clock, ChevronDown, ChevronRight, ChevronLeft, Send, Inbox, BarChart3, MessageSquare, Settings, ClipboardCheck, BookOpen, Eye, FileEdit, MailOpen } from 'lucide-react';
+import { Home, Mail, CheckCircle2, Clock, ChevronDown, ChevronRight, ChevronLeft, Send, Inbox, BarChart3, MessageSquare, Settings, ClipboardCheck, BookOpen, Eye, FileEdit } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
@@ -169,27 +169,7 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
             )}
           </Tooltip>
 
-          {/* Email Inbox */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div>
-                <NavLink
-                  to="/inbox"
-                  onClick={onNavigate}
-                  className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all`}
-                  activeClassName="bg-accent text-accent-foreground font-medium"
-                >
-                  <MailOpen className="h-5 w-5 text-primary" />
-                  {!isCollapsed && <span>Email Inbox</span>}
-                </NavLink>
-              </div>
-            </TooltipTrigger>
-            {isCollapsed && (
-              <TooltipContent side="right">
-                <p>Email Inbox</p>
-              </TooltipContent>
-            )}
-          </Tooltip>
+          {/* Inbox (To Reply) */}
 
           <Tooltip>
             <TooltipTrigger asChild>

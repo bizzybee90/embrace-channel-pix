@@ -29,7 +29,7 @@ import EmailOAuthCallback from "./pages/EmailOAuthCallback";
 import KnowledgeBase from "./pages/KnowledgeBase";
 import TestDashboard from "./pages/TestDashboard";
 import DevOpsDashboard from "./pages/admin/DevOpsDashboard";
-import Inbox from "./pages/Inbox";
+
 
 
 const queryClient = new QueryClient();
@@ -52,15 +52,8 @@ const RouterContent = () => {
         } 
       />
 
-      {/* Email Inbox - reads from email_import_queue */}
-      <Route
-        path="/inbox"
-        element={
-          <AuthGuard>
-            <Inbox />
-          </AuthGuard>
-        }
-      />
+      {/* Redirect old /inbox to /to-reply */}
+      <Route path="/inbox" element={<Navigate to="/to-reply" replace />} />
       
       {/* To Reply - Primary view */}
       <Route 

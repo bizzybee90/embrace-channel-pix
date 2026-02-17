@@ -278,7 +278,7 @@ export function ActivityFeed({ onNavigate, maxItems = 10 }: ActivityFeedProps) {
               if (activity.type === 'draft_ready') {
                 onNavigate(`/to-reply?id=${activity.conversationId}`);
               } else if (activity.type === 'inbox') {
-                onNavigate(`/inbox`);
+                onNavigate(`/to-reply`);
               } else {
                 onNavigate(`/to-reply?id=${activity.conversationId}`);
               }
