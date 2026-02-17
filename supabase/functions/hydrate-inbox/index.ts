@@ -180,40 +180,74 @@ serve(async (req) => {
         // Determine conversation status
         const status = needsReply ? 'new' : 'resolved';
 
-        const { data: convo, error: convoError } = await supabase
+        // Try to find existing conversation for this thread
+        const { data: existingConvo } = await supabase
           .from('conversations')
-          .insert({
-            workspace_id: workspaceId,
-            customer_id: customerId,
-            external_conversation_id: threadId,
-            title: latestEmail.subject || 'No subject',
-            channel: 'email',
-            category: latestCategory,
-            priority: getPriority(latestCategory),
-            status,
-            requires_reply: needsReply,
-            email_classification: latestCategory,
-            decision_bucket: getDecisionBucket(latestCategory, needsReply),
-            cognitive_load: latestCategory === 'complaint' ? 'high' : 'low',
-            risk_level: latestCategory === 'complaint' ? 'retention' : 'none',
-            message_count: threadEmails.length,
-            confidence: latestEmail.confidence,
-            triage_confidence: latestEmail.confidence,
-            extracted_entities: latestEmail.entities || {},
-            created_at: threadEmails[0].received_at,
-            updated_at: latestEmail.received_at,
-          })
           .select('id')
+          .eq('workspace_id', workspaceId)
+          .eq('external_conversation_id', threadId)
+          .limit(1)
           .single();
 
-        if (convoError) { console.error('Convo error:', convoError); continue; }
-        conversationsCreated++;
+        let convoId: string;
 
-        // Create messages
-        const msgs = threadEmails.map(email => {
+        if (existingConvo) {
+          // Update existing conversation with latest info
+          await supabase.from('conversations').update({
+            status,
+            requires_reply: needsReply,
+            decision_bucket: getDecisionBucket(latestCategory, needsReply),
+            message_count: threadEmails.length,
+            updated_at: latestEmail.received_at,
+          }).eq('id', existingConvo.id);
+          convoId = existingConvo.id;
+        } else {
+          const { data: convo, error: convoError } = await supabase
+            .from('conversations')
+            .insert({
+              workspace_id: workspaceId,
+              customer_id: customerId,
+              external_conversation_id: threadId,
+              title: latestEmail.subject || 'No subject',
+              channel: 'email',
+              category: latestCategory,
+              priority: getPriority(latestCategory),
+              status,
+              requires_reply: needsReply,
+              email_classification: latestCategory,
+              decision_bucket: getDecisionBucket(latestCategory, needsReply),
+              cognitive_load: latestCategory === 'complaint' ? 'high' : 'low',
+              risk_level: latestCategory === 'complaint' ? 'retention' : 'none',
+              message_count: threadEmails.length,
+              confidence: latestEmail.confidence,
+              triage_confidence: latestEmail.confidence,
+              extracted_entities: latestEmail.entities || {},
+              created_at: threadEmails[0].received_at,
+              updated_at: latestEmail.received_at,
+            })
+            .select('id')
+            .single();
+
+          if (convoError) { console.error('Convo error:', convoError); continue; }
+          convoId = convo.id;
+          conversationsCreated++;
+        }
+
+        // Filter out messages that already exist
+        const extIds = threadEmails.map(e => e.external_id).filter(Boolean);
+        const { data: existingMsgs } = await supabase
+          .from('messages')
+          .select('external_id')
+          .eq('conversation_id', convoId)
+          .in('external_id', extIds);
+        const existingExtIds = new Set((existingMsgs || []).map(m => m.external_id));
+
+        const msgs = threadEmails
+          .filter(email => !existingExtIds.has(email.external_id))
+          .map(email => {
           const isSent = isOwnEmail(email.from_email);
           return {
-            conversation_id: convo.id,
+            conversation_id: convoId,
             actor_type: isSent ? 'human_agent' : 'customer',
             actor_name: email.from_name || email.from_email,
             direction: isSent ? 'outbound' : 'inbound',
@@ -231,8 +265,10 @@ serve(async (req) => {
           };
         });
 
-        const { error: msgError } = await supabase.from('messages').insert(msgs);
-        if (!msgError) messagesCreated += msgs.length;
+        if (msgs.length > 0) {
+          const { error: msgError } = await supabase.from('messages').insert(msgs);
+          if (!msgError) messagesCreated += msgs.length;
+        }
       } catch (err) {
         console.error(`Thread ${threadId} error:`, err);
       }
