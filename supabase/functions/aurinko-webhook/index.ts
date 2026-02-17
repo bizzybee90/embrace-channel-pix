@@ -106,10 +106,7 @@ serve(async (req) => {
     });
   }
 
-  // ===== KILL SWITCH: Return immediately if webhook processing is disabled =====
-  if (Deno.env.get('AURINKO_WEBHOOK_ENABLED') !== 'true') {
-    return new Response('OK', { status: 200 });
-  }
+  // Webhook processing is always enabled (kill switch removed to prevent secret sync issues)
 
   // Rate limiting
   const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
