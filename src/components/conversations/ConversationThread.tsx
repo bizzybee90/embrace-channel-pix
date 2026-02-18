@@ -268,12 +268,17 @@ export const ConversationThread = ({ conversation, onUpdate, onBack }: Conversat
         <ConversationHeader conversation={conversation} onUpdate={onUpdate} onBack={onBack} />
       </div>
       
-      <div className="flex-1 min-h-0 overflow-y-auto p-5 space-y-5">
+      {/* AI Context — capped height, independently scrollable */}
+      <div className="flex-shrink-0 max-h-[45vh] overflow-y-auto p-5 border-b border-border">
         <AIContextPanel 
           conversation={conversation} 
           onUpdate={onUpdate}
           onUseDraft={setDraftText}
         />
+      </div>
+
+      {/* Message Timeline — always gets remaining space */}
+      <div className="flex-1 min-h-[200px] overflow-y-auto p-5">
         <MessageTimeline 
           messages={messages} 
           workspaceId={conversation.workspace_id}
