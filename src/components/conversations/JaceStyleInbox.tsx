@@ -62,10 +62,15 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
     let query = supabase
       .from('conversations')
       .select(`
-        *,
-        customer:customers(*),
-        assigned_user:users!conversations_assigned_to_fkey(*)
-      `)
+        id, title, status, channel, category, priority, confidence,
+        requires_reply, decision_bucket, sla_status, sla_due_at,
+        summary_for_human, ai_draft_response, final_response,
+        triage_confidence, snoozed_until, created_at, updated_at,
+        ai_reason_for_escalation, why_this_needs_you, is_escalated,
+        workspace_id, customer_id, assigned_to,
+        customer:customers(id, name, email),
+        assigned_user:users!conversations_assigned_to_fkey(id, name, email)
+      ` as string)
       .eq('workspace_id', userData.workspace_id)
       .order('updated_at', { ascending: false });
 
@@ -116,7 +121,7 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
         .not('snoozed_until', 'is', null)
         .gt('snoozed_until', new Date().toISOString());
     } else if (filter === 'sent') {
-      query = query.eq('direction', 'outbound');
+      query = query.eq('status', 'resolved');
     }
 
     // When searching, fetch more items so search works beyond the first page
@@ -187,13 +192,13 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
     } else if (isYesterday(date)) {
       groupedConversations.yesterday.push(conv as Conversation);
     } else {
-      groupedConversations.older.push(conv as Conversation);
+      groupedConversations.older.push(conv as unknown as Conversation);
     }
   });
 
   // Keyboard navigation (j/k/Enter/e)
   useKeyboardNavigation({
-    conversations: filteredConversations as Conversation[],
+    conversations: filteredConversations as unknown as Conversation[],
     selectedIndex: keyboardIndex,
     onSelectIndex: setKeyboardIndex,
     onSelect,

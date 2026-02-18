@@ -30,13 +30,13 @@ async function triggerFaqWorkflow(
 ) {
   console.log(`[n8n-callback] discovery_complete for workspace=${workspaceId}, triggering FAQ workflow`);
 
-  const { data: competitors, error: fetchError } = await supabase
+  const { data: competitors, error: fetchError } = await (supabase as any)
     .from('competitor_sites')
     .select('id, business_name, domain, url, address, rating, reviews_count, phone')
     .eq('workspace_id', workspaceId)
     .in('status', ['discovered', 'validated', 'approved'])
     .order('created_at', { ascending: false })
-    .limit(100);
+    .limit(100) as { data: Array<{ id: string; business_name: string; domain: string; url: string; address: string; rating: number; reviews_count: number; phone: string }> | null; error: unknown };
 
   if (fetchError) {
     console.error('[n8n-callback] Failed to fetch competitors:', fetchError);

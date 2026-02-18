@@ -66,7 +66,6 @@ export const useInboxEmails = ({ folder, categoryFilter, search, page }: UseInbo
           title,
           status,
           channel,
-          direction,
           email_classification,
           decision_bucket,
           requires_reply,
@@ -89,7 +88,7 @@ export const useInboxEmails = ({ folder, categoryFilter, search, page }: UseInbo
             .in('status', ['new', 'open', 'waiting_internal', 'ai_handling', 'escalated']);
           break;
         case 'sent':
-          query = query.eq('direction', 'outbound');
+          query = query.eq('status', 'resolved');
           break;
         case 'needs-reply':
           query = query.eq('requires_reply', true);
@@ -148,7 +147,7 @@ export const useEmailDetail = (emailId: string | null) => {
       const { data: conv, error: convError } = await supabase
         .from('conversations')
         .select(`
-          id, title, status, channel, direction, email_classification,
+          id, title, status, channel, email_classification,
           decision_bucket, requires_reply, triage_confidence,
           summary_for_human, external_conversation_id,
           created_at, updated_at,
