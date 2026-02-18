@@ -98,9 +98,10 @@ export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, on
     setError(null);
 
     try {
-      const { data, error: invokeError } = await supabase.functions.invoke('start-own-website-scrape', {
+      const { data, error: invokeError } = await supabase.functions.invoke('trigger-n8n-workflow', {
         body: {
-          workspaceId,
+          workspace_id: workspaceId,
+          workflow_type: 'own_website_scrape',
           websiteUrl: businessContext.websiteUrl,
           ...(opts?.provider ? { forceProvider: opts.provider } : {}),
         }

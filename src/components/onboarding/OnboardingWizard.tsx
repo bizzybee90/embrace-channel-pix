@@ -87,8 +87,8 @@ export function OnboardingWizard({ workspaceId, onComplete }: OnboardingWizardPr
     fetchCount();
 
     // Trigger inbox hydration in background (converts classified emails → conversations)
-    supabase.functions.invoke('hydrate-inbox', {
-      body: { workspaceId, daysBack: 90, limit: 200 },
+    supabase.functions.invoke('trigger-n8n-workflow', {
+      body: { workspace_id: workspaceId, workflow_type: 'email_import', daysBack: 90, limit: 200 },
     }).then(({ data, error }) => {
       if (error) console.error('Hydration error:', error);
       else console.log('Inbox hydration result:', data);

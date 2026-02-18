@@ -107,33 +107,11 @@ export function TriageLearningPanel() {
 
       if (!userData?.workspace_id) return;
 
-      const { data, error } = await supabase.functions.invoke('bulk-retriage-conversations', {
-        body: { 
-          workspaceId: userData.workspace_id,
-          limit: retriageLimit,
-          confidenceThreshold: retriageAll ? 1.0 : confidenceThreshold, // 1.0 means all conversations
-          dryRun: false,
-        }
+      // bulk-retriage-conversations edge function has been removed
+      toast({
+        title: 'Migrated to n8n',
+        description: 'Bulk re-triage has been migrated to n8n workflows.',
       });
-
-      if (error) throw error;
-
-      setRetriageResults(data?.results || []);
-      
-      if (data?.changed > 0) {
-        toast({
-          title: 'Re-triage complete',
-          description: `Updated ${data.changed} of ${data.processed} conversations`,
-        });
-      } else {
-        toast({
-          title: 'No changes needed',
-          description: `Reviewed ${data?.processed || 0} conversations, all classifications confirmed`,
-        });
-      }
-
-      // Refresh the count
-      fetchLowConfidenceCount();
     } catch (error) {
       console.error('Error running bulk re-triage:', error);
       toast({
@@ -195,12 +173,12 @@ export function TriageLearningPanel() {
 
       if (!userData?.workspace_id) return;
 
-      const { data, error } = await supabase.functions.invoke('bootstrap-sender-rules', {
-        body: { workspaceId: userData.workspace_id, minEmailCount: 3 }
+      // bootstrap-sender-rules edge function has been removed
+      toast({
+        title: 'Migrated to n8n',
+        description: 'Sender rule bootstrapping has been migrated to n8n workflows.',
       });
-
-      if (error) throw error;
-      setSuggestions(data?.suggestions || []);
+      setSuggestions([]);
     } catch (error) {
       console.error('Error fetching suggestions:', error);
     } finally {

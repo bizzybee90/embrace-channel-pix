@@ -135,23 +135,12 @@ export const TestMessageGenerator = () => {
         test_priority: scenario.priority
       };
 
-      console.log('Sending test message to receive-message function:', messagePayload);
-
-      const { data, error } = await supabase.functions.invoke('receive-message', {
-        body: messagePayload
-      });
-
-      if (error) {
-        console.error('Error invoking receive-message:', error);
-        throw error;
-      }
-
-      console.log('AI agent response:', data);
-
+      // receive-message edge function removed
       toast({
-        title: "Test message sent to AI agent",
-        description: `${scenario.channel} message from ${scenario.customer_name} processed. Check conversations.`,
+        title: "Test message generator disabled",
+        description: "This test function has been migrated to n8n.",
       });
+      return;
     } catch (error: any) {
       console.error('Test message error:', error);
       toast({

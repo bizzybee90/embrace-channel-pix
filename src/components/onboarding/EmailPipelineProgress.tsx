@@ -219,7 +219,7 @@ export function EmailPipelineProgress({
     };
 
     fetchStats();
-    const interval = setInterval(fetchStats, 3000);
+    const interval = setInterval(fetchStats, 10000);
     return () => clearInterval(interval);
   }, [workspaceId]);
 

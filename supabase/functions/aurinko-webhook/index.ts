@@ -298,8 +298,7 @@ async function processNewEmail(supabase: any, emailConfig: any, emailData: any) 
   // Fetch full message details from Aurinko API
   const messageUrl = `https://api.aurinko.io/v1/email/messages/${messageId}`;
   console.log('Fetching message from:', messageUrl);
-  console.log('Fetching message from:', messageUrl);
-  
+
   const messageResponse = await fetch(messageUrl, {
     headers: {
       'Authorization': `Bearer ${emailConfig.accessToken}`,
@@ -308,8 +307,21 @@ async function processNewEmail(supabase: any, emailConfig: any, emailData: any) 
 
   if (!messageResponse.ok) {
     const errorText = await messageResponse.text();
-    console.error('Failed to fetch full message:', messageResponse.status, errorText);
-    return processEmailFromData(supabase, emailConfig, emailData, messageId);
+    console.error('Failed to fetch full message (attempt 1):', messageResponse.status, errorText);
+
+    // Retry once after 2 seconds
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    const retryResponse = await fetch(messageUrl, {
+      headers: { 'Authorization': `Bearer ${emailConfig.accessToken}` },
+    });
+
+    if (!retryResponse.ok) {
+      console.error('Failed to fetch full message (attempt 2), skipping email:', messageId);
+      return;
+    }
+
+    const retryMessage = await retryResponse.json();
+    return processEmailFromData(supabase, emailConfig, retryMessage, messageId);
   }
 
   const message = await messageResponse.json();
@@ -530,10 +542,8 @@ async function processEmailFromData(supabase: any, emailConfig: any, message: an
   // Emails will be marked as read when the conversation is resolved in BizzyBee
   // This allows bi-directional sync with Gmail/Outlook
 
-  // Trigger triage and AI agent for processing
-  if (body.length > 0) {
-    await triggerAIAnalysis(supabase, conversationId, body, senderName, senderEmail, customer, subject, recipientEmail);
-  }
+  // AI triage is handled by n8n workflow, not called from webhook
+  console.log('Email stored, conversation:', conversationId, '— n8n will handle triage');
 }
 
 // Process email update notifications (e.g., when email is marked as read/unread externally)
@@ -645,328 +655,3 @@ async function markEmailAsRead(emailConfig: any, messageId: string) {
   }
 }
 
-async function triggerAIAnalysis(
-  supabase: any, 
-  conversationId: string, 
-  body: string, 
-  senderName: string, 
-  senderEmail: string, 
-  customer: any,
-  subject: string,
-  toEmail?: string
-) {
-  try {
-    console.log('Triggering AI analysis pipeline for conversation:', conversationId);
-    
-    const senderDomain = senderEmail.split('@')[1]?.toLowerCase();
-    
-    // Fetch workspace
-    const { data: workspace } = await supabase
-      .from('users')
-      .select('workspace_id')
-      .limit(1)
-      .single();
-    
-    const workspaceId = workspace?.workspace_id;
-
-    // ============================================================
-    // STEP 1: Call pre-triage-rules FIRST (deterministic, no LLM)
-    // This should handle 30-50% of emails with 100% accuracy
-    // ============================================================
-    console.log('Step 1: Calling pre-triage-rules...');
-    
-    const preTriageResponse = await supabase.functions.invoke('pre-triage-rules', {
-      body: {
-        email: {
-          from_email: senderEmail,
-          from_name: senderName,
-          subject: subject,
-          body: body.substring(0, 5000),
-        },
-        workspace_id: workspaceId,
-      }
-    });
-
-    console.log('Pre-triage response:', JSON.stringify(preTriageResponse.data || preTriageResponse.error));
-
-    // If pre-triage matched a rule and wants to skip LLM
-    if (preTriageResponse.data?.matched && preTriageResponse.data?.skip_llm) {
-      const preTriage = preTriageResponse.data;
-      console.log('Pre-triage matched! Skipping LLM. Bucket:', preTriage.decision_bucket);
-      
-      // Update conversation directly from pre-triage result
-      const updateData: any = {
-        status: preTriage.decision_bucket === 'auto_handled' ? 'resolved' : 'new',
-        requires_reply: preTriage.requires_reply ?? false,
-        decision_bucket: preTriage.decision_bucket,
-        why_this_needs_you: preTriage.why_this_needs_you || `Matched rule: ${preTriage.rule_type}`,
-        triage_confidence: 0.99,
-        email_classification: preTriage.classification || 'automated_notification',
-        urgency: preTriage.decision_bucket === 'act_now' ? 'high' : 'low',
-        urgency_reason: `Pre-triage rule: ${preTriage.rule_type}`,
-        cognitive_load: 'low',
-        risk_level: 'none',
-      };
-
-      // Set auto_handled_at for metrics
-      if (preTriage.decision_bucket === 'auto_handled') {
-        updateData.auto_handled_at = new Date().toISOString();
-        updateData.resolved_at = new Date().toISOString();
-      }
-
-      await supabase
-        .from('conversations')
-        .update(updateData)
-        .eq('id', conversationId);
-
-      console.log('Conversation updated from pre-triage (no LLM call):', {
-        bucket: preTriage.decision_bucket,
-        rule_type: preTriage.rule_type,
-      });
-
-      // Update sender behaviour stats
-      await updateSenderStats(supabase, workspaceId, senderDomain, senderEmail, preTriage.decision_bucket);
-
-      return; // Skip LLM entirely!
-    }
-
-    // ============================================================
-    // STEP 2: If pre-triage didn't match, call LLM triage agent
-    // ============================================================
-    console.log('Step 2: Pre-triage did not match, calling LLM triage agent...');
-
-    // Fetch business context
-    let businessContext = null;
-    if (workspaceId) {
-      const { data: context } = await supabase
-        .from('business_context')
-        .select('*')
-        .eq('workspace_id', workspaceId)
-        .single();
-      businessContext = context;
-    }
-
-    // Fetch sender behaviour stats for personalization
-    const { data: senderStats } = await supabase
-      .from('sender_behaviour_stats')
-      .select('*')
-      .eq('workspace_id', workspaceId)
-      .eq('sender_domain', senderDomain)
-      .maybeSingle();
-
-    // Call the dedicated triage agent (Haiku - fast & cheap)
-    const triageResponse = await supabase.functions.invoke('email-triage-agent', {
-      body: {
-        email: {
-          from_email: senderEmail,
-          from_name: senderName,
-          subject: subject,
-          body: body.substring(0, 5000),
-          to_email: toEmail,
-        },
-        workspace_id: workspaceId,
-        business_context: businessContext ? {
-          is_hiring: businessContext.is_hiring,
-          active_dispute: businessContext.active_stripe_case || businessContext.active_insurance_claim,
-        } : null,
-        sender_behaviour: senderStats ? {
-          reply_rate: senderStats.reply_rate,
-          ignored_rate: senderStats.ignored_rate,
-          vip_score: senderStats.vip_score,
-          suggested_bucket: senderStats.suggested_bucket,
-        } : null,
-        pre_triage_hints: preTriageResponse.data?.hints || null,
-      }
-    });
-
-    console.log('Triage response:', JSON.stringify(triageResponse.data || triageResponse.error));
-
-    if (triageResponse.error) {
-      console.error('Triage agent error:', triageResponse.error);
-      // On triage error, default to requiring human review
-      await supabase
-        .from('conversations')
-        .update({
-          status: 'new',
-          requires_reply: true,
-          urgency: 'high',
-          urgency_reason: 'Triage failed - requires manual review',
-        })
-        .eq('id', conversationId);
-      return;
-    }
-
-    const triage = triageResponse.data;
-
-    // Determine status based on triage result
-    let status = 'new';
-    if (!triage.classification.requires_reply) {
-      status = 'resolved'; // Auto-close non-reply emails
-    } else if (triage.needs_human_review) {
-      status = 'pending_review';
-    } else if (triage.priority.urgency === 'high' && (triage.sentiment.tone === 'angry' || triage.sentiment.tone === 'frustrated')) {
-      status = 'escalated';
-    }
-
-    // Update conversation with triage data
-    const updateData: any = {
-      status: status,
-      requires_reply: triage.classification.requires_reply,
-      email_classification: triage.classification.category,
-      triage_confidence: triage.classification.confidence,
-      urgency: triage.priority.urgency,
-      urgency_reason: triage.priority.urgency_reason,
-      ai_sentiment: triage.sentiment.tone,
-      extracted_entities: triage.entities || {},
-      suggested_actions: triage.suggested_actions || [],
-      triage_reasoning: triage.reasoning,
-      thread_context: triage.thread_context || {},
-      summary_for_human: triage.summary?.one_line || null,
-      title: triage.summary?.one_line || subject,
-    };
-
-    // Set resolved_at if auto-resolved
-    if (!triage.classification.requires_reply) {
-      updateData.resolved_at = new Date().toISOString();
-    }
-
-    // Set escalated_at if escalated
-    if (status === 'escalated') {
-      updateData.is_escalated = true;
-      updateData.escalated_at = new Date().toISOString();
-    }
-
-    await supabase
-      .from('conversations')
-      .update(updateData)
-      .eq('id', conversationId);
-
-    console.log('Conversation updated with triage data:', {
-      category: triage.classification.category,
-      requires_reply: triage.classification.requires_reply,
-      urgency: triage.priority.urgency,
-      status: status,
-    });
-
-    // If requires reply and not escalated, generate AI draft response
-    if (triage.classification.requires_reply && status !== 'escalated') {
-      console.log('Generating AI draft response...');
-      
-      const aiResponse = await supabase.functions.invoke('claude-ai-agent-tools', {
-        body: {
-          message: {
-            message_content: body.substring(0, 5000),
-            channel: 'email',
-            customer_identifier: senderEmail,
-            customer_name: senderName,
-            sender_phone: customer?.phone || null,
-            sender_email: senderEmail,
-          },
-          conversation_history: [],
-          customer_data: customer,
-          triage_context: {
-            category: triage.classification.category,
-            urgency: triage.priority.urgency,
-            sentiment: triage.sentiment.tone,
-            entities: triage.entities,
-            suggested_actions: triage.suggested_actions,
-          }
-        }
-      });
-
-      if (aiResponse.data && !aiResponse.error) {
-        const aiOutput = aiResponse.data;
-        
-        // Update with AI draft response
-        await supabase
-          .from('conversations')
-          .update({
-            ai_draft_response: aiOutput.response || null,
-            ai_confidence: aiOutput.confidence || triage.classification.confidence,
-            ai_reason_for_escalation: aiOutput.escalation_reason || null,
-            category: aiOutput.ai_category || triage.classification.category,
-            is_escalated: aiOutput.escalate || false,
-            status: aiOutput.escalate ? 'escalated' : status,
-            escalated_at: aiOutput.escalate ? new Date().toISOString() : null,
-          })
-          .eq('id', conversationId);
-
-        console.log('AI draft response generated:', {
-          has_response: !!aiOutput.response,
-          confidence: aiOutput.confidence,
-          escalated: aiOutput.escalate,
-        });
-      } else {
-        console.error('AI response generation error:', aiResponse.error);
-      }
-    }
-
-    // Update sender behaviour stats after processing
-    await updateSenderStats(supabase, workspaceId, senderDomain, senderEmail, triage.decision?.bucket || 'wait');
-
-  } catch (aiError) {
-    console.error('Triage/AI pipeline failed (non-blocking):', aiError);
-    // Ensure conversation is at least visible
-    await supabase
-      .from('conversations')
-      .update({
-        status: 'new',
-        requires_reply: true,
-      })
-      .eq('id', conversationId);
-  }
-}
-
-// Helper to update sender behaviour stats
-async function updateSenderStats(
-  supabase: any,
-  workspaceId: string | null,
-  senderDomain: string,
-  senderEmail: string,
-  bucket: string
-) {
-  if (!workspaceId || !senderDomain) return;
-
-  try {
-    // Upsert sender stats
-    const { data: existing } = await supabase
-      .from('sender_behaviour_stats')
-      .select('*')
-      .eq('workspace_id', workspaceId)
-      .eq('sender_domain', senderDomain)
-      .maybeSingle();
-
-    const isAutoHandled = bucket === 'auto_handled';
-    
-    if (existing) {
-      const totalMessages = (existing.total_messages || 0) + 1;
-      const ignoredCount = (existing.ignored_count || 0) + (isAutoHandled ? 1 : 0);
-      
-      await supabase
-        .from('sender_behaviour_stats')
-        .update({
-          total_messages: totalMessages,
-          ignored_count: ignoredCount,
-          ignored_rate: ignoredCount / totalMessages,
-          last_interaction_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', existing.id);
-    } else {
-      await supabase
-        .from('sender_behaviour_stats')
-        .insert({
-          workspace_id: workspaceId,
-          sender_domain: senderDomain,
-          sender_email: senderEmail,
-          total_messages: 1,
-          ignored_count: isAutoHandled ? 1 : 0,
-          ignored_rate: isAutoHandled ? 1 : 0,
-          last_interaction_at: new Date().toISOString(),
-        });
-    }
-  } catch (error) {
-    console.error('Error updating sender stats:', error);
-    // Non-blocking - don't fail the main flow
-  }
-}

@@ -65,39 +65,15 @@ export function DraftVerificationBadge({
   const runVerification = async () => {
     setIsVerifying(true);
     try {
-      const { data, error } = await supabase.functions.invoke('draft-verify', {
-        body: {
-          conversation_id: conversationId,
-          workspace_id: workspaceId,
-          draft_text: draft,
-          customer_message: 'Customer inquiry', // Will be fetched from context
-        },
-      });
-
-      if (error) throw error;
-
-      setLocalStatus(data.status);
-      setLocalIssues(data.issues || []);
-      setLocalCorrectedDraft(data.corrected_draft);
-      setLocalConfidence(data.confidence_score);
-
-      onVerificationComplete?.({
-        status: data.status,
-        issues: data.issues || [],
-        correctedDraft: data.corrected_draft,
-      });
+      // draft-verify edge function removed — return static unverified result
+      setLocalStatus('pending');
+      setLocalIssues([]);
+      setLocalCorrectedDraft(null);
+      setLocalConfidence(null);
 
       toast({
-        title: data.status === 'passed' ? 'Verification Passed' : 'Verification Complete',
-        description: data.notes || `Found ${data.issues?.length || 0} issues`,
-        variant: data.status === 'failed' ? 'destructive' : 'default',
-      });
-    } catch (err: any) {
-      console.error('Verification failed:', err);
-      toast({
-        title: 'Verification Failed',
-        description: err.message || 'Could not verify draft',
-        variant: 'destructive',
+        title: 'Draft verification migrated to n8n',
+        description: 'Verification is not currently available',
       });
     } finally {
       setIsVerifying(false);

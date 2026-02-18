@@ -12,20 +12,14 @@ export const IntegrationsPanel = () => {
   const handleTestTwilio = async () => {
     setTestingTwilio(true);
     try {
-      const { data, error } = await supabase.functions.invoke('test-integration', {
-        body: { service: 'twilio' }
-      });
-
+      const { count, error } = await supabase
+        .from('email_provider_configs')
+        .select('*', { count: 'exact', head: true });
       if (error) throw error;
-
-      if (data?.success) {
-        toast.success('Twilio connection verified');
-      } else {
-        toast.error(data?.message || 'Twilio connection failed');
-      }
+      toast.success('Supabase connection verified');
     } catch (err) {
-      console.error('Twilio test error:', err);
-      toast.error('Failed to test Twilio connection');
+      console.error('Connection test error:', err);
+      toast.error('Connection test failed');
     } finally {
       setTestingTwilio(false);
     }

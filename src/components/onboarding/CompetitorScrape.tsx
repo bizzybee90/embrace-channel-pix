@@ -20,8 +20,8 @@ export const CompetitorScrape = ({ workspaceId, onComplete }: CompetitorScrapePr
   const startScraping = async () => {
     setStatus('scraping');
     try {
-      const { data, error } = await supabase.functions.invoke('competitor-scrape', {
-        body: { workspace_id: workspaceId }
+      const { data, error } = await supabase.functions.invoke('trigger-n8n-workflow', {
+        body: { workspace_id: workspaceId, workflow_type: 'faq_generation' }
       });
 
       if (error) throw error;

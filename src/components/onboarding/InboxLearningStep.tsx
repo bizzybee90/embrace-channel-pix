@@ -60,8 +60,8 @@ export function InboxLearningStep({ workspaceId, onComplete, onBack }: InboxLear
     try {
       console.log('[InboxLearning] Starting voice learning with Claude...');
       
-      const { data, error: fnError } = await supabase.functions.invoke('voice-learn', {
-        body: { workspace_id: workspaceId }
+      const { data, error: fnError } = await supabase.functions.invoke('trigger-n8n-workflow', {
+        body: { workspace_id: workspaceId, workflow_type: 'voice_learning' }
       });
 
       if (fnError) {

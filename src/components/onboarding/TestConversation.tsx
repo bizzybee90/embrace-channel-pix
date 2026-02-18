@@ -23,18 +23,10 @@ export const TestConversation = ({ workspaceId, onComplete }: TestConversationPr
   const generateResponse = async (message?: string) => {
     setStatus('generating');
     try {
-      const { data, error } = await supabase.functions.invoke('test-conversation', {
-        body: { 
-          workspace_id: workspaceId,
-          test_message: message || undefined
-        }
-      });
-
-      if (error) throw error;
-
-      setResult(data);
-      setStatus('complete');
-
+      // test-conversation edge function removed
+      toast.info('Test conversation migrated to n8n');
+      setStatus('idle');
+      return;
     } catch (e: any) {
       toast.error(e.message || 'Failed to generate response');
       setStatus('idle');

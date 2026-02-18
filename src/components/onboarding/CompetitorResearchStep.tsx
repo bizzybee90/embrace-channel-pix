@@ -469,9 +469,10 @@ export function CompetitorResearchStep({
         .filter(sq => sq.enabled)
         .map(sq => sq.query);
 
-      const { data, error: invokeError } = await supabase.functions.invoke('competitor-hybrid-discovery', {
+      const { data, error: invokeError } = await supabase.functions.invoke('trigger-n8n-workflow', {
         body: {
-          workspaceId,
+          workspace_id: workspaceId,
+          workflow_type: 'competitor_discovery',
           industry: nicheQuery,
           location: serviceArea || 'UK',
           radiusMiles: 20,

@@ -7,7 +7,6 @@ import { DataExportPanel } from '@/components/settings/DataExportPanel';
 import { DataDeletionPanel } from '@/components/settings/DataDeletionPanel';
 import { AuditLogPanel } from '@/components/settings/AuditLogPanel';
 import { RetentionPolicyPanel } from '@/components/settings/RetentionPolicyPanel';
-import { TestDataCleanupPanel } from '@/components/settings/TestDataCleanupPanel';
 import { GDPRDashboard } from '@/components/settings/GDPRDashboard';
 import { WorkspaceGDPRSettingsPanel } from '@/components/settings/WorkspaceGDPRSettingsPanel';
 import { CustomerMergePanel } from '@/components/settings/CustomerMergePanel';
@@ -28,13 +27,12 @@ import { LearningAnalyticsDashboard } from '@/components/settings/LearningAnalyt
 import { InboxLearningInsightsPanel } from '@/components/settings/InboxLearningInsightsPanel';
 import { DataResetPanel } from '@/components/settings/DataResetPanel';
 import { OnboardingTriggerPanel } from '@/components/settings/OnboardingTriggerPanel';
-import { TestMessageGenerator } from '@/components/TestMessageGenerator';
 import { BackButton } from '@/components/shared/BackButton';
 import { SettingsSection } from '@/components/settings/SettingsSection';
 import { MobilePageLayout } from '@/components/layout/MobilePageLayout';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useWorkspace } from '@/hooks/useWorkspace';
-import { Bot, Plug, Shield, Layout, Code, ChevronRight, ExternalLink, Wrench, TestTube2 } from 'lucide-react';
+import { Bot, Plug, Shield, Layout, Code, ChevronRight, ExternalLink, Wrench } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface SettingsCategory {
@@ -200,20 +198,6 @@ export default function Settings() {
                   </Link>
                 </CardContent>
               </Card>
-              <Card className="bg-muted/30 hover:bg-muted/50 transition-colors">
-                <CardContent className="p-4">
-                  <Link to="/admin/test" className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-orange-500/10">
-                      <TestTube2 className="h-5 w-5 text-orange-500" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-medium text-sm">Test Dashboard</p>
-                      <p className="text-xs text-muted-foreground">Edge function testing</p>
-                    </div>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                  </Link>
-                </CardContent>
-              </Card>
             </div>
           </SettingsSection>
 
@@ -228,12 +212,6 @@ export default function Settings() {
               <DataResetPanel workspaceId={workspace.id} />
             </SettingsSection>
           )}
-          <SettingsSection title="Test Message Generator" description="Generate test messages">
-            <TestMessageGenerator />
-          </SettingsSection>
-          <SettingsSection title="Test Data Cleanup" description="Remove test data">
-            <TestDataCleanupPanel />
-          </SettingsSection>
           <SettingsSection title="Customer Merge" description="Merge duplicate customers">
             <CustomerMergePanel />
           </SettingsSection>

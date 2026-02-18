@@ -369,8 +369,8 @@ export function CompetitorReviewScreen({
 
     setIsSubmitting(true);
     try {
-      const { data, error } = await supabase.functions.invoke('competitor-scrape-start', {
-        body: { jobId, workspaceId, targetCount }
+      const { data, error } = await supabase.functions.invoke('trigger-n8n-workflow', {
+        body: { workspace_id: workspaceId, workflow_type: 'faq_generation', jobId, targetCount }
       });
 
       if (error) throw error;

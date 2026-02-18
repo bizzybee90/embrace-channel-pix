@@ -25,12 +25,12 @@ export const IndustryKeywords = ({ workspaceId, onComplete }: IndustryKeywordsPr
   const generateKeywords = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('industry-keywords', {
-        body: { workspace_id: workspaceId }
-      });
-
-      if (error) throw error;
-      setKeywords(data.keywords || []);
+      const { data: ctx } = await supabase
+        .from('business_context')
+        .select('industry_keywords')
+        .eq('workspace_id', workspaceId)
+        .single();
+      setKeywords(ctx?.industry_keywords || []);
     } catch (e: any) {
       toast.error('Failed to generate keywords');
     } finally {
@@ -53,13 +53,10 @@ export const IndustryKeywords = ({ workspaceId, onComplete }: IndustryKeywordsPr
   const saveAndContinue = async () => {
     setSaving(true);
     try {
-      const { error } = await supabase.functions.invoke('industry-keywords', {
-        body: { 
-          workspace_id: workspaceId,
-          action: 'save',
-          keywords 
-        }
-      });
+      const { error } = await supabase
+        .from('business_context')
+        .update({ industry_keywords: keywords })
+        .eq('workspace_id', workspaceId);
 
       if (error) throw error;
       toast.success('Keywords saved');

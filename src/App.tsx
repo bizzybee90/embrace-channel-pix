@@ -27,7 +27,6 @@ import GDPRPortal from "./pages/GDPRPortal";
 import EmailAuthSuccess from "./pages/EmailAuthSuccess";
 import EmailOAuthCallback from "./pages/EmailOAuthCallback";
 import KnowledgeBase from "./pages/KnowledgeBase";
-import TestDashboard from "./pages/TestDashboard";
 import DevOpsDashboard from "./pages/admin/DevOpsDashboard";
 
 
@@ -298,16 +297,6 @@ const RouterContent = () => {
           element={
             <AuthGuard>
               <KnowledgeBase />
-            </AuthGuard>
-          }
-        />
-
-        {/* Admin Test Dashboard - Development only */}
-        <Route
-          path="/admin/test"
-          element={
-            <AuthGuard>
-              <TestDashboard />
             </AuthGuard>
           }
         />

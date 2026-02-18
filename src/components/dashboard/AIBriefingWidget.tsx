@@ -37,18 +37,9 @@ export const AIBriefingWidget = () => {
         return;
       }
 
-      // Call the AI inbox summary function
-      const { data, error } = await supabase.functions.invoke('ai-inbox-summary', {
-        body: { 
-          workspace_id: userProfile.workspace_id,
-          send_notifications: false 
-        }
-      });
-
-      if (error) throw error;
-
-      setSummary(data?.summary || "No emails to summarize right now.");
-      setConversationCount(data?.conversation_count || 0);
+      // ai-inbox-summary edge function has been removed; set static data
+      setSummary("Email briefing is being migrated to n8n workflows. Check back soon!");
+      setConversationCount(0);
     } catch (error) {
       console.error('Error fetching AI summary:', error);
       setSummary("Unable to generate summary at the moment.");

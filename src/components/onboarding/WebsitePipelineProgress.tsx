@@ -248,8 +248,8 @@ export function WebsitePipelineProgress({
       )
       .subscribe();
 
-    // Also poll every 3 seconds as backup
-    const interval = setInterval(fetchStats, 3000);
+    // Also poll every 10 seconds as backup
+    const interval = setInterval(fetchStats, 10000);
 
     return () => {
       clearInterval(interval);

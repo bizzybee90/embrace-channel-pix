@@ -321,7 +321,7 @@ export function CompetitorPipelineProgress({
     };
 
     fetchStats();
-    const interval = setInterval(fetchStats, 3000);
+    const interval = setInterval(fetchStats, 10000);
 
     return () => clearInterval(interval);
   }, [jobId, startTime]);
@@ -450,8 +450,8 @@ export function CompetitorPipelineProgress({
   const handleRecoverJob = async () => {
     setIsRecovering(true);
     try {
-      const { data, error } = await supabase.functions.invoke('recover-competitor-job', {
-        body: { jobId, workspaceId }
+      const { data, error } = await supabase.functions.invoke('trigger-n8n-workflow', {
+        body: { workspace_id: workspaceId, workflow_type: 'competitor_discovery', jobId }
       });
       
       if (error) {

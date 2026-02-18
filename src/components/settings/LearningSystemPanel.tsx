@@ -86,121 +86,27 @@ export function LearningSystemPanel() {
   });
 
   const handlePopulateSenderRules = async () => {
-    if (!workspace?.id) return;
-    
-    setPopulatingRules(true);
-    setLastResult(null);
-
-    try {
-      const { data, error } = await supabase.functions.invoke('populate-sender-rules', {
-        body: { 
-          workspace_id: workspace.id, 
-          mode: 'both'
-        }
-      });
-
-      if (error) throw error;
-
-      setLastResult({
-        seeded: data?.seeded || 0,
-        learned: data?.learned || 0,
-        skipped: data?.skipped || 0,
-      });
-
-      toast({
-        title: 'Sender Rules Updated',
-        description: `Added ${data?.seeded || 0} known patterns, learned ${data?.learned || 0} from history. ${data?.skipped || 0} already existed.`,
-      });
-
-      refetchStats();
-      queryClient.invalidateQueries({ queryKey: ['sender-rules'] });
-      queryClient.invalidateQueries({ queryKey: ['behavior-stats'] });
-    } catch (error) {
-      console.error('Error populating sender rules:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to populate sender rules',
-        variant: 'destructive',
-      });
-    } finally {
-      setPopulatingRules(false);
-    }
+    // populate-sender-rules edge function has been removed
+    toast({
+      title: 'Migrated to n8n',
+      description: 'Sender rule population has been migrated to n8n workflows.',
+    });
   };
 
   const handleComputeSenderStats = async () => {
-    if (!workspace?.id) return;
-
-    setComputingStats(true);
-
-    try {
-      const { data, error } = await supabase.functions.invoke('compute-sender-stats', {
-        body: { workspace_id: workspace.id }
-      });
-
-      if (error) throw error;
-
-      setLastResult(prev => ({
-        ...prev,
-        statsUpdated: data?.stats_updated || 0,
-      }));
-
-      toast({
-        title: 'Sender Stats Computed',
-        description: `Analyzed ${data?.domains_analyzed || 0} domains, updated ${data?.stats_updated || 0} sender behavior records.`,
-      });
-
-      refetchStats();
-      queryClient.invalidateQueries({ queryKey: ['behavior-stats'] });
-    } catch (error) {
-      console.error('Error computing sender stats:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to compute sender stats',
-        variant: 'destructive',
-      });
-    } finally {
-      setComputingStats(false);
-    }
+    // compute-sender-stats edge function has been removed
+    toast({
+      title: 'Migrated to n8n',
+      description: 'Sender stats computation has been migrated to n8n workflows.',
+    });
   };
 
   const handleApplyRulesToExisting = async () => {
-    if (!workspace?.id) return;
-
-    setApplyingRules(true);
-
-    try {
-      const { data, error } = await supabase.functions.invoke('bulk-retriage-conversations', {
-        body: { 
-          workspace_id: workspace.id,
-          skipLLM: true, // Only apply sender rules, don't call AI
-          status: 'all'
-        }
-      });
-
-      if (error) throw error;
-
-      setLastResult(prev => ({
-        ...prev,
-        retriaged: data?.processed || 0,
-      }));
-
-      toast({
-        title: 'Rules Applied to Existing Emails',
-        description: `Re-sorted ${data?.processed || 0} existing emails using sender rules. ${data?.updated || 0} were updated.`,
-      });
-
-      queryClient.invalidateQueries({ queryKey: ['conversations'] });
-      refetchStats();
-    } catch (error) {
-      console.error('Error applying rules:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to apply rules to existing emails',
-        variant: 'destructive',
-      });
-    } finally {
-      setApplyingRules(false);
-    }
+    // bulk-retriage-conversations edge function has been removed
+    toast({
+      title: 'Migrated to n8n',
+      description: 'Bulk re-triage has been migrated to n8n workflows.',
+    });
   };
 
   const handleRunFullBootstrap = async () => {

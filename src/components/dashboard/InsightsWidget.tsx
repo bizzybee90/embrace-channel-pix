@@ -53,19 +53,8 @@ export const InsightsWidget = ({ workspaceId }: InsightsWidgetProps) => {
   };
 
   const runAnalysis = async () => {
-    setAnalyzing(true);
-    try {
-      const { error } = await supabase.functions.invoke('pattern-detect', {
-        body: { workspace_id: workspaceId, action: 'analyze', period_days: 7 }
-      });
-      if (error) throw error;
-      toast.success('Analysis complete! New insights generated.');
-      fetchInsights();
-    } catch (e: any) {
-      toast.error(e.message || 'Failed to run analysis');
-    } finally {
-      setAnalyzing(false);
-    }
+    // pattern-detect edge function has been removed; no-op
+    toast.info('Pattern detection has been migrated to n8n workflows.');
   };
 
   const markAsRead = async (id: string) => {

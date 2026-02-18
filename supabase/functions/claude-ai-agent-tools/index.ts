@@ -155,12 +155,12 @@ serve(async (req) => {
 
     const getPrompt = (agentType: string) => {
       const dbPrompt = prompts?.find(p => p.agent_type === agentType);
-      if (dbPrompt) return { prompt: dbPrompt.prompt, model: dbPrompt.model || 'claude-sonnet-4-20250514' };
+      if (dbPrompt) return { prompt: dbPrompt.prompt, model: dbPrompt.model || 'claude-3-5-haiku-20241022' };
       
       // Fallback defaults
-      if (agentType === 'router') return { prompt: DEFAULT_ROUTER_PROMPT, model: 'claude-sonnet-4-20250514' };
-      if (agentType === 'quote') return { prompt: DEFAULT_QUOTE_PROMPT, model: 'claude-sonnet-4-20250514' };
-      return { prompt: DEFAULT_CUSTOMER_SUPPORT_PROMPT, model: 'claude-sonnet-4-20250514' };
+      if (agentType === 'router') return { prompt: DEFAULT_ROUTER_PROMPT, model: 'claude-3-5-haiku-20241022' };
+      if (agentType === 'quote') return { prompt: DEFAULT_QUOTE_PROMPT, model: 'claude-3-5-haiku-20241022' };
+      return { prompt: DEFAULT_CUSTOMER_SUPPORT_PROMPT, model: 'claude-3-5-haiku-20241022' };
     };
 
     // Check sender rules first

@@ -8,6 +8,42 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Play, Loader2, CheckCircle, XCircle, Clock } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { toast } from 'sonner';
+
+const DELETED_FUNCTIONS = new Set([
+  'ai-draft', 'ai-inbox-summary', 'audio-process', 'backfill-classify',
+  'bootstrap-sender-rules', 'bulk-retriage', 'business-location',
+  'check-consent', 'classification-worker', 'classify-emails',
+  'classify-emails-dispatcher', 'cleanup-old-data', 'competitor-dedupe-faqs',
+  'competitor-discover', 'competitor-discover-smart', 'competitor-discovery-start',
+  'competitor-faq-generate', 'competitor-faq-per-site', 'competitor-hybrid-discovery',
+  'competitor-places-discover', 'competitor-refine-faqs', 'competitor-research-watchdog',
+  'competitor-scrape', 'competitor-scrape-start', 'competitor-search-suggest',
+  'competitor-serp-discovery', 'competitor-webhooks', 'compute-sender-stats',
+  'consolidate-faqs', 'copy-industry-faqs', 'create-consent',
+  'customer-intelligence', 'detect-style-drift', 'document-process',
+  'draft-verify', 'email-classify', 'email-classify-bulk', 'email-classify-v2',
+  'email-import', 'email-import-v2', 'export-customer-data', 'extract-website-faqs',
+  'fetch-email-body', 'force-email-sync', 'gdpr-portal-request', 'gdpr-portal-verify',
+  'generate-embedding', 'generate-response', 'generate-ai-summary',
+  'get-mailbox-stats', 'handle-discovery-complete', 'handle-scrape-failed',
+  'hydrate-inbox', 'hydrate-worker', 'image-analyze', 'industry-keywords',
+  'kb-discover-competitors', 'kb-mine-site', 'kb-start-job',
+  'learn-correction', 'learn-from-edit', 'log-conversation',
+  'n8n-competitor-callback', 'n8n-email-callback', 'nuclear-reset',
+  'parse-email-body', 'pattern-detect', 'pipeline-watchdog', 'places-webhook',
+  'process-own-website-scrape', 'process-worker', 'receive-apify-data',
+  'recover-competitor-job', 'refine-competitor-faqs', 'request-deletion',
+  'resume-own-website-scrape', 'save-classification-correction', 'scan-worker',
+  'send-csat-request', 'send-scheduled-summary', 'send-summary-notifications',
+  'start-competitor-analysis', 'start-competitor-research', 'start-email-import',
+  'start-own-website-scrape', 'start-website-scrape', 'sync-recent-emails',
+  'test-conversation', 'test-integration', 'trigger-n8n-workflows',
+  'validate-competitor-sites', 'voice-learn', 'voice-learning',
+  'website-scrape', 'withdraw-consent', 'competitor-extract-faqs',
+  'competitor-scrape-worker', 'bulk-retriage-conversations', 'populate-sender-rules',
+  'cleanup-duplicates', 'email-sync'
+]);
 
 interface Trigger {
   name: string;
@@ -115,15 +151,20 @@ export function ManualTriggers() {
   };
 
   const runTrigger = async (trigger: Trigger) => {
+    if (DELETED_FUNCTIONS.has(trigger.function)) {
+      toast.info('This function has been migrated to n8n workflows');
+      return;
+    }
+
     const triggerId = trigger.function;
-    
+
     setResults(prev => ({
       ...prev,
       [triggerId]: { triggerId, status: 'running' }
     }));
 
     const startTime = Date.now();
-    
+
     try {
       const params: Record<string, unknown> = {
         workspace_id: selectedWorkspace,

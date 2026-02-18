@@ -33,8 +33,8 @@ export const CompetitorDiscovery = ({ workspaceId, onComplete, onBack }: Competi
     setError(null);
     
     try {
-      const { data, error: invokeError } = await supabase.functions.invoke('competitor-discover', {
-        body: { workspace_id: workspaceId }
+      const { data, error: invokeError } = await supabase.functions.invoke('trigger-n8n-workflow', {
+        body: { workspace_id: workspaceId, workflow_type: 'competitor_discovery' }
       });
 
       if (invokeError) throw invokeError;

@@ -57,10 +57,11 @@ export function CompetitorMiningLoop({
     setCurrentDomain(site.domain);
 
     try {
-      const { data, error } = await supabase.functions.invoke('kb-mine-site', {
+      const { data, error } = await supabase.functions.invoke('trigger-n8n-workflow', {
         body: {
-          site_id: site.id,
           workspace_id: workspaceId,
+          workflow_type: 'faq_generation',
+          site_id: site.id,
           job_id: jobId
         }
       });

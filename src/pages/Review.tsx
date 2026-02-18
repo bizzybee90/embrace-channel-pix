@@ -227,19 +227,30 @@ export default function Review() {
 
       const email = lowConfidenceEmails.find(e => e.id === emailId);
       
-      const response = await supabase.functions.invoke('save-classification-correction', {
-        body: {
-          workspace_id: userData.workspace_id,
-          email_id: emailId,
-          original_category: email?.category,
-          corrected_category: correctedCategory,
-          corrected_requires_reply: correctedRequiresReply,
-          source_table: 'email_import_queue',
-        }
+      // Classification corrections migrated to n8n — direct table update
+      const { error: updateError } = await supabase
+        .from('email_import_queue')
+        .update({
+          category: correctedCategory,
+          requires_reply: correctedRequiresReply,
+          needs_review: false,
+          confidence: 0.9,
+        })
+        .eq('id', emailId);
+
+      if (updateError) throw updateError;
+
+      // Log correction for learning
+      await supabase.from('triage_corrections').insert({
+        workspace_id: userData.workspace_id,
+        original_classification: email?.category,
+        new_classification: correctedCategory,
+        corrected_by: user.id,
+        sender_email: email?.from_email,
+        sender_domain: email?.from_email?.split('@')[1],
       });
 
-      if (response.error) throw response.error;
-      return response.data;
+      return { siblings_updated: 0, rule_created: false };
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['low-confidence-emails'] });

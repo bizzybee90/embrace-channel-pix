@@ -104,19 +104,8 @@ export const GDPRDashboard = () => {
   };
 
   const runManualCleanup = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('cleanup-old-data');
-      
-      if (error) throw error;
-      
-      toast.success(`Cleanup complete: ${data.cleaned} conversations processed`);
-      loadStats();
-    } catch (error: any) {
-      toast.error('Cleanup failed: ' + error.message);
-    } finally {
-      setLoading(false);
-    }
+    // cleanup-old-data edge function has been removed
+    toast.info('Data cleanup migrated to n8n');
   };
 
   if (!isAdmin) {

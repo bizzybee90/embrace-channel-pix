@@ -91,9 +91,10 @@ export const WebsiteScrape = ({ workspaceId, onComplete }: WebsiteScrapeProps) =
     setLoading(true);
     
     try {
-      const { data, error } = await supabase.functions.invoke('start-website-scrape', {
+      const { data, error } = await supabase.functions.invoke('trigger-n8n-workflow', {
         body: {
           workspace_id: workspaceId,
+          workflow_type: 'own_website_scrape',
           website_url: url
         }
       });

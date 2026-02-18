@@ -33,9 +33,10 @@ export function InitialTriageStep({ workspaceId, onComplete, onBack }: InitialTr
       while (hasMore && totalProcessed < 500) {
         setProgress(Math.min(90, 10 + (totalProcessed / 5)));
 
-        const { data, error } = await supabase.functions.invoke('bulk-retriage', {
-          body: { 
-            workspaceId, 
+        const { data, error } = await supabase.functions.invoke('trigger-n8n-workflow', {
+          body: {
+            workspace_id: workspaceId,
+            workflow_type: 'email_classification',
             limit: batchSize,
             dryRun: false,
             skipLLM: true, // Use sender rules only for speed

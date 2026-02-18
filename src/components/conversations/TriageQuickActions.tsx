@@ -40,8 +40,8 @@ export function TriageQuickActions({ conversation, onUpdate }: TriageQuickAction
     setRetriageResult(null);
     
     try {
-      const { data, error } = await supabase.functions.invoke('bulk-retriage', {
-        body: { conversationId: conversation.id, limit: 1 }
+      const { data, error } = await supabase.functions.invoke('trigger-n8n-workflow', {
+        body: { workflow_type: 'email_classification', conversationId: conversation.id, limit: 1 }
       });
 
       if (error) throw error;

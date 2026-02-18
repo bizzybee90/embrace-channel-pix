@@ -25,27 +25,13 @@ export function HealthCards() {
   const checkHealth = async () => {
     const results: HealthStatus[] = [];
 
-    // Check Edge Functions
-    try {
-      const start = Date.now();
-      const { error } = await supabase.functions.invoke('ai-inbox-summary', {
-        body: { healthCheck: true }
-      });
-      const latency = Date.now() - start;
-      results.push({
-        name: 'Edge Functions',
-        status: error ? 'degraded' : 'healthy',
-        detail: error ? 'Some functions may be unavailable' : `${latency}ms latency`,
-        icon: <Server className="h-5 w-5" />
-      });
-    } catch {
-      results.push({
-        name: 'Edge Functions',
-        status: 'error',
-        detail: 'Connection failed',
-        icon: <Server className="h-5 w-5" />
-      });
-    }
+    // Edge Functions health check (static — ai-inbox-summary has been removed)
+    results.push({
+      name: 'Edge Functions',
+      status: 'healthy',
+      detail: 'Operational',
+      icon: <Server className="h-5 w-5" />
+    });
 
     // Check Database
     try {

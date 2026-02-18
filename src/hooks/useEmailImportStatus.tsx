@@ -72,9 +72,9 @@ export function useEmailImportStatus(workspaceId: string | null): UseEmailImport
     enabled: !!workspaceId,
     refetchInterval: (query) => {
       const data = query.state.data as EmailProviderConfig | null | undefined;
-      // Poll every 3s while syncing; also poll on rate limit so UI can recover automatically.
+      // Poll every 10s while syncing; also poll on rate limit so UI can recover automatically.
       if (data && (data.sync_status === 'syncing' || isRateLimitError(data.sync_error))) {
-        return 3000;
+        return 10000;
       }
       return false;
     },

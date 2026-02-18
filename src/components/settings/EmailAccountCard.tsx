@@ -118,8 +118,8 @@ export const EmailAccountCard = ({ config, onDisconnect, onUpdate }: EmailAccoun
   const handleSync = async () => {
     setSyncing(true);
     try {
-      const { data, error } = await supabase.functions.invoke('email-import', {
-        body: { configId: config.id, mode: config.import_mode },
+      const { data, error } = await supabase.functions.invoke('trigger-n8n-workflow', {
+        body: { workflow_type: 'email_import', configId: config.id, mode: config.import_mode },
       });
 
       if (error) throw error;

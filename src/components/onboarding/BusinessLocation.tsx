@@ -40,7 +40,7 @@ export const BusinessLocation = ({ workspaceId, onComplete }: BusinessLocationPr
 
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('business-location', {
+      const { data, error } = await supabase.functions.invoke('google-places-autocomplete', {
         body: {
           workspace_id: workspaceId,
           business_name: businessName,

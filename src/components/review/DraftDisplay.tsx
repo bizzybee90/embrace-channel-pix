@@ -53,38 +53,15 @@ export const DraftDisplay = ({
 
   const verifyDraft = async () => {
     if (!draftText || !customerMessage) return;
-    
+
     setVerifying(true);
     try {
-      const { data, error } = await supabase.functions.invoke('draft-verify', {
-        body: {
-          workspace_id: workspaceId,
-          conversation_id: conversationId,
-          draft_text: draftText,
-          customer_message: customerMessage
-        }
-      });
-
-      if (error) throw error;
-      setVerification(data.verification);
-      
-      if (data.verification.status === 'failed') {
-        toast.warning('Draft needs review', {
-          description: 'Some issues were found that may need attention'
-        });
-      } else if (data.verification.status === 'passed') {
-        toast.success('Draft verified', {
-          description: 'No issues found'
-        });
-      }
-    } catch (e: any) {
-      console.error('Verification failed:', e);
-      // Don't block on verification failure
-      setVerification({ 
-        status: 'passed', 
-        confidence_score: 0.5, 
+      // draft-verify edge function removed — return static unverified result
+      setVerification({
+        status: 'pending',
+        confidence_score: 0,
         issues: [],
-        notes: 'Verification unavailable'
+        notes: 'Draft verification migrated to n8n'
       });
     } finally {
       setVerifying(false);

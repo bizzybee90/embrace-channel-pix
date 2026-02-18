@@ -79,14 +79,9 @@ export const CustomerIntelligence = ({ workspaceId, customerId }: CustomerIntell
   const analyzeCustomer = async () => {
     setAnalyzing(true);
     try {
-      const { data, error } = await supabase.functions.invoke('customer-intelligence', {
-        body: { workspace_id: workspaceId, customer_id: customerId, action: 'analyze' }
-      });
-      if (error) throw error;
-      toast.success('Analysis complete!');
-      fetchData();
-    } catch (e: any) {
-      toast.error(e.message || 'Failed to analyze customer');
+      // customer-intelligence edge function removed
+      toast.info('Customer intelligence migrated to n8n');
+      return;
     } finally {
       setAnalyzing(false);
     }

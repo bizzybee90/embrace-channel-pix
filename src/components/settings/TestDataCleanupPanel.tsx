@@ -122,21 +122,12 @@ export const TestDataCleanupPanel = () => {
     setCurrentStep(step);
     
     try {
-      const { data, error } = await supabase.functions.invoke('cleanup-duplicates', {
-        body: { step, workspaceId: workspace.id }
-      });
-
-      if (error) throw error;
-
-      setStepResults(prev => ({ ...prev, [step]: data }));
-      
+      // cleanup-duplicates edge function removed
       toast({
-        title: `Step ${step} Complete`,
-        description: data.message,
+        title: 'Cleanup migrated to n8n',
+        description: 'Database cleanup functions have been migrated to n8n workflows.',
       });
-
-      // Refresh counts after cleanup
-      fetchCounts();
+      return;
     } catch (error: any) {
       console.error('Cleanup error:', error);
       toast({
@@ -170,26 +161,14 @@ export const TestDataCleanupPanel = () => {
     setNuclearResult(null);
     
     try {
-      const { data, error } = await supabase.functions.invoke('nuclear-reset', {
-        body: { 
-          workspaceId: workspace.id, 
-          confirm: 'CONFIRM_NUCLEAR_RESET' 
-        }
-      });
-
-      if (error) throw error;
-
-      setNuclearResult({ success: true, result: data.result });
-      
+      // nuclear-reset edge function removed
       toast({
-        title: '☢️ Nuclear Reset Complete',
-        description: `Cleared ${data.result?.messages_cleared?.toLocaleString() || 0} messages, ${data.result?.conversations_cleared?.toLocaleString() || 0} conversations, ${data.result?.customers_cleared?.toLocaleString() || 0} customers`,
+        title: 'Nuclear reset migrated to n8n',
+        description: 'Nuclear reset has been migrated to n8n workflows.',
       });
-
-      // Refresh counts
-      fetchCounts();
       setNuclearConfirmText('');
       setNuclearResetOpen(false);
+      return;
     } catch (error: any) {
       console.error('Nuclear reset error:', error);
       toast({
@@ -309,35 +288,11 @@ export const TestDataCleanupPanel = () => {
         .eq('workspace_id', workspace.id)
         .limit(1);
 
-      if (emailConfigs && emailConfigs.length > 0) {
-        const { error: syncError } = await supabase.functions.invoke('email-sync', {
-          body: {
-            configId: emailConfigs[0].id,
-            mode: 'all_historical_90_days',
-            maxMessages: 25,
-          }
-        });
-
-        if (syncError) {
-          console.error('Sync error:', syncError);
-          toast({
-            title: 'Re-sync started with issues',
-            description: 'Some emails may not have synced. Check Settings → Email to retry.',
-            variant: 'destructive',
-          });
-        } else {
-          toast({
-            title: 'Re-sync complete!',
-            description: 'Emails have been re-imported with your updated business context.',
-          });
-        }
-      } else {
-        toast({
-          title: 'No email account connected',
-          description: 'Connect an email account first, then try again.',
-          variant: 'destructive',
-        });
-      }
+      // email-sync edge function removed
+      toast({
+        title: 'Email sync migrated to n8n',
+        description: 'Email sync has been migrated to n8n workflows. Data was cleared but re-sync must be triggered from n8n.',
+      });
 
       setCounts(null);
     } catch (error) {

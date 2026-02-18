@@ -54,32 +54,11 @@ export const AIActivityWidget = () => {
   };
 
   const generateSummary = async () => {
-    setGenerating(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('generate-ai-summary', {
-        body: { period: 'daily' }
-      });
-
-      if (error) throw error;
-
-      if (data?.success) {
-        setSummary(data.summary);
-        setShowSummary(true);
-        toast({
-          title: 'Summary Generated',
-          description: 'AI activity summary has been generated successfully.'
-        });
-      }
-    } catch (error) {
-      console.error('Error generating summary:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to generate AI activity summary.',
-        variant: 'destructive'
-      });
-    } finally {
-      setGenerating(false);
-    }
+    // generate-ai-summary edge function has been removed; no-op
+    toast({
+      title: 'Summary generation migrated',
+      description: 'AI summary generation has been migrated to n8n workflows.'
+    });
   };
 
   if (loading) {

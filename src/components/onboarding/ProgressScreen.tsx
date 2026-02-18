@@ -280,8 +280,8 @@ function InlineCompetitorReview({
     if (selectedCount === 0) { toast.error('Select at least one competitor'); return; }
     setIsStarting(true);
     try {
-      const { data, error } = await supabase.functions.invoke('start-competitor-analysis', {
-        body: { workspace_id: workspaceId }
+      const { data, error } = await supabase.functions.invoke('trigger-n8n-workflow', {
+        body: { workspace_id: workspaceId, workflow_type: 'competitor_discovery' }
       });
       if (error) throw error;
       toast.success(`Analysis started for ${data.competitors_count} competitors`);
@@ -404,8 +404,8 @@ export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenPr
     };
     fetchCount();
 
-    // Re-fetch every 5s to catch batch inserts from consolidation
-    const countInterval = window.setInterval(fetchCount, 5000);
+    // Re-fetch every 15s to catch batch inserts from consolidation
+    const countInterval = window.setInterval(fetchCount, 15000);
 
     const channel = supabase
       .channel('faq-progress')
@@ -555,7 +555,7 @@ export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenPr
     };
 
     pollProgress();
-    const interval = window.setInterval(pollProgress, 3000);
+    const interval = window.setInterval(pollProgress, 10000);
     return () => window.clearInterval(interval);
   }, [workspaceId]);
 

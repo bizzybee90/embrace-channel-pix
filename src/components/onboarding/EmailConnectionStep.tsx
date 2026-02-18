@@ -184,8 +184,8 @@ export function EmailConnectionStep({
     // Initial poll
     poll();
 
-    // Poll every 3 seconds
-    pollIntervalRef.current = window.setInterval(poll, 3000);
+    // Poll every 10 seconds
+    pollIntervalRef.current = window.setInterval(poll, 10000);
 
     return () => {
       if (pollIntervalRef.current) {
@@ -311,8 +311,8 @@ export function EmailConnectionStep({
     
     try {
       // Trigger n8n workflows via edge function (avoids CORS issues from browser)
-      const { data, error: fnError } = await supabase.functions.invoke('trigger-n8n-workflows', {
-        body: { workspaceId },
+      const { data, error: fnError } = await supabase.functions.invoke('trigger-n8n-workflow', {
+        body: { workspace_id: workspaceId },
       });
 
       if (fnError) {

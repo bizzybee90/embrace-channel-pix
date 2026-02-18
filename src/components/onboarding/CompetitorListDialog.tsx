@@ -139,7 +139,7 @@ export function CompetitorListDialog({
 
     setIsSearching(true);
     try {
-      const { data, error } = await supabase.functions.invoke('competitor-search-suggest', {
+      const { data, error } = await supabase.functions.invoke('google-places-autocomplete', {
         body: { query: searchQuery, location: serviceArea, niche: nicheQuery }
       });
 

@@ -205,7 +205,27 @@ export default function TestDashboard() {
   const [results, setResults] = useState<Record<string, TestResult>>({});
   const [isRunningAll, setIsRunningAll] = useState(false);
 
+  const KEPT_FUNCTIONS = [
+    'aurinko-auth-callback', 'aurinko-auth-start', 'aurinko-exchange-token', 'aurinko-webhook',
+    'claude-ai-agent-tools', 'email-send', 'google-places-autocomplete',
+    'mark-email-read', 'pre-triage-rules', 'refresh-aurinko-subscriptions', 'trigger-n8n-workflow',
+  ];
+
   const runTest = async (functionName: string, payload: Record<string, any>, testName: string) => {
+    // Check if function is in the kept list
+    if (!KEPT_FUNCTIONS.includes(functionName)) {
+      setResults(prev => ({
+        ...prev,
+        [testName]: {
+          name: testName,
+          status: 'error',
+          duration: 0,
+          error: `Function "${functionName}" migrated to n8n`,
+        }
+      }));
+      return;
+    }
+
     setResults(prev => ({
       ...prev,
       [testName]: { name: testName, status: 'running' }

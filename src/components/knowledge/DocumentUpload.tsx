@@ -120,34 +120,9 @@ export const DocumentUpload = ({ workspaceId, onDocumentProcessed }: DocumentUpl
   const processDocument = async (documentId: string) => {
     setProcessing(documentId);
     try {
-      // Process document (chunk and embed)
-      const { data: processData, error: processError } = await supabase.functions.invoke('document-process', {
-        body: { workspace_id: workspaceId, document_id: documentId, action: 'process' }
-      });
-
-      if (processError) throw processError;
-
-      // Extract FAQs
-      const { data: faqData, error: faqError } = await supabase.functions.invoke('document-process', {
-        body: { workspace_id: workspaceId, document_id: documentId, action: 'extract_faqs' }
-      });
-
-      if (faqError) {
-        console.warn('FAQ extraction failed:', faqError);
-      }
-
-      toast.success(`Document processed! ${faqData?.faqs_extracted || 0} FAQs extracted.`);
-      onDocumentProcessed?.();
-      fetchDocuments();
-      
-    } catch (e: any) {
-      toast.error(e.message || 'Processing failed');
-      // Update status to failed
-      await supabase
-        .from('documents')
-        .update({ status: 'failed', error_message: e.message })
-        .eq('id', documentId);
-      fetchDocuments();
+      // document-process edge function removed
+      toast.info('Document processing migrated to n8n');
+      return;
     } finally {
       setProcessing(null);
     }
@@ -155,9 +130,14 @@ export const DocumentUpload = ({ workspaceId, onDocumentProcessed }: DocumentUpl
 
   const deleteDocument = async (documentId: string) => {
     try {
-      const { error } = await supabase.functions.invoke('document-process', {
-        body: { workspace_id: workspaceId, document_id: documentId, action: 'delete' }
-      });
+      // document-process edge function removed — delete directly
+      toast.info('Document processing migrated to n8n');
+
+      // Still delete the record from the database
+      const { error } = await supabase
+        .from('documents')
+        .delete()
+        .eq('id', documentId);
 
       if (error) throw error;
 

@@ -45,8 +45,8 @@ export const VoiceLearning = ({ workspaceId, onComplete }: VoiceLearningProps) =
   const startAnalysis = async () => {
     setStatus('analyzing');
     try {
-      const { data, error } = await supabase.functions.invoke('voice-learning', {
-        body: { workspace_id: workspaceId }
+      const { data, error } = await supabase.functions.invoke('trigger-n8n-workflow', {
+        body: { workspace_id: workspaceId, workflow_type: 'voice_learning' }
       });
 
       if (error) throw error;

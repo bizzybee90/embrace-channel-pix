@@ -100,58 +100,13 @@ export const VoiceProfileCard = ({ workspaceId }: VoiceProfileCardProps) => {
   };
 
   const checkDrift = async () => {
-    setCheckingDrift(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('detect-style-drift', {
-        body: { workspace_id: workspaceId }
-      });
-
-      if (error) throw error;
-
-      if (data?.refresh_triggered) {
-        toast.success(`Style drift detected (${(data.drift_score * 100).toFixed(0)}%) — voice profile is being refreshed!`);
-        // Re-fetch profile after a delay to get the updated one
-        setTimeout(() => fetchProfile(), 5000);
-      } else if (data?.drift_score > 0) {
-        toast.info(`Minor drift detected (${(data.drift_score * 100).toFixed(0)}%) — no refresh needed.`);
-      } else {
-        toast.success('No style drift detected — your voice profile is up to date!');
-      }
-      fetchDriftLog();
-    } catch (e: any) {
-      toast.error(e.message || 'Drift check failed');
-    } finally {
-      setCheckingDrift(false);
-    }
+    // detect-style-drift edge function has been removed
+    toast.info('Style drift detection migrated to n8n');
   };
 
   const analyzeVoice = async (forceRefresh = false) => {
-    setAnalyzing(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('voice-learning', {
-        body: { 
-          workspace_id: workspaceId,
-          force_refresh: forceRefresh
-        }
-      });
-
-      if (error) throw error;
-
-      if (data?.skipped) {
-        toast.info(data.reason);
-      } else if (data?.reason === 'insufficient_data') {
-        toast.info(`Need more emails. Found ${data.pairs_found} conversation pairs.`);
-      } else if (data?.success) {
-        toast.success(`Voice profile updated! Analyzed ${data.pairs_analyzed} emails, stored ${data.examples_stored} examples.`);
-        fetchProfile();
-      } else {
-        toast.error(data?.error || 'Analysis failed');
-      }
-    } catch (e: any) {
-      toast.error(e.message || 'Analysis failed');
-    } finally {
-      setAnalyzing(false);
-    }
+    // voice-learning edge function has been removed
+    toast.info('Voice learning migrated to n8n');
   };
 
   if (loading) {
