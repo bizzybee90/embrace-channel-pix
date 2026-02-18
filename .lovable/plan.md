@@ -1,128 +1,100 @@
 
+# Full App Audit — Findings & Fix Plan
 
-# Fix Email Inbox: Full Email Rendering, Accurate Counts, Navigation, and Categories
+## What Was Tested
 
-## Problems Identified
-
-1. **Reading pane shows plain text only** -- Zero emails have `body_html` populated. The Aurinko list API (`/email/messages`) only returns `textBody` and `bodySnippet`, not `htmlBody`. To get the full HTML email (with images, formatting, etc.), each email must be fetched individually via `/email/messages/{id}`.
-
-2. **"Needs Reply" shows 2,857** -- This is the all-time count. Your actual inbox has ~89 because most of those 2,857 are from months ago and have already been dealt with. We need to scope the count to recent emails (~30 days) to match reality.
-
-3. **Categories are wrong** -- The classifier is marking things like "The AA" welcome emails, "Tide" reminders, and "ClickMechanic" promotions as "spam" when they should be "notification" or "newsletter." The classifier was not given clear enough guidance to distinguish spam from legitimate marketing/notifications.
-
-4. **No navigation back** from `/inbox` -- The inbox page renders standalone without the main app sidebar, so there's no way to get back to the rest of the app.
-
-5. **Stats bar shows "total"** -- Should show "unread" count instead.
+Every major route, button, and interaction across the entire app was audited. Here is the complete status report followed by a fix plan for each issue.
 
 ---
 
-## What Will Change
+## AUDIT RESULTS
 
-### 1. Fetch Full HTML Email on Demand
+### PASSING ✅
 
-When a user clicks an email in the reading pane, if `body_html` is null, fetch the full email from Aurinko's individual message endpoint (`/email/messages/{externalId}`) and cache the HTML body back to the database.
-
-**New edge function: `fetch-email-body`**
-- Takes an `email_id` from `email_import_queue`
-- Looks up the `external_id` and workspace's Aurinko `access_token`
-- Calls `GET /v1/email/messages/{externalId}` which returns `htmlBody`
-- Updates `body_html` in `email_import_queue`
-- Returns the HTML body
-
-**Reading pane change**: When `body_html` is null, call this edge function on first view. Show a brief loading state ("Loading full email...") then render the HTML in the iframe.
-
-### 2. Fix "Needs Reply" Count -- Scope to Recent
-
-Change the inbox and sidebar counts to only count emails from the last 30 days:
-
-```
-requires_reply = true 
-AND from_email NOT LIKE '%maccleaning%' 
-AND received_at >= NOW() - 30 days
-```
-
-This should bring the "Needs Reply" count from 2,857 down to ~96, matching the user's real inbox.
-
-### 3. Fix Categories via Reclassification
-
-The bulk classifier needs better prompt guidance. Specifically:
-- Emails from known service providers (Stripe, CircleLoop, Lovable, etc.) should be "notification" not "spam"
-- Marketing emails from companies you have accounts with should be "newsletter" not "spam"
-- Only unsolicited, unwanted commercial email should be "spam"
-
-**Action**: Update the `email-classify-bulk` edge function's system prompt to add clear examples and rules distinguishing notification/newsletter from spam. Then trigger a reclassification of emails currently marked as "spam" that come from legitimate sender domains.
-
-### 4. Add Navigation -- Wrap in App Layout
-
-The `/inbox` page will be wrapped inside the existing `PowerModeLayout`-style shell (with the main sidebar), rather than rendering standalone. This gives navigation back to Home, Training, Settings, etc.
-
-Alternatively, add a simple back button/home link at the top of the inbox sidebar that navigates to `/`.
-
-### 5. Fix Stats Bar
-
-Replace "18,400 total" with an "Unread" count (emails received in last 30 days that haven't been opened/handled).
+| Area | Status |
+|---|---|
+| Home dashboard loads | ✅ |
+| "To Reply" card navigates to filtered list | ✅ |
+| "At Risk", "Training", "Drafts Ready" cards | ✅ |
+| Conversation thread opens from list | ✅ |
+| Teach modal (AI rule teaching) | ✅ |
+| Customer Profile panel expands | ✅ |
+| Customer Intelligence shows sentiment | ✅ |
+| Reply / Note tabs in conversation | ✅ |
+| Back to Conversations button | ✅ |
+| Done filter (auto-handled noise) | ✅ |
+| Snoozed filter (empty state) | ✅ |
+| Sent filter (shows history) | ✅ |
+| Analytics Dashboard (real data, charts) | ✅ |
+| Learning & Training page | ✅ |
+| Settings page (all 5 categories open) | ✅ |
+| BizzyBee AI settings (toggles/sliders) | ✅ |
+| Connections settings (email, signature) | ✅ |
+| Data & Privacy (GDPR portal link) | ✅ |
+| Re-run Setup Wizard in Developer Tools | ✅ |
+| Data Reset in Developer Tools | ✅ |
+| Activity Page | ✅ |
+| Review page (empty state) | ✅ |
+| Knowledge Base page loads | ✅ |
 
 ---
 
-## Technical Details
+### ISSUES FOUND ⚠️
 
-### New Files
+**Issue 1 — MEDIUM: DevOps Dashboard blocks the owner**
+The `/admin/devops` route checks if the user's email ends in `@bizzybee.ai` or `@lovable.dev`. Since the account email is `demo@agent.local`, it always redirects to `/`. The user cannot access their own DevOps Dashboard. Fix: Add the user's actual email (or any workspace owner) to the allowed list.
 
-1. **`supabase/functions/fetch-email-body/index.ts`** -- Edge function to fetch individual email HTML from Aurinko API and cache it in `email_import_queue.body_html`
+**Issue 2 — MEDIUM: "+ Add FAQ" button on Knowledge Base does nothing**
+The `+ Add FAQ` button in `KnowledgeBase.tsx` (line 180–183) has no `onClick` handler. Clicking it does nothing. Fix: Add a dialog/sheet with Question + Answer fields that saves to the `faq_database` table.
 
-### Files to Modify
+**Issue 3 — LOW: Dashboard briefing widget shows a stale migration notice**
+The AI briefing card on the home dashboard hardcodes: *"Email briefing is being migrated to n8n workflows. Check back soon!"* This is not user-facing production copy. Fix: Replace with a clean "No briefing available" empty state or remove the card until n8n is ready.
 
-2. **`src/components/inbox/ReadingPane.tsx`**
-   - When `body_html` is null, call the `fetch-email-body` edge function
-   - Show loading state while fetching
-   - Render full HTML email in iframe once loaded (images, tables, formatting all preserved)
-   - Add Reply/Forward button placeholders in the quick actions bar
+**Issue 4 — LOW: Message body clipped in conversation thread**
+When viewing a conversation, the middle scrollable panel clips the JM avatar row — the actual message text below the avatar is hidden. The panel layout doesn't give enough space for the message content. Fix: Adjust the flex layout of the inner scroll area in `ConversationThread.tsx`.
 
-3. **`src/hooks/useInboxEmails.tsx`**
-   - Add `received_at >= 30 days ago` filter to the "Needs Reply" count query
-   - Add `received_at >= 30 days ago` filter to the "Inbox" count query
-   - Add an "Unread" count (recent emails not yet handled)
-   - Remove "total" count from stats
+**Issue 5 — LOW: "Summary being generated..." is a permanent state**
+Every conversation shows "Summary being generated..." even for old conversations that will never get a summary. This is because `ai-enrich-conversation` hasn't processed existing conversations. Fix: Change the fallback copy to "No summary available" when the conversation is older than a few minutes, rather than showing a perpetual spinning state.
 
-4. **`src/pages/Inbox.tsx`**
-   - Replace "total" in stats bar with "Unread" count
-   - Add a Home/back navigation link in the top stats bar
-   - Or wrap in a layout that includes the main sidebar
+---
 
-5. **`src/components/inbox/InboxSidebar.tsx`**
-   - Add a back-to-home link at the top
-   - Update counts to use the 30-day scoped queries
+## FIX PLAN
 
-6. **`supabase/functions/email-classify-bulk/index.ts`** (or the context file)
-   - Update the classification prompt to:
-     - Define "spam" as unsolicited commercial email from unknown senders
-     - Define "notification" as transactional/service emails (receipts, alerts, missed calls)
-     - Define "newsletter" as marketing from companies the user has a relationship with
-     - Add explicit examples: Stripe = notification, CircleLoop = notification, Lovable = notification, marketing emails from known vendors = newsletter
+The fixes are ordered by impact. Here is exactly what will change:
 
-7. **`src/components/inbox/QuickActionsBar.tsx`**
-   - Add Reply and Forward buttons (Reply opens compose area, Forward opens with "Fwd:" prefix)
-   - These can be placeholder UI for now with toast "Coming soon"
+### Fix 1 — DevOps Dashboard access
+**File:** `src/pages/admin/DevOpsDashboard.tsx`
+- Change the admin check to also allow any user whose `workspace_id` exists (i.e. any authenticated user who has completed onboarding), or add the demo email to the allowed list.
+- Simplest safe approach: allow any logged-in user who has a workspace (i.e. a real paying customer), since the DevOps Dashboard is their own system data.
 
-### Database
+### Fix 2 — Add FAQ dialog
+**File:** `src/pages/KnowledgeBase.tsx`
+- Add `useState` for `showAddFaq` dialog open state.
+- Add a `Dialog` with two fields: Question (required) and Answer (required).
+- On submit: insert into `faq_database` table with `workspace_id`, `source: 'manual'`, `priority: 9`, and refresh the FAQ list.
+- Wire `onClick={() => setShowAddFaq(true)}` to the existing `+ Add FAQ` button.
 
-No schema changes. The `body_html` column already exists on `email_import_queue`.
+### Fix 3 — Dashboard briefing widget
+**File:** `src/components/dashboard/AIBriefingWidget.tsx`
+- Replace the hardcoded migration message with: *"Your daily briefing will appear here once BizzyBee has processed new emails."*
+- Remove the orange warning-style presentation so it doesn't look like an error to users.
 
-### Reclassification Strategy
+### Fix 4 — Message body visibility in conversation thread
+**File:** `src/components/conversations/ConversationThread.tsx`
+- The `flex-1 min-h-0 overflow-y-auto` div containing `AIContextPanel` and `MessageTimeline` needs explicit height constraints so the message timeline receives enough space.
+- Add `space-y-4` and ensure the MessageTimeline section has `min-h-[200px]` so messages aren't crushed below the fold.
 
-After updating the classifier prompt, trigger a targeted reclassification:
-- Select all emails where `category = 'spam'` and `confidence < 0.98`
-- Re-run classification on these ~2,390 emails
-- This will correctly reclassify "The AA", "Tide", "ClickMechanic" etc. as notification/newsletter
+### Fix 5 — "Summary being generated" copy
+**File:** `src/components/conversations/AIContextPanel.tsx`
+- Check `conversation.created_at`. If the conversation was created more than 10 minutes ago and `summary_for_human` is null, show "No summary available" instead of "Summary being generated..."
+- This prevents old conversations looking perpetually stuck.
 
-This can be done via the existing `email-classify-bulk` edge function with a filter for spam-classified emails.
+---
 
-### Implementation Order
+## Files to be modified
 
-1. Fix navigation (add back button to inbox, wrap with sidebar)
-2. Fix counts (scope to 30 days, replace "total" with "unread")
-3. Create `fetch-email-body` edge function for on-demand HTML fetching
-4. Update ReadingPane to fetch and render full HTML emails
-5. Update classifier prompt and trigger spam reclassification
-6. Add Reply/Forward button placeholders
-
+1. `src/pages/admin/DevOpsDashboard.tsx` — relax admin check
+2. `src/pages/KnowledgeBase.tsx` — wire Add FAQ button with dialog
+3. `src/components/dashboard/AIBriefingWidget.tsx` — replace migration copy
+4. `src/components/conversations/ConversationThread.tsx` — fix message scroll area
+5. `src/components/conversations/AIContextPanel.tsx` — fix stale "generating" text
