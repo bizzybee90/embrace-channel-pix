@@ -32,7 +32,7 @@ serve(async (req) => {
     // 1. Fetch conversation + customer + messages
     const { data: conversation } = await supabase
       .from('conversations')
-      .select('*, customer:customers(name, email, vip_status, sentiment_trend, intelligence)')
+      .select('*, customer:customers(name, email, vip_status, sentiment_trend, intelligence, topics_discussed)')
       .eq('id', conversation_id)
       .single();
 
@@ -97,7 +97,9 @@ serve(async (req) => {
 6. "sentiment" - One of: "positive", "negative", "neutral"
 7. "urgency" - One of: "high", "medium", "low"
 8. "draft_response" - If requires_reply is true, write a professional, friendly reply from ${businessName}. Match a warm but professional UK tone. Keep it concise. If requires_reply is false, set this to null.
-9. "customer_insight" - A brief note about this customer's needs or pattern (e.g., "Regular customer checking on appointment", "New inquiry about pricing", "Frustrated about missed service")
+9. "customer_summary" - A 1-2 sentence profile of this customer based on this conversation (e.g., "Regular residential customer, polite communicator, primarily interested in window cleaning services")
+10. "customer_topics" - Array of 1-5 topic keywords discussed (e.g., ["window cleaning", "scheduling", "pricing"])
+11. "customer_tone" - The customer's communication tone: one of "formal", "casual", "friendly", "frustrated", "neutral"
 
 ${faqContext}
 
@@ -194,15 +196,26 @@ ${threadText}`;
     }
 
     // 8. Update customer intelligence if we have a customer
-    if (conversation.customer_id && enrichment.customer_insight) {
-      const existingIntel = conversation.customer?.intelligence || {};
+    if (conversation.customer_id) {
+      const existingIntel = (conversation.customer?.intelligence || {}) as Record<string, any>;
+      const existingTopics = (conversation.customer as any)?.topics_discussed || [];
+
+      // Merge new topics with existing, deduplicate
+      const newTopics = enrichment.customer_topics || [];
+      const mergedTopics = [...new Set([...existingTopics, ...newTopics])].slice(0, 15);
+
       await supabase
         .from('customers')
         .update({
           sentiment_trend: enrichment.sentiment || null,
+          topics_discussed: mergedTopics,
           intelligence: {
             ...existingIntel,
-            last_insight: enrichment.customer_insight,
+            summary: enrichment.customer_summary || enrichment.customer_insight || existingIntel.summary || null,
+            communication_patterns: {
+              ...(existingIntel.communication_patterns || {}),
+              tone: enrichment.customer_tone || existingIntel?.communication_patterns?.tone || null,
+            },
             last_analyzed_at: new Date().toISOString(),
           },
           last_analyzed_at: new Date().toISOString(),
