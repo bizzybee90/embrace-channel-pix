@@ -190,7 +190,7 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend, ex
     <div className={
       useMobileStyle
         ? "p-3 m-3 bg-card/80 rounded-[22px] backdrop-blur-sm"
-        : "p-4 m-4 bg-card/80 rounded-[22px] backdrop-blur-sm"
+        : "px-5 py-4 bg-transparent"
     }>
       <Tabs defaultValue="reply" orientation={isMobile ? "vertical" : "horizontal"}>
         <div className={isMobile ? "flex flex-col gap-2" : ""}>

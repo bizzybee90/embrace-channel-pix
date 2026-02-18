@@ -182,14 +182,6 @@ All colors MUST be HSL.
     @apply fixed inset-0 bg-background/50 backdrop-blur-sm z-40 animate-in fade-in-0 duration-200;
   }
   
-  .message-spacing {
-    @apply space-y-6;
-  }
-  
-  .card-elevation {
-    @apply shadow-sm border border-border/50 transition-shadow hover:shadow-md;
-  }
-  
   /* Apple-quality mobile utilities */
   @media (max-width: 900px) {
     .mobile-native-card {

@@ -210,7 +210,7 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
         <span className={cn('h-2 w-2 rounded-full flex-shrink-0', dotColor)} />
 
         {/* Sender name */}
-        <span className="text-sm font-semibold text-foreground truncate flex-1 min-w-0">
+        <span className="text-sm font-semibold text-foreground/90 truncate flex-1 min-w-0">
           {senderName}
         </span>
 
@@ -234,7 +234,7 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
         )}
 
         {/* Short timestamp */}
-        <span className="text-xs text-muted-foreground flex-shrink-0">{timeStr}</span>
+        <span className="text-xs text-foreground/40 flex-shrink-0">{timeStr}</span>
       </div>
 
       {/* Row 2: Subject/Title */}
@@ -244,7 +244,7 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
 
       {/* Row 3: AI snippet + indicators */}
       <div className="flex items-center gap-2">
-        <p className="text-xs text-muted-foreground truncate flex-1 min-w-0">
+        <p className="text-xs text-foreground/50 truncate flex-1 min-w-0">
           {snippet}
         </p>
         <div className="flex items-center gap-1 flex-shrink-0">
@@ -297,8 +297,8 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
           onClick={handleClick}
           className={cn(
             "relative cursor-pointer transition-all duration-300 rounded-[22px] overflow-hidden",
-            "bg-card apple-shadow hover:apple-shadow-lg spring-press",
-            selected && "apple-shadow-lg bg-gradient-to-br from-primary/8 via-primary/4 to-card"
+            "bg-card ring-1 ring-black/[0.04] apple-shadow hover:apple-shadow-lg spring-press spring-bounce",
+            selected && "ring-primary/40 bg-primary/[0.03]"
           )}
           style={{
             transform: isSwiping ? `translateX(${swipeDistance}px)` : 'translateX(0)',
@@ -317,8 +317,8 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
       onClick={handleClick}
       className={cn(
         "relative cursor-pointer transition-all duration-300 ease-out rounded-[22px] mb-2 overflow-hidden",
-        "bg-card apple-shadow hover:apple-shadow-lg spring-press",
-        selected && "apple-shadow-lg bg-gradient-to-br from-primary/8 via-primary/4 to-card"
+        "bg-card ring-1 ring-black/[0.04] apple-shadow hover:apple-shadow-lg spring-press spring-bounce",
+        selected && "ring-primary/40 bg-primary/[0.03]"
       )}
     >
       {cardInner('p-4')}

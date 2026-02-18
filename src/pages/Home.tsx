@@ -244,11 +244,7 @@ export const Home = () => {
                       <p className="text-sm font-medium text-muted-foreground">At Risk</p>
                     </div>
                   </div>
-                  {stats.atRiskCount > 0 && (
-                    <span className="text-xs font-medium text-destructive bg-destructive/10 px-2 py-1 rounded-full">
-                      Urgent reply needed
-                    </span>
-                  )}
+                  <ChevronRight className="h-5 w-5 text-muted-foreground/40" />
                 </div>
               </Card>
 
@@ -271,11 +267,7 @@ export const Home = () => {
                       <p className="text-sm font-medium text-muted-foreground">Training</p>
                     </div>
                   </div>
-                  {stats.reviewCount > 0 && (
-                    <span className="text-xs font-medium text-purple-500 bg-purple-500/10 px-2 py-1 rounded-full">
-                      AI checking confidence
-                    </span>
-                  )}
+                  <ChevronRight className="h-5 w-5 text-muted-foreground/40" />
                 </div>
               </Card>
 
@@ -298,11 +290,7 @@ export const Home = () => {
                       <p className="text-sm font-medium text-muted-foreground">To Reply</p>
                     </div>
                   </div>
-                  {stats.toReplyCount > 0 && (
-                    <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-1 rounded-full">
-                      Ready for you
-                    </span>
-                  )}
+                  <ChevronRight className="h-5 w-5 text-muted-foreground/40" />
                 </div>
               </Card>
 
@@ -325,11 +313,7 @@ export const Home = () => {
                       <p className="text-sm font-medium text-muted-foreground">Drafts Ready</p>
                     </div>
                   </div>
-                  {stats.draftCount > 0 && (
-                    <span className="text-xs font-medium text-amber-500 bg-amber-500/10 px-2 py-1 rounded-full">
-                      Ready to send
-                    </span>
-                  )}
+                  <ChevronRight className="h-5 w-5 text-muted-foreground/40" />
                 </div>
               </Card>
             </div>

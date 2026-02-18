@@ -1,9 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
 import { Lightbulb, TrendingUp, AlertTriangle, Info, X, Sparkles } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -48,11 +46,6 @@ export const InsightsWidget = ({ workspaceId }: InsightsWidgetProps) => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const runAnalysis = async () => {
-    // pattern-detect edge function has been removed; no-op
-    toast.info('Pattern detection has been migrated to n8n workflows.');
   };
 
   const markAsRead = async (id: string) => {
@@ -108,8 +101,8 @@ export const InsightsWidget = ({ workspaceId }: InsightsWidgetProps) => {
       <CardContent className="space-y-2">
         {insights.length === 0 ? (
           <div className="text-center py-6 text-muted-foreground">
-            <Lightbulb className="h-8 w-8 mx-auto mb-2 opacity-50" />
-            <p className="text-sm">Insights will appear as BizzyBee processes your emails</p>
+            <Sparkles className="h-8 w-8 mx-auto mb-2 opacity-50" />
+            <p className="text-sm">Insights appear as patterns emerge</p>
           </div>
         ) : (
           insights.map(insight => (

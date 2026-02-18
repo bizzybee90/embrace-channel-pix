@@ -80,12 +80,12 @@ export const TabletLayout = ({ filter = "all-open" }: TabletLayoutProps) => {
   return (
     <div className="flex h-screen w-full bg-background overflow-hidden">
       {/* Column 1: Collapsed sidebar (icons only) */}
-      <div data-sidebar className="flex-shrink-0 border-r border-border/40 bg-card shadow-sm">
+      <div data-sidebar className="flex-shrink-0 border-r border-border/20 bg-card z-10">
         <Sidebar forceCollapsed onNavigate={() => setSelectedConversation(null)} />
       </div>
 
       {/* Column 2: Master list (fixed width) */}
-      <div className="w-[320px] flex-shrink-0 border-r border-border/40 flex flex-col min-h-0 overflow-hidden">
+      <div className="w-[320px] flex-shrink-0 border-r border-border/20 flex flex-col min-h-0 overflow-hidden">
         <JaceStyleInbox
           onSelect={handleSelectConversation}
           filter={filter}
@@ -101,11 +101,14 @@ export const TabletLayout = ({ filter = "all-open" }: TabletLayoutProps) => {
             onUpdate={handleUpdate}
           />
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center gap-3 text-muted-foreground">
-            <div className="h-12 w-12 rounded-2xl bg-muted/50 flex items-center justify-center">
-              <Sparkles className="h-6 w-6 text-muted-foreground/50" />
+          <div className="flex-1 flex flex-col items-center justify-center gap-4 text-muted-foreground">
+            <div className="h-14 w-14 rounded-2xl bg-muted/30 flex items-center justify-center">
+              <Sparkles className="h-7 w-7 text-muted-foreground/30" />
             </div>
-            <p className="text-sm font-medium">Select a conversation</p>
+            <div className="text-center">
+              <p className="text-sm font-medium text-foreground/60">Select a conversation</p>
+              <p className="text-xs text-muted-foreground/50 mt-1">Choose from the list to get started</p>
+            </div>
           </div>
         )}
       </div>
