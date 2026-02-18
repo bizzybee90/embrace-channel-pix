@@ -124,7 +124,11 @@ const PANEL_HEADER_CLASSES = "flex items-center justify-between w-full px-4 gap-
           <CollapsibleContent>
             <div className="px-4 pb-4">
               <p className="text-sm text-foreground/80 leading-relaxed">
-                {conversation.summary_for_human || 'Summary being generated...'}
+                {conversation.summary_for_human || (() => {
+                  const createdAt = conversation.created_at ? new Date(conversation.created_at) : null;
+                  const ageMinutes = createdAt ? (Date.now() - createdAt.getTime()) / 60000 : Infinity;
+                  return ageMinutes < 10 ? 'Summary being generated...' : 'No summary available';
+                })()}
               </p>
             </div>
           </CollapsibleContent>

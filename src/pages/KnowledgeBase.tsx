@@ -1,31 +1,37 @@
 import { useState, useEffect } from 'react';
 import { useWorkspace } from '@/hooks/useWorkspace';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Sidebar } from '@/components/sidebar/Sidebar';
 import { 
   Search, Globe, Users, FileText, Star, Trash2, Edit, 
   Plus, BookOpen, Brain, ChevronDown, ChevronUp, ArrowLeft
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { toast } from 'sonner';
 
 interface FAQ {
   id: string;
   question: string;
   answer: string;
-  source: string | null;
+  generation_source: string | null;
+  source?: string | null;
   priority?: number;
   created_at: string;
 }
 
-const getSourceIcon = (source: string | null) => {
-  if (source?.includes('website')) return <Globe className="h-4 w-4 text-blue-500" />;
-  if (source?.includes('competitor')) return <Users className="h-4 w-4 text-purple-500" />;
-  if (source?.includes('document')) return <FileText className="h-4 w-4 text-amber-500" />;
+const getSourceIcon = (faq: FAQ) => {
+  const src = faq.generation_source || faq.source || '';
+  if (src.includes('website')) return <Globe className="h-4 w-4 text-blue-500" />;
+  if (src.includes('competitor')) return <Users className="h-4 w-4 text-purple-500" />;
+  if (src.includes('document')) return <FileText className="h-4 w-4 text-amber-500" />;
   return <Star className="h-4 w-4 text-muted-foreground" />;
 };
 
@@ -52,7 +58,7 @@ function FAQCard({ faq, onDelete }: { faq: FAQ; onDelete: () => void }) {
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-2">
-              {getSourceIcon(faq.source)}
+              {getSourceIcon(faq)}
               {getPriorityBadge(faq.priority ?? 0)}
             </div>
             
@@ -97,6 +103,10 @@ export default function KnowledgeBase() {
   const [faqs, setFaqs] = useState<FAQ[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showAddFaq, setShowAddFaq] = useState(false);
+  const [newQuestion, setNewQuestion] = useState('');
+  const [newAnswer, setNewAnswer] = useState('');
+  const [savingFaq, setSavingFaq] = useState(false);
 
   useEffect(() => {
     if (workspace?.id) {
@@ -108,7 +118,7 @@ export default function KnowledgeBase() {
     if (!workspace?.id) return;
     
     const { data } = await supabase
-      .from('faqs')
+      .from('faq_database')
       .select('*')
       .eq('workspace_id', workspace.id)
       .order('priority', { ascending: false });
@@ -117,12 +127,38 @@ export default function KnowledgeBase() {
     setLoading(false);
   };
 
+  const handleAddFaq = async () => {
+    if (!newQuestion.trim() || !newAnswer.trim() || !workspace?.id) return;
+    setSavingFaq(true);
+    const { error } = await supabase.from('faq_database').insert([{
+      workspace_id: workspace.id,
+      question: newQuestion.trim(),
+      answer: newAnswer.trim(),
+      category: 'manual',
+      generation_source: 'manual',
+      priority: 9,
+      is_active: true,
+      is_own_content: true,
+    }]);
+    setSavingFaq(false);
+    if (error) {
+      toast.error('Failed to save FAQ');
+      return;
+    }
+    toast.success('FAQ added successfully');
+    setNewQuestion('');
+    setNewAnswer('');
+    setShowAddFaq(false);
+    fetchFaqs();
+  };
+
   // Group FAQs by source
+  const getSrc = (f: FAQ) => f.generation_source || f.source || '';
   const groupedFaqs = {
-    website: faqs.filter(f => f.source?.includes('website') || (f.priority ?? 0) >= 9),
-    competitor: faqs.filter(f => f.source?.includes('competitor') || ((f.priority ?? 0) >= 5 && (f.priority ?? 0) < 9 && !f.source?.includes('website'))),
-    document: faqs.filter(f => f.source?.includes('document')),
-    manual: faqs.filter(f => f.source === 'manual' || !f.source)
+    website: faqs.filter(f => getSrc(f).includes('website') || (f.priority ?? 0) >= 9),
+    competitor: faqs.filter(f => getSrc(f).includes('competitor') || ((f.priority ?? 0) >= 5 && (f.priority ?? 0) < 9 && !getSrc(f).includes('website'))),
+    document: faqs.filter(f => getSrc(f).includes('document')),
+    manual: faqs.filter(f => getSrc(f) === 'manual' || !getSrc(f))
   };
 
   const filteredFaqs = faqs.filter(faq => 
@@ -177,7 +213,7 @@ export default function KnowledgeBase() {
                 Everything BizzyBee knows about your business
               </p>
             </div>
-            <Button className="gap-2">
+            <Button className="gap-2" onClick={() => setShowAddFaq(true)}>
               <Plus className="h-4 w-4" />
               Add FAQ
             </Button>
@@ -314,6 +350,45 @@ export default function KnowledgeBase() {
           )}
         </div>
       </div>
+
+      {/* Add FAQ Dialog */}
+      <Dialog open={showAddFaq} onOpenChange={setShowAddFaq}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add FAQ</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="faq-question">Question</Label>
+              <Input
+                id="faq-question"
+                placeholder="e.g. What are your opening hours?"
+                value={newQuestion}
+                onChange={e => setNewQuestion(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="faq-answer">Answer</Label>
+              <Textarea
+                id="faq-answer"
+                placeholder="e.g. We're open Monday–Friday, 9am–5pm."
+                value={newAnswer}
+                onChange={e => setNewAnswer(e.target.value)}
+                className="min-h-[120px]"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddFaq(false)}>Cancel</Button>
+            <Button
+              onClick={handleAddFaq}
+              disabled={savingFaq || !newQuestion.trim() || !newAnswer.trim()}
+            >
+              {savingFaq ? 'Saving...' : 'Save FAQ'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
