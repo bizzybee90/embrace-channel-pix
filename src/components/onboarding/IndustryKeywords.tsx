@@ -27,10 +27,11 @@ export const IndustryKeywords = ({ workspaceId, onComplete }: IndustryKeywordsPr
     try {
       const { data: ctx } = await supabase
         .from('business_context')
-        .select('industry_keywords')
+        .select('custom_flags')
         .eq('workspace_id', workspaceId)
         .single();
-      setKeywords(ctx?.industry_keywords || []);
+      const flags = ctx?.custom_flags as Record<string, unknown> | null;
+      setKeywords((flags?.industry_keywords as string[]) || []);
     } catch (e: any) {
       toast.error('Failed to generate keywords');
     } finally {
@@ -55,7 +56,7 @@ export const IndustryKeywords = ({ workspaceId, onComplete }: IndustryKeywordsPr
     try {
       const { error } = await supabase
         .from('business_context')
-        .update({ industry_keywords: keywords })
+        .update({ custom_flags: { industry_keywords: keywords } })
         .eq('workspace_id', workspaceId);
 
       if (error) throw error;

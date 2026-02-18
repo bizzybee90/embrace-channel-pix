@@ -53,12 +53,12 @@ serve(async (req) => {
   let currentStep = 'initializing';
 
   try {
+    // Parse and validate input
+    currentStep = 'validating_input';
+    const body = await req.json();
+
     // Auth validation
     const { validateAuth, AuthError, authErrorResponse } = await import('../_shared/auth.ts');
-    let body: any;
-    try {
-      body = await req.clone().json();
-    } catch { body = {}; }
     try {
       await validateAuth(req, body.workspace_id);
     } catch (authErr: any) {
@@ -82,10 +82,6 @@ serve(async (req) => {
     }
 
     const supabase = createClient(supabaseUrl, supabaseKey);
-
-    // Parse and validate input
-    currentStep = 'validating_input';
-    const body = await req.json();
     
     if (!body.conversation_id) {
       throw new Error('conversation_id is required');
