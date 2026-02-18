@@ -111,6 +111,12 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
         .in('status', ['new', 'open', 'waiting_internal', 'ai_handling']);
     } else if (filter === 'cleared') {
       query = query.or('decision_bucket.eq.auto_handled,status.eq.resolved');
+    } else if (filter === 'snoozed') {
+      query = query
+        .not('snoozed_until', 'is', null)
+        .gt('snoozed_until', new Date().toISOString());
+    } else if (filter === 'sent') {
+      query = query.eq('direction', 'outbound');
     }
 
     // When searching, fetch more items so search works beyond the first page
@@ -121,6 +127,8 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
     if (error) throw error;
 
     return (data || []).filter((conv: any) => {
+      // When viewing snoozed filter, don't filter out snoozed items
+      if (filter === 'snoozed') return true;
       if (!conv.snoozed_until) return true;
       return new Date(conv.snoozed_until) <= new Date();
     });

@@ -31,6 +31,26 @@ interface UseInboxEmailsOptions {
   page: number;
 }
 
+// Map a conversation row (with customer join) to the InboxEmail shape
+const mapConversationToInboxEmail = (conv: any): InboxEmail => ({
+  id: conv.id,
+  from_email: conv.customer?.email || null,
+  from_name: conv.customer?.name || null,
+  to_emails: null,
+  subject: conv.title || null,
+  body: conv.summary_for_human || null,
+  body_html: null,
+  received_at: conv.created_at || null,
+  category: conv.email_classification || null,
+  confidence: conv.triage_confidence || null,
+  needs_review: conv.triage_confidence != null && conv.triage_confidence < 0.7,
+  is_noise: conv.decision_bucket === 'auto_handled',
+  requires_reply: conv.requires_reply ?? null,
+  thread_id: conv.external_conversation_id || conv.id,
+  status: conv.status || null,
+  direction: conv.direction || 'inbound',
+});
+
 export const useInboxEmails = ({ folder, categoryFilter, search, page }: UseInboxEmailsOptions) => {
   const { workspace } = useWorkspace();
 
@@ -40,31 +60,47 @@ export const useInboxEmails = ({ folder, categoryFilter, search, page }: UseInbo
       if (!workspace?.id) return { emails: [], total: 0 };
 
       let query = supabase
-        .from('email_import_queue')
-        .select('id, from_email, from_name, to_emails, subject, body, received_at, category, confidence, needs_review, is_noise, requires_reply, thread_id, status, direction', { count: 'exact' })
+        .from('conversations')
+        .select(`
+          id,
+          title,
+          status,
+          channel,
+          direction,
+          email_classification,
+          decision_bucket,
+          requires_reply,
+          triage_confidence,
+          snoozed_until,
+          summary_for_human,
+          external_conversation_id,
+          created_at,
+          updated_at,
+          customer:customers(id, name, email)
+        `, { count: 'exact' })
         .eq('workspace_id', workspace.id)
-        .order('received_at', { ascending: false });
+        .order('updated_at', { ascending: false });
 
       // Apply folder filters
       switch (folder) {
         case 'inbox':
           query = query
-            .not('from_email', 'ilike', '%maccleaning%')
-            .or('is_noise.is.null,is_noise.eq.false');
+            .neq('decision_bucket', 'auto_handled')
+            .in('status', ['new', 'open', 'waiting_internal', 'ai_handling', 'escalated']);
           break;
         case 'sent':
-          query = query.ilike('from_email', '%maccleaning%');
+          query = query.eq('direction', 'outbound');
           break;
         case 'needs-reply':
-          query = query
-            .eq('requires_reply', true)
-            .not('from_email', 'ilike', '%maccleaning%');
+          query = query.eq('requires_reply', true);
           break;
         case 'ai-review':
-          query = query.eq('needs_review', true);
+          query = query
+            .lt('triage_confidence', 0.7)
+            .in('status', ['new', 'open']);
           break;
         case 'noise':
-          query = query.or('is_noise.eq.true,category.eq.spam');
+          query = query.or('decision_bucket.eq.auto_handled,email_classification.eq.spam');
           break;
         case 'all':
           // No filter
@@ -75,13 +111,13 @@ export const useInboxEmails = ({ folder, categoryFilter, search, page }: UseInbo
       if (categoryFilter) {
         const group = CATEGORY_GROUPS.find(g => g.key === categoryFilter);
         if (group) {
-          query = query.in('category', group.categories);
+          query = query.in('email_classification', group.categories);
         }
       }
 
-      // Apply search
+      // Apply search (search customer name/email via title or joined customer)
       if (search.trim()) {
-        query = query.or(`from_email.ilike.%${search}%,from_name.ilike.%${search}%,subject.ilike.%${search}%`);
+        query = query.or(`title.ilike.%${search}%,summary_for_human.ilike.%${search}%`);
       }
 
       // Pagination
@@ -90,7 +126,8 @@ export const useInboxEmails = ({ folder, categoryFilter, search, page }: UseInbo
       const { data, count, error } = await query;
       if (error) throw error;
 
-      return { emails: (data || []) as InboxEmail[], total: count || 0 };
+      const emails = (data || []).map(mapConversationToInboxEmail);
+      return { emails, total: count || 0 };
     },
     enabled: !!workspace?.id,
     staleTime: 30000,
@@ -98,6 +135,7 @@ export const useInboxEmails = ({ folder, categoryFilter, search, page }: UseInbo
 };
 
 // Fetch full email with body_html for reading pane
+// Tries conversations first (for metadata), falls back to email_import_queue for body content
 export const useEmailDetail = (emailId: string | null) => {
   const { workspace } = useWorkspace();
 
@@ -106,6 +144,44 @@ export const useEmailDetail = (emailId: string | null) => {
     queryFn: async () => {
       if (!emailId || !workspace?.id) return null;
 
+      // First try conversations (which is what the list returns)
+      const { data: conv, error: convError } = await supabase
+        .from('conversations')
+        .select(`
+          id, title, status, channel, direction, email_classification,
+          decision_bucket, requires_reply, triage_confidence,
+          summary_for_human, external_conversation_id,
+          created_at, updated_at,
+          customer:customers(id, name, email)
+        `)
+        .eq('id', emailId)
+        .single();
+
+      if (!convError && conv) {
+        // Fetch the latest message body for this conversation
+        const { data: latestMsg } = await supabase
+          .from('messages')
+          .select('body, raw_payload')
+          .eq('conversation_id', conv.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        const mapped = mapConversationToInboxEmail(conv);
+        if (latestMsg) {
+          mapped.body = latestMsg.body || mapped.body;
+          // Try to get HTML from raw_payload
+          const raw = latestMsg.raw_payload as any;
+          if (raw?.htmlBody) {
+            mapped.body_html = raw.htmlBody;
+          } else if (raw?.body?.html) {
+            mapped.body_html = raw.body.html;
+          }
+        }
+        return mapped;
+      }
+
+      // Fallback: try email_import_queue (for older imported emails)
       const { data, error } = await supabase
         .from('email_import_queue')
         .select('*')
@@ -119,7 +195,7 @@ export const useEmailDetail = (emailId: string | null) => {
   });
 };
 
-// Fetch thread emails
+// Fetch thread emails (messages within a conversation)
 export const useEmailThread = (threadId: string | null) => {
   const { workspace } = useWorkspace();
 
@@ -128,6 +204,45 @@ export const useEmailThread = (threadId: string | null) => {
     queryFn: async () => {
       if (!threadId || !workspace?.id) return [];
 
+      // Try to find messages for this conversation
+      const { data: messages, error: msgError } = await supabase
+        .from('messages')
+        .select('id, actor_name, actor_type, direction, body, raw_payload, created_at')
+        .eq('conversation_id', threadId)
+        .order('created_at', { ascending: true });
+
+      if (!msgError && messages && messages.length > 0) {
+        // Get conversation customer info
+        const { data: conv } = await supabase
+          .from('conversations')
+          .select('title, customer:customers(name, email)')
+          .eq('id', threadId)
+          .single();
+
+        return messages.map((msg: any): InboxEmail => {
+          const raw = msg.raw_payload as any;
+          return {
+            id: msg.id,
+            from_email: msg.direction === 'inbound' ? (conv as any)?.customer?.email || null : null,
+            from_name: msg.actor_name || (msg.direction === 'inbound' ? (conv as any)?.customer?.name : 'You'),
+            to_emails: null,
+            subject: (conv as any)?.title || null,
+            body: msg.body || null,
+            body_html: raw?.htmlBody || raw?.body?.html || null,
+            received_at: msg.created_at,
+            category: null,
+            confidence: null,
+            needs_review: null,
+            is_noise: null,
+            requires_reply: null,
+            thread_id: threadId,
+            status: null,
+            direction: msg.direction || 'inbound',
+          };
+        });
+      }
+
+      // Fallback: try email_import_queue thread
       const { data, error } = await supabase
         .from('email_import_queue')
         .select('id, from_email, from_name, to_emails, subject, body, body_html, received_at, category, confidence, direction')
@@ -142,7 +257,7 @@ export const useEmailThread = (threadId: string | null) => {
   });
 };
 
-// Folder counts - scoped to last 30 days for accuracy
+// Folder counts from conversations table
 export const useInboxCounts = () => {
   const { workspace } = useWorkspace();
 
@@ -155,32 +270,30 @@ export const useInboxCounts = () => {
 
       const [inboxResult, needsReplyResult, aiReviewResult, unreadResult] = await Promise.all([
         supabase
-          .from('email_import_queue')
+          .from('conversations')
           .select('id', { count: 'exact', head: true })
           .eq('workspace_id', workspace.id)
-          .not('from_email', 'ilike', '%maccleaning%')
-          .or('is_noise.is.null,is_noise.eq.false')
-          .gte('received_at', thirtyDaysAgo),
+          .neq('decision_bucket', 'auto_handled')
+          .in('status', ['new', 'open', 'waiting_internal', 'ai_handling', 'escalated'])
+          .gte('created_at', thirtyDaysAgo),
         supabase
-          .from('email_import_queue')
+          .from('conversations')
           .select('id', { count: 'exact', head: true })
           .eq('workspace_id', workspace.id)
           .eq('requires_reply', true)
-          .not('from_email', 'ilike', '%maccleaning%')
-          .gte('received_at', thirtyDaysAgo),
+          .gte('created_at', thirtyDaysAgo),
         supabase
-          .from('email_import_queue')
+          .from('conversations')
           .select('id', { count: 'exact', head: true })
           .eq('workspace_id', workspace.id)
-          .eq('needs_review', true),
+          .lt('triage_confidence', 0.7)
+          .in('status', ['new', 'open']),
         supabase
-          .from('email_import_queue')
+          .from('conversations')
           .select('id', { count: 'exact', head: true })
           .eq('workspace_id', workspace.id)
-          .not('from_email', 'ilike', '%maccleaning%')
-          .or('is_noise.is.null,is_noise.eq.false')
-          .neq('status', 'processed')
-          .gte('received_at', thirtyDaysAgo),
+          .eq('status', 'new')
+          .gte('created_at', thirtyDaysAgo),
       ]);
 
       return {

@@ -11,6 +11,7 @@ interface MessageCardProps {
     customer_name: string | null;
     customer_identifier: string;
     message_content: string;
+    body?: string;
     conversation_context: any;
     priority: string;
     status: string;
@@ -81,7 +82,7 @@ export const MessageCard = ({ message, onRespond }: MessageCardProps) => {
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="rounded-lg bg-muted p-4">
-          <p className="text-sm text-foreground whitespace-pre-wrap">{message.message_content}</p>
+          <p className="text-sm text-foreground whitespace-pre-wrap">{message.body || message.message_content}</p>
         </div>
         
         {message.conversation_context && (

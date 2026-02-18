@@ -542,8 +542,81 @@ async function processEmailFromData(supabase: any, emailConfig: any, message: an
   // Emails will be marked as read when the conversation is resolved in BizzyBee
   // This allows bi-directional sync with Gmail/Outlook
 
-  // AI triage is handled by n8n workflow, not called from webhook
-  console.log('Email stored, conversation:', conversationId, '— n8n will handle triage');
+  // Step 1: Run deterministic pre-triage rules (zero cost, pattern matching only)
+  try {
+    const preTriageResponse = await fetch(
+      `${Deno.env.get('SUPABASE_URL')}/functions/v1/pre-triage-rules`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+        },
+        body: JSON.stringify({
+          email: {
+            from_email: senderEmail,
+            from_name: senderName,
+            subject: subject,
+            body: body,
+          },
+          workspace_id: emailConfig.workspace_id,
+        }),
+      }
+    );
+
+    if (preTriageResponse.ok) {
+      const triage = await preTriageResponse.json();
+      console.log('Pre-triage result:', triage.rule_type, triage.decision_bucket, 'skip_llm:', triage.skip_llm);
+
+      // Build update object with only columns that exist in conversations table
+      const triageUpdate: Record<string, any> = {
+        requires_reply: triage.requires_reply,
+      };
+      if (triage.decision_bucket) triageUpdate.decision_bucket = triage.decision_bucket;
+      if (triage.classification) triageUpdate.email_classification = triage.classification;
+      if (triage.confidence) triageUpdate.triage_confidence = triage.confidence;
+      if (triage.why_this_needs_you) triageUpdate.why_this_needs_you = triage.why_this_needs_you;
+
+      // Update conversation with classification
+      if (triage.matched) {
+        const { error: updateError } = await supabase
+          .from('conversations')
+          .update(triageUpdate)
+          .eq('id', conversationId);
+
+        if (updateError) {
+          console.error('Failed to update triage:', updateError.message);
+        }
+      }
+
+      // Step 2: If pre-triage couldn't fully classify, trigger n8n for AI
+      if (!triage.skip_llm) {
+        const n8nWebhookUrl = Deno.env.get('N8N_WEBHOOK_URL');
+        if (n8nWebhookUrl) {
+          fetch(`${n8nWebhookUrl}/email-classify`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              conversation_id: conversationId,
+              workspace_id: emailConfig.workspace_id,
+              from_email: senderEmail,
+              from_name: senderName,
+              subject: subject,
+              body: body.substring(0, 2000),
+            }),
+          }).catch(err => console.error('n8n classification trigger failed:', err));
+          console.log('Triggered n8n classification for conversation:', conversationId);
+        }
+      }
+    } else {
+      console.error('Pre-triage call failed:', preTriageResponse.status);
+    }
+  } catch (triageErr) {
+    // Non-blocking - email is already saved, classification is a bonus
+    console.error('Pre-triage error (non-blocking):', triageErr);
+  }
+
+  console.log('Email fully processed, conversation:', conversationId);
 }
 
 // Process email update notifications (e.g., when email is marked as read/unread externally)
