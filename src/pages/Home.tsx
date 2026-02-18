@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { ThreeColumnLayout } from '@/components/layout/ThreeColumnLayout';
 import { Sidebar } from '@/components/sidebar/Sidebar';
 import { MobilePageLayout } from '@/components/layout/MobilePageLayout';
@@ -172,12 +173,21 @@ export const Home = () => {
 
   const mainContent = (
     <ScrollArea className="h-[calc(100vh-4rem)]">
-      <div className="p-6 space-y-6">
+      <div className="p-4 md:p-6 space-y-6">
         {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-              <p className="text-muted-foreground">Loading...</p>
+          <div className="space-y-4">
+            <div className="flex items-center gap-4">
+              <Skeleton className="h-20 w-20 rounded-2xl" />
+              <div className="space-y-2">
+                <Skeleton className="h-6 w-40" />
+                <Skeleton className="h-4 w-64" />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Skeleton className="h-24 rounded-2xl" />
+              <Skeleton className="h-24 rounded-2xl" />
+              <Skeleton className="h-24 rounded-2xl" />
+              <Skeleton className="h-24 rounded-2xl" />
             </div>
           </div>
         ) : (
@@ -240,9 +250,6 @@ export const Home = () => {
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground mt-3">
-                  {stats.atRiskCount > 0 ? 'Handle these first' : 'No SLA issues right now'}
-                </p>
               </Card>
 
               {/* Training - Help BizzyBee learn */}
@@ -270,9 +277,6 @@ export const Home = () => {
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground mt-3">
-                  {stats.reviewCount > 0 ? "Help BizzyBee learn new patterns — you'll see fewer each week" : 'BizzyBee is confident on all items'}
-                </p>
               </Card>
 
               {/* To Reply - Primary work queue */}
@@ -300,9 +304,6 @@ export const Home = () => {
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground mt-3">
-                  {stats.toReplyCount > 0 ? "Clear these and you're done for today" : 'Inbox clear'}
-                </p>
               </Card>
 
               {/* Drafts Ready - Actionable, quick wins */}
@@ -330,9 +331,6 @@ export const Home = () => {
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground mt-3">
-                  {stats.draftCount > 0 ? 'AI drafted, you approve' : 'No drafts pending'}
-                </p>
               </Card>
             </div>
 
@@ -350,7 +348,7 @@ export const Home = () => {
             )}
 
             {/* Main Content Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {/* Drafts Section */}
               <Card className="p-4">
                 <div className="flex items-center gap-2 mb-4">

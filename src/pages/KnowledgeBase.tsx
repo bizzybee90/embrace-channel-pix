@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useWorkspace } from '@/hooks/useWorkspace';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { MobilePageLayout } from '@/components/layout/MobilePageLayout';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -100,6 +102,7 @@ function FAQCard({ faq, onDelete }: { faq: FAQ; onDelete: () => void }) {
 
 export default function KnowledgeBase() {
   const { workspace, loading: workspaceLoading } = useWorkspace();
+  const isMobile = useIsMobile();
   const [faqs, setFaqs] = useState<FAQ[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -181,6 +184,83 @@ export default function KnowledgeBase() {
           <div className="animate-pulse text-muted-foreground">Loading...</div>
         </div>
       </div>
+    );
+  }
+
+  if (isMobile) {
+    return (
+      <MobilePageLayout>
+        <div className="flex-1 overflow-auto">
+          <div className="max-w-5xl mx-auto p-4 space-y-6">
+            <Link to="/" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
+              <ArrowLeft className="h-4 w-4" />
+              <span className="text-sm">Back to Dashboard</span>
+            </Link>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
+                    <Brain className="h-5 w-5 text-primary" />
+                  </div>
+                  <h1 className="text-2xl font-bold">Knowledge Base</h1>
+                </div>
+                <p className="text-muted-foreground">Everything BizzyBee knows about your business</p>
+              </div>
+              <Button className="gap-2 self-start sm:self-auto" onClick={() => setShowAddFaq(true)}>
+                <Plus className="h-4 w-4" />
+                Add FAQ
+              </Button>
+            </div>
+            {/* Stats Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <Card><CardContent className="p-4"><div className="flex items-center gap-3"><Globe className="h-8 w-8 text-blue-500" /><div><p className="text-2xl font-bold">{groupedFaqs.website.length}</p><p className="text-xs text-muted-foreground">From Your Website</p></div></div></CardContent></Card>
+              <Card><CardContent className="p-4"><div className="flex items-center gap-3"><Users className="h-8 w-8 text-purple-500" /><div><p className="text-2xl font-bold">{groupedFaqs.competitor.length}</p><p className="text-xs text-muted-foreground">From Competitors</p></div></div></CardContent></Card>
+              <Card><CardContent className="p-4"><div className="flex items-center gap-3"><FileText className="h-8 w-8 text-amber-500" /><div><p className="text-2xl font-bold">{groupedFaqs.document.length}</p><p className="text-xs text-muted-foreground">From Documents</p></div></div></CardContent></Card>
+              <Card><CardContent className="p-4"><div className="flex items-center gap-3"><BookOpen className="h-8 w-8 text-green-500" /><div><p className="text-2xl font-bold">{faqs.length}</p><p className="text-xs text-muted-foreground">Total FAQs</p></div></div></CardContent></Card>
+            </div>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input placeholder="Search FAQs..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10" />
+            </div>
+            <Tabs defaultValue="all" className="space-y-4">
+              <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="all">All ({faqs.length})</TabsTrigger>
+                <TabsTrigger value="website">Website ({groupedFaqs.website.length})</TabsTrigger>
+                <TabsTrigger value="competitors">Competitors ({groupedFaqs.competitor.length})</TabsTrigger>
+                <TabsTrigger value="documents">Documents ({groupedFaqs.document.length})</TabsTrigger>
+              </TabsList>
+              <TabsContent value="all" className="space-y-3">
+                {loading ? <div className="text-center py-8 text-muted-foreground">Loading FAQs...</div> : filteredFaqs.length > 0 ? filteredFaqs.map(faq => <FAQCard key={faq.id} faq={faq} onDelete={fetchFaqs} />) : <div className="text-center py-8 text-muted-foreground">No FAQs found</div>}
+              </TabsContent>
+              <TabsContent value="website" className="space-y-3">
+                {filterByTab(groupedFaqs.website).length > 0 ? filterByTab(groupedFaqs.website).map(faq => <FAQCard key={faq.id} faq={faq} onDelete={fetchFaqs} />) : <div className="text-center py-8 text-muted-foreground">No website FAQs yet</div>}
+              </TabsContent>
+              <TabsContent value="competitors" className="space-y-3">
+                {filterByTab(groupedFaqs.competitor).length > 0 ? filterByTab(groupedFaqs.competitor).map(faq => <FAQCard key={faq.id} faq={faq} onDelete={fetchFaqs} />) : <div className="text-center py-8 text-muted-foreground">No competitor FAQs yet</div>}
+              </TabsContent>
+              <TabsContent value="documents" className="space-y-3">
+                {filterByTab(groupedFaqs.document).length > 0 ? filterByTab(groupedFaqs.document).map(faq => <FAQCard key={faq.id} faq={faq} onDelete={fetchFaqs} />) : <div className="text-center py-8 text-muted-foreground">No document FAQs yet</div>}
+              </TabsContent>
+            </Tabs>
+            {faqs.length === 0 && !loading && (
+              <Card className="border-dashed"><CardContent className="flex flex-col items-center justify-center py-12"><BookOpen className="h-12 w-12 text-muted-foreground mb-4" /><h3 className="text-lg font-medium mb-2">No knowledge yet</h3><p className="text-muted-foreground text-center mb-4">Complete onboarding to build your knowledge base.</p><Button asChild><Link to="/onboarding">Go to Onboarding</Link></Button></CardContent></Card>
+            )}
+          </div>
+        </div>
+        <Dialog open={showAddFaq} onOpenChange={setShowAddFaq}>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Add FAQ</DialogTitle></DialogHeader>
+            <div className="space-y-4 py-2">
+              <div className="space-y-2"><Label htmlFor="faq-question-m">Question</Label><Input id="faq-question-m" placeholder="e.g. What are your opening hours?" value={newQuestion} onChange={e => setNewQuestion(e.target.value)} /></div>
+              <div className="space-y-2"><Label htmlFor="faq-answer-m">Answer</Label><Textarea id="faq-answer-m" placeholder="e.g. We're open Monday–Friday, 9am–5pm." value={newAnswer} onChange={e => setNewAnswer(e.target.value)} className="min-h-[120px]" /></div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowAddFaq(false)}>Cancel</Button>
+              <Button onClick={handleAddFaq} disabled={savingFaq || !newQuestion.trim() || !newAnswer.trim()}>{savingFaq ? 'Saving...' : 'Save FAQ'}</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </MobilePageLayout>
     );
   }
 

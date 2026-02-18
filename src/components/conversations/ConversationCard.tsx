@@ -1,11 +1,9 @@
 import { memo } from 'react';
-import { Conversation, DecisionBucket } from '@/lib/types';
-import { Badge } from '@/components/ui/badge';
+import { Conversation } from '@/lib/types';
 import { Button } from '@/components/ui/button';
-import { formatDistanceToNow } from 'date-fns';
-import { Clock, CheckCircle2, UserPlus, FileEdit, User, Bot, AlertTriangle, MessageSquare, Hourglass, Star, CircleAlert, CircleCheck, CirclePause, Timer, RotateCcw, History } from 'lucide-react';
+import { differenceInMinutes, differenceInHours, differenceInDays } from 'date-fns';
+import { CheckCircle2, UserPlus, FileEdit, RotateCcw } from 'lucide-react';
 import { ChannelIcon } from '../shared/ChannelIcon';
-import { CategoryLabel } from '../shared/CategoryLabel';
 import { cn } from '@/lib/utils';
 import { useIsTablet } from '@/hooks/use-tablet';
 import { useHaptics } from '@/hooks/useHaptics';
@@ -13,40 +11,27 @@ import { useState, useRef, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { TriageQuickActions } from './TriageQuickActions';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
-// Decision bucket badge helper - PRIMARY display
-const getDecisionBucketBadge = (bucket: DecisionBucket | string | null | undefined) => {
-  if (!bucket) return null;
-  
-  const badges: Record<string, { icon: typeof CircleAlert; label: string; emoji: string; className: string }> = {
-    act_now: { 
-      icon: CircleAlert, 
-      label: 'Act Now', 
-      emoji: '🔴',
-      className: 'bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/30 font-bold' 
-    },
-    quick_win: { 
-      icon: Timer, 
-      label: 'Quick Win', 
-      emoji: '🟡',
-      className: 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30 font-bold' 
-    },
-    auto_handled: { 
-      icon: CircleCheck, 
-      label: 'Auto-Handled', 
-      emoji: '🟢',
-      className: 'bg-green-500/15 text-green-600 dark:text-green-400 border-green-500/30 font-bold' 
-    },
-    wait: { 
-      icon: CirclePause, 
-      label: 'Wait', 
-      emoji: '🔵',
-      className: 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30 font-bold' 
-    },
-  };
-  
-  return badges[bucket] || null;
+// Status dot color based on decision bucket / status
+const getStatusDotColor = (bucket: string | null | undefined, status: string | null | undefined): string => {
+  if (bucket === 'act_now') return 'bg-destructive';
+  if (bucket === 'quick_win') return 'bg-amber-500';
+  if (bucket === 'auto_handled') return 'bg-green-500';
+  if (bucket === 'wait') return 'bg-blue-400';
+  if (status === 'resolved') return 'bg-green-500';
+  return 'bg-muted-foreground/40';
+};
+
+// Short relative time: "2m", "1h", "3d"
+const formatShortTime = (dateStr: string): string => {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const mins = differenceInMinutes(now, date);
+  if (mins < 60) return `${mins}m`;
+  const hrs = differenceInHours(now, date);
+  if (hrs < 24) return `${hrs}h`;
+  const days = differenceInDays(now, date);
+  return `${days}d`;
 };
 
 interface ConversationCardProps {
@@ -63,59 +48,12 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
   const { toast } = useToast();
 
   const [hasDraft, setHasDraft] = useState(false);
-  const [assignedUserName, setAssignedUserName] = useState<string | null>(null);
-  const [correction, setCorrection] = useState<{
-    original_classification: string | null;
-    new_classification: string | null;
-    original_requires_reply: boolean | null;
-    new_requires_reply: boolean | null;
-  } | null>(null);
   const [isReopening, setIsReopening] = useState(false);
 
   useEffect(() => {
     const draftKey = `draft-${conversation.id}`;
     const draft = localStorage.getItem(draftKey);
     setHasDraft(!!draft && draft.trim().length > 0);
-  }, [conversation.id]);
-
-  useEffect(() => {
-    const fetchAssignedUser = async () => {
-      if (!conversation.assigned_to) {
-        setAssignedUserName(null);
-        return;
-      }
-      
-      const { data } = await supabase
-        .from('users')
-        .select('name')
-        .eq('id', conversation.assigned_to)
-        .single();
-      
-      if (data) {
-        setAssignedUserName(data.name);
-      }
-    };
-    
-    fetchAssignedUser();
-  }, [conversation.assigned_to]);
-
-  // Fetch correction history for this conversation
-  useEffect(() => {
-    const fetchCorrection = async () => {
-      const { data } = await supabase
-        .from('triage_corrections')
-        .select('original_classification, new_classification, original_requires_reply, new_requires_reply')
-        .eq('conversation_id', conversation.id)
-        .order('corrected_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      
-      if (data) {
-        setCorrection(data);
-      }
-    };
-    
-    fetchCorrection();
   }, [conversation.id]);
 
   const [swipeDistance, setSwipeDistance] = useState(0);
@@ -248,52 +186,87 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
     setIsReopening(false);
   };
 
-  // Helper to format classification for display
-  const formatClassification = (classification: string | null) => {
-    if (!classification) return 'Unknown';
-    return classification
-      .replace(/_/g, ' ')
-      .replace(/\b\w/g, l => l.toUpperCase());
-  };
-  
-  const getBucketBarColor = (bucket: string | null | undefined) => {
-    if (!bucket) return 'bg-muted';
-    switch (bucket) {
-      case 'act_now': return 'bg-red-500';
-      case 'quick_win': return 'bg-amber-500';
-      case 'auto_handled': return 'bg-green-500';
-      case 'wait': return 'bg-blue-500';
-      default: return 'bg-muted';
-    }
-  };
-
-  const getPriorityBarColor = (priority: string | null) => {
-    if (!priority) return 'bg-muted';
-    switch (priority.toLowerCase()) {
-      case 'urgent': return 'bg-priority-urgent';
-      case 'high': return 'bg-priority-high';
-      case 'medium': return 'bg-priority-medium';
-      case 'low': return 'bg-priority-low';
-      default: return 'bg-muted';
-    }
-  };
-
   const swipeProgress = Math.min(Math.abs(swipeDistance) / SWIPE_THRESHOLD, 1);
   const isRightSwipe = swipeDistance > 0;
   const isOverdue = conversation.sla_due_at && new Date() > new Date(conversation.sla_due_at);
-  
-  // Get decision bucket badge (primary)
-  const bucketBadge = getDecisionBucketBadge(conversation.decision_bucket);
-  
-  // Determine the primary description to show
-  const primaryDescription = conversation.why_this_needs_you || conversation.summary_for_human || conversation.ai_reason_for_escalation;
+  const isResolvable = conversation.status === 'resolved' || conversation.decision_bucket === 'auto_handled';
 
-  // Compact tablet layout
+  const dotColor = getStatusDotColor(conversation.decision_bucket, conversation.status);
+  const timeStr = formatShortTime(conversation.updated_at || conversation.created_at!);
+
+  // Derive sender name from joined customer or title
+  const conv = conversation as any;
+  const senderName = conv.customer?.name || conv.customer?.email || conversation.title || 'Unknown';
+
+  // AI snippet
+  const snippet = conversation.summary_for_human || conversation.why_this_needs_you || 'Processing...';
+
+  // Inner content shared between tablet and desktop (differs only in padding)
+  const cardInner = (padClass: string) => (
+    <div className={padClass}>
+      {/* Row 1: Status dot · Sender · [overdue dot] · [reopen] · time */}
+      <div className="flex items-center gap-2 mb-1">
+        {/* Status dot */}
+        <span className={cn('h-2 w-2 rounded-full flex-shrink-0', dotColor)} />
+
+        {/* Sender name */}
+        <span className="text-sm font-semibold text-foreground truncate flex-1 min-w-0">
+          {senderName}
+        </span>
+
+        {/* Overdue red dot */}
+        {isOverdue && (
+          <span className="h-2 w-2 rounded-full bg-destructive flex-shrink-0" title="Overdue" />
+        )}
+
+        {/* Reopen ghost button */}
+        {isResolvable && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleReopen}
+            disabled={isReopening}
+            className="h-5 px-1.5 text-[10px] text-muted-foreground hover:text-foreground flex-shrink-0"
+          >
+            <RotateCcw className="h-3 w-3 mr-0.5" />
+            Reopen
+          </Button>
+        )}
+
+        {/* Short timestamp */}
+        <span className="text-xs text-muted-foreground flex-shrink-0">{timeStr}</span>
+      </div>
+
+      {/* Row 2: Subject/Title */}
+      <p className="text-sm font-medium text-foreground truncate mb-1">
+        {conversation.title || 'No subject'}
+      </p>
+
+      {/* Row 3: AI snippet + indicators */}
+      <div className="flex items-center gap-2">
+        <p className="text-xs text-muted-foreground truncate flex-1 min-w-0">
+          {snippet}
+        </p>
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {hasDraft && <FileEdit className="h-3 w-3 text-primary/60" />}
+          {conversation.channel !== 'email' && (
+            <ChannelIcon channel={conversation.channel} className="h-3 w-3 opacity-60" />
+          )}
+        </div>
+      </div>
+
+      {showTriageActions && (
+        <TriageQuickActions conversation={conversation} onUpdate={onUpdate} />
+      )}
+    </div>
+  );
+
+  // Tablet layout (with swipe gestures)
   if (isTablet) {
     return (
       <div 
         ref={cardRef}
-        className="relative overflow-hidden touch-pan-y mb-3"
+        className="relative overflow-hidden touch-pan-y mb-2"
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
@@ -333,139 +306,7 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
             transition: isSwiping ? 'none' : 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
           }}
         >
-          {/* Decision Bucket Accent Bar - PRIMARY indicator */}
-          <div 
-            className={cn(
-              "absolute top-0 left-0 right-0 h-1.5",
-              conversation.decision_bucket 
-                ? getBucketBarColor(conversation.decision_bucket)
-                : conversation.status === 'resolved' 
-                  ? "bg-green-500" 
-                  : getPriorityBarColor(conversation.priority)
-            )}
-          />
-          
-          {isOverdue && (
-            <Badge variant="destructive" className="absolute top-4 right-4 text-[11px] font-bold uppercase tracking-wide px-3 py-1.5 rounded-full shadow-sm">
-              Overdue
-            </Badge>
-          )}
-
-          <div className="p-5">
-            {/* Decision Bucket Badge + Category Label - FIRST AND PROMINENT */}
-            <div className="flex flex-wrap items-center gap-2 mb-3">
-              {bucketBadge && (
-                <Badge 
-                  variant="outline" 
-                  className={cn(
-                    "rounded-full text-sm px-4 py-2 border-2 flex items-center gap-2 w-fit",
-                    bucketBadge.className
-                  )}
-                >
-                  <span className="text-base">{bucketBadge.emoji}</span>
-                  <bucketBadge.icon className="h-4 w-4" />
-                  {bucketBadge.label}
-                </Badge>
-              )}
-              {/* Category label next to status */}
-              <CategoryLabel classification={conversation.email_classification} size="md" />
-            </div>
-
-            {/* Title */}
-            <h3 className={cn(
-              "font-semibold text-base leading-snug mb-2 line-clamp-2 text-foreground",
-              isOverdue && !bucketBadge && "pr-20"
-            )}>
-              {conversation.title || 'Untitled Conversation'}
-            </h3>
-
-            {/* Why This Needs You - PRIMARY description */}
-            {primaryDescription && (
-              <p className={cn(
-                "text-sm leading-relaxed mb-3 line-clamp-2",
-                conversation.why_this_needs_you 
-                  ? "text-foreground font-medium" 
-                  : "text-muted-foreground"
-              )}>
-                {primaryDescription}
-              </p>
-            )}
-
-            {/* Secondary Badge Row - Compact */}
-            <div className="flex flex-wrap items-center gap-1.5 mb-3">
-              <Badge variant="outline" className="rounded-full text-[11px] font-medium px-2.5 py-1 border-border/50 flex items-center gap-1">
-                <ChannelIcon channel={conversation.channel} className="h-3 w-3" />
-                {conversation.channel}
-              </Badge>
-
-
-              {hasDraft && (
-                <Badge variant="secondary" className="rounded-full text-[11px] font-medium px-2.5 py-1 bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 flex items-center gap-1">
-                  <FileEdit className="h-3 w-3" />
-                  Draft
-                </Badge>
-              )}
-
-              {conversation.assigned_to && (
-                <Badge variant="secondary" className="rounded-full text-[11px] font-medium px-2.5 py-1 flex items-center gap-1">
-                  <User className="h-3 w-3" />
-                  {assignedUserName || 'Assigned'}
-                </Badge>
-              )}
-
-              {/* Correction badge - shows when this email was reclassified */}
-              {correction && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Badge variant="outline" className="rounded-full text-[11px] font-medium px-2.5 py-1 bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20 flex items-center gap-1 cursor-help">
-                      <History className="h-3 w-3" />
-                      Corrected
-                    </Badge>
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="max-w-xs">
-                    <p className="text-xs">
-                      <span className="font-semibold">You corrected this:</span><br />
-                      {correction.original_classification && correction.new_classification && (
-                        <>Classification: {formatClassification(correction.original_classification)} → {formatClassification(correction.new_classification)}<br /></>
-                      )}
-                      {correction.original_requires_reply !== correction.new_requires_reply && (
-                        <>Reply needed: {correction.original_requires_reply ? 'Yes' : 'No'} → {correction.new_requires_reply ? 'Yes' : 'No'}</>
-                      )}
-                    </p>
-                  </TooltipContent>
-                </Tooltip>
-              )}
-            </div>
-
-            <div className="flex items-center justify-between text-xs text-muted-foreground font-medium">
-              <span className="uppercase tracking-wide text-[10px]">
-                {conversation.category?.replace(/_/g, ' ') || 'General'}
-              </span>
-              <div className="flex items-center gap-2">
-                {/* Reopen button for resolved/auto-handled conversations */}
-                {(conversation.status === 'resolved' || conversation.decision_bucket === 'auto_handled') && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleReopen}
-                    disabled={isReopening}
-                    className="h-6 px-2 text-[10px] text-muted-foreground hover:text-foreground"
-                  >
-                    <RotateCcw className="h-3 w-3 mr-1" />
-                    Reopen
-                  </Button>
-                )}
-                <span className="flex items-center gap-1">
-                  <Clock className="h-3 w-3" />
-                  {formatDistanceToNow(new Date(conversation.updated_at || conversation.created_at!), { addSuffix: true })}
-                </span>
-              </div>
-            </div>
-          
-            {showTriageActions && (
-              <TriageQuickActions conversation={conversation} onUpdate={onUpdate} />
-            )}
-          </div>
+          {cardInner('p-3.5')}
         </div>
       </div>
     );
@@ -476,165 +317,13 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
     <div
       onClick={handleClick}
       className={cn(
-        "relative cursor-pointer transition-all duration-300 ease-out rounded-[22px] mb-3 overflow-hidden",
+        "relative cursor-pointer transition-all duration-300 ease-out rounded-[22px] mb-2 overflow-hidden",
         "bg-card border border-border/30 hover:border-primary/30",
         "apple-shadow hover:apple-shadow-lg spring-press",
         selected && "border-primary/50 apple-shadow-lg bg-gradient-to-br from-primary/8 via-primary/4 to-card"
       )}
     >
-      {/* Decision Bucket Accent Bar */}
-      <div 
-        className={cn(
-          "absolute top-0 left-0 right-0 h-1.5",
-          conversation.decision_bucket 
-            ? getBucketBarColor(conversation.decision_bucket)
-            : conversation.status === 'resolved' 
-              ? "bg-green-500" 
-              : getPriorityBarColor(conversation.priority)
-        )}
-      />
-      
-      {isOverdue && (
-        <Badge variant="destructive" className="absolute top-4 right-4 text-[11px] font-bold uppercase tracking-wide px-3 py-1.5 rounded-full shadow-sm">
-          Overdue
-        </Badge>
-      )}
-
-      <div className="p-6">
-        {/* Decision Bucket Badge + Category Label - FIRST AND PROMINENT */}
-        <div className="flex flex-wrap items-center gap-2 mb-3">
-          {bucketBadge && (
-            <Badge 
-              variant="outline" 
-              className={cn(
-                "rounded-full text-sm px-4 py-2 border-2 flex items-center gap-2 w-fit",
-                bucketBadge.className
-              )}
-            >
-              <span className="text-base">{bucketBadge.emoji}</span>
-              <bucketBadge.icon className="h-4 w-4" />
-              {bucketBadge.label}
-            </Badge>
-          )}
-          {/* Category label next to status */}
-          <CategoryLabel classification={conversation.email_classification} size="md" />
-        </div>
-
-        {/* Title */}
-        <h3 className={cn(
-          "font-semibold text-lg leading-snug mb-2 text-foreground line-clamp-2",
-          isOverdue && !bucketBadge && "pr-20"
-        )}>
-          {conversation.title || 'Untitled Conversation'}
-        </h3>
-
-        {/* Why This Needs You - PRIMARY description */}
-        {primaryDescription && (
-          <p className={cn(
-            "text-[15px] leading-relaxed mb-4 line-clamp-2",
-            conversation.why_this_needs_you 
-              ? "text-foreground font-medium" 
-              : "text-muted-foreground"
-          )}>
-            {primaryDescription}
-          </p>
-        )}
-
-        {/* Secondary Badge Row */}
-        <div className="flex flex-wrap items-center gap-2 mb-4">
-          <Badge variant="outline" className="rounded-full text-xs font-semibold px-3 py-1.5 border-border/50 flex items-center gap-1.5">
-            <ChannelIcon channel={conversation.channel} className="h-3.5 w-3.5" />
-            {conversation.channel}
-          </Badge>
-
-
-          {hasDraft && (
-            <Badge variant="secondary" className="rounded-full text-xs font-semibold px-3 py-1.5 bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 flex items-center gap-1.5">
-              <FileEdit className="h-3 w-3" />
-              Draft
-            </Badge>
-          )}
-
-          {conversation.assigned_to ? (
-            <Badge variant="secondary" className="rounded-full text-xs font-semibold px-3 py-1.5 flex items-center gap-1.5">
-              <User className="h-3 w-3" />
-              {assignedUserName || 'Assigned'}
-            </Badge>
-          ) : (
-            <Badge variant="outline" className="rounded-full text-xs font-semibold px-3 py-1.5 text-amber-600 border-amber-500/20 flex items-center gap-1.5">
-              Unassigned
-            </Badge>
-          )}
-
-          {conversation.customer_satisfaction && (
-            <Badge variant="outline" className="rounded-full text-xs font-semibold px-3 py-1.5 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/20 flex items-center gap-1.5">
-              <Star className="h-3 w-3 fill-current" />
-              {conversation.customer_satisfaction}/5
-            </Badge>
-          )}
-
-          {/* Low confidence indicator */}
-          {conversation.triage_confidence !== null && conversation.triage_confidence !== undefined && conversation.triage_confidence < 0.7 && (
-            <Badge variant="outline" className="rounded-full text-xs font-semibold px-3 py-1.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 flex items-center gap-1.5">
-              <AlertTriangle className="h-3 w-3" />
-              Review
-            </Badge>
-          )}
-
-          {/* Correction badge - shows when this email was reclassified */}
-          {correction && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Badge variant="outline" className="rounded-full text-xs font-semibold px-3 py-1.5 bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20 flex items-center gap-1.5 cursor-help">
-                  <History className="h-3 w-3" />
-                  Corrected
-                </Badge>
-              </TooltipTrigger>
-              <TooltipContent side="top" className="max-w-xs">
-                <p className="text-xs">
-                  <span className="font-semibold">You corrected this:</span><br />
-                  {correction.original_classification && correction.new_classification && (
-                    <>Classification: {formatClassification(correction.original_classification)} → {formatClassification(correction.new_classification)}<br /></>
-                  )}
-                  {correction.original_requires_reply !== correction.new_requires_reply && (
-                    <>Reply needed: {correction.original_requires_reply ? 'Yes' : 'No'} → {correction.new_requires_reply ? 'Yes' : 'No'}</>
-                  )}
-                </p>
-              </TooltipContent>
-            </Tooltip>
-          )}
-        </div>
-
-        {/* Meta Row */}
-        <div className="flex items-center justify-between text-[13px] text-muted-foreground font-medium">
-          <span className="uppercase tracking-wide text-[11px]">
-            {conversation.category?.replace(/_/g, ' ') || 'General'}
-          </span>
-          <div className="flex items-center gap-2">
-            {/* Reopen button for resolved/auto-handled conversations */}
-            {(conversation.status === 'resolved' || conversation.decision_bucket === 'auto_handled') && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleReopen}
-                disabled={isReopening}
-                className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
-              >
-                <RotateCcw className="h-3.5 w-3.5 mr-1" />
-                Reopen
-              </Button>
-            )}
-            <span className="flex items-center gap-1.5">
-              <Clock className="h-3.5 w-3.5" />
-              {formatDistanceToNow(new Date(conversation.updated_at || conversation.created_at!), { addSuffix: true })}
-            </span>
-          </div>
-        </div>
-        
-        {showTriageActions && (
-          <TriageQuickActions conversation={conversation} onUpdate={onUpdate} />
-        )}
-      </div>
+      {cardInner('p-4')}
     </div>
   );
 };

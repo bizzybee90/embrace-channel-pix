@@ -278,8 +278,8 @@ export const CustomerIntelligence = ({ workspaceId, customerId }: CustomerIntell
         {!intelligence?.summary && insights.length === 0 && (
           <div className="text-center py-6">
             <Brain className="h-12 w-12 mx-auto text-muted-foreground/30 mb-3" />
-            <p className="text-sm text-muted-foreground mb-3">No intelligence gathered yet</p>
-            <Button onClick={analyzeCustomer} disabled={analyzing} size="sm">
+            <p className="text-sm text-muted-foreground mb-3">Intelligence builds automatically with each conversation</p>
+            <Button onClick={analyzeCustomer} disabled={analyzing} variant="ghost" size="sm">
               {analyzing ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />

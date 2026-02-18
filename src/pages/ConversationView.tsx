@@ -6,10 +6,15 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import type { Conversation } from "@/lib/types";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { ThreeColumnLayout } from "@/components/layout/ThreeColumnLayout";
+import { MobilePageLayout } from "@/components/layout/MobilePageLayout";
+import { Sidebar } from "@/components/sidebar/Sidebar";
 
 export default function ConversationView() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
+  const isMobile = useIsMobile();
 
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [loading, setLoading] = useState(true);
@@ -66,9 +71,25 @@ export default function ConversationView() {
     );
   }
 
+  if (isMobile) {
+    return (
+      <MobilePageLayout showBackButton onBackClick={() => navigate(-1)} backToText="Back">
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <ConversationThread conversation={conversation} onUpdate={() => {}} onBack={() => navigate(-1)} />
+        </div>
+      </MobilePageLayout>
+    );
+  }
+
   return (
-    <div className="h-screen w-full bg-background">
-      <ConversationThread conversation={conversation} onUpdate={() => {}} onBack={() => navigate(-1)} />
-    </div>
+    <ThreeColumnLayout
+      sidebar={<Sidebar />}
+      main={
+        <div className="flex flex-col h-screen overflow-hidden">
+          <ConversationThread conversation={conversation} onUpdate={() => {}} onBack={() => navigate(-1)} />
+        </div>
+      }
+    />
   );
 }
+

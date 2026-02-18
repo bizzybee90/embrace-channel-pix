@@ -515,9 +515,10 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
       <div className="flex-1 overflow-y-auto">
         {filteredConversations.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
-            <Sparkles className="h-12 w-12 mb-4 opacity-20" />
+          <Sparkles className="h-12 w-12 mb-4 opacity-20" />
             <p className="text-lg font-medium">You're all caught up!</p>
             <p className="text-sm mt-1 opacity-75">No messages need your attention right now</p>
+            <p className="text-xs text-muted-foreground/60 mt-3">⌘K to search • J/K to navigate</p>
           </div>
         ) : (
           <>
