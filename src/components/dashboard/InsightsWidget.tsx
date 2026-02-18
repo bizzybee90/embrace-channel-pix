@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Lightbulb, TrendingUp, AlertTriangle, Info, RefreshCw, Loader2, X, Sparkles } from 'lucide-react';
+import { Lightbulb, TrendingUp, AlertTriangle, Info, X, Sparkles } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface Insight {
@@ -26,8 +26,6 @@ interface InsightsWidgetProps {
 export const InsightsWidget = ({ workspaceId }: InsightsWidgetProps) => {
   const [insights, setInsights] = useState<Insight[]>([]);
   const [loading, setLoading] = useState(true);
-  const [analyzing, setAnalyzing] = useState(false);
-
   useEffect(() => {
     if (workspaceId) {
       fetchInsights();
@@ -101,39 +99,17 @@ export const InsightsWidget = ({ workspaceId }: InsightsWidgetProps) => {
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between pb-3">
+      <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
           <Lightbulb className="h-4 w-4 text-primary" />
           Insights
         </CardTitle>
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          onClick={runAnalysis}
-          disabled={analyzing}
-          className="h-8 w-8 p-0"
-        >
-          {analyzing ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <RefreshCw className="h-4 w-4" />
-          )}
-        </Button>
       </CardHeader>
       <CardContent className="space-y-2">
         {insights.length === 0 ? (
           <div className="text-center py-6 text-muted-foreground">
             <Lightbulb className="h-8 w-8 mx-auto mb-2 opacity-50" />
-            <p className="text-sm">No new insights</p>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={runAnalysis}
-              disabled={analyzing}
-              className="mt-3"
-            >
-              {analyzing ? 'Analyzing...' : 'Run Analysis'}
-            </Button>
+            <p className="text-sm">Insights will appear as BizzyBee processes your emails</p>
           </div>
         ) : (
           insights.map(insight => (

@@ -1,4 +1,4 @@
-import { Check, Ban, Tag, MessageSquare, Reply, Forward } from 'lucide-react';
+import { Check, Ban, Tag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { supabase } from '@/integrations/supabase/client';
@@ -52,15 +52,6 @@ export const QuickActionsBar = ({ emailId, workspaceId }: QuickActionsBarProps) 
 
   return (
     <div className="flex items-center gap-2 p-3 border-t border-border bg-card flex-nowrap overflow-x-auto">
-      <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => toast.info('Reply coming soon')}>
-        <Reply className="h-3.5 w-3.5" />
-        Reply
-      </Button>
-      <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => toast.info('Forward coming soon')}>
-        <Forward className="h-3.5 w-3.5" />
-        Forward
-      </Button>
-      <div className="w-px h-5 bg-border" />
       <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={markHandled}>
         <Check className="h-3.5 w-3.5" />
         Handled
