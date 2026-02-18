@@ -1,100 +1,129 @@
 
-# Full App Audit — Findings & Fix Plan
+# UI Polish — 4-Area Fix Plan
 
-## What Was Tested
+## What Will Change
 
-Every major route, button, and interaction across the entire app was audited. Here is the complete status report followed by a fix plan for each issue.
-
----
-
-## AUDIT RESULTS
-
-### PASSING ✅
-
-| Area | Status |
-|---|---|
-| Home dashboard loads | ✅ |
-| "To Reply" card navigates to filtered list | ✅ |
-| "At Risk", "Training", "Drafts Ready" cards | ✅ |
-| Conversation thread opens from list | ✅ |
-| Teach modal (AI rule teaching) | ✅ |
-| Customer Profile panel expands | ✅ |
-| Customer Intelligence shows sentiment | ✅ |
-| Reply / Note tabs in conversation | ✅ |
-| Back to Conversations button | ✅ |
-| Done filter (auto-handled noise) | ✅ |
-| Snoozed filter (empty state) | ✅ |
-| Sent filter (shows history) | ✅ |
-| Analytics Dashboard (real data, charts) | ✅ |
-| Learning & Training page | ✅ |
-| Settings page (all 5 categories open) | ✅ |
-| BizzyBee AI settings (toggles/sliders) | ✅ |
-| Connections settings (email, signature) | ✅ |
-| Data & Privacy (GDPR portal link) | ✅ |
-| Re-run Setup Wizard in Developer Tools | ✅ |
-| Data Reset in Developer Tools | ✅ |
-| Activity Page | ✅ |
-| Review page (empty state) | ✅ |
-| Knowledge Base page loads | ✅ |
+Five distinct areas of the UI will be cleaned up. All changes are purely visual/UX — no backend, no database, no edge functions.
 
 ---
 
-### ISSUES FOUND ⚠️
+## Fix 1 — Sidebar: Expanded by default + mini-label collapsed mode
 
-**Issue 1 — MEDIUM: DevOps Dashboard blocks the owner**
-The `/admin/devops` route checks if the user's email ends in `@bizzybee.ai` or `@lovable.dev`. Since the account email is `demo@agent.local`, it always redirects to `/`. The user cannot access their own DevOps Dashboard. Fix: Add the user's actual email (or any workspace owner) to the allowed list.
+**File:** `src/components/sidebar/Sidebar.tsx`
 
-**Issue 2 — MEDIUM: "+ Add FAQ" button on Knowledge Base does nothing**
-The `+ Add FAQ` button in `KnowledgeBase.tsx` (line 180–183) has no `onClick` handler. Clicking it does nothing. Fix: Add a dialog/sheet with Question + Answer fields that saves to the `faq_database` table.
+**Current problems:**
+- `useState(true)` starts the sidebar collapsed — users see an icon-only bar on first load
+- Collapsed mode shows bare icons with no label — disorienting
+- Collapsed width is `w-[72px]` — too narrow for mini-labels
+- Collapsed secondary items (Sent, Settings) have no mini-labels
 
-**Issue 3 — LOW: Dashboard briefing widget shows a stale migration notice**
-The AI briefing card on the home dashboard hardcodes: *"Email briefing is being migrated to n8n workflows. Check back soon!"* This is not user-facing production copy. Fix: Replace with a clean "No briefing available" empty state or remove the card until n8n is ready.
+**Changes:**
 
-**Issue 4 — LOW: Message body clipped in conversation thread**
-When viewing a conversation, the middle scrollable panel clips the JM avatar row — the actual message text below the avatar is hidden. The panel layout doesn't give enough space for the message content. Fix: Adjust the flex layout of the inner scroll area in `ConversationThread.tsx`.
+1. `useState(true)` → `useState(false)` so sidebar opens expanded by default
 
-**Issue 5 — LOW: "Summary being generated..." is a permanent state**
-Every conversation shows "Summary being generated..." even for old conversations that will never get a summary. This is because `ai-enrich-conversation` hasn't processed existing conversations. Fix: Change the fallback copy to "No summary available" when the conversation is older than a few minutes, rather than showing a perpetual spinning state.
+2. Collapsed width: `w-[72px]` → `w-[80px]`
+
+3. For every primary nav item in collapsed mode, replace `justify-center p-2` with a column layout:
+```tsx
+<div className="relative flex flex-col items-center gap-0.5 py-2">
+  <IconComponent className="h-5 w-5 text-color" />
+  <span className="text-[9px] text-muted-foreground leading-none">Label</span>
+</div>
+```
+Short labels: **Home**, **Inbox**, **Unread**, **Drafts**, **Train**, **Snooze**, **Done**
+
+4. Badge overlay for Inbox (toReply), Unread (unread), Drafts (drafts) counts — positioned absolute, top-right of icon:
+```tsx
+{count > 0 && (
+  <span className="absolute -top-1 -right-1 bg-destructive text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+    {count > 99 ? '99+' : count}
+  </span>
+)}
+```
+
+5. Collapsed secondary section (Sent, Settings): same column layout with mini-labels **Sent** (text-blue-500 icon) and **Settings**. Remove the tooltip-only pattern for these.
 
 ---
 
-## FIX PLAN
+## Fix 2 — Remove dead buttons from InsightsWidget
 
-The fixes are ordered by impact. Here is exactly what will change:
+**File:** `src/components/dashboard/InsightsWidget.tsx`
 
-### Fix 1 — DevOps Dashboard access
-**File:** `src/pages/admin/DevOpsDashboard.tsx`
-- Change the admin check to also allow any user whose `workspace_id` exists (i.e. any authenticated user who has completed onboarding), or add the demo email to the allowed list.
-- Simplest safe approach: allow any logged-in user who has a workspace (i.e. a real paying customer), since the DevOps Dashboard is their own system data.
+**Current problems:**
+- Header has a `RefreshCw` button that calls `runAnalysis()` — which just shows a toast "Pattern detection has been migrated to n8n workflows" — a dead button
+- Empty state has a "Run Analysis" button with the same dead behaviour
 
-### Fix 2 — Add FAQ dialog
-**File:** `src/pages/KnowledgeBase.tsx`
-- Add `useState` for `showAddFaq` dialog open state.
-- Add a `Dialog` with two fields: Question (required) and Answer (required).
-- On submit: insert into `faq_database` table with `workspace_id`, `source: 'manual'`, `priority: 9`, and refresh the FAQ list.
-- Wire `onClick={() => setShowAddFaq(true)}` to the existing `+ Add FAQ` button.
+**Changes:**
+1. Remove the `<Button>` (RefreshCw icon) from the `CardHeader`
+2. Remove `analyzing` state and `runAnalysis` function entirely
+3. Replace the empty state content with:
+   - Keep the `Lightbulb` icon
+   - Text: "Insights will appear as BizzyBee processes your emails"
+   - No button
 
-### Fix 3 — Dashboard briefing widget
-**File:** `src/components/dashboard/AIBriefingWidget.tsx`
-- Replace the hardcoded migration message with: *"Your daily briefing will appear here once BizzyBee has processed new emails."*
-- Remove the orange warning-style presentation so it doesn't look like an error to users.
+---
 
-### Fix 4 — Message body visibility in conversation thread
+## Fix 3 — Remove dead Reply/Forward buttons from QuickActionsBar
+
+**File:** `src/components/inbox/QuickActionsBar.tsx`
+
+**Current problems:**
+- Reply button → `toast.info('Reply coming soon')`
+- Forward button → `toast.info('Forward coming soon')`
+
+**Changes:**
+1. Remove the Reply `<Button>` entirely
+2. Remove the Forward `<Button>` entirely
+3. Remove the `<div className="w-px h-5 bg-border" />` divider between them and the working buttons (since there's nothing left before the divider)
+4. Keep: Handled, Category dropdown, Spam
+
+---
+
+## Fix 4 — Fix conversation thread layout (AI panels vs messages)
+
 **File:** `src/components/conversations/ConversationThread.tsx`
-- The `flex-1 min-h-0 overflow-y-auto` div containing `AIContextPanel` and `MessageTimeline` needs explicit height constraints so the message timeline receives enough space.
-- Add `space-y-4` and ensure the MessageTimeline section has `min-h-[200px]` so messages aren't crushed below the fold.
 
-### Fix 5 — "Summary being generated" copy
-**File:** `src/components/conversations/AIContextPanel.tsx`
-- Check `conversation.created_at`. If the conversation was created more than 10 minutes ago and `summary_for_human` is null, show "No summary available" instead of "Summary being generated..."
-- This prevents old conversations looking perpetually stuck.
+**Current problem:**
+The `AIContextPanel` and `MessageTimeline` share a single `flex-1 overflow-y-auto` scroll container. On smaller screens, the AI panels (Why, Summary, Draft, Customer Profile — all expanded by default) consume most of the viewport, pushing `MessageTimeline` below the fold. The user has to scroll past all AI cards just to see their messages.
+
+**Change:** Split the single scroll area into two independently scrollable sections:
+
+```tsx
+{/* AI Context — capped height, independently scrollable */}
+<div className="flex-shrink-0 max-h-[45vh] overflow-y-auto p-5 border-b border-border">
+  <AIContextPanel conversation={conversation} onUpdate={onUpdate} onUseDraft={setDraftText} />
+</div>
+
+{/* Message Timeline — always gets remaining space */}
+<div className="flex-1 min-h-[200px] overflow-y-auto p-5">
+  <MessageTimeline messages={messages} workspaceId={conversation.workspace_id} onDraftTextChange={setDraftText} />
+</div>
+```
+
+This ensures:
+- AI panels scroll independently and never exceed 45% of the viewport
+- Messages always have at least `200px` and fill all remaining space
+- Both sections are independently scrollable — no double-scroll confusion
 
 ---
 
-## Files to be modified
+## Fix 5 — Remove demo credentials from Auth page
 
-1. `src/pages/admin/DevOpsDashboard.tsx` — relax admin check
-2. `src/pages/KnowledgeBase.tsx` — wire Add FAQ button with dialog
-3. `src/components/dashboard/AIBriefingWidget.tsx` — replace migration copy
-4. `src/components/conversations/ConversationThread.tsx` — fix message scroll area
-5. `src/components/conversations/AIContextPanel.tsx` — fix stale "generating" text
+**File:** `src/pages/Auth.tsx`
+
+**Current problem:**
+The `useState("")` for email and password are already empty (lines 16–17), which is correct. However the "Quick Demo Login" button is visible on the login page — this hardcodes `demo@agent.local` / `demo123456` which is unprofessional for real users.
+
+**Change:** Remove the entire "Quick Demo Login" section from the UI (the `<div className="mt-4">` block containing the divider and the demo button, lines 382–408). The `handleDemoLogin` function can remain in code (it won't be called) but the UI button will be gone. The normal sign-in form and the "Don't have an account? Sign up" toggle remain untouched.
+
+---
+
+## Files to be Modified
+
+| File | Change |
+|---|---|
+| `src/components/sidebar/Sidebar.tsx` | Default expanded, mini-labels, badge overlays, wider collapsed width |
+| `src/components/dashboard/InsightsWidget.tsx` | Remove dead Run Analysis button, clean empty state |
+| `src/components/inbox/QuickActionsBar.tsx` | Remove Reply and Forward dead buttons |
+| `src/components/conversations/ConversationThread.tsx` | Split scroll area so messages always visible |
+| `src/pages/Auth.tsx` | Remove Quick Demo Login button from UI |
