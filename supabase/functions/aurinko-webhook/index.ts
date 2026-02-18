@@ -589,31 +589,35 @@ async function processEmailFromData(supabase: any, emailConfig: any, message: an
         }
       }
 
-      // Step 2: If pre-triage couldn't fully classify, trigger n8n for AI
-      if (!triage.skip_llm) {
-        const n8nWebhookUrl = Deno.env.get('N8N_WEBHOOK_URL');
-        if (n8nWebhookUrl) {
-          fetch(`${n8nWebhookUrl}/email-classify`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              conversation_id: conversationId,
-              workspace_id: emailConfig.workspace_id,
-              from_email: senderEmail,
-              from_name: senderName,
-              subject: subject,
-              body: body.substring(0, 2000),
-            }),
-          }).catch(err => console.error('n8n classification trigger failed:', err));
-          console.log('Triggered n8n classification for conversation:', conversationId);
-        }
-      }
+      // AI enrichment handles classification for emails pre-triage couldn't classify
+      // (triggered separately after pre-triage completes)
     } else {
       console.error('Pre-triage call failed:', preTriageResponse.status);
     }
   } catch (triageErr) {
     // Non-blocking - email is already saved, classification is a bonus
     console.error('Pre-triage error (non-blocking):', triageErr);
+  }
+
+  // Step 3: Trigger AI enrichment (summary, draft, sentiment) — non-blocking
+  try {
+    fetch(
+      `${Deno.env.get('SUPABASE_URL')}/functions/v1/ai-enrich-conversation`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+        },
+        body: JSON.stringify({
+          conversation_id: conversationId,
+          workspace_id: emailConfig.workspace_id,
+        }),
+      }
+    ).catch(err => console.error('AI enrichment trigger failed:', err));
+    console.log('Triggered AI enrichment for conversation:', conversationId);
+  } catch (enrichErr) {
+    console.error('AI enrichment error (non-blocking):', enrichErr);
   }
 
   console.log('Email fully processed, conversation:', conversationId);

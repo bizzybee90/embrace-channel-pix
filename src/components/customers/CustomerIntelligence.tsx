@@ -79,9 +79,38 @@ export const CustomerIntelligence = ({ workspaceId, customerId }: CustomerIntell
   const analyzeCustomer = async () => {
     setAnalyzing(true);
     try {
-      // customer-intelligence edge function removed
-      toast.info('Customer intelligence migrated to n8n');
-      return;
+      // Find the most recent conversation for this customer
+      const { data: recentConv } = await supabase
+        .from('conversations')
+        .select('id, workspace_id')
+        .eq('customer_id', customerId)
+        .eq('workspace_id', workspaceId)
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (recentConv) {
+        const { error } = await supabase.functions.invoke('ai-enrich-conversation', {
+          body: {
+            conversation_id: recentConv.id,
+            workspace_id: workspaceId,
+          },
+        });
+
+        if (error) {
+          console.error('Enrichment error:', error);
+          toast.error('Analysis failed');
+        } else {
+          toast.success('Customer analysis updated');
+          // Refresh the data
+          fetchData();
+        }
+      } else {
+        toast.info('No conversations found for this customer');
+      }
+    } catch (err) {
+      console.error('Analysis error:', err);
+      toast.error('Analysis failed');
     } finally {
       setAnalyzing(false);
     }

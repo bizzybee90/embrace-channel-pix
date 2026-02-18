@@ -61,7 +61,7 @@ const PANEL_HEADER_CLASSES = "flex items-center justify-between w-full px-4 gap-
       case 'wait':
         return { title: 'Why This Can Wait', color: 'blue', icon: FileText, emoji: '🔵', why: whyText || 'Deferred for later' };
       default:
-        return { title: 'AI Context', color: 'primary', icon: AlertCircle, emoji: '❓', why: whyText || conversation.ai_reason_for_escalation || 'No context available' };
+        return { title: 'Analyzing...', color: 'primary', icon: AlertCircle, emoji: '⏳', why: whyText || conversation.ai_reason_for_escalation || 'AI is processing this conversation. Refresh in a moment.' };
     }
   };
 
@@ -124,7 +124,7 @@ const PANEL_HEADER_CLASSES = "flex items-center justify-between w-full px-4 gap-
           <CollapsibleContent>
             <div className="px-4 pb-4">
               <p className="text-sm text-foreground/80 leading-relaxed">
-                {conversation.summary_for_human || 'No summary available'}
+                {conversation.summary_for_human || 'Summary being generated...'}
               </p>
             </div>
           </CollapsibleContent>
