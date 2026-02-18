@@ -136,6 +136,7 @@ export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerMod
                 conversation={selectedConversation}
                 onUpdate={handleUpdate}
                 onBack={handleBack}
+                hideBackButton={true}
               />
             </div>
           </ResizablePanel>
