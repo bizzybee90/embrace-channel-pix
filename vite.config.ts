@@ -15,4 +15,9 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  define: {
+    'import.meta.env.VITE_SUPABASE_URL': JSON.stringify('https://ikioetqbrybnofqkdcib.supabase.co'),
+    'import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY': JSON.stringify('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlraW9ldHFicnlibm9mcWtkY2liIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM0MTY0NjksImV4cCI6MjA3ODk5MjQ2OX0.QdmwwkzNYj9jzeD5oRGMAJm-4ADcJc5EEpqVKwhOyOw'),
+  },
 }));
+
