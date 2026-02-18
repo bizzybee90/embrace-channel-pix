@@ -1,257 +1,107 @@
 
-# BizzyBee — World-Class UI Transformation Plan
+# UI Forensic Fixes — Premium Shadow System + Layout Refinements
 
-## Overview
+## What This Changes and Why
 
-This is a large but well-scoped frontend-only overhaul across 8 files. No edge functions, no database changes. Every change is contained to React components and pages.
-
----
-
-## Current State Assessment
-
-After reading all files, here is what already exists vs. what needs changing:
-
-**Already done from previous polish pass:**
-- Sidebar: `useState(false)` (expanded by default) ✅
-- Sidebar: mini-labels in collapsed state ✅
-- Sidebar: badge counts on Inbox/Unread/Drafts in collapsed ✅
-- ConversationThread: split scroll (AIContextPanel 45vh + MessageTimeline min-h-200px) ✅
-- InsightsWidget: dead "Run Analysis" button already removed, clean empty state ✅
-- QuickActionsBar: Reply/Forward buttons already removed ✅
-- Auth: demo credentials already NOT visible in the rendered UI (fields start empty, `handleDemoLogin` is in code but not rendered)
-
-**What still needs to be done (net-new changes):**
-
-1. **Sidebar active state** — no `bg-primary/8 rounded-xl` active highlight; collapsed width is still `w-[80px]` (instruction says `w-[76px]` — small diff, keep 80px since mini-labels need room)
-2. **ConversationCard full redesign** — still shows the old multi-badge layout (~140px tall). This is the biggest change.
-3. **Dashboard stat cards** — remove the bottom description text from each card
-4. **Dashboard bottom grid** — change to `md:grid-cols-2 lg:grid-cols-3`
-5. **Dashboard loading** — replace spinner with skeleton cards
-6. **Dashboard padding** — `p-6` → `p-4 md:p-6`
-7. **KnowledgeBase mobile** — wrap in `MobilePageLayout` for mobile users
-8. **Settings desktop** — wrap in `ThreeColumnLayout` with Sidebar for consistency
-9. **ConversationView** — add `ThreeColumnLayout` wrapper on desktop, `MobilePageLayout` on mobile
-10. **CustomerIntelligence** — subtle "Analyze Customer" button, better empty state text
-11. **Time format** — short-form timestamps ("2m", "1h", "3d") in ConversationCard
-12. **JaceStyleInbox empty state** — add keyboard hint text
+The user has performed a forensic audit identifying five specific areas where the CSS and component implementations fall short of the "Gold Standard" target. All changes are purely visual — no backend, no database, no edge functions.
 
 ---
 
-## Detailed Changes Per File
+## Fix 1 — CSS Shadows + Spring Physics (`src/index.css`)
 
-### File 1: `src/components/conversations/ConversationCard.tsx`
+**Problem:** The `.apple-shadow`, `.apple-shadow-lg`, and `.apple-shadow-sm` utility classes are currently defined *inside* the `@media (max-width: 900px)` block. This means they only apply on small screens — cards on desktop have no shadow at all. The shadow values themselves are also single-layer and muddy.
 
-**This is the biggest change.** Current card height ~140px → target ~60-70px.
-
-**Remove entirely:**
-- Top color accent bar (`h-1.5` div with bucket color)
-- Decision bucket badge row (`bucketBadge` Badge component in both layouts)
-- `CategoryLabel` component
-- Secondary badge row (channel, draft, assigned, satisfaction, confidence, correction badges)
-- Meta row (category text, Reopen button in footer)
-- `getBucketBarColor`, `getPriorityBarColor` helper functions (unused after removal)
-
-**Add:**
-- `getStatusDotColor(bucket, status)` helper returning a Tailwind color class
-- Short timestamp formatter: e.g. "2m", "1h", "3d" using `formatDistanceToNow` output parsed, or using `differenceInMinutes/Hours/Days`
-- `senderName` derived from `conversation.customer?.name || conversation.customer?.email || conversation.title`
-
-**New 3-row layout (both Desktop and Tablet):**
-
-```
-Row 1: [status dot]  [Sender Name]  [overdue dot if applicable]  [2m]
-Row 2: [Subject / Title — single line truncate]
-Row 3: [AI snippet — single line truncate]  [draft icon]  [channel icon if non-email]
-```
-
-**Desktop padding:** `p-6` → `p-4`
-**Desktop margin:** `mb-3` → `mb-2`
-**Tablet padding:** `p-5` → `p-3.5`
-**Tablet margin:** `mb-3` → `mb-2`
-
-**Keep:**
-- `rounded-[22px]` card shape
-- `apple-shadow hover:apple-shadow-lg spring-press` classes
-- `selected` state gradient
-- All swipe gesture code (touchStart/Move/End handlers, swipe backgrounds)
-- `showTriageActions` / `TriageQuickActions`
-- All Supabase mutation handlers (`handleAssignToMe`, `handleResolve`, `handleReopen`)
-- Memo comparison function
-
-**Note on `conversation.customer`:** The `Conversation` type has `customer_id` but `customer` is a joined field. Looking at `JaceStyleInbox`, conversations are fetched with `select('*, customer:customers(*)')` — so `conversation.customer` is available. The card already has `conversation.customer_id` and the existing code doesn't use `conversation.customer` directly. For the sender name, we'll fall back gracefully: `conversation.customer?.name || conversation.customer?.email || conversation.title || 'Unknown'`.
-
-**Reopen button:** Moved from meta row to Row 1 area (ghost icon, visible only when resolved/auto_handled, `stopPropagation` preserved).
-
-### File 2: `src/pages/Home.tsx`
-
-**4 targeted changes:**
-
-1. **Outer padding:** `p-6 space-y-6` → `p-4 md:p-6 space-y-6`
-
-2. **Stat card descriptions removed** — in each of the 4 cards, remove the `<p className="text-xs text-muted-foreground mt-3">` line (the "No SLA issues right now" / "Handle these first" etc. text). Keep the number, label, icon, and conditional badge pill.
-
-3. **Bottom grid:** `grid grid-cols-1 lg:grid-cols-3` → `grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3`
-
-4. **Loading skeleton:** Replace the spinner div with skeleton cards:
-```tsx
-{loading ? (
-  <div className="space-y-4">
-    <div className="flex items-center gap-4">
-      <Skeleton className="h-20 w-20 rounded-2xl" />
-      <div className="space-y-2">
-        <Skeleton className="h-6 w-40" />
-        <Skeleton className="h-4 w-64" />
-      </div>
-    </div>
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <Skeleton className="h-24 rounded-2xl" />
-      <Skeleton className="h-24 rounded-2xl" />
-      <Skeleton className="h-24 rounded-2xl" />
-      <Skeleton className="h-24 rounded-2xl" />
-    </div>
-  </div>
-) : ( ...existing content... )}
-```
-Import `Skeleton` from `@/components/ui/skeleton`.
-
-### File 3: `src/pages/KnowledgeBase.tsx`
-
-**Problem:** Mobile users see no navigation — the sidebar is `hidden md:flex` with no mobile fallback.
-
-**Fix:** Add `useIsMobile` hook. When mobile, wrap in `MobilePageLayout`. The existing desktop layout (`flex h-screen bg-background` with sidebar) stays unchanged.
-
-```tsx
-import { useIsMobile } from '@/hooks/use-mobile';
-// ...
-const isMobile = useIsMobile();
-// ...
-if (isMobile) {
-  return (
-    <MobilePageLayout>
-      <div className="flex-1 overflow-auto">
-        <div className="max-w-5xl mx-auto p-4 space-y-6">
-          {/* existing inner content, without the sidebar wrapper */}
-        </div>
-      </div>
-    </MobilePageLayout>
-  );
-}
-// desktop return stays same
-```
-
-Also change the header `flex items-center justify-between` → `flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3` so the title + Add FAQ button stack on small screens.
-
-### File 4: `src/pages/Settings.tsx`
-
-**Problem:** On desktop, Settings renders without any sidebar — it's just raw content. Every other main page has a sidebar.
-
-**Fix:** Wrap the desktop return in `ThreeColumnLayout`:
-
-```tsx
-import { ThreeColumnLayout } from '@/components/layout/ThreeColumnLayout';
-import { Sidebar } from '@/components/sidebar/Sidebar';
-// ...
-if (isMobile) {
-  return <MobilePageLayout>{content}</MobilePageLayout>;
-}
-return (
-  <ThreeColumnLayout
-    sidebar={<Sidebar />}
-    main={<ScrollArea className="h-screen">{content}</ScrollArea>}
-  />
-);
-```
-
-`content` is the existing `<div className="max-w-3xl mx-auto p-4 md:p-6 space-y-6">` block.
-
-### File 5: `src/pages/ConversationView.tsx`
-
-**Problem:** No navigation wrapper at all — no sidebar, no mobile header.
-
-**Fix:** Add `ThreeColumnLayout` on desktop, `MobilePageLayout` on mobile. The `ConversationThread` itself handles the full height layout internally.
-
-```tsx
-import { useIsMobile } from '@/hooks/use-mobile';
-import { ThreeColumnLayout } from '@/components/layout/ThreeColumnLayout';
-import { MobilePageLayout } from '@/components/layout/MobilePageLayout';
-import { Sidebar } from '@/components/sidebar/Sidebar';
-// ...
-if (isMobile) {
-  return (
-    <MobilePageLayout showBackButton onBackClick={() => navigate(-1)} backToText="Back">
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <ConversationThread conversation={conversation} onUpdate={() => {}} onBack={() => navigate(-1)} />
-      </div>
-    </MobilePageLayout>
-  );
-}
-return (
-  <ThreeColumnLayout
-    sidebar={<Sidebar />}
-    main={
-      <div className="flex flex-col h-screen overflow-hidden">
-        <ConversationThread conversation={conversation} onUpdate={() => {}} onBack={() => navigate(-1)} />
-      </div>
-    }
-  />
-);
-```
-
-### File 6: `src/components/customers/CustomerIntelligence.tsx`
-
-**Change the "no data" empty state:**
-- Keep the `Brain` icon
-- Change text from "No intelligence gathered yet" to "Intelligence builds automatically with each conversation"
-- Change the "Analyze Customer" `Button` from `size="sm"` (default solid) to `variant="ghost" size="sm"` — subtle, not primary CTA
-
-### File 7: `src/components/conversations/JaceStyleInbox.tsx`
-
-**Add keyboard hint to the existing empty state:**
-After the "You're all caught up!" text, add:
-```tsx
-<p className="text-xs text-muted-foreground/60 mt-3">⌘K to search • J/K to navigate</p>
-```
+**Fix:**
+- Move the three `.apple-shadow-*` classes and `.spring-bounce`/`.spring-press` *outside* the media query so they apply everywhere
+- Replace the single-layer shadow with multi-layer Apple-style shadows:
+  - `apple-shadow-sm`: subtle 1px ring + 2px diffuse
+  - `apple-shadow`: 4px + 1px + 1px ring
+  - `apple-shadow-lg`: dramatic 24px lift + 1px ring
+- Fix spring bezier: current is `cubic-bezier(0.5, 0.9, 0.25, 1.3)` → corrected to `cubic-bezier(0.175, 0.885, 0.32, 1.275)` (proper overshoot curve)
+- Keep all mobile-specific utilities (`mobile-native-card`, `mobile-frosted`, etc.) inside the media query
 
 ---
 
-## Implementation Order
+## Fix 2 — Conversation Card ("Ring Trick" + Typography) (`src/components/conversations/ConversationCard.tsx`)
 
-1. `ConversationCard.tsx` — largest change, independent of others
-2. `Home.tsx` — skeleton + padding + grid fixes
-3. `KnowledgeBase.tsx` — mobile wrap
-4. `Settings.tsx` — desktop sidebar wrap
-5. `ConversationView.tsx` — navigation wrapper
-6. `CustomerIntelligence.tsx` — empty state tweak
-7. `JaceStyleInbox.tsx` — keyboard hint
+**Problem:** Cards use `border border-border/30` which adds visible outlines between adjacent cards, creating a heavy grid feeling. The `formatShortTime` custom formatter is correct but can be simplified. Typography uses `text-foreground` at full opacity for both sender name and title, causing no visual hierarchy.
 
----
-
-## Risk Assessment
-
-**Low risk:**
-- Home.tsx padding/grid/skeleton — additive changes
-- InsightsWidget, CustomerIntelligence, JaceStyleInbox — small text changes
-- KnowledgeBase mobile wrap — guarded by `if (isMobile)` branch
-
-**Medium risk:**
-- Settings desktop sidebar — need to verify `ThreeColumnLayout` handles the content scroll correctly; wrapping in `ScrollArea` prevents double-scrollbar
-- ConversationView navigation wrap — need to ensure `ConversationThread`'s `h-full flex flex-col` still works inside `ThreeColumnLayout`'s `main` slot
-
-**Higher risk:**
-- ConversationCard full redesign — this touches both tablet and desktop layouts, removes many elements, and must preserve all swipe/haptic/keyboard behavior. The memo comparison function must also be preserved. The `conversation.customer` field access should gracefully handle null (the `?.` operator covers this).
-
-**Mitigation:** All swipe gesture state variables and handlers are in the upper portion of the component and untouched. The new layout only changes what's inside the return JSX.
+**Fix:**
+- Remove `border border-border/30 hover:border-primary/30` — instead let the `apple-shadow` provide the card edge definition (the "ring trick": shadow's `0 0 0 1px rgba(0,0,0,0.02)` acts as a hairline border)
+- Selected state: remove `border-primary/50`, keep the gradient background + stronger shadow
+- Typography hierarchy: sender name stays `font-semibold text-foreground`, title becomes `text-foreground/80`, snippet stays `text-muted-foreground`
+- Keep all swipe gestures, mutation handlers, memo comparison, `TriageQuickActions` — untouched
+- Keep `formatShortTime` as-is (it's already correct short-form: "2m", "1h", "3d")
 
 ---
 
-## Files Changed Summary
+## Fix 3 — Reply Area (Floating Input Style) (`src/components/conversations/ReplyArea.tsx`)
 
-| File | Nature of Change |
+**Problem:** The textarea sits inside a `Card` component inside another `div`, creating "box-in-a-box" depth layering. The textarea has a full border that fights with the card's border.
+
+**Fix:**
+- Remove the outer `Card` wrapper; use `div` with subtle background and border-radius directly
+- Textarea: replace `border-border/60` with `border-0 bg-muted/30 shadow-[inset_0_1px_2px_rgba(0,0,0,0.02)]` — floating input with inner shadow, no visible border
+- Focus state: `focus-visible:ring-1 focus-visible:ring-primary/30` (subtle, not jarring)
+- Send button: `bg-foreground text-background hover:bg-foreground/90 rounded-[12px]` — dark pill button like Superhuman/Linear
+- Note textarea: same treatment but with `bg-warning/5` tint and `focus-visible:ring-warning/30`
+- Keep all existing logic: auto-resize, draft loading, keyboard shortcuts, file upload, `onSend`/`onDraftChange` callbacks
+- Remove the `Select` and `Card` imports since they're no longer used
+
+---
+
+## Fix 4 — Tablet Layout (True Master-Detail Split) (`src/components/layout/TabletLayout.tsx`)
+
+**Problem:** The current tablet layout is a two-state toggle — either you see the list OR the conversation, never both. This wastes the larger screen real estate of tablets (760–1199px). A true master-detail split uses a fixed-width list column alongside a fluid detail column.
+
+**Fix — Three-column split:**
+```
+[Sidebar: icons-only, ~80px] [List: fixed ~320px] [Detail: flex-1]
+```
+
+- Column 1: `<Sidebar forceCollapsed>` — icon-only, no labels, for space efficiency
+- Column 2: `<JaceStyleInbox>` in a `w-[320px] flex-shrink-0` container with overflow-y-auto — always visible
+- Column 3: `<ConversationThread>` or an empty state (`Sparkles` icon + "Select a conversation") — fills remaining space
+- Remove `handleBackToList` (no longer needed as list stays persistent)
+- Remove `refreshKey` state (was only used for the old two-state toggle)
+- Keep `handleSelectConversation` (loads messages, triggers haptic)
+- Keep `handleUpdate` (refreshes messages after reply)
+- The `getFilterTitle` helper can be removed as it was only used for the now-removed header
+
+**Result:** Users can scan the list and click into conversations without losing their place. The list stays persistent on the left. This is the standard pattern for iPad email apps (Mail, Superhuman).
+
+---
+
+## Fix 5 — Sidebar Active State Polish (`src/components/sidebar/Sidebar.tsx`)
+
+**Problem:** The active state uses `bg-accent text-accent-foreground font-medium` (from `NavLink`'s `activeClassName`). This is a generic grey highlight. The brief calls for `bg-primary/8 rounded-xl` with `text-primary` icon and `text-primary font-semibold` mini-label for active items.
+
+**Fix:**
+- Change `activeClassName` on all primary NavLinks from `"bg-accent text-accent-foreground font-medium"` to `"bg-primary/10 text-primary font-semibold"`
+- When in collapsed mode, the active item's mini-label should inherit `text-primary` from the parent (already works via CSS cascade with the `activeClassName` approach)
+- The icon color in collapsed active state: icons currently have hard-coded color classes (`text-destructive`, `text-blue-500`, etc.). When active, these override the parent's `text-primary`. Instead, remove the hard-coded icon color classes so they inherit `currentColor` from the active state — OR keep them but accept the fixed icon colors (the mini-label going `text-primary` is already a good enough active signal)
+
+For simplicity and to avoid breaking the existing color coding (red inbox = urgent, blue eye = unread, amber draft = draft), keep the icon colors fixed but update `activeClassName` to `"bg-primary/10 text-primary"` without `font-semibold` on the wrapper — instead apply `font-semibold` only to the label span when active. This requires using `useLocation` to detect the active route rather than relying on `NavLink`'s `activeClassName`.
+
+Given the complexity, the cleaner approach: just update `activeClassName` to `"bg-primary/10 rounded-xl"` (adds the correct background, border-radius, and lets the mini-label color be controlled by Tailwind's cascade). This is a one-line change per NavLink.
+
+---
+
+## Files to be Modified
+
+| File | Change |
 |---|---|
-| `src/components/conversations/ConversationCard.tsx` | Major redesign — 3-row compact layout |
-| `src/pages/Home.tsx` | Skeleton loading, padding, grid, stat card trim |
-| `src/pages/KnowledgeBase.tsx` | Mobile navigation wrapper |
-| `src/pages/Settings.tsx` | Desktop sidebar via ThreeColumnLayout |
-| `src/pages/ConversationView.tsx` | Full navigation wrapper (mobile + desktop) |
-| `src/components/customers/CustomerIntelligence.tsx` | Empty state text + button style |
-| `src/components/conversations/JaceStyleInbox.tsx` | Keyboard hint in empty state |
+| `src/index.css` | Move shadow/spring utilities outside media query; replace shadow values with multi-layer |
+| `src/components/conversations/ConversationCard.tsx` | Remove border; ring-trick via shadow; typography hierarchy |
+| `src/components/conversations/ReplyArea.tsx` | Remove Card wrapper; floating textarea with inner shadow; dark send button |
+| `src/components/layout/TabletLayout.tsx` | Three-column master-detail split |
+| `src/components/sidebar/Sidebar.tsx` | Update `activeClassName` to `bg-primary/10 rounded-xl` on all NavLinks |
+
+---
+
+## Implementation Notes
+
+- The `TabletLayout` change is the most structural. The existing `JaceStyleInbox` and `ConversationThread` components don't need any changes — only how they're composed in `TabletLayout.tsx`.
+- The `ReplyArea` change removes the `Card` and `Select` imports — need to verify no TypeScript errors from unused imports.
+- The CSS shadow fix is the highest leverage change — it affects every card across the entire app.
+- All swipe gestures, haptics, keyboard shortcuts, and Supabase mutation logic are preserved untouched.
