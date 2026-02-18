@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import { AlertTriangle, Loader2, RotateCcw, Trash2 } from 'lucide-react';
+import { AlertTriangle, Loader2, RotateCcw, Trash2, Zap } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
@@ -26,14 +26,15 @@ interface DataResetPanelProps {
 export function DataResetPanel({ workspaceId }: DataResetPanelProps) {
   const navigate = useNavigate();
   const [isResetting, setIsResetting] = useState(false);
+  const [isNuking, setIsNuking] = useState(false);
   const [includeCustomers, setIncludeCustomers] = useState(false);
   const [includeSenderRules, setIncludeSenderRules] = useState(true);
   const [includeBusinessContext, setIncludeBusinessContext] = useState(false);
+  const [nukeStep, setNukeStep] = useState('');
 
   const handleReset = async () => {
     setIsResetting(true);
     try {
-      // Get conversation IDs first for message deletion
       const { data: conversations } = await supabase
         .from('conversations')
         .select('id')
@@ -41,61 +42,22 @@ export function DataResetPanel({ workspaceId }: DataResetPanelProps) {
       
       const conversationIds = conversations?.map(c => c.id) || [];
 
-      // 1. Delete messages first (depends on conversations)
       if (conversationIds.length > 0) {
-        const { error: messagesError } = await supabase
-          .from('messages')
-          .delete()
-          .in('conversation_id', conversationIds);
-        if (messagesError) console.error('Error deleting messages:', messagesError);
+        await supabase.from('messages').delete().in('conversation_id', conversationIds);
       }
 
-      // 2. Delete conversations
-      const { error: convoError } = await supabase
-        .from('conversations')
-        .delete()
-        .eq('workspace_id', workspaceId);
-      if (convoError) console.error('Error deleting conversations:', convoError);
+      await supabase.from('conversations').delete().eq('workspace_id', workspaceId);
+      await supabase.from('triage_corrections').delete().eq('workspace_id', workspaceId);
+      await supabase.from('sender_behaviour_stats').delete().eq('workspace_id', workspaceId);
 
-      // 3. Delete triage corrections
-      const { error: triageError } = await supabase
-        .from('triage_corrections')
-        .delete()
-        .eq('workspace_id', workspaceId);
-      if (triageError) console.error('Error deleting triage corrections:', triageError);
-
-      // 4. Delete sender behaviour stats
-      const { error: statsError } = await supabase
-        .from('sender_behaviour_stats')
-        .delete()
-        .eq('workspace_id', workspaceId);
-      if (statsError) console.error('Error deleting sender stats:', statsError);
-
-      // 5. Optionally delete sender rules
       if (includeSenderRules) {
-        const { error: rulesError } = await supabase
-          .from('sender_rules')
-          .delete()
-          .eq('workspace_id', workspaceId);
-        if (rulesError) console.error('Error deleting sender rules:', rulesError);
+        await supabase.from('sender_rules').delete().eq('workspace_id', workspaceId);
       }
-
-      // 6. Optionally delete customers
       if (includeCustomers) {
-        const { error: customersError } = await supabase
-          .from('customers')
-          .delete()
-          .eq('workspace_id', workspaceId);
-        if (customersError) console.error('Error deleting customers:', customersError);
+        await supabase.from('customers').delete().eq('workspace_id', workspaceId);
       }
-
-      // 7. Optionally reset business context
       if (includeBusinessContext) {
-        const { error: contextError } = await supabase
-          .from('business_context')
-          .delete()
-          .eq('workspace_id', workspaceId);
-        if (contextError) console.error('Error deleting business context:', contextError);
+        await supabase.from('business_context').delete().eq('workspace_id', workspaceId);
       }
 
       toast.success('Data reset complete');
@@ -110,21 +72,14 @@ export function DataResetPanel({ workspaceId }: DataResetPanelProps) {
   const handleReOnboard = async () => {
     setIsResetting(true);
     try {
-      // Reset all data
       await handleReset();
-
-      // Reset user onboarding status
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        await supabase
-          .from('users')
-          .update({ 
-            onboarding_completed: false,
-            onboarding_step: 'welcome'
-          })
-          .eq('id', user.id);
+        await supabase.from('users').update({ 
+          onboarding_completed: false,
+          onboarding_step: 'welcome'
+        }).eq('id', user.id);
       }
-
       toast.success('Redirecting to onboarding...');
       navigate('/onboarding');
     } catch (error) {
@@ -132,6 +87,76 @@ export function DataResetPanel({ workspaceId }: DataResetPanelProps) {
       toast.error('Failed to start re-onboarding');
     } finally {
       setIsResetting(false);
+    }
+  };
+
+  const handleFullNukeAndRestart = async () => {
+    setIsNuking(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      // Step 1: Nuclear reset (conversations, messages, emails, import jobs)
+      setNukeStep('Wiping email & conversation data…');
+      const { error: nukeError } = await supabase.functions.invoke('nuclear-reset', {
+        body: { workspaceId, confirm: 'CONFIRM_NUCLEAR_RESET' }
+      });
+      if (nukeError) throw nukeError;
+
+      // Step 2: Wipe knowledge base
+      setNukeStep('Clearing knowledge base…');
+      await supabase.from('faq_database').delete().eq('workspace_id', workspaceId);
+      await supabase.from('example_responses').delete().eq('workspace_id', workspaceId);
+
+      // Step 3: Wipe competitor research
+      setNukeStep('Clearing competitor research…');
+      await supabase.from('competitor_faq_candidates').delete().eq('workspace_id', workspaceId);
+      await supabase.from('competitor_faqs_raw').delete().eq('workspace_id', workspaceId);
+      await supabase.from('competitor_pages').delete().eq('workspace_id', workspaceId);
+      await supabase.from('competitor_sites').delete().eq('workspace_id', workspaceId);
+      await supabase.from('competitor_research_jobs').delete().eq('workspace_id', workspaceId);
+
+      // Step 4: Wipe voice & learning data
+      setNukeStep('Clearing AI learning data…');
+      await supabase.from('voice_profiles').delete().eq('workspace_id', workspaceId);
+      await supabase.from('correction_examples').delete().eq('workspace_id', workspaceId);
+      await supabase.from('classification_corrections').delete().eq('workspace_id', workspaceId);
+      await supabase.from('sender_rules').delete().eq('workspace_id', workspaceId);
+      await supabase.from('sender_behaviour_stats').delete().eq('workspace_id', workspaceId);
+
+      // Step 5: Wipe scraping jobs & progress
+      setNukeStep('Clearing progress & job state…');
+      await supabase.from('scraping_jobs').delete().eq('workspace_id', workspaceId);
+      await supabase.from('n8n_workflow_progress').delete().eq('workspace_id', workspaceId);
+      await supabase.from('email_import_progress').delete().eq('workspace_id', workspaceId);
+
+      // Step 6: Wipe customers
+      setNukeStep('Clearing customers…');
+      await supabase.from('customers').delete().eq('workspace_id', workspaceId);
+
+      // Step 7: Reset onboarding state
+      setNukeStep('Resetting onboarding state…');
+      await supabase.from('users').update({
+        onboarding_completed: false,
+        onboarding_step: 'welcome',
+      }).eq('id', user.id);
+
+      // Step 8: Clear localStorage
+      try {
+        Object.keys(localStorage).forEach(key => {
+          if (key.startsWith('bizzybee:')) localStorage.removeItem(key);
+        });
+      } catch { /* ignore */ }
+
+      setNukeStep('Done!');
+      toast.success('Full reset complete — starting fresh!');
+      navigate('/onboarding?reset=true');
+    } catch (error: any) {
+      console.error('Nuclear reset failed:', error);
+      toast.error(`Reset failed: ${error?.message || 'Unknown error'}`);
+    } finally {
+      setIsNuking(false);
+      setNukeStep('');
     }
   };
 
@@ -147,9 +172,73 @@ export function DataResetPanel({ workspaceId }: DataResetPanelProps) {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Options */}
+        {/* Full Nuke Section — most prominent */}
+        <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 space-y-3">
+          <div className="flex items-start gap-3">
+            <Zap className="h-5 w-5 text-destructive mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="text-sm font-semibold text-destructive">Full Wipe & Restart Onboarding</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Deletes <strong>everything</strong> — emails, conversations, FAQs, competitor research, AI learning, voice profile, customers — and sends you back to step 1. Use this for a clean end-to-end test.
+              </p>
+            </div>
+          </div>
+
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="destructive"
+                className="w-full"
+                disabled={isNuking || isResetting}
+              >
+                {isNuking ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    {nukeStep || 'Resetting…'}
+                  </>
+                ) : (
+                  <>
+                    <Zap className="h-4 w-4 mr-2" />
+                    Full Wipe & Restart Onboarding
+                  </>
+                )}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+                  <AlertTriangle className="h-5 w-5" />
+                  This will delete EVERYTHING
+                </AlertDialogTitle>
+                <AlertDialogDescription className="space-y-2">
+                  <span className="block">This removes all data from your workspace with no recovery possible:</span>
+                  <ul className="text-sm list-disc list-inside space-y-1 text-foreground/80">
+                    <li>All emails, conversations & messages</li>
+                    <li>All FAQs & knowledge base content</li>
+                    <li>All competitor research data</li>
+                    <li>AI voice profile & learning data</li>
+                    <li>All customers & sender rules</li>
+                    <li>All onboarding progress</li>
+                  </ul>
+                  <span className="block font-medium text-destructive">You will be sent back to Step 1 of onboarding. Your email connection is preserved.</span>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleFullNukeAndRestart}
+                  className="bg-destructive hover:bg-destructive/90"
+                >
+                  Yes, wipe everything & restart
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+
+        {/* Lighter Reset Options */}
         <div className="space-y-3">
-          <Label className="text-sm font-medium">What to include in reset:</Label>
+          <Label className="text-sm font-medium text-muted-foreground">Lighter options:</Label>
           
           <div className="space-y-2">
             <div className="flex items-center gap-2">
@@ -162,7 +251,6 @@ export function DataResetPanel({ workspaceId }: DataResetPanelProps) {
                 Sender rules & AI learning data
               </Label>
             </div>
-
             <div className="flex items-center gap-2">
               <Checkbox 
                 id="customers" 
@@ -173,7 +261,6 @@ export function DataResetPanel({ workspaceId }: DataResetPanelProps) {
                 Customer records
               </Label>
             </div>
-
             <div className="flex items-center gap-2">
               <Checkbox 
                 id="business-context" 
@@ -185,82 +272,66 @@ export function DataResetPanel({ workspaceId }: DataResetPanelProps) {
               </Label>
             </div>
           </div>
-
           <p className="text-xs text-muted-foreground">
             Conversations and messages are always deleted. Email connections are preserved.
           </p>
-        </div>
 
-        {/* Action Buttons */}
-        <div className="flex flex-col gap-3">
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button 
-                variant="outline" 
-                className="w-full border-destructive/50 text-destructive hover:bg-destructive/10"
-                disabled={isResetting}
-              >
-                {isResetting ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Trash2 className="h-4 w-4 mr-2" />
-                )}
-                Reset Data Only
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Reset workspace data?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This will permanently delete all selected data. This action cannot be undone.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction 
-                  onClick={handleReset}
-                  className="bg-destructive hover:bg-destructive/90"
+          <div className="flex flex-col gap-3">
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  className="w-full border-destructive/50 text-destructive hover:bg-destructive/10"
+                  disabled={isResetting || isNuking}
                 >
-                  Reset Data
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+                  {isResetting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Trash2 className="h-4 w-4 mr-2" />}
+                  Reset Data Only
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Reset workspace data?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will permanently delete all selected data. This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleReset} className="bg-destructive hover:bg-destructive/90">
+                    Reset Data
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
 
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button 
-                variant="destructive" 
-                className="w-full"
-                disabled={isResetting}
-              >
-                {isResetting ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <RotateCcw className="h-4 w-4 mr-2" />
-                )}
-                Reset & Re-Onboard
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Reset and start fresh?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This will delete all selected data and restart the onboarding wizard. 
-                  Your email connection will be preserved.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction 
-                  onClick={handleReOnboard}
-                  className="bg-destructive hover:bg-destructive/90"
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button 
+                  variant="outline"
+                  className="w-full border-destructive/50 text-destructive hover:bg-destructive/10"
+                  disabled={isResetting || isNuking}
                 >
-                  Reset & Re-Onboard
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+                  {isResetting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RotateCcw className="h-4 w-4 mr-2" />}
+                  Reset & Re-Onboard (partial)
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Reset and start fresh?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will delete the selected data and restart the onboarding wizard. 
+                    Your email connection and knowledge base will be preserved.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleReOnboard} className="bg-destructive hover:bg-destructive/90">
+                    Reset & Re-Onboard
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
         </div>
       </CardContent>
     </Card>
