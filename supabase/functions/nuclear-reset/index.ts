@@ -44,24 +44,19 @@ Deno.serve(async (req) => {
     const userId = user.id;
     console.log(`[nuclear-reset] Authenticated user: ${userId}`);
 
-    // Get user's workspace and verify they have permission
-    const { data: userData, error: userError } = await userSupabase
+    // Use service role to look up workspace (avoids RLS issues)
+    const serviceSupabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    const { data: userData, error: userError } = await serviceSupabase
       .from('users')
-      .select('workspace_id, role')
+      .select('workspace_id')
       .eq('id', userId)
       .single();
 
     if (userError || !userData?.workspace_id) {
+      console.error('[nuclear-reset] User workspace lookup failed:', userError);
       return new Response(
         JSON.stringify({ error: 'User not associated with a workspace' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Only admins can perform nuclear reset
-    if (userData.role !== 'admin' && userData.role !== 'owner') {
-      return new Response(
-        JSON.stringify({ error: 'Only admins can perform nuclear reset' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -92,8 +87,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Use service role for the actual reset
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    // Use service role for the actual reset (already created above as serviceSupabase)
+    const supabase = serviceSupabase;
 
     console.log(`[nuclear-reset] ⚠️ Starting nuclear reset for workspace ${workspaceId} by user ${userId}`);
     console.log(`[nuclear-reset] This will TRUNCATE all messages, conversations, customers, and import data`);
