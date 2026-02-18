@@ -45,7 +45,7 @@ async function triggerFaqWorkflow(
 
   if (!competitors || competitors.length === 0) {
     console.warn('[n8n-callback] No competitors found to scrape');
-    await supabase.from('n8n_workflow_progress').upsert({
+    await (supabase as any).from('n8n_workflow_progress').upsert({
       workspace_id: workspaceId,
       workflow_type: 'competitor_scrape',
       status: 'complete',
@@ -60,9 +60,9 @@ async function triggerFaqWorkflow(
     .from('business_context')
     .select('business_type, company_name')
     .eq('workspace_id', workspaceId)
-    .maybeSingle();
+    .maybeSingle() as { data: { business_type?: string; company_name?: string } | null };
 
-  await supabase.from('n8n_workflow_progress').upsert({
+  await (supabase as any).from('n8n_workflow_progress').upsert({
     workspace_id: workspaceId,
     workflow_type: 'competitor_scrape',
     status: 'pending',
@@ -100,7 +100,7 @@ async function triggerFaqWorkflow(
     console.log(`[n8n-callback] FAQ workflow triggered: status=${response.status}, competitors=${competitors.length}`);
   } catch (err) {
     console.error('[n8n-callback] Failed to trigger FAQ workflow:', err);
-    await supabase.from('n8n_workflow_progress').upsert({
+    await (supabase as any).from('n8n_workflow_progress').upsert({
       workspace_id: workspaceId,
       workflow_type: 'competitor_scrape',
       status: 'failed',
@@ -187,7 +187,7 @@ Deno.serve(async (req) => {
     const isComplete = status === 'discovery_complete' || status === 'complete' || status === 'scrape_complete';
     const dbStatus = isComplete ? 'complete' : (status || 'in_progress');
 
-    const { error: upsertError } = await supabase
+    const { error: upsertError } = await (supabase as any)
       .from('n8n_workflow_progress')
       .upsert({
         workspace_id,
@@ -212,7 +212,7 @@ Deno.serve(async (req) => {
     // review/edit the competitor list before the FAQ workflow starts.
     // The UI will call start-competitor-analysis when the user confirms.
     if (status === 'discovery_complete') {
-      await supabase.from('n8n_workflow_progress').upsert({
+      await (supabase as any).from('n8n_workflow_progress').upsert({
         workspace_id,
         workflow_type: 'competitor_scrape',
         status: 'review_ready',

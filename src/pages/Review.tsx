@@ -255,8 +255,8 @@ export default function Review() {
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['low-confidence-emails'] });
       const msg = result?.siblings_updated > 0
-        ? `Corrected! Also fixed ${result.siblings_updated} similar emails.${result.rule_created ? ` Auto-rule created for @${result.sender_domain}.` : ''}`
-        : `Correction saved.${result?.rule_created ? ` Auto-rule created for @${result.sender_domain}.` : ''}`;
+        ? `Corrected! Also fixed ${result.siblings_updated} similar emails.${result.rule_created ? ` Auto-rule created for sender domain.` : ''}`
+        : `Correction saved.${result?.rule_created ? ` Auto-rule created for sender domain.` : ''}`;
       toast({ title: '✅ Learned', description: msg });
       setLcIndex(prev => Math.min(prev, lowConfidenceEmails.length - 2));
     },
