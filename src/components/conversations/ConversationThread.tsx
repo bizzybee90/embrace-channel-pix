@@ -13,9 +13,10 @@ interface ConversationThreadProps {
   conversation: Conversation;
   onUpdate: () => void;
   onBack?: () => void;
+  hideBackButton?: boolean;
 }
 
-export const ConversationThread = ({ conversation, onUpdate, onBack }: ConversationThreadProps) => {
+export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackButton }: ConversationThreadProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [draftText, setDraftText] = useState<string>('');  // Only for AI-generated drafts
@@ -265,7 +266,7 @@ export const ConversationThread = ({ conversation, onUpdate, onBack }: Conversat
   return (
     <div className="flex flex-col h-full min-h-0 overflow-hidden">
       <div className="flex-shrink-0 bg-background border-b border-border">
-        <ConversationHeader conversation={conversation} onUpdate={onUpdate} onBack={onBack} />
+        <ConversationHeader conversation={conversation} onUpdate={onUpdate} onBack={onBack} hideBackButton={hideBackButton} />
       </div>
       
       {/* AI Context — capped height, independently scrollable */}

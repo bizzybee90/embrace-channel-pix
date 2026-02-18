@@ -99,6 +99,7 @@ export const TabletLayout = ({ filter = "all-open" }: TabletLayoutProps) => {
             conversation={selectedConversation}
             onBack={() => setSelectedConversation(null)}
             onUpdate={handleUpdate}
+            hideBackButton={true}
           />
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center gap-4 text-muted-foreground">
