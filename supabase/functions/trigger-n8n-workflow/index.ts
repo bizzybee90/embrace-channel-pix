@@ -161,6 +161,53 @@ Deno.serve(async (req) => {
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
 
+    } else if (workflow_type === 'own_website_scrape') {
+      const websiteUrl = body.websiteUrl || body.website_url || businessContext?.website_url;
+
+      if (!websiteUrl) {
+        return new Response(
+          JSON.stringify({ error: 'No website URL provided' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const websitePayload = {
+        workspace_id,
+        website_url: websiteUrl.startsWith('http') ? websiteUrl : `https://${websiteUrl}`,
+        business_name: businessContext?.company_name || 'Own Website',
+        callback_url: callbackUrl,
+      };
+
+      console.log('[trigger-n8n] Sending to own-website-scrape:', JSON.stringify(websitePayload));
+
+      const response = await fetch(`${n8nWebhookBaseUrl}/own-website-scrape`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(websitePayload),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[trigger-n8n] n8n website scrape error:', errorText);
+        return new Response(
+          JSON.stringify({ error: 'Failed to trigger website scrape', details: errorText }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      await supabase.from('n8n_workflow_progress').upsert({
+        workspace_id,
+        workflow_type: 'own_website_scrape',
+        status: 'pending',
+        details: { message: 'Website scrape triggered, waiting for n8n...' },
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'workspace_id,workflow_type' });
+
+      return new Response(
+        JSON.stringify({ success: true, workflow: 'own_website_scrape' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+
     } else {
       return new Response(
         JSON.stringify({ error: `Unknown workflow_type: ${workflow_type}` }),
