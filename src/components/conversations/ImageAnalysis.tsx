@@ -54,9 +54,25 @@ export const ImageAnalysis = ({
   const analyzeImage = async () => {
     setLoading(true);
     try {
-      // image-analyze edge function removed
-      toast.info('Image analysis migrated to n8n');
-      return;
+      const { data, error } = await supabase.functions.invoke('image-analyze', {
+        body: {
+          workspace_id: workspaceId,
+          message_id: messageId,
+          image_url: imageUrl,
+          analysis_type: analysisType,
+          customer_message: customerMessage
+        }
+      });
+
+      if (error) throw error;
+      setAnalysis(data.result);
+
+      if (data.result?.suggested_response) {
+        toast.success('Image analyzed! Response suggestion ready.');
+      }
+    } catch (e: unknown) {
+      const errorMessage = e instanceof Error ? e.message : 'Failed to analyze image';
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }

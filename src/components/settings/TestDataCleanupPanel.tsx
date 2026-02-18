@@ -156,19 +156,31 @@ export const TestDataCleanupPanel = () => {
 
   const handleNuclearReset = async () => {
     if (!workspace?.id || nuclearConfirmText !== 'CONFIRM') return;
-    
+
     setNuclearRunning(true);
     setNuclearResult(null);
-    
+
     try {
-      // nuclear-reset edge function removed
-      toast({
-        title: 'Nuclear reset migrated to n8n',
-        description: 'Nuclear reset has been migrated to n8n workflows.',
+      const { data, error } = await supabase.functions.invoke('nuclear-reset', {
+        body: {
+          workspaceId: workspace.id,
+          confirm: 'CONFIRM_NUCLEAR_RESET'
+        }
       });
+
+      if (error) throw error;
+
+      setNuclearResult({ success: true, result: data.result });
+
+      toast({
+        title: '☢️ Nuclear Reset Complete',
+        description: `Cleared ${data.result?.messages_cleared?.toLocaleString() || 0} messages, ${data.result?.conversations_cleared?.toLocaleString() || 0} conversations, ${data.result?.customers_cleared?.toLocaleString() || 0} customers`,
+      });
+
+      // Refresh counts
+      fetchCounts();
       setNuclearConfirmText('');
       setNuclearResetOpen(false);
-      return;
     } catch (error: any) {
       console.error('Nuclear reset error:', error);
       toast({

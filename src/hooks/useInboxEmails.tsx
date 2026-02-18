@@ -196,12 +196,14 @@ export const useInboxCounts = () => {
   });
 };
 
-// Fetch HTML body on demand — edge function removed, return empty
+// Fetch HTML body on demand via edge function
 export const useFetchEmailBody = () => {
   const fetchBody = async (emailId: string): Promise<string | null> => {
-    // fetch-email-body edge function removed — email body loading handled by inbox sync
-    console.info('fetch-email-body removed: email body loading handled by inbox sync');
-    return null;
+    const { data, error } = await supabase.functions.invoke('fetch-email-body', {
+      body: { email_id: emailId },
+    });
+    if (error) throw error;
+    return data?.body_html || null;
   };
   return { fetchBody };
 };

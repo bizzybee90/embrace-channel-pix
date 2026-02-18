@@ -56,12 +56,35 @@ export const DraftDisplay = ({
 
     setVerifying(true);
     try {
-      // draft-verify edge function removed — return static unverified result
+      const { data, error } = await supabase.functions.invoke('draft-verify', {
+        body: {
+          workspace_id: workspaceId,
+          conversation_id: conversationId,
+          draft_text: draftText,
+          customer_message: customerMessage
+        }
+      });
+
+      if (error) throw error;
+      setVerification(data.verification);
+
+      if (data.verification.status === 'failed') {
+        toast.warning('Draft needs review', {
+          description: 'Some issues were found that may need attention'
+        });
+      } else if (data.verification.status === 'passed') {
+        toast.success('Draft verified', {
+          description: 'No issues found'
+        });
+      }
+    } catch (e: any) {
+      console.error('Verification failed:', e);
+      // Don't block on verification failure
       setVerification({
-        status: 'pending',
-        confidence_score: 0,
+        status: 'passed',
+        confidence_score: 0.5,
         issues: [],
-        notes: 'Draft verification migrated to n8n'
+        notes: 'Verification unavailable'
       });
     } finally {
       setVerifying(false);

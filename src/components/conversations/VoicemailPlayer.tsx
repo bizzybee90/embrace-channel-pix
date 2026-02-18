@@ -69,9 +69,21 @@ export const VoicemailPlayer = ({
   const transcribe = async () => {
     setTranscribing(true);
     try {
-      // audio-process edge function removed
-      toast.info('Audio processing migrated to n8n');
-      return;
+      const { data, error } = await supabase.functions.invoke('audio-process', {
+        body: {
+          workspace_id: workspaceId,
+          message_id: messageId,
+          audio_url: audioUrl,
+          customer_name: customerName
+        }
+      });
+
+      if (error) throw error;
+      setResult(data);
+      toast.success('Voicemail transcribed!');
+    } catch (e: unknown) {
+      const errorMessage = e instanceof Error ? e.message : 'Failed to transcribe voicemail';
+      toast.error(errorMessage);
     } finally {
       setTranscribing(false);
     }

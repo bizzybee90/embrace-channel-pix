@@ -36,9 +36,22 @@ export default function GDPRPortal() {
   const handleVerification = async (token: string, requestAction: RequestType) => {
     setVerifying(true);
     try {
-      // GDPR portal migrated to n8n
-      toast.info('GDPR portal migrated to n8n');
-      setState('form');
+      const { data, error } = await supabase.functions.invoke('gdpr-portal-verify', {
+        body: { token, action: requestAction }
+      });
+
+      if (error) throw error;
+
+      setState('verified');
+      toast.success(
+        requestAction === 'export'
+          ? 'Your data export request has been confirmed. You will receive an email with your data shortly.'
+          : 'Your deletion request has been confirmed. We will process it within 30 days.'
+      );
+    } catch (error: any) {
+      console.error('Verification error:', error);
+      setState('error');
+      toast.error('Verification failed. The link may have expired.');
     } finally {
       setVerifying(false);
     }
@@ -54,9 +67,22 @@ export default function GDPRPortal() {
 
     setLoading(true);
     try {
-      // GDPR portal migrated to n8n
-      toast.info('GDPR portal migrated to n8n');
-      return;
+      const { data, error } = await supabase.functions.invoke('gdpr-portal-request', {
+        body: {
+          email: email.trim().toLowerCase(),
+          request_type: requestType,
+          reason: reason.trim() || undefined,
+          workspace_slug: workspaceSlug || 'default'
+        }
+      });
+
+      if (error) throw error;
+
+      setState('submitted');
+      toast.success('Verification email sent! Please check your inbox.');
+    } catch (error: any) {
+      console.error('Request error:', error);
+      toast.error(error.message || 'Failed to submit request. Please try again.');
     } finally {
       setLoading(false);
     }

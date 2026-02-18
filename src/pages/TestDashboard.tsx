@@ -206,9 +206,15 @@ export default function TestDashboard() {
   const [isRunningAll, setIsRunningAll] = useState(false);
 
   const KEPT_FUNCTIONS = [
-    'aurinko-auth-callback', 'aurinko-auth-start', 'aurinko-exchange-token', 'aurinko-webhook',
-    'claude-ai-agent-tools', 'email-send', 'google-places-autocomplete',
-    'mark-email-read', 'pre-triage-rules', 'refresh-aurinko-subscriptions', 'trigger-n8n-workflow',
+    'ai-draft', 'audio-process', 'aurinko-auth-callback', 'aurinko-auth-start',
+    'aurinko-exchange-token', 'aurinko-webhook', 'check-consent', 'claude-ai-agent-tools',
+    'create-consent', 'document-process', 'draft-verify', 'email-send',
+    'export-customer-data', 'fetch-email-body', 'gdpr-portal-request', 'gdpr-portal-verify',
+    'generate-embedding', 'get-mailbox-stats', 'google-places-autocomplete',
+    'hydrate-inbox', 'image-analyze', 'mark-email-read', 'n8n-competitor-callback',
+    'n8n-email-callback', 'nuclear-reset', 'parse-email-body', 'pre-triage-rules',
+    'refresh-aurinko-subscriptions', 'request-deletion', 'trigger-n8n-workflow',
+    'trigger-n8n-workflows', 'withdraw-consent',
   ];
 
   const runTest = async (functionName: string, payload: Record<string, any>, testName: string) => {
