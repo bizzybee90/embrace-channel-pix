@@ -1,7 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': Deno.env.get('ALLOWED_ORIGIN') || '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-n8n-signature',
 };
 
@@ -122,20 +122,21 @@ Deno.serve(async (req) => {
 
     const rawBody = await req.text();
 
-    // Bug 1 Fix: Only verify signature if BOTH the secret is configured AND the header is present
-    const signature = req.headers.get('x-n8n-signature') || '';
-    if (n8nSecret && signature) {
-      if (!(await verifyN8nSignature(rawBody, signature, n8nSecret))) {
-        console.error('[n8n-callback] Invalid webhook signature');
-        return new Response(
-          JSON.stringify({ error: 'Unauthorized: invalid signature' }),
-          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      console.log('[n8n-callback] Signature verified successfully');
-    } else {
-      console.log('[n8n-callback] Skipping signature verification (no secret or no header)');
+    // Mandatory webhook signature verification
+    if (!n8nSecret) {
+      console.error('[n8n-callback] N8N_WEBHOOK_SECRET not configured — rejecting request');
+      return new Response(JSON.stringify({ error: 'Webhook secret not configured' }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
+    const signature = req.headers.get('x-n8n-signature') || '';
+    if (!signature || !(await verifyN8nSignature(rawBody, signature, n8nSecret))) {
+      console.error('[n8n-callback] Invalid or missing webhook signature');
+      return new Response(JSON.stringify({ error: 'Invalid signature' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    console.log('[n8n-callback] Signature verified successfully');
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const body = JSON.parse(rawBody);
