@@ -86,13 +86,9 @@ export function OnboardingWizard({ workspaceId, onComplete }: OnboardingWizardPr
     };
     fetchCount();
 
-    // Trigger inbox hydration in background (converts classified emails → conversations)
-    supabase.functions.invoke('trigger-n8n-workflow', {
-      body: { workspace_id: workspaceId, workflow_type: 'email_import', daysBack: 90, limit: 200 },
-    }).then(({ data, error }) => {
-      if (error) console.error('Hydration error:', error);
-      else console.log('Inbox hydration result:', data);
-    });
+    // Email import is handled automatically by the aurinko-webhook
+    // as emails arrive. No batch import needed.
+    console.log('Onboarding complete. Emails will be classified as they arrive via webhook.');
   }, [currentStep, workspaceId]);
 
   useEffect(() => {

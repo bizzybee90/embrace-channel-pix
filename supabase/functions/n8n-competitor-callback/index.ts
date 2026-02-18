@@ -224,22 +224,9 @@ Deno.serve(async (req) => {
       }, { onConflict: 'workspace_id,workflow_type' });
     }
 
-    // When scraping completes, trigger FAQ consolidation in the background
+    // FAQ consolidation handled by n8n workflow directly
     if (status === 'scrape_complete') {
-      const consolidateUrl = `${supabaseUrl}/functions/v1/consolidate-faqs`;
-      try {
-        fetch(consolidateUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${supabaseServiceKey}`,
-          },
-          body: JSON.stringify({ workspace_id }),
-        }).then(r => console.log(`[n8n-callback] consolidate-faqs triggered: status=${r.status}`))
-          .catch(e => console.error('[n8n-callback] consolidate-faqs trigger failed:', e));
-      } catch (err) {
-        console.error('[n8n-callback] Failed to trigger consolidate-faqs:', err);
-      }
+      console.log('[n8n-callback] FAQ scraping complete for workspace:', workspace_id);
     }
 
     return new Response(

@@ -208,6 +208,66 @@ Deno.serve(async (req) => {
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
 
+    } else if (workflow_type === 'faq_generation') {
+      // FAQ generation scrapes competitor websites and extracts FAQs
+      // Called after competitor_discovery finds competitors
+
+      // Get competitors from the database for this workspace
+      const { data: competitors } = await supabase
+        .from('competitor_sites')
+        .select('id, domain, business_name, website_url')
+        .eq('workspace_id', workspace_id)
+        .eq('is_active', true)
+        .limit(20);
+
+      if (!competitors || competitors.length === 0) {
+        return new Response(
+          JSON.stringify({ error: 'No competitors found. Run competitor discovery first.' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const faqPayload = {
+        workspace_id,
+        competitors: competitors.map(c => ({
+          id: c.id,
+          domain: c.domain,
+          business_name: c.business_name,
+          url: c.website_url || `https://${c.domain}`,
+        })),
+        callback_url: callbackUrl,
+      };
+
+      console.log('[trigger-n8n] Sending to faq-generation:', competitors.length, 'competitors');
+
+      const response = await fetch(`${n8nWebhookBaseUrl}/faq-generation`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(faqPayload),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[trigger-n8n] n8n faq generation error:', errorText);
+        return new Response(
+          JSON.stringify({ error: 'Failed to trigger FAQ generation', details: errorText }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      await supabase.from('n8n_workflow_progress').upsert({
+        workspace_id,
+        workflow_type: 'faq_generation',
+        status: 'pending',
+        details: { message: `Scraping ${competitors.length} competitor websites for FAQs...` },
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'workspace_id,workflow_type' });
+
+      return new Response(
+        JSON.stringify({ success: true, workflow: 'faq_generation', competitors_count: competitors.length }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+
     } else {
       return new Response(
         JSON.stringify({ error: `Unknown workflow_type: ${workflow_type}` }),
