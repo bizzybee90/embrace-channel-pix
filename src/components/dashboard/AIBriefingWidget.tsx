@@ -37,8 +37,8 @@ export const AIBriefingWidget = () => {
         return;
       }
 
-      // ai-inbox-summary edge function has been removed; set static data
-      setSummary("Email briefing is being migrated to n8n workflows. Check back soon!");
+      // Daily briefing will be generated once the AI pipeline processes new emails
+      setSummary(null);
       setConversationCount(0);
     } catch (error) {
       console.error('Error fetching AI summary:', error);
@@ -95,9 +95,15 @@ export const AIBriefingWidget = () => {
                 <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
               </Button>
             </div>
-            <p className="text-sm text-amber-800 dark:text-amber-200 leading-relaxed">
-              {summary}
-            </p>
+            {summary ? (
+              <p className="text-sm text-amber-800 dark:text-amber-200 leading-relaxed">
+                {summary}
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground leading-relaxed italic">
+                Your daily briefing will appear here once BizzyBee has processed new emails.
+              </p>
+            )}
             {conversationCount > 0 && (
               <p className="text-xs text-amber-600 dark:text-amber-400 mt-3">
                 Based on {conversationCount} email{conversationCount !== 1 ? 's' : ''} from the last 24 hours

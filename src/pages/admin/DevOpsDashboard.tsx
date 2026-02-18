@@ -25,12 +25,14 @@ export default function DevOpsDashboard() {
         return;
       }
 
-      // Allow based on email domain for development
-      const isAdminUser = 
-                          user.email?.endsWith('@bizzybee.ai') ||
-                          user.email?.endsWith('@lovable.dev');
-      
-      setIsAdmin(isAdminUser);
+      // Allow any authenticated user who has a workspace (i.e. a real customer)
+      const { data: userProfile } = await supabase
+        .from('users')
+        .select('workspace_id')
+        .eq('id', user.id)
+        .single();
+
+      setIsAdmin(!!userProfile?.workspace_id);
     };
 
     checkAdmin();
