@@ -151,8 +151,8 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
             to="/"
             end
             onClick={onNavigate}
-            className={`flex items-center ${isCollapsed ? 'flex-col justify-center gap-0.5 py-2 px-1' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all`}
-            activeClassName="bg-accent text-accent-foreground font-medium"
+            className={`flex items-center ${isCollapsed ? 'flex-col justify-center gap-0.5 py-2 px-1' : 'gap-3 px-3 py-2.5'} rounded-xl text-sm text-foreground hover:bg-accent/50 transition-all`}
+            activeClassName="bg-primary/10 text-primary rounded-xl"
           >
             <Home className="h-5 w-5 text-muted-foreground" />
             {isCollapsed ? (
@@ -166,8 +166,8 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
           <NavLink
             to="/to-reply"
             onClick={onNavigate}
-            className={`flex items-center ${isCollapsed ? 'flex-col justify-center gap-0.5 py-2 px-1' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all`}
-            activeClassName="bg-accent text-accent-foreground font-medium"
+            className={`flex items-center ${isCollapsed ? 'flex-col justify-center gap-0.5 py-2 px-1' : 'gap-3 px-3 py-2.5'} rounded-xl text-sm text-foreground hover:bg-accent/50 transition-all`}
+            activeClassName="bg-primary/10 text-primary rounded-xl"
           >
             <div className="relative">
               <Inbox className="h-5 w-5 text-destructive" />
@@ -193,8 +193,8 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
           <NavLink
             to="/unread"
             onClick={onNavigate}
-            className={`flex items-center ${isCollapsed ? 'flex-col justify-center gap-0.5 py-2 px-1' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all`}
-            activeClassName="bg-accent text-accent-foreground font-medium"
+            className={`flex items-center ${isCollapsed ? 'flex-col justify-center gap-0.5 py-2 px-1' : 'gap-3 px-3 py-2.5'} rounded-xl text-sm text-foreground hover:bg-accent/50 transition-all`}
+            activeClassName="bg-primary/10 text-primary rounded-xl"
           >
             <div className="relative">
               <Eye className="h-5 w-5 text-blue-500" />
@@ -220,8 +220,8 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
           <NavLink
             to="/drafts"
             onClick={onNavigate}
-            className={`flex items-center ${isCollapsed ? 'flex-col justify-center gap-0.5 py-2 px-1' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all`}
-            activeClassName="bg-accent text-accent-foreground font-medium"
+            className={`flex items-center ${isCollapsed ? 'flex-col justify-center gap-0.5 py-2 px-1' : 'gap-3 px-3 py-2.5'} rounded-xl text-sm text-foreground hover:bg-accent/50 transition-all`}
+            activeClassName="bg-primary/10 text-primary rounded-xl"
           >
             <div className="relative">
               <FileEdit className="h-5 w-5 text-amber-500" />
@@ -247,8 +247,8 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
           <NavLink
             to="/review"
             onClick={onNavigate}
-            className={`flex items-center ${isCollapsed ? 'flex-col justify-center gap-0.5 py-2 px-1' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all`}
-            activeClassName="bg-accent text-accent-foreground font-medium"
+            className={`flex items-center ${isCollapsed ? 'flex-col justify-center gap-0.5 py-2 px-1' : 'gap-3 px-3 py-2.5'} rounded-xl text-sm text-foreground hover:bg-accent/50 transition-all`}
+            activeClassName="bg-primary/10 text-primary rounded-xl"
           >
             <ClipboardCheck className="h-5 w-5 text-purple-500" />
             {isCollapsed ? (
@@ -267,8 +267,8 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
           <NavLink
             to="/snoozed"
             onClick={onNavigate}
-            className={`flex items-center ${isCollapsed ? 'flex-col justify-center gap-0.5 py-2 px-1' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all`}
-            activeClassName="bg-accent text-accent-foreground font-medium"
+            className={`flex items-center ${isCollapsed ? 'flex-col justify-center gap-0.5 py-2 px-1' : 'gap-3 px-3 py-2.5'} rounded-xl text-sm text-foreground hover:bg-accent/50 transition-all`}
+            activeClassName="bg-primary/10 text-primary rounded-xl"
           >
             <Clock className="h-5 w-5 text-amber-500" />
             {isCollapsed ? (
@@ -287,8 +287,8 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
           <NavLink
             to="/done"
             onClick={onNavigate}
-            className={`flex items-center ${isCollapsed ? 'flex-col justify-center gap-0.5 py-2 px-1' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all`}
-            activeClassName="bg-accent text-accent-foreground font-medium"
+            className={`flex items-center ${isCollapsed ? 'flex-col justify-center gap-0.5 py-2 px-1' : 'gap-3 px-3 py-2.5'} rounded-xl text-sm text-foreground hover:bg-accent/50 transition-all`}
+            activeClassName="bg-primary/10 text-primary rounded-xl"
           >
             <CheckCircle2 className="h-5 w-5 text-green-500" />
             {isCollapsed ? (
@@ -322,8 +322,8 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
                 <NavLink
                   to="/sent"
                   onClick={onNavigate}
-                  className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-all"
-                  activeClassName="bg-accent text-accent-foreground font-medium"
+                  className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-all"
+                  activeClassName="bg-primary/10 text-primary rounded-xl"
                 >
                   <Send className="h-4 w-4" />
                   <span>Sent</span>
@@ -331,8 +331,8 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
                 <NavLink
                   to="/all-open"
                   onClick={onNavigate}
-                  className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-all"
-                  activeClassName="bg-accent text-accent-foreground font-medium"
+                  className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-all"
+                  activeClassName="bg-primary/10 text-primary rounded-xl"
                 >
                   <Inbox className="h-4 w-4" />
                   <span>Inbox (All)</span>
@@ -340,8 +340,8 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
                 <NavLink
                   to="/channels"
                   onClick={onNavigate}
-                  className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-all"
-                  activeClassName="bg-accent text-accent-foreground font-medium"
+                  className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-all"
+                  activeClassName="bg-primary/10 text-primary rounded-xl"
                 >
                   <MessageSquare className="h-4 w-4" />
                   <span>Channels</span>
@@ -349,8 +349,8 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
                 <NavLink
                   to="/analytics"
                   onClick={onNavigate}
-                  className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-all"
-                  activeClassName="bg-accent text-accent-foreground font-medium"
+                  className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-all"
+                  activeClassName="bg-primary/10 text-primary rounded-xl"
                 >
                   <BarChart3 className="h-4 w-4" />
                   <span>Analytics</span>
@@ -358,8 +358,8 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
                 <NavLink
                   to="/knowledge-base"
                   onClick={onNavigate}
-                  className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-all"
-                  activeClassName="bg-accent text-accent-foreground font-medium"
+                  className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-all"
+                  activeClassName="bg-primary/10 text-primary rounded-xl"
                 >
                   <BookOpen className="h-4 w-4" />
                   <span>Knowledge Base</span>
@@ -367,8 +367,8 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
                 <NavLink
                   to="/settings"
                   onClick={onNavigate}
-                  className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-all"
-                  activeClassName="bg-accent text-accent-foreground font-medium"
+                  className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-all"
+                  activeClassName="bg-primary/10 text-primary rounded-xl"
                 >
                   <Settings className="h-4 w-4" />
                   <span>Settings</span>
@@ -383,8 +383,8 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
               <NavLink
                 to="/sent"
                 onClick={onNavigate}
-                className="flex flex-col items-center gap-0.5 py-2 px-1 rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all"
-                activeClassName="bg-accent text-accent-foreground"
+                className="flex flex-col items-center gap-0.5 py-2 px-1 rounded-xl text-sm text-foreground hover:bg-accent/50 transition-all"
+                activeClassName="bg-primary/10 text-primary rounded-xl"
               >
                 <Send className="h-5 w-5 text-blue-500" />
                 <span className="text-[9px] text-muted-foreground leading-none">Sent</span>
@@ -392,8 +392,8 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
               <NavLink
                 to="/settings"
                 onClick={onNavigate}
-                className="flex flex-col items-center gap-0.5 py-2 px-1 rounded-lg text-sm text-foreground hover:bg-accent/50 transition-all"
-                activeClassName="bg-accent text-accent-foreground"
+                className="flex flex-col items-center gap-0.5 py-2 px-1 rounded-xl text-sm text-foreground hover:bg-accent/50 transition-all"
+                activeClassName="bg-primary/10 text-primary rounded-xl"
               >
                 <Settings className="h-5 w-5 text-muted-foreground" />
                 <span className="text-[9px] text-muted-foreground leading-none">Settings</span>

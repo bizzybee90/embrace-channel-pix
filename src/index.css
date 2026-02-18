@@ -195,74 +195,70 @@ All colors MUST be HSL.
     .mobile-native-card {
       @apply rounded-2xl bg-card border border-border/30 shadow-sm p-4;
     }
-    
     .mobile-frosted {
       @apply bg-card/95 backdrop-blur-md;
     }
-    
     .mobile-section-spacing {
       @apply space-y-5;
     }
-    
     .mobile-touch-target {
       @apply min-h-[44px] flex items-center;
     }
-    
     .mobile-bottom-tab {
       @apply flex flex-col items-center justify-center gap-1 py-2 px-4 rounded-xl transition-all duration-150;
     }
-    
     .mobile-bottom-tab-active {
       @apply bg-primary/10 text-primary;
     }
-    
     .mobile-message-bubble {
       @apply rounded-[18px] px-4 py-3 max-w-[85%] shadow-sm;
     }
-    
-  .mobile-spring-bounce {
-    @apply transition-transform duration-200 ease-out active:scale-[0.98];
+    .mobile-spring-bounce {
+      @apply transition-transform duration-200 ease-out active:scale-[0.98];
+    }
+    .mobile-slide-up {
+      @apply animate-in slide-in-from-bottom-4 duration-150;
+    }
+    /* Tablet-specific utility classes */
+    .tablet-card-shadow {
+      @apply shadow-sm hover:shadow-md transition-shadow;
+    }
+    .tablet-container-padding {
+      @apply px-8 py-6;
+    }
+    .tablet-header-sticky {
+      @apply sticky top-0 z-10 backdrop-blur-sm bg-background/80;
+    }
   }
-  
-  .mobile-slide-up {
-    @apply animate-in slide-in-from-bottom-4 duration-150;
-  }
-  
-  /* Apple-style shadows */
+
+  /* PREMIUM MULTI-LAYER APPLE SHADOWS — apply globally, not inside media query */
   .apple-shadow-sm {
-    box-shadow: 0 2px 8px -2px hsl(var(--foreground) / 0.08);
+    box-shadow:
+      0px 1px 2px rgba(0, 0, 0, 0.04),
+      0px 0px 0px 1px rgba(0, 0, 0, 0.02);
   }
-  
+
   .apple-shadow {
-    box-shadow: 0 10px 40px -5px hsl(var(--foreground) / 0.08);
+    box-shadow:
+      0px 4px 12px rgba(0, 0, 0, 0.06),
+      0px 1px 2px rgba(0, 0, 0, 0.04),
+      0px 0px 0px 1px rgba(0, 0, 0, 0.02);
   }
-  
+
   .apple-shadow-lg {
-    box-shadow: 0 20px 50px -10px hsl(var(--foreground) / 0.12);
+    box-shadow:
+      0px 24px 48px -12px rgba(0, 0, 0, 0.12),
+      0px 0px 0px 1px rgba(0, 0, 0, 0.02);
   }
-  
-  /* Spring animations */
+
+  /* SPRING PHYSICS — corrected bezier curve */
   .spring-bounce {
-    transition: transform 0.3s cubic-bezier(0.5, 0.9, 0.25, 1.3);
+    transition-timing-function: cubic-bezier(0.175, 0.885, 0.32, 1.275);
   }
-  
+
   .spring-press {
     @apply active:scale-[0.97] transition-transform duration-150 ease-out;
   }
-  
-  /* Tablet-specific utility classes */
-  .tablet-card-shadow {
-    @apply shadow-sm hover:shadow-md transition-shadow;
-  }
-
-  .tablet-container-padding {
-    @apply px-8 py-6;
-  }
-
-  .tablet-header-sticky {
-    @apply sticky top-0 z-10 backdrop-blur-sm bg-background/80;
-  }
-}
 }
 
 @layer base {

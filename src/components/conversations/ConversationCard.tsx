@@ -238,7 +238,7 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
       </div>
 
       {/* Row 2: Subject/Title */}
-      <p className="text-sm font-medium text-foreground truncate mb-1">
+      <p className="text-sm font-medium text-foreground/80 truncate mb-1">
         {conversation.title || 'No subject'}
       </p>
 
@@ -297,9 +297,8 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
           onClick={handleClick}
           className={cn(
             "relative cursor-pointer transition-all duration-300 rounded-[22px] overflow-hidden",
-            "bg-card border border-border/30 hover:border-primary/30",
-            "apple-shadow hover:apple-shadow-lg spring-press",
-            selected && "border-primary/50 apple-shadow-lg bg-gradient-to-br from-primary/8 via-primary/4 to-card"
+            "bg-card apple-shadow hover:apple-shadow-lg spring-press",
+            selected && "apple-shadow-lg bg-gradient-to-br from-primary/8 via-primary/4 to-card"
           )}
           style={{
             transform: isSwiping ? `translateX(${swipeDistance}px)` : 'translateX(0)',
@@ -318,9 +317,8 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
       onClick={handleClick}
       className={cn(
         "relative cursor-pointer transition-all duration-300 ease-out rounded-[22px] mb-2 overflow-hidden",
-        "bg-card border border-border/30 hover:border-primary/30",
-        "apple-shadow hover:apple-shadow-lg spring-press",
-        selected && "border-primary/50 apple-shadow-lg bg-gradient-to-br from-primary/8 via-primary/4 to-card"
+        "bg-card apple-shadow hover:apple-shadow-lg spring-press",
+        selected && "apple-shadow-lg bg-gradient-to-br from-primary/8 via-primary/4 to-card"
       )}
     >
       {cardInner('p-4')}

@@ -2,13 +2,12 @@ import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Card } from '@/components/ui/card';
 import { Send, Paperclip, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useIsTablet } from '@/hooks/use-tablet';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '@/integrations/supabase/client';
+import { cn } from '@/lib/utils';
 
 interface ReplyAreaProps {
   conversationId: string;
@@ -189,9 +188,9 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend, ex
 
   return (
     <div className={
-      useMobileStyle 
-        ? "p-4 m-3 bg-card rounded-[22px] border border-border/30 shadow-lg backdrop-blur-sm"
-        : "p-4 m-4 bg-card rounded-[22px] border border-border/30 shadow-lg backdrop-blur-sm"
+      useMobileStyle
+        ? "p-3 m-3 bg-card/80 rounded-[22px] backdrop-blur-sm"
+        : "p-4 m-4 bg-card/80 rounded-[22px] backdrop-blur-sm"
     }>
       <Tabs defaultValue="reply" orientation={isMobile ? "vertical" : "horizontal"}>
         <div className={isMobile ? "flex flex-col gap-2" : ""}>
@@ -202,71 +201,51 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend, ex
 
           <TabsContent value="reply" className="mt-0">
             <div className="space-y-2">
-              <div className="flex items-center gap-2">
+              <div className="flex items-end gap-2">
                 <Textarea
                   ref={replyTextareaRef}
                   placeholder="Type your reply..."
                   value={replyBody}
                   onChange={(e) => {
-                    console.log('⌨️ Textarea onChange:', { value: e.target.value, length: e.target.value.length });
                     const newValue = e.target.value;
                     setReplyBody(newValue);
-                    
-                    // Auto-save to localStorage
                     if (newValue.trim()) {
                       localStorage.setItem(`draft-${conversationId}`, newValue);
-                      console.log('✅ Draft saved to localStorage');
                     } else {
                       localStorage.removeItem(`draft-${conversationId}`);
-                      console.log('🗑️ Draft removed from localStorage');
                     }
-                    
                     onDraftChange?.(newValue);
                   }}
-                  className={
-                    useMobileStyle
-                      ? "resize-none border-border/60 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all text-sm min-h-[80px] max-h-[300px] rounded-2xl bg-background shadow-sm flex-1 overflow-y-auto"
-                      : "resize-none border-border/60 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all text-base min-h-[56px] max-h-[300px] rounded-xl bg-background shadow-sm flex-1 overflow-y-auto"
-                  }
+                  className={cn(
+                    useMobileStyle ? "min-h-[80px] text-sm" : "min-h-[56px] text-base",
+                    "w-full resize-none rounded-xl border-0 bg-muted/30 focus-visible:ring-1 focus-visible:ring-primary/30 leading-relaxed placeholder:text-muted-foreground/50 shadow-[inset_0_1px_2px_rgba(0,0,0,0.02)] transition-all duration-200 flex-1 overflow-y-auto"
+                  )}
                 />
-                <Button 
-                  onClick={handleSendReply} 
+                <Button
+                  onClick={handleSendReply}
                   disabled={sending || uploading || (!replyBody.trim() && attachments.length === 0)}
-                  className={
-                    useMobileStyle
-                      ? "mobile-spring-bounce h-10 w-10 rounded-xl font-medium shadow-sm flex-shrink-0 self-end"
-                      : "h-10 w-10 rounded-xl font-medium shadow-sm flex-shrink-0 self-center"
-                  }
                   size="icon"
+                  className="h-10 w-10 rounded-[12px] bg-foreground text-background hover:bg-foreground/90 shadow-sm flex-shrink-0 mb-1"
                 >
                   <Send className="h-4 w-4" />
                 </Button>
               </div>
-              
+
               {attachments.length > 0 && (
                 <div className="space-y-1 px-1">
                   {attachments.map((file, idx) => (
                     <div key={idx} className="flex items-center gap-2 text-sm bg-muted/50 rounded-lg px-3 py-2">
-                      <Paperclip className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <Paperclip className="h-3 w-3 text-muted-foreground" />
                       <span className="flex-1 truncate">{file.name}</span>
-                      <span className="text-xs text-muted-foreground flex-shrink-0">
-                        ({Math.round(file.size / 1024)}KB)
-                      </span>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeAttachment(idx)}
-                        className="h-6 w-6 p-0 flex-shrink-0"
-                      >
+                      <Button type="button" variant="ghost" size="sm" onClick={() => removeAttachment(idx)} className="h-6 w-6 p-0">
                         <X className="h-3 w-3" />
                       </Button>
                     </div>
                   ))}
                 </div>
               )}
-              
-              <div className="flex items-center gap-2">
+
+              <div className="flex items-center gap-2 px-1">
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -281,42 +260,36 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend, ex
                   size="sm"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploading || attachments.length >= 10}
-                  className="text-xs text-muted-foreground"
+                  className="h-6 px-2 text-xs text-muted-foreground"
                 >
-                  <Paperclip className="h-4 w-4 mr-1" />
-                  Attach files
+                  <Paperclip className="h-3 w-3 mr-1" />
+                  Attach
                 </Button>
-                <span className="text-xs text-muted-foreground">
-                  {attachments.length > 0 && `${attachments.length}/10 files • `}
-                  Press Ctrl+Enter to send
+                <span className="text-[10px] text-muted-foreground/60 ml-auto">
+                  ⌘+Enter to send
                 </span>
               </div>
             </div>
           </TabsContent>
 
           <TabsContent value="note" className="mt-0">
-            <div className="flex items-center gap-2">
+            <div className="flex items-end gap-2">
               <Textarea
                 ref={noteTextareaRef}
                 placeholder="Add an internal note..."
                 value={noteBody}
                 onChange={(e) => setNoteBody(e.target.value)}
-                className={
-                  useMobileStyle
-                    ? "resize-none border-border/60 focus:border-warning/50 focus:ring-2 focus:ring-warning/20 transition-all text-sm min-h-[80px] max-h-[300px] rounded-2xl bg-background shadow-sm flex-1 overflow-y-auto"
-                    : "resize-none border-border/60 focus:border-warning/50 focus:ring-2 focus:ring-warning/20 transition-all text-base min-h-[56px] max-h-[300px] rounded-xl bg-background shadow-sm flex-1 overflow-y-auto"
-                }
+                className={cn(
+                  useMobileStyle ? "min-h-[80px] text-sm" : "min-h-[56px] text-base",
+                  "w-full resize-none rounded-xl border-0 bg-warning/5 focus-visible:ring-1 focus-visible:ring-warning/30 leading-relaxed placeholder:text-muted-foreground/50 shadow-[inset_0_1px_2px_rgba(0,0,0,0.02)] transition-all duration-200 flex-1 overflow-y-auto"
+                )}
               />
-              <Button 
-                onClick={handleSendNote} 
-                disabled={sending || !noteBody.trim()} 
-                variant="outline" 
-                className={
-                  useMobileStyle
-                    ? "hover:bg-warning/10 hover:border-warning/50 transition-all h-10 w-10 rounded-xl mobile-spring-bounce font-medium flex-shrink-0 self-end"
-                    : "hover:bg-warning/10 hover:border-warning/50 transition-all h-10 w-10 rounded-xl font-medium flex-shrink-0 self-center"
-                }
+              <Button
+                onClick={handleSendNote}
+                disabled={sending || !noteBody.trim()}
+                variant="outline"
                 size="icon"
+                className="h-10 w-10 rounded-[12px] border-warning/20 bg-warning/10 text-warning hover:bg-warning/20 mb-1 flex-shrink-0"
               >
                 <Send className="h-4 w-4" />
               </Button>
