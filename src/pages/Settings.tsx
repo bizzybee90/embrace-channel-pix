@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Button } from '@/components/ui/button';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { DataExportPanel } from '@/components/settings/DataExportPanel';
 import { DataDeletionPanel } from '@/components/settings/DataDeletionPanel';
 import { AuditLogPanel } from '@/components/settings/AuditLogPanel';
@@ -30,6 +31,8 @@ import { OnboardingTriggerPanel } from '@/components/settings/OnboardingTriggerP
 import { BackButton } from '@/components/shared/BackButton';
 import { SettingsSection } from '@/components/settings/SettingsSection';
 import { MobilePageLayout } from '@/components/layout/MobilePageLayout';
+import { ThreeColumnLayout } from '@/components/layout/ThreeColumnLayout';
+import { Sidebar } from '@/components/sidebar/Sidebar';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useWorkspace } from '@/hooks/useWorkspace';
 import { Bot, Plug, Shield, Layout, Code, ChevronRight, ExternalLink, Wrench } from 'lucide-react';
@@ -296,5 +299,10 @@ export default function Settings() {
     );
   }
 
-  return content;
+  return (
+    <ThreeColumnLayout
+      sidebar={<Sidebar />}
+      main={<ScrollArea className="h-screen">{content}</ScrollArea>}
+    />
+  );
 }
