@@ -73,12 +73,13 @@ export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, on
 
         // Check for FAQs from website source
         // @ts-ignore - Supabase types cause deep instantiation errors
-        const faqResult = await supabase.from('faq_database').select('id, source_page_url').eq('workspace_id', workspaceId).eq('is_own_content', true).limit(500);
-        const faqs = faqResult?.data as Array<{ id: string; source_page_url?: string }> | null;
+        const faqResult = await supabase.from('faq_database').select('id, generation_source').eq('workspace_id', workspaceId).eq('is_own_content', true).limit(500);
+        const faqs = faqResult?.data as Array<{ id: string; generation_source?: string }> | null;
         const faqCount = faqs?.length || 0;
 
         if (faqCount > 0) {
-          const uniquePages = new Set(faqs?.map(f => f.source_page_url).filter(Boolean) ?? []);
+          // n8n stores the source page URL in generation_source
+          const uniquePages = new Set(faqs?.map(f => f.generation_source).filter(Boolean) ?? []);
           setExistingKnowledge({
             faqCount,
             pagesScraped: uniquePages.size,
@@ -119,17 +120,17 @@ export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, on
     }, 1000);
 
     const markComplete = async (count: number) => {
-      // Derive pages scraped from distinct source_page_url values in faq_database
+      // Derive pages scraped from distinct generation_source values (n8n stores page URL there)
       let pagesScraped = 0;
       try {
         // @ts-ignore
         const { data: pageRows } = await supabase
           .from('faq_database')
-          .select('source_page_url')
+          .select('generation_source')
           .eq('workspace_id', workspaceId)
           .eq('is_own_content', true)
-          .not('source_page_url', 'is', null);
-        const uniquePages = new Set((pageRows as Array<{ source_page_url: string }> | null)?.map(r => r.source_page_url) ?? []);
+          .not('generation_source', 'is', null);
+        const uniquePages = new Set((pageRows as Array<{ generation_source: string }> | null)?.map(r => r.generation_source) ?? []);
         pagesScraped = uniquePages.size;
       } catch (err) {
         console.warn('Could not count pages:', err);
