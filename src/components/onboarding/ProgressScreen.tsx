@@ -281,7 +281,7 @@ function InlineCompetitorReview({
     setIsStarting(true);
     try {
       const { data, error } = await supabase.functions.invoke('trigger-n8n-workflow', {
-        body: { workspace_id: workspaceId, workflow_type: 'competitor_discovery' }
+        body: { workspace_id: workspaceId, workflow_type: 'faq_generation' }
       });
       if (error) throw error;
       toast.success(`Analysis started for ${data.competitors_count} competitors`);
