@@ -1,5 +1,4 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { chainNextBatch } from '../_shared/batch-processor.ts';
 
 // Redirect helper that uses origin from state
 
@@ -279,35 +278,6 @@ Deno.serve(async (req) => {
         started_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }, { onConflict: 'workspace_id' });
-
-    // =============================================
-    // TRIGGER EMAIL IMPORT V2 (RELAY RACE START)
-    // Fire and forget - let it run autonomously
-    // =============================================
-    if (configData?.id) {
-      console.log('[aurinko-auth-callback] Triggering email-import-v2 for workspace:', workspaceId);
-      
-      // Update sync status to indicate sync is starting
-      await supabase
-        .from('email_provider_configs')
-        .update({ 
-          sync_status: 'syncing',
-          sync_stage: 'fetching_sent',
-          sync_started_at: new Date().toISOString()
-        })
-        .eq('id', configData.id);
-
-      // Fire the relay race - chainNextBatch is fire-and-forget
-      // Use speed_phase: true during onboarding to cap at 2,500 emails for fast start
-      chainNextBatch(SUPABASE_URL!, 'email-import-v2', {
-        workspace_id: workspaceId,
-        import_mode: importMode,
-        speed_phase: true,
-        _relay_depth: 0,
-      }, SUPABASE_SERVICE_ROLE_KEY!);
-
-      console.log('[aurinko-auth-callback] Relay race started - email-import-v2 triggered');
-    }
 
     // Redirect back into the app instead of showing an inline HTML page.
     // This avoids browsers showing raw HTML (text/plain) and keeps the UX consistent.
