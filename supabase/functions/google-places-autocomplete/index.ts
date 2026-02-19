@@ -1,18 +1,32 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': Deno.env.get('ALLOWED_ORIGIN') || '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+const getAllowedOrigin = (req: Request): string => {
+  const origin = req.headers.get('Origin') || '';
+  const allowedOrigin = Deno.env.get('ALLOWED_ORIGIN') || '*';
+  if (
+    allowedOrigin === '*' ||
+    origin === allowedOrigin ||
+    origin.endsWith('.lovableproject.com') ||
+    origin.endsWith('.lovable.app')
+  ) {
+    return origin || '*';
+  }
+  return allowedOrigin;
 };
 
+const getCorsHeaders = (req: Request) => ({
+  'Access-Control-Allow-Origin': getAllowedOrigin(req),
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+});
+
 serve(async (req) => {
-  // Handle CORS preflight requests
+  const corsHeaders = getCorsHeaders(req);
+
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // --- AUTH CHECK ---
   const authHeader = req.headers.get('Authorization');
   if (!authHeader) {
     return new Response(JSON.stringify({ error: 'Missing authorization' }), {
@@ -30,7 +44,6 @@ serve(async (req) => {
       status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }
-  // --- END AUTH CHECK ---
 
   try {
     const { input } = await req.json();
@@ -51,10 +64,8 @@ serve(async (req) => {
       );
     }
 
-    // Call Google Places Autocomplete API
     const url = new URL('https://maps.googleapis.com/maps/api/place/autocomplete/json');
     url.searchParams.set('input', input);
-    // Use geocode type to include cities, counties, regions, countries
     url.searchParams.set('types', 'geocode');
     url.searchParams.set('key', apiKey);
 
@@ -74,16 +85,14 @@ serve(async (req) => {
       );
     }
 
-    // Format the predictions - strip country suffix but keep parent region for disambiguation
     const countryPattern = /, (UK|United Kingdom|USA|United States|Australia|Canada|Ireland|Germany|France|Italy|Spain|Netherlands|New Zealand|India|Poland|Czechia|South Korea|Malaysia|Belarus|England|Scotland|Wales|Northern Ireland)$/i;
     
     const predictions = (data.predictions || []).map((p: any) => {
-      // Remove country from the end but keep everything else (like county/region)
       const cleanDescription = p.description.replace(countryPattern, '');
       return {
         description: cleanDescription,
         place_id: p.place_id,
-        original: p.description, // Keep original for reference
+        original: p.description,
       };
     });
 
