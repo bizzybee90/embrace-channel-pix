@@ -551,13 +551,14 @@ export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenPr
         });
 
         // Auto-fire faq_generation when discovery completes (removes manual "Start Analysis" gate)
+        // NOTE: keep the panel visible so users can still add/curate competitors before it fires
         if (scrapeRecord?.status === 'review_ready' && !autoScrapeTriggeredRef.current) {
           autoScrapeTriggeredRef.current = true;
           console.log('[ProgressScreen] Auto-triggering faq_generation');
           supabase.functions.invoke('trigger-n8n-workflow', {
             body: { workspace_id: workspaceId, workflow_type: 'faq_generation' },
           }).catch(err => console.error('[ProgressScreen] faq_generation auto-trigger failed:', err));
-          setReviewDismissed(true);
+          // Do NOT dismiss the panel — keep it visible so users can see/add competitors
         }
 
         // Scrape track (Workflow 2) — stays 'waiting' until discovery completes
