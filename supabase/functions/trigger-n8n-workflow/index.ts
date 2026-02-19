@@ -178,6 +178,27 @@ Deno.serve(async (req) => {
         callback_url: callbackUrl,
       };
 
+      // Create scraping_jobs row so the frontend can track progress
+      const { data: job, error: jobError } = await supabase
+        .from('scraping_jobs')
+        .insert({
+          workspace_id,
+          job_type: 'own_website',
+          website_url: websitePayload.website_url,
+          status: 'pending',
+          started_at: new Date().toISOString(),
+        })
+        .select('id')
+        .single();
+
+      if (jobError) {
+        console.error('[trigger-n8n] Failed to create scraping job:', jobError);
+        return new Response(
+          JSON.stringify({ error: 'Failed to create scraping job' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
       console.log('[trigger-n8n] Sending to own-website-scrape:', JSON.stringify(websitePayload));
 
       const response = await fetch(`${n8nWebhookBaseUrl}/own-website-scrape`, {
@@ -204,7 +225,7 @@ Deno.serve(async (req) => {
       }, { onConflict: 'workspace_id,workflow_type' });
 
       return new Response(
-        JSON.stringify({ success: true, workflow: 'own_website_scrape' }),
+        JSON.stringify({ success: true, workflow: 'own_website_scrape', jobId: job.id }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
 

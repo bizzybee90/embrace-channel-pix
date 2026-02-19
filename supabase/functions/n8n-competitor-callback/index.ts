@@ -205,6 +205,34 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Update scraping_jobs for own-website-scrape callbacks
+    if (status === 'scraping' || status === 'scrape_complete') {
+      const jobUpdate: Record<string, unknown> = { updated_at: new Date().toISOString() };
+
+      if (status === 'scraping') {
+        jobUpdate.status = 'scraping';
+      } else if (status === 'scrape_complete') {
+        jobUpdate.status = 'complete';
+        jobUpdate.completed_at = new Date().toISOString();
+        if (body.faqs_extracted !== undefined) {
+          jobUpdate.faqs_found = body.faqs_extracted;
+          jobUpdate.faqs_stored = body.faqs_extracted;
+        }
+      }
+
+      const { error: jobUpdateError } = await (supabase as any)
+        .from('scraping_jobs')
+        .update(jobUpdate)
+        .eq('workspace_id', workspace_id)
+        .eq('job_type', 'own_website')
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (jobUpdateError) {
+        console.error('[n8n-callback] Failed to update scraping_jobs:', jobUpdateError);
+      }
+    }
+
     // When discovery completes, set status to review_ready so the user can
     // review/edit the competitor list before the FAQ workflow starts.
     // The UI will call start-competitor-analysis when the user confirms.
