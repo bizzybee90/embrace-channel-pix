@@ -420,32 +420,37 @@ export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenPr
           }).catch(err => console.error('[ProgressScreen] competitor_discovery trigger failed:', err));
         }
 
+        // Check email import queue count — used for both guards below
+        const { count: emailQueueCount } = await supabase
+          .from('email_import_queue' as 'allowed_webhook_ips')
+          .select('id', { count: 'exact', head: true })
+          .eq('workspace_id', workspaceId) as unknown as { count: number | null };
+
         // Guarded email_classification trigger — only if emails exist in the queue
         if (!emailRecord || emailRecord.status === 'pending') {
-          const { count: emailCount } = await supabase
-            .from('email_import_queue' as 'allowed_webhook_ips')
-            .select('id', { count: 'exact', head: true })
-            .eq('workspace_id', workspaceId) as unknown as { count: number | null };
-
-          if ((emailCount ?? 0) > 0) {
+          if ((emailQueueCount ?? 0) > 0) {
             // Emails already imported — trigger classification
             supabase.functions.invoke('trigger-n8n-workflow', {
               body: { workspace_id: workspaceId, workflow_type: 'email_classification' },
             }).catch(err => console.error('[ProgressScreen] email_classification trigger failed:', err));
-          } else {
-            // No emails yet — check if import is stuck (config exists but queue is empty)
-            const { data: emailConfig } = await supabase
-              .from('email_provider_configs' as 'allowed_webhook_ips')
-              .select('id, sync_status')
-              .eq('workspace_id', workspaceId)
-              .maybeSingle() as unknown as { data: { id: string; sync_status: string } | null };
+          }
+        }
 
-            if (emailConfig && emailConfig.sync_status === 'pending') {
-              console.log('[ProgressScreen] Email config exists but queue is empty — triggering email-import-v2');
-              supabase.functions.invoke('email-import-v2', {
-                body: { config_id: emailConfig.id, workspace_id: workspaceId },
-              }).catch(err => console.error('[ProgressScreen] email-import-v2 trigger failed:', err));
-            }
+        // Email import recovery — fires regardless of email_import status
+        // Handles cases where email-import-v2 never ran (queue empty but config exists)
+        // Also covers 'dispatched' status where classification ran on empty queue
+        if ((emailQueueCount ?? 0) === 0) {
+          const { data: emailConfig } = await supabase
+            .from('email_provider_configs' as 'allowed_webhook_ips')
+            .select('id, sync_status')
+            .eq('workspace_id', workspaceId)
+            .maybeSingle() as unknown as { data: { id: string; sync_status: string } | null };
+
+          if (emailConfig && emailConfig.sync_status === 'pending') {
+            console.log('[ProgressScreen] Email queue empty + config pending — triggering email-import-v2');
+            supabase.functions.invoke('email-import-v2', {
+              body: { config_id: emailConfig.id, workspace_id: workspaceId },
+            }).catch(err => console.error('[ProgressScreen] email-import-v2 trigger failed:', err));
           }
         }
       } catch (err) {

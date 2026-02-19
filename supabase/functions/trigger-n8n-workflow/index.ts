@@ -234,12 +234,13 @@ Deno.serve(async (req) => {
       // Called after competitor_discovery finds competitors
 
       // Get competitors from the database for this workspace
+      // Use is_selected OR is_valid (fallback) — 'is_active' does not exist in schema
       const { data: competitors } = await supabase
         .from('competitor_sites')
-        .select('id, domain, business_name, website_url')
+        .select('id, domain, business_name, url')
         .eq('workspace_id', workspace_id)
-        .eq('is_active', true)
-        .limit(20);
+        .not('status', 'eq', 'rejected')
+        .limit(30);
 
       if (!competitors || competitors.length === 0) {
         return new Response(
@@ -254,7 +255,7 @@ Deno.serve(async (req) => {
           id: c.id,
           domain: c.domain,
           business_name: c.business_name,
-          url: c.website_url || `https://${c.domain}`,
+          url: c.url || `https://${c.domain}`,
         })),
         callback_url: callbackUrl,
       };
