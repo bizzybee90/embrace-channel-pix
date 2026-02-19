@@ -76,9 +76,33 @@ Deno.serve(async (req) => {
         }
       }
 
+      // Create a research job record so competitor_sites can reference it
+      const { data: researchJob, error: jobError } = await supabase
+        .from('competitor_research_jobs')
+        .insert({
+          workspace_id,
+          status: 'discovering',
+          config: {
+            business_type: businessContext?.business_type,
+            location: businessContext?.service_area,
+            target_count: searchConfig.target_count || 50,
+          },
+        })
+        .select('id')
+        .single();
+
+      if (jobError || !researchJob) {
+        console.error('[trigger-n8n] Failed to create research job:', jobError);
+        return new Response(
+          JSON.stringify({ error: 'Failed to create research job' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
       // Build payload for n8n competitor discovery
       const competitorPayload = {
         workspace_id,
+        job_id: researchJob.id,
         business_name: businessContext?.company_name || 'Unknown Business',
         business_type: businessContext?.business_type || '',
         website_url: businessContext?.website_url || '',
