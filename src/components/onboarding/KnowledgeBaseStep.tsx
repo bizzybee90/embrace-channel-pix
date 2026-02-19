@@ -73,14 +73,15 @@ export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, on
 
         // Check for FAQs from website source
         // @ts-ignore - Supabase types cause deep instantiation errors
-        const faqResult = await supabase.from('faq_database').select('id').eq('workspace_id', workspaceId).eq('is_own_content', true).limit(100);
-        const faqs = faqResult?.data as Array<{ id: string }> | null;
+        const faqResult = await supabase.from('faq_database').select('id, source_page_url').eq('workspace_id', workspaceId).eq('is_own_content', true).limit(500);
+        const faqs = faqResult?.data as Array<{ id: string; source_page_url?: string }> | null;
         const faqCount = faqs?.length || 0;
 
         if (faqCount > 0) {
+          const uniquePages = new Set(faqs?.map(f => f.source_page_url).filter(Boolean) ?? []);
           setExistingKnowledge({
             faqCount,
-            pagesScraped: 0,
+            pagesScraped: uniquePages.size,
             scrapedAt: null,
           });
           setStatus('already_done');
@@ -118,6 +119,22 @@ export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, on
     }, 1000);
 
     const markComplete = async (count: number) => {
+      // Derive pages scraped from distinct source_page_url values in faq_database
+      let pagesScraped = 0;
+      try {
+        // @ts-ignore
+        const { data: pageRows } = await supabase
+          .from('faq_database')
+          .select('source_page_url')
+          .eq('workspace_id', workspaceId)
+          .eq('is_own_content', true)
+          .not('source_page_url', 'is', null);
+        const uniquePages = new Set((pageRows as Array<{ source_page_url: string }> | null)?.map(r => r.source_page_url) ?? []);
+        pagesScraped = uniquePages.size;
+      } catch (err) {
+        console.warn('Could not count pages:', err);
+      }
+
       // Update scraping_jobs row in DB so re-entry detection works
       if (jobDbId) {
         try {
@@ -126,6 +143,7 @@ export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, on
             .update({
               status: 'completed',
               faqs_found: count,
+              pages_processed: pagesScraped,
               completed_at: new Date().toISOString(),
             })
             .eq('id', jobDbId);
@@ -136,7 +154,7 @@ export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, on
 
       setExistingKnowledge({
         faqCount: count,
-        pagesScraped: 0,
+        pagesScraped,
         scrapedAt: new Date().toISOString(),
       });
       setStatus('already_done');
