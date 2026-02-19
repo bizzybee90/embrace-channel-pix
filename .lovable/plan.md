@@ -1,43 +1,74 @@
 
-# Pre-Launch Security Hardening
+## Problem Summary
 
-## What Needs Doing
+When n8n finishes the website scrape, it inserts FAQs into `faq_database` but **never updates `scraping_jobs` status to `completed`**. The frontend (`WebsitePipelineProgress`) polls `scraping_jobs` exclusively, so it sees `pending` forever and eventually shows an error — even though the data is there. The 3-minute auto-retry also fires a second n8n execution via Firecrawl unnecessarily.
 
-Three security items before going live:
+## Solution: Direct FAQ Polling in KnowledgeBaseStep
 
-### Item 1: Set ALLOWED_ORIGIN secret (Can be done now)
-All 16 edge functions currently default to `Access-Control-Allow-Origin: *` because no `ALLOWED_ORIGIN` secret is set. This means any website in the world could call your backend functions from a browser. Setting it to your production domain locks this down.
+Replace the `WebsitePipelineProgress` component (which relies on `scraping_jobs` callbacks) with a lightweight inline polling UI inside `KnowledgeBaseStep` that watches `faq_database` directly. When FAQs appear, update `scraping_jobs` to `completed` in the database, then show the success screen.
 
-- Published URL: `https://embrace-channel-pix.lovable.app`
-- Secret to add: `ALLOWED_ORIGIN` = `https://embrace-channel-pix.lovable.app`
+## Files to Change
 
-**Important caveat for webhook functions:** Functions called by external services (n8n, Aurinko, Apify) must allow those origins too. However, these webhook functions are server-to-server calls — the CORS header only applies to browser requests, so setting `ALLOWED_ORIGIN` to your app domain is safe for all functions, including webhooks.
+### 1. `src/components/onboarding/KnowledgeBaseStep.tsx`
 
-### Item 2: N8N_WEBHOOK_SECRET — Already configured ✅
-This secret exists and is set. The `n8n-email-callback` and `n8n-competitor-callback` functions both perform HMAC-SHA256 signature verification using it. Nothing to do here.
+**Key changes:**
 
-### Item 3: Rotate the Anon Key (Requires manual action from you)
-The anon key is in your git history. To rotate it:
-1. Open your Lovable Cloud backend view
-2. Navigate to Project Settings → API
-3. Click "Regenerate" on the anon key
-4. The `.env` file and `src/integrations/supabase/client.ts` will auto-update
+**New state:**
+- Replace `'running'` status with a `'polling'` status that drives the new inline progress UI
+- Add `pollingFaqCount` state to display live FAQ count as n8n inserts rows
+- Add `jobDbId` (the `scraping_jobs.id` returned from `trigger-n8n-workflow`) for the final update
 
-This will invalidate any existing browser sessions (users will need to log in again), but it's necessary since the old key is public.
+**After `startScraping()` succeeds:**
+- Switch to `'polling'` status instead of `'running'` (no longer mount `WebsitePipelineProgress`)
+- Store the `jobId` from the response for the DB update
 
-## Implementation Steps
+**New polling `useEffect` (active only when `status === 'polling'`):**
+- Polls `faq_database` every 8 seconds: `select count(*) where workspace_id = ... and is_own_content = true`
+- Updates `pollingFaqCount` on each tick so the user sees live growth
+- Detects completion: two consecutive polls with the same count ≥ 5 FAQs, OR 5-minute maximum timeout
+- On completion:
+  1. Calls `supabase.from('scraping_jobs').update({ status: 'completed', faqs_found: count, completed_at: now() }).eq('id', jobDbId)` — persists to DB so re-entry `checkExisting` works
+  2. Sets `existingKnowledge` with the FAQ count
+  3. Transitions to `'already_done'` to show the existing success UI (reuses the "Knowledge Base Ready" screen)
+- On timeout (5 min): if count > 0, treat as complete; if count = 0, show error
 
-**Step 1 — Add ALLOWED_ORIGIN secret**
-Use the `add_secret` tool to set `ALLOWED_ORIGIN` to `https://embrace-channel-pix.lovable.app`. This will immediately apply to all edge function deployments with no code changes needed, since all functions already read `Deno.env.get('ALLOWED_ORIGIN') || '*'`.
+**New `'polling'` render branch:**
+- Shows a clean progress card:
+  - Header: "Extracting your website knowledge..."
+  - Subtitle: the website URL
+  - Three stage rows (Discover, Scrape, Extract) — all show as `in_progress` spinner until FAQs appear, then animate to `done`
+  - Live counter: `{pollingFaqCount} FAQs found so far` (updates in real-time)
+  - Elapsed timer (seconds → minutes)
+  - Skip button for impatient users
 
-**Step 2 — Verify webhook functions still work**
-The Aurinko and n8n webhook functions use server-to-server calls (not browser CORS), so they won't be affected. However, we should confirm the Aurinko OAuth callback flow works post-change since that involves a browser redirect.
+**Remove:** The `status === 'running'` branch that mounted `WebsitePipelineProgress` — no longer needed.
 
-**Step 3 — Anon key rotation (manual)**
-This must be done by you directly in the Lovable Cloud backend. After rotation, test the login flow to confirm the new key propagates correctly.
+### 2. `src/components/onboarding/WebsitePipelineProgress.tsx` — Remove auto-retry
 
-## Technical Note
-No code changes are required for Item 1 — the `ALLOWED_ORIGIN` pattern is already implemented in all functions. This is purely a secrets configuration task. Items 2 and 3 are also non-code changes.
+Disable the Firecrawl auto-retry `useEffect` (lines 337–349). The 3-minute trigger fires when `pagesFound === 0`, which is always the case in our n8n flow (n8n never updates `scraping_jobs.total_pages_found`). This was causing duplicate executions.
 
-## What I Can Do Right Now
-I can trigger the `add_secret` tool to prompt you to set `ALLOWED_ORIGIN` to `https://embrace-channel-pix.lovable.app`. The anon key rotation requires you to action it directly in the backend — I'll provide the exact steps.
+Change: Wrap the auto-retry effect body with an early return so it never fires, or simply remove the `onRetry` call inside it.
+
+## Data Flow After Fix
+
+```text
+User clicks "Start Scraping"
+  → trigger-n8n-workflow (creates scraping_jobs row, returns jobId)
+  → KnowledgeBaseStep switches to 'polling'
+  → n8n runs independently, inserts FAQs into faq_database (is_own_content=true)
+  → Poll every 8s: SELECT COUNT(*) FROM faq_database WHERE workspace_id=... AND is_own_content=true
+  → Count grows: 0 → 12 → 31 → 47 (shown live to user)
+  → Two consecutive polls same count ≥ 5
+  → UPDATE scraping_jobs SET status='completed', faqs_found=47, completed_at=now()
+  → Transition to 'already_done' → show "Knowledge Base Ready" success screen
+  → User clicks Continue
+```
+
+## What This Achieves
+
+- No n8n changes required
+- No duplicate Firecrawl executions
+- User sees live FAQ count growing (better UX than a frozen spinner)
+- `scraping_jobs` gets updated to `completed` in the DB — re-entry detection works correctly
+- 5-minute safety timeout handles edge cases
+- Skip button always available so users are never truly stuck
