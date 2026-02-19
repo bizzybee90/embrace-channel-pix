@@ -195,10 +195,12 @@ interface CompetitorItem {
 
 function InlineCompetitorReview({ 
   workspaceId, 
-  onStartAnalysis 
+  onStartAnalysis,
+  autoStarted = false,
 }: { 
   workspaceId: string; 
   onStartAnalysis: () => void;
+  autoStarted?: boolean;
 }) {
   const [competitors, setCompetitors] = useState<CompetitorItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -355,20 +357,28 @@ function InlineCompetitorReview({
         </div>
       </ScrollArea>
 
-      {/* Start analysis button */}
-      <Button
-        onClick={handleStart}
-        disabled={isStarting || selectedCount === 0}
-        className="w-full gap-2"
-        size="sm"
-      >
-        {isStarting ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : (
-          <Play className="h-4 w-4" />
-        )}
-        Start Analysis ({selectedCount} competitors)
-      </Button>
+      {/* Start analysis button — hidden when auto-triggered */}
+      {!autoStarted && (
+        <Button
+          onClick={handleStart}
+          disabled={isStarting || selectedCount === 0}
+          className="w-full gap-2"
+          size="sm"
+        >
+          {isStarting ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Play className="h-4 w-4" />
+          )}
+          Start Analysis ({selectedCount} competitors)
+        </Button>
+      )}
+      {autoStarted && (
+        <div className="flex items-center gap-2 text-sm text-primary py-1">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          Analysis started automatically — scraping in progress...
+        </div>
+      )}
     </div>
   );
 }
@@ -385,6 +395,7 @@ export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenPr
   const [reviewDismissed, setReviewDismissed] = useState(false);
   const startTimeRef = useRef<number>(Date.now());
   const autoTriggeredRef = useRef(false);
+  const autoScrapeTriggeredRef = useRef(false);
 
   // Auto-trigger n8n workflows on mount (fire-and-forget)
   useEffect(() => {
@@ -409,11 +420,33 @@ export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenPr
           }).catch(err => console.error('[ProgressScreen] competitor_discovery trigger failed:', err));
         }
 
-        // Trigger email_classification if no record or status is pending
+        // Guarded email_classification trigger — only if emails exist in the queue
         if (!emailRecord || emailRecord.status === 'pending') {
-          supabase.functions.invoke('trigger-n8n-workflow', {
-            body: { workspace_id: workspaceId, workflow_type: 'email_classification' },
-          }).catch(err => console.error('[ProgressScreen] email_classification trigger failed:', err));
+          const { count: emailCount } = await supabase
+            .from('email_import_queue' as 'allowed_webhook_ips')
+            .select('id', { count: 'exact', head: true })
+            .eq('workspace_id', workspaceId) as unknown as { count: number | null };
+
+          if ((emailCount ?? 0) > 0) {
+            // Emails already imported — trigger classification
+            supabase.functions.invoke('trigger-n8n-workflow', {
+              body: { workspace_id: workspaceId, workflow_type: 'email_classification' },
+            }).catch(err => console.error('[ProgressScreen] email_classification trigger failed:', err));
+          } else {
+            // No emails yet — check if import is stuck (config exists but queue is empty)
+            const { data: emailConfig } = await supabase
+              .from('email_provider_configs' as 'allowed_webhook_ips')
+              .select('id, sync_status')
+              .eq('workspace_id', workspaceId)
+              .maybeSingle() as unknown as { data: { id: string; sync_status: string } | null };
+
+            if (emailConfig && emailConfig.sync_status === 'pending') {
+              console.log('[ProgressScreen] Email config exists but queue is empty — triggering email-import-v2');
+              supabase.functions.invoke('email-import-v2', {
+                body: { config_id: emailConfig.id, workspace_id: workspaceId },
+              }).catch(err => console.error('[ProgressScreen] email-import-v2 trigger failed:', err));
+            }
+          }
         }
       } catch (err) {
         console.error('[ProgressScreen] Auto-trigger check failed:', err);
@@ -516,6 +549,16 @@ export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenPr
           ] : [],
           error: isStale(discoveryRecord) ? 'Timed out — the workflow may have failed. Please retry.' : (discoveryDetails.error as string | undefined),
         });
+
+        // Auto-fire faq_generation when discovery completes (removes manual "Start Analysis" gate)
+        if (scrapeRecord?.status === 'review_ready' && !autoScrapeTriggeredRef.current) {
+          autoScrapeTriggeredRef.current = true;
+          console.log('[ProgressScreen] Auto-triggering faq_generation');
+          supabase.functions.invoke('trigger-n8n-workflow', {
+            body: { workspace_id: workspaceId, workflow_type: 'faq_generation' },
+          }).catch(err => console.error('[ProgressScreen] faq_generation auto-trigger failed:', err));
+          setReviewDismissed(true);
+        }
 
         // Scrape track (Workflow 2) — stays 'waiting' until discovery completes
         const scrapeDetails = (scrapeRecord?.details || {}) as Record<string, unknown>;
@@ -660,6 +703,7 @@ export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenPr
           <InlineCompetitorReview
             workspaceId={workspaceId}
             onStartAnalysis={() => setReviewDismissed(true)}
+            autoStarted={autoScrapeTriggeredRef.current}
           />
         )}
         <TrackProgress
