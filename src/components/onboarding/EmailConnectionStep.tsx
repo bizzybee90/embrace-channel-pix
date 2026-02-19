@@ -312,7 +312,7 @@ export function EmailConnectionStep({
     try {
       // Trigger n8n workflows via edge function (avoids CORS issues from browser)
       const { data, error: fnError } = await supabase.functions.invoke('trigger-n8n-workflow', {
-        body: { workspace_id: workspaceId },
+        body: { workspace_id: workspaceId, workflow_type: 'email_classification' },
       });
 
       if (fnError) {
