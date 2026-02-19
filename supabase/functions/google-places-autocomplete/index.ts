@@ -1,24 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const getAllowedOrigin = (req: Request): string => {
-  const origin = req.headers.get('Origin') || '';
-  const allowedOrigin = Deno.env.get('ALLOWED_ORIGIN') || '*';
-  if (
-    allowedOrigin === '*' ||
-    origin === allowedOrigin ||
-    origin.endsWith('.lovableproject.com') ||
-    origin.endsWith('.lovable.app')
-  ) {
-    return origin || '*';
-  }
-  return allowedOrigin;
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const getCorsHeaders = (req: Request) => ({
-  'Access-Control-Allow-Origin': getAllowedOrigin(req),
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-});
+const getCorsHeaders = (_req: Request) => corsHeaders;
 
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
