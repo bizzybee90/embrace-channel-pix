@@ -332,21 +332,13 @@ export function WebsitePipelineProgress({
     return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
   }, [elapsedSeconds]);
 
-  // Auto fallback: if we're "scraping" for a while with no pages reported yet,
-  // restart the job using Firecrawl (connector) so the user isn't stuck.
-  useEffect(() => {
-    if (didAutoResume) return;
-    if (stats.phase !== 'scraping') return;
-    if (!stats.apifyRunId) return;
-    if (stats.pagesFound > 0) return;
-    if (elapsedSeconds == null) return;
-
-    // Wait 3 minutes before attempting an automatic fallback.
-    if (elapsedSeconds < 180) return;
-
-    setDidAutoResume(true);
-    onRetry({ provider: 'firecrawl' });
-  }, [didAutoResume, elapsedSeconds, jobId, stats.apifyRunId, stats.pagesFound, stats.phase, workspaceId]);
+  // Auto-retry disabled: n8n handles scraping internally and never updates
+  // scraping_jobs.total_pages_found, so pagesFound is always 0. The old
+  // Firecrawl fallback was causing duplicate n8n executions. KnowledgeBaseStep
+  // now polls faq_database directly and no longer uses this component for the
+  // own-website-scrape flow.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  void didAutoResume;
 
   const handleContinue = () => {
     onComplete({

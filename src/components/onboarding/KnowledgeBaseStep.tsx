@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { ChevronLeft, ChevronRight, AlertCircle, CheckCircle2, RotateCcw, Globe, FileText, Download, Loader2, Search, Sparkles, ArrowRight } from 'lucide-react';
-import { WebsitePipelineProgress } from './WebsitePipelineProgress';
+import {
+  ChevronLeft, ChevronRight, AlertCircle, CheckCircle2, RotateCcw,
+  Globe, FileText, Download, Loader2, Search, Sparkles, ArrowRight
+} from 'lucide-react';
 import { generateKnowledgeBasePDF } from '@/components/settings/knowledge-base/generateKnowledgeBasePDF';
 import { toast } from 'sonner';
 import bizzybeeLogoSrc from '@/assets/bizzybee-logo.png';
@@ -18,7 +20,7 @@ interface KnowledgeBaseStepProps {
   onBack: () => void;
 }
 
-type Status = 'checking' | 'idle' | 'already_done' | 'starting' | 'running' | 'complete' | 'error';
+type Status = 'checking' | 'idle' | 'already_done' | 'starting' | 'polling' | 'complete' | 'error';
 
 interface ExistingKnowledge {
   faqCount: number;
@@ -28,11 +30,17 @@ interface ExistingKnowledge {
 
 export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, onBack }: KnowledgeBaseStepProps) {
   const [status, setStatus] = useState<Status>('checking');
-  const [jobId, setJobId] = useState<string | null>(null);
+  const [jobDbId, setJobDbId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [results, setResults] = useState({ faqsExtracted: 0, pagesScraped: 0 });
   const [downloadingPDF, setDownloadingPDF] = useState(false);
   const [existingKnowledge, setExistingKnowledge] = useState<ExistingKnowledge | null>(null);
+
+  // Polling state
+  const [pollingFaqCount, setPollingFaqCount] = useState(0);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const pollingStartRef = useRef<number | null>(null);
+  const lastCountRef = useRef<number>(-1);
+  const stableCountRef = useRef<number>(0);
 
   // Check if we already have website knowledge
   useEffect(() => {
@@ -65,9 +73,8 @@ export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, on
 
         // Check for FAQs from website source
         // @ts-ignore - Supabase types cause deep instantiation errors
-        const faqResult = await supabase.from('faq_database').select('id').eq('workspace_id', workspaceId).eq('source', 'website').limit(100);
+        const faqResult = await supabase.from('faq_database').select('id').eq('workspace_id', workspaceId).eq('is_own_content', true).limit(100);
         const faqs = faqResult?.data as Array<{ id: string }> | null;
-
         const faqCount = faqs?.length || 0;
 
         if (faqCount > 0) {
@@ -80,7 +87,6 @@ export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, on
           return;
         }
 
-        // No existing knowledge, show idle state
         setStatus('idle');
       } catch (err) {
         console.error('Error checking existing knowledge:', err);
@@ -91,11 +97,111 @@ export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, on
     checkExisting();
   }, [workspaceId, businessContext.websiteUrl]);
 
-  const startScraping = async (opts?: { provider?: 'apify' | 'firecrawl' }) => {
+  // Polling logic: watch faq_database directly while status === 'polling'
+  useEffect(() => {
+    if (status !== 'polling') return;
+
+    pollingStartRef.current = Date.now();
+    lastCountRef.current = -1;
+    stableCountRef.current = 0;
+
+    const MAX_POLL_MS = 5 * 60 * 1000; // 5 minutes
+    const POLL_INTERVAL_MS = 8000;
+    const MIN_STABLE_COUNT = 5;
+    const STABLE_TICKS_REQUIRED = 2;
+
+    // Elapsed timer
+    const timerInterval = setInterval(() => {
+      if (pollingStartRef.current) {
+        setElapsedSeconds(Math.floor((Date.now() - pollingStartRef.current) / 1000));
+      }
+    }, 1000);
+
+    const markComplete = async (count: number) => {
+      // Update scraping_jobs row in DB so re-entry detection works
+      if (jobDbId) {
+        try {
+          await supabase
+            .from('scraping_jobs')
+            .update({
+              status: 'completed',
+              faqs_found: count,
+              completed_at: new Date().toISOString(),
+            })
+            .eq('id', jobDbId);
+        } catch (err) {
+          console.warn('Could not update scraping_jobs:', err);
+        }
+      }
+
+      setExistingKnowledge({
+        faqCount: count,
+        pagesScraped: 0,
+        scrapedAt: new Date().toISOString(),
+      });
+      setStatus('already_done');
+    };
+
+    const poll = async () => {
+      const elapsed = pollingStartRef.current ? Date.now() - pollingStartRef.current : 0;
+
+      try {
+        // @ts-ignore
+        const { count } = await supabase
+          .from('faq_database')
+          .select('id', { count: 'exact', head: true })
+          .eq('workspace_id', workspaceId)
+          .eq('is_own_content', true);
+
+        const currentCount = count || 0;
+        setPollingFaqCount(currentCount);
+
+        // Check stability
+        if (currentCount >= MIN_STABLE_COUNT && currentCount === lastCountRef.current) {
+          stableCountRef.current += 1;
+          if (stableCountRef.current >= STABLE_TICKS_REQUIRED) {
+            clearInterval(pollInterval);
+            clearInterval(timerInterval);
+            await markComplete(currentCount);
+            return;
+          }
+        } else {
+          stableCountRef.current = 0;
+        }
+        lastCountRef.current = currentCount;
+
+        // 5-minute timeout
+        if (elapsed >= MAX_POLL_MS) {
+          clearInterval(pollInterval);
+          clearInterval(timerInterval);
+          if (currentCount > 0) {
+            await markComplete(currentCount);
+          } else {
+            setError('The scrape timed out. You can add FAQs manually later or try again.');
+            setStatus('error');
+          }
+        }
+      } catch (err) {
+        console.error('Polling error:', err);
+      }
+    };
+
+    // First poll immediately, then every 8s
+    poll();
+    const pollInterval = setInterval(poll, POLL_INTERVAL_MS);
+
+    return () => {
+      clearInterval(pollInterval);
+      clearInterval(timerInterval);
+    };
+  }, [status, workspaceId, jobDbId]);
+
+  const startScraping = async () => {
     if (!businessContext.websiteUrl) return;
-    
+
     setStatus('starting');
     setError(null);
+    setPollingFaqCount(0);
 
     try {
       const { data, error: invokeError } = await supabase.functions.invoke('trigger-n8n-workflow', {
@@ -103,20 +209,14 @@ export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, on
           workspace_id: workspaceId,
           workflow_type: 'own_website_scrape',
           websiteUrl: businessContext.websiteUrl,
-          ...(opts?.provider ? { forceProvider: opts.provider } : {}),
         }
       });
 
-      if (invokeError) {
-        throw new Error(invokeError.message || 'Failed to start scraping');
-      }
+      if (invokeError) throw new Error(invokeError.message || 'Failed to start scraping');
+      if (!data?.success) throw new Error(data?.error || 'Failed to start scraping');
 
-      if (!data?.success) {
-        throw new Error(data?.error || 'Failed to start scraping');
-      }
-
-      setJobId(data.jobId);
-      setStatus('running');
+      setJobDbId(data.jobId || null);
+      setStatus('polling');
     } catch (err: any) {
       console.error('Start scraping error:', err);
       setError(err.message || 'Something went wrong');
@@ -124,69 +224,40 @@ export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, on
     }
   };
 
-  const handleRetry = (opts?: { provider?: 'apify' | 'firecrawl' }) => {
-    setError(null);
-    setResults({ faqsExtracted: 0, pagesScraped: 0 });
-    startScraping(opts);
-  };
-
-  const handlePipelineComplete = (pipelineResults: { faqsExtracted: number; pagesScraped: number }) => {
-    setResults(pipelineResults);
-    onComplete({
-      industryFaqs: 0,
-      websiteFaqs: pipelineResults.faqsExtracted
-    });
-  };
-
   const handleSkip = () => {
-    onComplete({
-      industryFaqs: 0,
-      websiteFaqs: 0
-    });
+    onComplete({ industryFaqs: 0, websiteFaqs: 0 });
   };
 
   const handleContinueWithExisting = () => {
-    onComplete({
-      industryFaqs: 0,
-      websiteFaqs: existingKnowledge?.faqCount || 0
-    });
+    onComplete({ industryFaqs: 0, websiteFaqs: existingKnowledge?.faqCount || 0 });
   };
 
-  // Checking state
+  const elapsedLabel = (() => {
+    const mins = Math.floor(elapsedSeconds / 60);
+    const secs = elapsedSeconds % 60;
+    return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+  })();
+
+  // ── Checking state ──────────────────────────────────────────────
   if (status === 'checking') {
     return (
       <div className="space-y-6">
         <div className="text-center space-y-2">
           <h2 className="text-xl font-semibold">Checking existing knowledge...</h2>
-          <p className="text-sm text-muted-foreground">
-            Just a moment
-          </p>
+          <p className="text-sm text-muted-foreground">Just a moment</p>
         </div>
       </div>
     );
   }
 
-  // Show pipeline progress when job is running
-  if (status === 'running' && jobId && businessContext.websiteUrl) {
-    return (
-      <WebsitePipelineProgress
-        workspaceId={workspaceId}
-        jobId={jobId}
-        websiteUrl={businessContext.websiteUrl}
-        onComplete={handlePipelineComplete}
-        onBack={onBack}
-        onRetry={handleRetry}
-      />
-    );
-  }
-
-  // Already done state - website knowledge exists
+  // ── Already done state ──────────────────────────────────────────
   if (status === 'already_done' && existingKnowledge) {
     const pagesCount = existingKnowledge.pagesScraped || 0;
     const faqCount = existingKnowledge.faqCount || 0;
-
     const websiteDomain = businessContext.websiteUrl?.replace(/^https?:\/\//, '').replace(/\/.*$/, '') || '';
-    const faviconUrl = businessContext.websiteUrl ? `https://www.google.com/s2/favicons?domain=${websiteDomain}&sz=64` : null;
+    const faviconUrl = businessContext.websiteUrl
+      ? `https://www.google.com/s2/favicons?domain=${websiteDomain}&sz=64`
+      : null;
 
     return (
       <div className="space-y-5">
@@ -208,10 +279,10 @@ export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, on
           <p className="text-sm text-muted-foreground">{businessContext.websiteUrl}</p>
         </div>
 
-        {/* Compact results summary */}
+        {/* Results summary */}
         <div className="grid grid-cols-3 gap-3">
           <div className="bg-card border rounded-xl p-3 text-center">
-            <p className="text-2xl font-bold text-primary">{pagesCount}</p>
+            <p className="text-2xl font-bold text-primary">{pagesCount || '—'}</p>
             <p className="text-xs text-muted-foreground">Pages Scraped</p>
           </div>
           <div className="bg-card border rounded-xl p-3 text-center">
@@ -219,16 +290,16 @@ export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, on
             <p className="text-xs text-muted-foreground">FAQs Extracted</p>
           </div>
           <div className="bg-card border rounded-xl p-3 text-center">
-            <CheckCircle2 className="h-6 w-6 text-success mx-auto mb-1" />
+            <CheckCircle2 className="h-6 w-6 text-primary mx-auto mb-1" />
             <p className="text-xs text-muted-foreground">Complete</p>
           </div>
         </div>
 
-        {/* Stage progress (collapsed) */}
+        {/* Stage progress */}
         <div className="border rounded-xl overflow-hidden">
           {[
-            { icon: Search, label: 'Discover Pages', detail: `${pagesCount} pages found` },
-            { icon: Globe, label: 'Scrape Content', detail: `${pagesCount} pages scraped` },
+            { icon: Search, label: 'Discover Pages', detail: pagesCount ? `${pagesCount} pages found` : 'Complete' },
+            { icon: Globe, label: 'Scrape Content', detail: pagesCount ? `${pagesCount} pages scraped` : 'Complete' },
             { icon: Sparkles, label: 'Extract Knowledge', detail: `${faqCount} FAQs extracted` },
           ].map(({ icon: Icon, label, detail }, i) => (
             <div key={i} className={`flex items-center justify-between px-4 py-2.5 ${i < 2 ? 'border-b' : ''}`}>
@@ -238,7 +309,7 @@ export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, on
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-muted-foreground">{detail}</span>
-                <CheckCircle2 className="h-3.5 w-3.5 text-success" />
+                <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
               </div>
             </div>
           ))}
@@ -267,16 +338,11 @@ export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, on
         </Button>
 
         <div className="flex gap-3">
-          <Button variant="outline" onClick={onBack} className="flex-1">
-            Back
-          </Button>
-          <Button 
-            variant="ghost" 
+          <Button variant="outline" onClick={onBack} className="flex-1">Back</Button>
+          <Button
+            variant="ghost"
             size="sm"
-            onClick={() => {
-              setExistingKnowledge(null);
-              setStatus('idle');
-            }}
+            onClick={() => { setExistingKnowledge(null); setStatus('idle'); }}
             className="gap-1 text-muted-foreground"
           >
             <RotateCcw className="h-3.5 w-3.5" />
@@ -291,49 +357,52 @@ export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, on
     );
   }
 
-  // Idle state - ready to start (no website URL or user chose to re-scrape)
-  if (status === 'idle') {
-    if (!businessContext.websiteUrl) {
-      return (
-        <div className="space-y-6">
-          <div className="text-center space-y-2">
-            <h2 className="text-xl font-semibold">Ready to continue</h2>
-            <p className="text-sm text-muted-foreground">
-              You can add FAQs manually in Settings → Knowledge Base later
-            </p>
-          </div>
+  // ── Polling state (n8n running, watching faq_database) ──────────
+  if (status === 'polling') {
+    const faqsDetected = pollingFaqCount >= 5;
 
-          <div className="flex gap-3">
-            <Button variant="outline" onClick={onBack} className="flex-1">
-              <ChevronLeft className="h-4 w-4 mr-2" />
-              Back
-            </Button>
-            <Button onClick={() => onComplete({ industryFaqs: 0, websiteFaqs: 0 })} className="flex-1">
-              Continue
-              <ChevronRight className="h-4 w-4 ml-2" />
-            </Button>
-          </div>
-        </div>
-      );
-    }
+    const stages = [
+      { icon: Search, label: 'Discover Pages' },
+      { icon: Globe, label: 'Scrape Content' },
+      { icon: Sparkles, label: 'Extract Knowledge' },
+    ];
 
-    // Has website URL, show start button
     return (
-      <div className="space-y-6">
-        <div className="text-center space-y-2">
-          <Globe className="h-12 w-12 text-primary mx-auto" />
-          <h2 className="text-xl font-semibold">Extract Website Knowledge</h2>
-          <p className="text-sm text-muted-foreground">
-            We'll scrape your website to extract FAQs, pricing, and services
-          </p>
+      <div className="space-y-5">
+        <div className="text-center space-y-1">
+          <h2 className="text-xl font-semibold">Extracting your website knowledge...</h2>
+          <p className="text-sm text-muted-foreground">{businessContext.websiteUrl}</p>
         </div>
 
-        <div className="bg-muted/30 border rounded-lg p-4">
-          <div className="flex items-center gap-3">
-            <Globe className="h-5 w-5 text-muted-foreground" />
-            <p className="font-medium">{businessContext.websiteUrl}</p>
-          </div>
+        {/* Stage rows */}
+        <div className="border rounded-xl overflow-hidden">
+          {stages.map(({ icon: Icon, label }, i) => (
+            <div key={i} className={`flex items-center justify-between px-4 py-2.5 ${i < stages.length - 1 ? 'border-b' : ''}`}>
+              <div className="flex items-center gap-2">
+                <Icon className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium">{label}</span>
+              </div>
+              {faqsDetected ? (
+                <CheckCircle2 className="h-4 w-4 text-primary" />
+              ) : (
+                <Loader2 className="h-4 w-4 animate-spin text-primary" />
+              )}
+            </div>
+          ))}
         </div>
+
+        {/* Live FAQ counter */}
+        <div className="bg-muted/40 border rounded-xl p-4 text-center space-y-1">
+          <p className="text-3xl font-bold text-primary">{pollingFaqCount}</p>
+          <p className="text-sm text-muted-foreground">FAQs found so far</p>
+          {elapsedSeconds > 0 && (
+            <p className="text-xs text-muted-foreground">{elapsedLabel} elapsed</p>
+          )}
+        </div>
+
+        <p className="text-xs text-center text-muted-foreground">
+          This usually takes 1–3 minutes. Feel free to wait or skip for now.
+        </p>
 
         <div className="flex gap-3">
           <Button variant="outline" onClick={onBack} className="flex-1">
@@ -341,27 +410,22 @@ export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, on
             Back
           </Button>
           <Button variant="ghost" onClick={handleSkip} className="flex-1 text-muted-foreground">
-            Skip this step
-          </Button>
-          <Button onClick={() => startScraping()} className="flex-1">
-            Start Scraping
+            Skip for now
           </Button>
         </div>
       </div>
     );
   }
 
-  // Starting state
+  // ── Starting state ──────────────────────────────────────────────
   if (status === 'starting') {
     return (
       <div className="space-y-6">
         <div className="text-center space-y-2">
+          <Loader2 className="h-10 w-10 animate-spin text-primary mx-auto" />
           <h2 className="text-xl font-semibold">Connecting to your website...</h2>
-          <p className="text-sm text-muted-foreground">
-            This will just take a moment
-          </p>
+          <p className="text-sm text-muted-foreground">This will just take a moment</p>
         </div>
-
         <div className="flex gap-3">
           <Button variant="outline" onClick={onBack} className="flex-1">
             <ChevronLeft className="h-4 w-4 mr-2" />
@@ -375,18 +439,75 @@ export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, on
     );
   }
 
-  // Error state
+  // ── Error state ─────────────────────────────────────────────────
+  if (status === 'error') {
+    return (
+      <div className="space-y-6">
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mx-auto">
+            <AlertCircle className="h-8 w-8 text-destructive" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-xl font-semibold">Something went wrong</h2>
+            <p className="text-sm text-muted-foreground">
+              {error || "We couldn't scrape your website. You can add FAQs manually later."}
+            </p>
+          </div>
+        </div>
+        <div className="flex gap-3">
+          <Button variant="outline" onClick={onBack} className="flex-1">
+            <ChevronLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
+          <Button variant="outline" onClick={handleSkip} className="flex-1">
+            Skip for now
+          </Button>
+          <Button onClick={() => { setError(null); setStatus('idle'); }} className="flex-1">
+            Try Again
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Idle state ──────────────────────────────────────────────────
+  if (!businessContext.websiteUrl) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center space-y-2">
+          <h2 className="text-xl font-semibold">Ready to continue</h2>
+          <p className="text-sm text-muted-foreground">
+            You can add FAQs manually in Settings → Knowledge Base later
+          </p>
+        </div>
+        <div className="flex gap-3">
+          <Button variant="outline" onClick={onBack} className="flex-1">
+            <ChevronLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
+          <Button onClick={() => onComplete({ industryFaqs: 0, websiteFaqs: 0 })} className="flex-1">
+            Continue
+            <ChevronRight className="h-4 w-4 ml-2" />
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      <div className="text-center space-y-4">
-        <div className="w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mx-auto">
-          <AlertCircle className="h-8 w-8 text-destructive" />
-        </div>
-        <div className="space-y-2">
-          <h2 className="text-xl font-semibold">Something went wrong</h2>
-          <p className="text-sm text-muted-foreground">
-            {error || 'We couldn\'t scrape your website. You can add FAQs manually later.'}
-          </p>
+      <div className="text-center space-y-2">
+        <Globe className="h-12 w-12 text-primary mx-auto" />
+        <h2 className="text-xl font-semibold">Extract Website Knowledge</h2>
+        <p className="text-sm text-muted-foreground">
+          We'll scrape your website to extract FAQs, pricing, and services
+        </p>
+      </div>
+
+      <div className="bg-muted/30 border rounded-lg p-4">
+        <div className="flex items-center gap-3">
+          <Globe className="h-5 w-5 text-muted-foreground" />
+          <p className="font-medium">{businessContext.websiteUrl}</p>
         </div>
       </div>
 
@@ -395,11 +516,11 @@ export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, on
           <ChevronLeft className="h-4 w-4 mr-2" />
           Back
         </Button>
-        <Button variant="outline" onClick={handleSkip} className="flex-1">
-          Skip for now
+        <Button variant="ghost" onClick={handleSkip} className="flex-1 text-muted-foreground">
+          Skip this step
         </Button>
-        <Button onClick={() => handleRetry()} className="flex-1">
-          Try Again
+        <Button onClick={() => startScraping()} className="flex-1">
+          Start Scraping
         </Button>
       </div>
     </div>
