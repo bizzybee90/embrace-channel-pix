@@ -384,6 +384,44 @@ export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenPr
   const liveFaqCountRef = useRef(0);
   const [reviewDismissed, setReviewDismissed] = useState(false);
   const startTimeRef = useRef<number>(Date.now());
+  const autoTriggeredRef = useRef(false);
+
+  // Auto-trigger n8n workflows on mount (fire-and-forget)
+  useEffect(() => {
+    if (autoTriggeredRef.current) return;
+    autoTriggeredRef.current = true;
+
+    const autoTrigger = async () => {
+      try {
+        // Check competitor_discovery status
+        const { data: workflowRecords } = await supabase
+          .from('n8n_workflow_progress' as 'allowed_webhook_ips')
+          .select('workflow_type, status')
+          .eq('workspace_id', workspaceId) as unknown as { data: Array<{ workflow_type: string; status: string }> | null };
+
+        const discoveryRecord = workflowRecords?.find(r => r.workflow_type === 'competitor_discovery');
+        const emailRecord = workflowRecords?.find(r => r.workflow_type === 'email_import');
+
+        // Trigger competitor_discovery if no record or status is pending
+        if (!discoveryRecord || discoveryRecord.status === 'pending') {
+          supabase.functions.invoke('trigger-n8n-workflow', {
+            body: { workspace_id: workspaceId, workflow_type: 'competitor_discovery' },
+          }).catch(err => console.error('[ProgressScreen] competitor_discovery trigger failed:', err));
+        }
+
+        // Trigger email_classification if no record or status is pending
+        if (!emailRecord || emailRecord.status === 'pending') {
+          supabase.functions.invoke('trigger-n8n-workflow', {
+            body: { workspace_id: workspaceId, workflow_type: 'email_classification' },
+          }).catch(err => console.error('[ProgressScreen] email_classification trigger failed:', err));
+        }
+      } catch (err) {
+        console.error('[ProgressScreen] Auto-trigger check failed:', err);
+      }
+    };
+
+    autoTrigger();
+  }, [workspaceId]);
 
   // Realtime subscription for live FAQ count + keep ref in sync
   useEffect(() => {
