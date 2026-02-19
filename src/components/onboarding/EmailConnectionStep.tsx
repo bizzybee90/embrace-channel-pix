@@ -433,23 +433,12 @@ export function EmailConnectionStep({
               </Button>
             </div>
 
-            {/* Start n8n workflows */}
-            <div className="space-y-4">
-              <Button onClick={startImport} disabled={importStarted} className="w-full gap-2">
-                {importStarted ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Starting...
-                  </>
-                ) : (
-                  'Start AI Training'
-                )}
+            {/* Fix B: simple Continue — email import is triggered automatically by aurinko-auth-callback */}
+            <div className="space-y-3">
+              <Button onClick={onNext} className="w-full gap-2">
+                Continue
+                <CheckCircle2 className="h-4 w-4" />
               </Button>
-              {importStarted && (
-                <Button variant="ghost" size="sm" onClick={() => setImportStarted(false)} className="w-full text-muted-foreground">
-                  Cancel &amp; Retry
-                </Button>
-              )}
               <Button variant="outline" onClick={onNext} className="w-full">
                 Skip for Now
               </Button>

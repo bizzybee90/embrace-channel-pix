@@ -707,7 +707,7 @@ export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenPr
             <Button variant="ghost" size="sm" onClick={onBack} className="text-muted-foreground">
               ← Back
             </Button>
-            <Button variant="ghost" size="sm" onClick={onNext} className="text-muted-foreground">
+            <Button variant="outline" size="sm" onClick={onNext}>
               Skip for now →
             </Button>
           </div>

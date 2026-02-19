@@ -137,7 +137,23 @@ export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, on
       }
 
       // Update scraping_jobs row in DB so re-entry detection works
-      if (jobDbId) {
+      // Fix D: fall back to querying the most recent job if jobDbId isn't set (e.g. after remount)
+      let resolvedJobId = jobDbId;
+      if (!resolvedJobId) {
+        try {
+          const { data: latestJob } = await supabase
+            .from('scraping_jobs')
+            .select('id')
+            .eq('workspace_id', workspaceId)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          resolvedJobId = latestJob?.id || null;
+        } catch (err) {
+          console.warn('Could not find latest scraping_jobs row:', err);
+        }
+      }
+      if (resolvedJobId) {
         try {
           await supabase
             .from('scraping_jobs')
@@ -147,7 +163,7 @@ export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, on
               pages_processed: pagesScraped,
               completed_at: new Date().toISOString(),
             })
-            .eq('id', jobDbId);
+            .eq('id', resolvedJobId);
         } catch (err) {
           console.warn('Could not update scraping_jobs:', err);
         }
@@ -361,7 +377,20 @@ export function KnowledgeBaseStep({ workspaceId, businessContext, onComplete, on
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => { setExistingKnowledge(null); setStatus('idle'); }}
+            onClick={async () => {
+              // Fix A: clear stale faq_database + scraping_jobs rows so re-entry doesn't detect old data
+              try {
+                await Promise.all([
+                  supabase.from('faq_database').delete().eq('workspace_id', workspaceId).eq('is_own_content', true),
+                  supabase.from('scraping_jobs').delete().eq('workspace_id', workspaceId),
+                ]);
+              } catch (err) {
+                console.warn('Could not clear stale rows before re-scrape:', err);
+              }
+              setExistingKnowledge(null);
+              setJobDbId(null);
+              setStatus('idle');
+            }}
             className="gap-1 text-muted-foreground"
           >
             <RotateCcw className="h-3.5 w-3.5" />
