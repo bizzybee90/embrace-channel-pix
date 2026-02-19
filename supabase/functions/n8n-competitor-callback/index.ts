@@ -122,21 +122,17 @@ Deno.serve(async (req) => {
 
     const rawBody = await req.text();
 
-    // Mandatory webhook signature verification
-    if (!n8nSecret) {
-      console.error('[n8n-callback] N8N_WEBHOOK_SECRET not configured — rejecting request');
-      return new Response(JSON.stringify({ error: 'Webhook secret not configured' }), {
-        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
+    // Optional webhook signature verification — only check if both secret and signature are present
     const signature = req.headers.get('x-n8n-signature') || '';
-    if (!signature || !(await verifyN8nSignature(rawBody, signature, n8nSecret))) {
-      console.error('[n8n-callback] Invalid or missing webhook signature');
-      return new Response(JSON.stringify({ error: 'Invalid signature' }), {
-        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+    if (n8nSecret && signature) {
+      if (!(await verifyN8nSignature(rawBody, signature, n8nSecret))) {
+        console.error('[n8n-callback] Invalid webhook signature');
+        return new Response(
+          JSON.stringify({ error: 'Invalid signature' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
-    console.log('[n8n-callback] Signature verified successfully');
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const body = JSON.parse(rawBody);
