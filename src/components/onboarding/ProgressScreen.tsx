@@ -197,10 +197,12 @@ function InlineCompetitorReview({
   workspaceId, 
   onStartAnalysis,
   autoStarted = false,
+  scrapeComplete = false,
 }: { 
   workspaceId: string; 
   onStartAnalysis: () => void;
   autoStarted?: boolean;
+  scrapeComplete?: boolean;
 }) {
   const [competitors, setCompetitors] = useState<CompetitorItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -357,8 +359,8 @@ function InlineCompetitorReview({
         </div>
       </ScrollArea>
 
-      {/* Start analysis button — hidden when auto-triggered */}
-      {!autoStarted && (
+      {/* Start/Re-run button — hidden while auto-trigger is in progress, shown when complete for re-runs */}
+      {(!autoStarted || scrapeComplete) && (
         <Button
           onClick={handleStart}
           disabled={isStarting || selectedCount === 0}
@@ -370,10 +372,12 @@ function InlineCompetitorReview({
           ) : (
             <Play className="h-4 w-4" />
           )}
-          Start Analysis ({selectedCount} competitors)
+          {scrapeComplete
+            ? `Re-run Analysis (${selectedCount} competitors)`
+            : `Start Analysis (${selectedCount} competitors)`}
         </Button>
       )}
-      {autoStarted && (
+      {autoStarted && !scrapeComplete && (
         <div className="flex items-center gap-2 text-sm text-primary py-1">
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
           Analysis started automatically — scraping in progress...
@@ -704,12 +708,13 @@ export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenPr
           counts={discoveryTrack.counts}
           error={discoveryTrack.error}
         />
-        {/* Inline review gate — shown when discovery is done but scrape hasn't started */}
-        {scrapeTrack.status === 'review_ready' && !reviewDismissed && (
+        {/* Inline review gate — shown when discovery is done (review_ready or complete) */}
+        {(scrapeTrack.status === 'review_ready' || scrapeTrack.status === 'complete') && !reviewDismissed && (
           <InlineCompetitorReview
             workspaceId={workspaceId}
             onStartAnalysis={() => setReviewDismissed(true)}
             autoStarted={autoScrapeTriggeredRef.current}
+            scrapeComplete={scrapeTrack.status === 'complete'}
           />
         )}
         <TrackProgress
