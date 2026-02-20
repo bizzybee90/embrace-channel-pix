@@ -2304,6 +2304,7 @@ export type Database = {
           classified_at: string | null
           confidence: number | null
           config_id: string
+          conversation_id: string | null
           created_at: string | null
           direction: string
           entities: Json | null
@@ -2315,6 +2316,7 @@ export type Database = {
           has_body: boolean | null
           id: string
           is_noise: boolean | null
+          is_read: boolean | null
           job_id: string | null
           needs_review: boolean | null
           noise_reason: string | null
@@ -2335,6 +2337,7 @@ export type Database = {
           classified_at?: string | null
           confidence?: number | null
           config_id: string
+          conversation_id?: string | null
           created_at?: string | null
           direction: string
           entities?: Json | null
@@ -2346,6 +2349,7 @@ export type Database = {
           has_body?: boolean | null
           id?: string
           is_noise?: boolean | null
+          is_read?: boolean | null
           job_id?: string | null
           needs_review?: boolean | null
           noise_reason?: string | null
@@ -2366,6 +2370,7 @@ export type Database = {
           classified_at?: string | null
           confidence?: number | null
           config_id?: string
+          conversation_id?: string | null
           created_at?: string | null
           direction?: string
           entities?: Json | null
@@ -2377,6 +2382,7 @@ export type Database = {
           has_body?: boolean | null
           id?: string
           is_noise?: boolean | null
+          is_read?: boolean | null
           job_id?: string | null
           needs_review?: boolean | null
           noise_reason?: string | null
@@ -2395,6 +2401,13 @@ export type Database = {
             columns: ["config_id"]
             isOneToOne: false
             referencedRelation: "email_provider_configs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_import_queue_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
             referencedColumns: ["id"]
           },
           {

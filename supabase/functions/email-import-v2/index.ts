@@ -460,6 +460,7 @@ serve(async (req) => {
         direction: folder === 'SENT' ? 'outbound' : 'inbound',
         status: 'scanned',
         has_body: !!(msg.textBody || msg.bodySnippet),
+        is_read: Array.isArray(msg.flags) ? msg.flags.some((f: string) => f.toLowerCase().includes('seen')) : false,
       }));
 
 			const { error: insertError, data: insertedData } = await supabase
