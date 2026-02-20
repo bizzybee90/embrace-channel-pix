@@ -55,6 +55,7 @@ const DISCOVERY_PHASES = [
 // FAQ scrape phases (Workflow 2)
 const SCRAPE_PHASES = [
   { key: 'waiting', label: 'Waiting for discovery...', icon: Loader2 },
+  { key: 'validating', label: 'Validating competitors...', icon: Search },
   { key: 'review_ready', label: 'Ready for review', icon: CheckCircle2 },
   { key: 'pending', label: 'Queued for scraping', icon: Loader2 },
   { key: 'scraping', label: 'Scraping competitor websites...', icon: Search },
@@ -215,7 +216,7 @@ function InlineCompetitorReview({
       setIsLoading(true);
       const { data } = await supabase
         .from('competitor_sites')
-        .select('id, business_name, domain, url, is_selected')
+        .select('id, business_name, domain, url, is_selected, validation_status, validation_notes')
         .eq('workspace_id', workspaceId)
         .in('status', ['discovered', 'validated', 'approved'])
         .order('relevance_score', { ascending: false, nullsFirst: false });

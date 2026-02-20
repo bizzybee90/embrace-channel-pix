@@ -233,20 +233,35 @@ Deno.serve(async (req) => {
       }
     }
 
-    // When discovery completes, set status to review_ready so the user can
-    // review/edit the competitor list before the FAQ workflow starts.
-    // The UI will call start-competitor-analysis when the user confirms.
+    // When discovery completes, validate competitors (health check, relevance, scoring)
     if (status === 'discovery_complete') {
       await (supabase as any).from('n8n_workflow_progress').upsert({
         workspace_id,
         workflow_type: 'competitor_scrape',
-        status: 'review_ready',
+        status: 'validating',
         details: {
-          message: `${details.competitors_found || 0} competitors ready for review`,
+          message: `Validating ${details.competitors_found || 0} competitors...`,
           competitors_found: details.competitors_found || 0,
         },
         updated_at: new Date().toISOString(),
       }, { onConflict: 'workspace_id,workflow_type' });
+      const { data: bizContext } = await supabase
+        .from('business_context')
+        .select('business_type')
+        .eq('workspace_id', workspace_id)
+        .maybeSingle();
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      fetch(`${supabaseUrl}/functions/v1/validate-competitors`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabaseServiceKey}`,
+        },
+        body: JSON.stringify({
+          workspace_id,
+          business_type: bizContext?.business_type || '',
+        }),
+      }).catch(err => console.error('[n8n-callback] Failed to invoke validate-competitors:', err));
     }
 
     // FAQ consolidation handled by n8n workflow directly
