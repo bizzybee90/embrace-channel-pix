@@ -587,8 +587,10 @@ export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenPr
           const totalEmails = (emailDetails.total_emails as number) || 
                              (emailProgress?.estimated_total_emails as number) || 
                              (emailProgress?.emails_received as number) || 0;
-          const classifiedEmails = (emailDetails.emails_classified as number) || 
-                                   (emailProgress?.emails_classified as number) || 0;
+          const rawClassified = (emailDetails.emails_classified as number) || 
+                                    (emailProgress?.emails_classified as number) || 0;
+          // Cap classified to never exceed total (prevents >100% display bugs)
+          const classifiedEmails = totalEmails > 0 ? Math.min(rawClassified, totalEmails) : rawClassified;
 
           let effectiveEmailStatus = emailStatus;
 
