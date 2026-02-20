@@ -30,14 +30,14 @@ export const RecentActivityWidget = () => {
   const fetchRecentActivity = async () => {
     setLoading(true);
     
-    // Fetch recent outbound messages with conversation data for category
+    // Fetch recent inbound messages with conversation data for category
     const { data: messages } = await supabase
       .from('messages')
       .select(`
         id, body, actor_name, actor_type, channel, created_at, conversation_id,
         conversations(email_classification)
       `)
-      .eq('direction', 'outbound')
+      .eq('direction', 'inbound')
       .eq('is_internal', false)
       .order('created_at', { ascending: false })
       .limit(5);
@@ -110,7 +110,7 @@ export const RecentActivityWidget = () => {
           event: 'INSERT',
           schema: 'public',
           table: 'messages',
-          filter: 'direction=eq.outbound'
+          filter: 'direction=eq.inbound'
         },
         (payload) => {
           const newMessage = payload.new as any;
@@ -194,7 +194,7 @@ export const RecentActivityWidget = () => {
     if (activity.type === 'escalation') return 'Escalated';
     if (activity.type === 'resolution') return 'Resolved';
     if (activity.actor_type === 'ai_agent') return 'AI Reply';
-    return 'Reply Sent';
+    return 'New Message';
   };
 
 
