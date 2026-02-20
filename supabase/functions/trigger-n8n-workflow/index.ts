@@ -82,11 +82,10 @@ Deno.serve(async (req) => {
         .insert({
           workspace_id,
           status: 'discovering',
-          config: {
-            business_type: businessContext?.business_type,
-            location: businessContext?.service_area,
-            target_count: searchConfig.target_count || 50,
-          },
+          niche_query: `${businessContext?.business_type || 'business'} near ${businessContext?.service_area || 'local area'}`,
+          industry: businessContext?.business_type || null,
+          location: businessContext?.service_area || null,
+          target_count: (searchConfig.target_count as number) || 50,
         })
         .select('id')
         .single();
