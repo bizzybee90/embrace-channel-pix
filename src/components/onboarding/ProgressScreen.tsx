@@ -584,9 +584,10 @@ export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenPr
         const emailProgress = emailProgressRes.data as unknown as Record<string, unknown> | null;
 
         if (emailProgress || emailRecord) {
-          const totalEmails = (emailDetails.total_emails as number) || 
+          // Prefer emails_received (live counter) over stale dispatcher snapshot
+          const totalEmails = (emailProgress?.emails_received as number) || 
                              (emailProgress?.estimated_total_emails as number) || 
-                             (emailProgress?.emails_received as number) || 0;
+                             (emailDetails.total_emails as number) || 0;
           const rawClassified = (emailDetails.emails_classified as number) || 
                                     (emailProgress?.emails_classified as number) || 0;
           // Cap classified to never exceed total (prevents >100% display bugs)
