@@ -223,7 +223,7 @@ function InlineCompetitorReview({
       setIsLoading(false);
     };
     fetch();
-  }, [workspaceId]);
+  }, [workspaceId, scrapeComplete]);
 
   const selectedCount = competitors.filter(c => c.is_selected).length;
 
