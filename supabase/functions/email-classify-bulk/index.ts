@@ -412,7 +412,7 @@ async function handlePartitionComplete(
     });
   }
 
-  console.log(`${workerTag} ALL DONE - triggering voice-learning`);
+  console.log(`${workerTag} ALL DONE - triggering voice-learning + conversion`);
 
   const { count: totalClassified } = await supabase
     .from('email_import_queue')
@@ -442,6 +442,17 @@ async function handlePartitionComplete(
 
   // Trigger voice learning
   await triggerVoiceLearning(supabaseUrl, supabaseServiceKey, workspace_id);
+
+  // Trigger email-to-conversation conversion (fire and forget)
+  fetch(`${supabaseUrl}/functions/v1/convert-emails-to-conversations`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${supabaseServiceKey}`,
+    },
+    body: JSON.stringify({ workspace_id }),
+  }).catch(e => console.error(`${workerTag} Failed to trigger conversion:`, e));
+  console.log(`${workerTag} Triggered convert-emails-to-conversations`);
 
   // Send callback to n8n if provided
   if (callback_url) {

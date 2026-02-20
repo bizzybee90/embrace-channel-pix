@@ -296,3 +296,6 @@ verify_jwt = false
 [functions.save-classification-correction]
 verify_jwt = false
 
+[functions.convert-emails-to-conversations]
+verify_jwt = false
+
