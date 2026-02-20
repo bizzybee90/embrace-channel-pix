@@ -453,7 +453,7 @@ export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenPr
           if (emailConfig && emailConfig.sync_status === 'pending') {
             console.log('[ProgressScreen] Email queue empty + config pending — triggering email-import-v2');
             supabase.functions.invoke('email-import-v2', {
-              body: { config_id: emailConfig.id, workspace_id: workspaceId },
+              body: { config_id: emailConfig.id, workspace_id: workspaceId, speed_phase: true },
             }).catch(err => console.error('[ProgressScreen] email-import-v2 trigger failed:', err));
           }
         }
