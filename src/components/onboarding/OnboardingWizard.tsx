@@ -325,18 +325,8 @@ export function OnboardingWizard({ workspaceId, onComplete }: OnboardingWizardPr
                 </Button>
                 <Button 
                   variant="outline" 
-                  onClick={async () => {
-                    const { data: { user } } = await supabase.auth.getUser();
-                    if (user) {
-                      await supabase
-                        .from('users')
-                        .update({ 
-                          onboarding_completed: true,
-                          onboarding_step: 'complete'
-                        })
-                        .eq('id', user.id);
-                    }
-                    window.location.href = '/knowledge-base';
+                  onClick={() => {
+                    window.open('/knowledge-base', '_blank');
                   }}
                   className="gap-2"
                 >

@@ -216,11 +216,11 @@ function InlineCompetitorReview({
       setIsLoading(true);
       const { data } = await supabase
         .from('competitor_sites')
-        .select('id, business_name, domain, url, is_selected, validation_status, validation_notes')
+        .select('id, business_name, domain, url, is_selected, validation_status')
         .eq('workspace_id', workspaceId)
         .in('status', ['discovered', 'validated', 'approved'])
         .order('relevance_score', { ascending: false, nullsFirst: false });
-      setCompetitors((data || []).map(c => ({ ...c, is_selected: c.is_selected ?? true })));
+      setCompetitors((data || []).map(c => ({ id: c.id, business_name: c.business_name, domain: c.domain, url: c.url, is_selected: c.is_selected ?? true })));
       setIsLoading(false);
     };
     fetch();
@@ -570,7 +570,7 @@ export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenPr
         setScrapeTrack({
           status: scrapeStatus,
           counts: scrapeRecord ? [
-            { label: 'scraped', value: (scrapeDetails.competitors_scraped as number) || 0 },
+            { label: 'scraped', value: (scrapeDetails.current as number) || (scrapeDetails.competitors_scraped as number) || 0 },
             { label: 'FAQs generated', value: liveFaqCountRef.current },
           ] : [],
           error: scrapeDetails.error as string | undefined,
@@ -767,7 +767,9 @@ export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenPr
 
       {!allComplete && (
         <div className="text-center text-sm text-muted-foreground p-4 bg-muted/30 rounded-lg">
-          <p>This typically takes 3-5 minutes for the initial setup.</p>
+          <p>{scrapeTrack.status === 'scraping' || scrapeTrack.status === 'extracting'
+            ? 'This may take 10-15 minutes depending on the number of competitors.'
+            : 'This typically takes 3-5 minutes for the initial setup.'}</p>
           <p className="mt-1">Deep learning from your full email history will continue in the background.</p>
         </div>
       )}
