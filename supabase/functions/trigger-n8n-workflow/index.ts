@@ -263,6 +263,7 @@ Deno.serve(async (req) => {
         .from('competitor_sites')
         .select('id, domain, business_name, url')
         .eq('workspace_id', workspace_id)
+        .eq('is_selected', true)
         .not('status', 'eq', 'rejected')
         .limit(30);
 
