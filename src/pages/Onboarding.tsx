@@ -194,6 +194,19 @@ export default function Onboarding() {
             onboarding_step: 'complete'
           })
           .eq('id', user.id);
+
+        // Fire-and-forget: trigger deep backfill import for remaining historical emails
+        const { data: userData } = await supabase
+          .from('users')
+          .select('workspace_id')
+          .eq('id', user.id)
+          .single();
+
+        if (userData?.workspace_id) {
+          supabase.functions.invoke('email-import-v2', {
+            body: { workspace_id: userData.workspace_id, speed_phase: false },
+          }).catch(err => console.error('Deep backfill trigger failed (non-blocking):', err));
+        }
       }
       navigate('/');
     } catch (err) {
