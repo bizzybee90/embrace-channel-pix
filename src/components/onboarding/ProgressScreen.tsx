@@ -399,7 +399,7 @@ export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenPr
   const [reviewDismissed, setReviewDismissed] = useState(false);
   const startTimeRef = useRef<number>(Date.now());
   const autoTriggeredRef = useRef(false);
-  const autoScrapeTriggeredRef = useRef(false);
+  
 
   // Auto-trigger n8n workflows on mount (fire-and-forget)
   useEffect(() => {
@@ -559,16 +559,8 @@ export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenPr
           error: isStale(discoveryRecord) ? 'Timed out — the workflow may have failed. Please retry.' : (discoveryDetails.error as string | undefined),
         });
 
-        // Auto-fire faq_generation when discovery completes (removes manual "Start Analysis" gate)
-        // NOTE: keep the panel visible so users can still add/curate competitors before it fires
-        if (scrapeRecord?.status === 'review_ready' && !autoScrapeTriggeredRef.current) {
-          autoScrapeTriggeredRef.current = true;
-          console.log('[ProgressScreen] Auto-triggering faq_generation');
-          supabase.functions.invoke('trigger-n8n-workflow', {
-            body: { workspace_id: workspaceId, workflow_type: 'faq_generation' },
-          }).catch(err => console.error('[ProgressScreen] faq_generation auto-trigger failed:', err));
-          // Do NOT dismiss the panel — keep it visible so users can see/add competitors
-        }
+        // faq_generation is now triggered manually via the InlineCompetitorReview "Start Analysis" button
+        // This ensures users can review, add, and curate competitors before scraping begins
 
         // Scrape track (Workflow 2) — stays 'waiting' until discovery completes
         const scrapeDetails = (scrapeRecord?.details || {}) as Record<string, unknown>;
@@ -713,7 +705,7 @@ export function ProgressScreen({ workspaceId, onNext, onBack }: ProgressScreenPr
           <InlineCompetitorReview
             workspaceId={workspaceId}
             onStartAnalysis={() => setReviewDismissed(true)}
-            autoStarted={autoScrapeTriggeredRef.current}
+            autoStarted={false}
             scrapeComplete={scrapeTrack.status === 'complete'}
           />
         )}
