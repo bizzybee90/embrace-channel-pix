@@ -58,6 +58,7 @@ export function ActivityFeed({ onNavigate, maxItems = 10 }: ActivityFeedProps) {
           .limit(5);
 
         // Get recent sent messages (outbound)
+        const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
         const { data: sentMessages } = await supabase
           .from('messages')
           .select(`
@@ -73,6 +74,7 @@ export function ActivityFeed({ onNavigate, maxItems = 10 }: ActivityFeedProps) {
           `)
           .eq('direction', 'outbound')
           .eq('is_internal', false)
+          .gte('created_at', oneDayAgo)
           .order('created_at', { ascending: false })
           .limit(5);
 
@@ -101,6 +103,7 @@ export function ActivityFeed({ onNavigate, maxItems = 10 }: ActivityFeedProps) {
           .from('email_import_queue')
           .select('id, from_name, from_email, subject, body, received_at, category, direction')
           .eq('workspace_id', workspace.id)
+          .eq('direction', 'inbound')
           .or('is_noise.is.null,is_noise.eq.false')
           .not('from_email', 'ilike', '%maccleaning%')
           .order('received_at', { ascending: false })

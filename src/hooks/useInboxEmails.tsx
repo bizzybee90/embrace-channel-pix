@@ -91,7 +91,9 @@ export const useInboxEmails = ({ folder, categoryFilter, search, page }: UseInbo
           query = query.eq('status', 'resolved');
           break;
         case 'needs-reply':
-          query = query.eq('requires_reply', true);
+          query = query
+            .eq('requires_reply', true)
+            .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
           break;
         case 'ai-review':
           query = query
