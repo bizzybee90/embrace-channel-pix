@@ -256,13 +256,13 @@ serve(async (req) => {
 });
 
 async function setReviewReady(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   workspaceId: string,
   total: number,
   validated: number,
   rejected: number
 ) {
-  await (supabase as any).from('n8n_workflow_progress').upsert({
+  await supabase.from('n8n_workflow_progress').upsert({
     workspace_id: workspaceId,
     workflow_type: 'competitor_scrape',
     status: 'review_ready',
