@@ -336,7 +336,7 @@ function InlineCompetitorReview({
       </div>
 
       {/* Compact competitor list */}
-      <ScrollArea className="max-h-48">
+      <ScrollArea className="h-[280px]">
         <div className="space-y-1">
           {competitors.map(c => (
             <label
