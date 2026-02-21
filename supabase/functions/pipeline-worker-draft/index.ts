@@ -224,7 +224,7 @@ Deno.serve(async (req) => {
           })
           .eq("id", job.conversation_id)
           .eq("last_inbound_message_id", job.target_message_id)
-          .neq("last_draft_message_id", job.target_message_id);
+          .or(`last_draft_message_id.is.null,last_draft_message_id.neq.${job.target_message_id}`);
 
         if (updateConversationError) {
           throw new Error(`Conversation draft update failed: ${updateConversationError.message}`);
