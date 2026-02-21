@@ -37,7 +37,8 @@ function asEmail(value: unknown): string | null {
   }
 
   if (typeof value === "object") {
-    const maybeEmail = normalizeEmail((value as { email?: string }).email);
+    const obj = value as { email?: string; address?: string };
+    const maybeEmail = normalizeEmail(obj.email || obj.address);
     return maybeEmail || null;
   }
 
@@ -109,10 +110,10 @@ export function aurinkoToUnifiedMessage(
     channel: "email",
     direction: params.direction,
     from_identifier: fromEmail,
-    from_name: typeof message.from === "object" && message.from ? (message.from as { name?: string }).name || null : null,
+    from_name: typeof message.from === "object" && message.from ? ((message.from as { name?: string }).name || null) : null,
     to_identifier: toEmail,
-    body: String(message.textBody || ""),
-    body_html: message.htmlBody ? String(message.htmlBody) : null,
+    body: String(message.textBody || message.bodySnippet || ""),
+    body_html: message.htmlBody ? String(message.htmlBody) : (message.body ? String(message.body) : null),
     subject: message.subject ? String(message.subject) : null,
     timestamp,
     is_read: !sysLabels.includes("unread"),
