@@ -40,6 +40,10 @@ function normalizeClassification(value: unknown): ClassificationResult {
     entities: typeof candidate.entities === "object" && candidate.entities
       ? candidate.entities as Record<string, unknown>
       : {},
+    reasoning: typeof candidate.reasoning === "string" ? candidate.reasoning : null,
+    sentiment: typeof candidate.sentiment === "string" ? candidate.sentiment : null,
+    why_this_needs_you: typeof candidate.why_this_needs_you === "string" ? candidate.why_this_needs_you : null,
+    summary_for_human: typeof candidate.summary_for_human === "string" ? candidate.summary_for_human : null,
   };
 }
 
@@ -115,6 +119,9 @@ You will receive a batch of items as JSON. For EACH item, return:
   "category": "one of the 9 categories above",
   "requires_reply": boolean,
   "confidence": 0.0-1.0,
+  "sentiment": "positive" | "neutral" | "negative" | "frustrated",
+  "why_this_needs_you": "1-2 sentences explaining why this landed in this bucket, written for the business owner, always filled even for auto_handled",
+  "summary_for_human": "2-3 sentence context summary giving the human full context to act immediately without reading the email",
   "entities": {
     "urgency": "high" | "medium" | "low",
     "extracted_phones": [],

@@ -73,4 +73,8 @@ export interface ClassificationResult {
   requires_reply: boolean;
   confidence: number;
   entities: Record<string, unknown>;
+  reasoning?: string | null;
+  sentiment?: string | null;
+  why_this_needs_you?: string | null;
+  summary_for_human?: string | null;
 }
