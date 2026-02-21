@@ -112,36 +112,37 @@ Deno.serve(async (req) => {
     await verifyAurinkoSignature(rawBody, req);
 
     const payload = JSON.parse(rawBody) as Record<string, unknown>;
-    const workspaceId = String(payload.workspace_id || payload.workspaceId || "").trim() || null;
-    const explicitConfigId = String(payload.config_id || payload.configId || "").trim() || null;
+    console.log("📨 Aurinko webhook payload keys:", Object.keys(payload), "subscriptionId:", payload.subscriptionId || payload.subscription_id, "accountId:", payload.accountId || payload.account_id);
 
     const supabase = createServiceClient();
 
-    let configQuery = supabase
-      .from("email_provider_configs")
-      .select("id, workspace_id, email_address, aliases, access_token, subscription_id, account_id")
-      .limit(1);
-
-    if (explicitConfigId) {
-      configQuery = configQuery.eq("id", explicitConfigId);
-    }
-
-    if (workspaceId) {
-      configQuery = configQuery.eq("workspace_id", workspaceId);
-    }
-
+    // Aurinko sends subscriptionId and/or accountId — match on those
     const subscriptionId = String(payload.subscription_id || payload.subscriptionId || "").trim();
     const accountId = String(payload.account_id || payload.accountId || "").trim();
 
-    if (!explicitConfigId && subscriptionId) {
-      configQuery = configQuery.eq("subscription_id", subscriptionId);
-    }
+    let config: Record<string, unknown> | null = null;
+    let configError: { message: string } | null = null;
 
-    if (!explicitConfigId && !subscriptionId && accountId) {
-      configQuery = configQuery.eq("account_id", accountId);
+    // Try subscription_id first, then account_id, then fallback to single config
+    if (subscriptionId) {
+      const res = await supabase.from("email_provider_configs")
+        .select("id, workspace_id, email_address, aliases, access_token, subscription_id, account_id")
+        .eq("subscription_id", subscriptionId).maybeSingle();
+      config = res.data; configError = res.error;
     }
-
-    const { data: config, error: configError } = await configQuery.maybeSingle();
+    if (!config && accountId) {
+      const res = await supabase.from("email_provider_configs")
+        .select("id, workspace_id, email_address, aliases, access_token, subscription_id, account_id")
+        .eq("account_id", accountId).maybeSingle();
+      config = res.data; configError = res.error;
+    }
+    if (!config) {
+      // Fallback: if there's only one config, use it
+      const res = await supabase.from("email_provider_configs")
+        .select("id, workspace_id, email_address, aliases, access_token, subscription_id, account_id")
+        .limit(1).maybeSingle();
+      config = res.data; configError = res.error;
+    }
 
     if (configError || !config) {
       throw new Error(`email_provider_configs lookup failed: ${configError?.message || "not found"}`);
@@ -152,53 +153,65 @@ Deno.serve(async (req) => {
       throw new Error("Missing Aurinko access token for webhook config");
     }
 
-    const messageId = extractMessageId(payload);
-    let aurinkoMessage = extractInlineMessage(payload);
-
-    if (!aurinkoMessage) {
-      if (!messageId) {
-        throw new HttpError(400, "Webhook payload does not include a message id or inline message object");
-      }
-
-      aurinkoMessage = await fetchAurinkoMessageById({
-        accessToken,
-        messageId,
-      });
-    }
-
     const ownerEmail = String(config.email_address || "").trim().toLowerCase();
     const aliases = Array.isArray(config.aliases)
-      ? config.aliases.map((entry) => String(entry).trim().toLowerCase()).filter(Boolean)
+      ? config.aliases.map((entry: unknown) => String(entry).trim().toLowerCase()).filter(Boolean)
       : [];
 
-    const direction = inferDirectionFromOwner(aurinkoMessage, ownerEmail, aliases);
+    // Aurinko v2 webhook format: { subscription, resource, accountId, payloads: [{...}, ...] }
+    const payloads = Array.isArray(payload.payloads) ? payload.payloads as Record<string, unknown>[] : [payload];
+    console.log(`📬 Processing ${payloads.length} payload(s) from Aurinko webhook`);
 
-    const unified = aurinkoToUnifiedMessage({
-      message: aurinkoMessage,
-      channel: "email",
-      direction,
-      defaultToIdentifier: ownerEmail,
-    });
+    const results: unknown[] = [];
 
-    const { data: ingestData, error: ingestError } = await supabase.rpc("bb_ingest_unified_messages", {
-      p_workspace_id: config.workspace_id,
-      p_config_id: config.id,
-      p_run_id: null,
-      p_channel: "email",
-      p_messages: [unified],
-    });
+    for (const item of payloads) {
+      const messageId = extractMessageId(item);
+      let aurinkoMessage = extractInlineMessage(item);
 
-    if (ingestError) {
-      throw new Error(`bb_ingest_unified_messages failed: ${ingestError.message}`);
+      if (!aurinkoMessage && !messageId) {
+        console.warn("⚠️ Skipping payload without message id or inline message:", Object.keys(item));
+        continue;
+      }
+
+      if (!aurinkoMessage) {
+        aurinkoMessage = await fetchAurinkoMessageById({
+          accessToken,
+          messageId: messageId!,
+        });
+      }
+
+      const direction = inferDirectionFromOwner(aurinkoMessage, ownerEmail, aliases);
+
+      const unified = aurinkoToUnifiedMessage({
+        message: aurinkoMessage,
+        channel: "email",
+        direction,
+        defaultToIdentifier: ownerEmail,
+      });
+
+      const { data: ingestData, error: ingestError } = await supabase.rpc("bb_ingest_unified_messages", {
+        p_workspace_id: config.workspace_id,
+        p_config_id: config.id,
+        p_run_id: null,
+        p_channel: "email",
+        p_messages: [unified],
+      });
+
+      if (ingestError) {
+        console.error(`❌ Ingest failed for message ${messageId}:`, ingestError.message);
+        continue;
+      }
+
+      console.log(`✅ Ingested message ${unified.external_id} (${direction})`);
+      results.push({ external_id: unified.external_id, direction, ingest: ingestData });
     }
 
     return jsonResponse({
       ok: true,
       config_id: config.id,
       workspace_id: config.workspace_id,
-      external_id: unified.external_id,
-      direction: unified.direction,
-      ingest: ingestData,
+      processed: results.length,
+      results,
     });
   } catch (error) {
     console.error("aurinko-webhook error", error);
