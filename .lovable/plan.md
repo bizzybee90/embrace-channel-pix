@@ -1,50 +1,58 @@
 
-# Fix Pipeline Workers: Queue Read Error + Missing Environment Variables
 
-## Problem
-All 4 pipeline workers (import, ingest, classify, draft) are crashing every 10 seconds with the same error. There are also 2 missing environment variables that will block the import and classify workers once the queue error is fixed.
+## Upgrade Classification Prompt and Decision Engine
 
-### Issue 1: `bb_queue_read` SQL function incompatible with PGMQ
-The `pgmq.read()` function returns a named composite type (`pgmq.message_record`). Our wrapper tries to alias the output with a column definition list (`AS r(msg_id, ...)`), which Postgres rejects. This is blocking ALL workers.
+This plan implements the three changes from your Gemini-reviewed prompt: a structured classification system prompt with chain-of-thought reasoning and identity extraction, an updated decision engine handling all 9 categories, and passive identity harvesting into `customer_identities`.
 
-### Issue 2: Missing `AURINKO_API_BASE_URL`
-Used by `getRequiredEnv()` in the Aurinko shared module. Without it, the import worker and aurinko-webhook function will crash.
+### Changes
 
-### Issue 3: Missing `LOVABLE_AI_GATEWAY_URL`  
-Used by `getRequiredEnv()` in the AI shared module. Without it, the classify worker will crash.
+**1. Replace classification system prompt (`supabase/functions/_shared/ai.ts`)**
 
----
+Replace `classificationSystemPrompt()` with the new structured prompt that:
+- Extracts business name/industry/rules from the `business_context` record
+- Injects FAQ knowledge base and historical corrections
+- Defines 9 precise categories: `quote`, `booking`, `complaint`, `follow_up`, `inquiry`, `notification`, `newsletter`, `spam`, `personal`
+- Adds chain-of-thought `reasoning` field (generated before the classification decision)
+- Requests identity extraction: `extracted_phones`, `extracted_emails`, `location_or_postcode`, `summary`
+- Preserves the existing batch input/output contract (`{items: [...]}` in, `{results: [...]}` out)
 
-## Step 1: Fix `bb_queue_read` function (SQL migration)
+Also update `DEFAULT_CLASSIFICATION` to use `category: "inquiry"` instead of `"general"` to match the new category set.
 
-Replace the function body to remove the column definition list from the `pgmq.read()` call:
+**2. Update decision engine (`supabase/functions/pipeline-worker-classify/index.ts`)**
 
-```text
-CREATE OR REPLACE FUNCTION public.bb_queue_read(queue_name text, vt_seconds integer, n integer)
- RETURNS TABLE(msg_id bigint, read_ct integer, enqueued_at timestamptz, vt timestamptz, message jsonb)
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public', 'pgmq', 'pg_catalog'
-AS $function$
-begin
-  return query
-  select r.msg_id, r.read_ct, r.enqueued_at, r.vt, r.message
-  from pgmq.read(queue_name, greatest(vt_seconds, 1), greatest(n, 1)) r;
-end;
-$function$;
-```
+Replace `decisionForClassification()` to handle all 9 categories:
+- `notification`, `newsletter`, `spam`, `personal` -> `auto_handled` / `resolved`
+- `follow_up` where `requires_reply === false` -> `auto_handled` / `resolved`
+- Low confidence (< 0.7) -> `needs_human` / `escalated`
+- `complaint` -> `act_now` / `ai_handling`
+- Everything else needing reply -> `quick_win` / `open`
 
-The key change: `AS r(msg_id bigint, ...)` becomes just `r` -- letting Postgres use the named composite type columns directly.
+**3. Add identity harvesting (`supabase/functions/pipeline-worker-classify/index.ts`)**
 
-## Step 2: Add `AURINKO_API_BASE_URL` secret
+After `applyClassification` successfully updates a conversation, extract `extracted_phones` and `extracted_emails` from the AI response entities and upsert them into `customer_identities`. This passively enriches the cross-channel identity graph with every classified email -- phones formatted to E.164, emails lowercased, all linked to the conversation's `customer_id`.
 
-Value: `https://api.aurinko.io` (no trailing `/v1` -- the code appends that).
+**4. Update UI category labels (`src/components/shared/CategoryLabel.tsx`)**
 
-## Step 3: Add `LOVABLE_AI_GATEWAY_URL` secret
+Add direct mappings for the new category keys so they render proper pills in the inbox:
+- `quote` -> amber Quote pill
+- `booking` -> blue Booking pill
+- `complaint` -> red Complaint pill
+- `follow_up` -> orange Follow-up pill
+- `inquiry` -> blue Enquiry pill
+- `notification` -> slate Auto pill
+- `newsletter` -> pink Marketing pill
+- `spam` -> red Spam pill
+- `personal` -> purple Personal pill
 
-This is the Lovable AI gateway endpoint. Will check if it's auto-injected; if not, add it as a secret.
+### Technical Details
 
-## Step 4: Verify
+**Files modified:**
+- `supabase/functions/_shared/ai.ts` -- new system prompt, updated default category
+- `supabase/functions/pipeline-worker-classify/index.ts` -- updated `decisionForClassification`, identity harvesting after `applyClassification`
+- `src/components/shared/CategoryLabel.tsx` -- new category config entries
 
-- Check worker logs to confirm queue reads succeed (no more "column definition list" error)
-- Confirm workers return `{"ok": true}` responses
+**Edge functions redeployed:**
+- `pipeline-worker-classify`
+
+**No database migration needed** -- `customer_identities` table and its unique constraint already exist.
+
