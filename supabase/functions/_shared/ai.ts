@@ -64,9 +64,9 @@ export async function classifyBatchWithLovable(params: {
     return new Map();
   }
 
-  const endpoint = getRequiredEnv("LOVABLE_AI_GATEWAY_URL");
-  const model = getOptionalEnv("LOVABLE_CLASSIFY_MODEL", "gemini-2.5-flash");
-  const apiKey = getOptionalEnv("LOVABLE_AI_GATEWAY_KEY");
+  const endpoint = getOptionalEnv("AI_GATEWAY_URL", "https://ai.gateway.lovable.dev/v1/chat/completions");
+  const model = getOptionalEnv("LOVABLE_CLASSIFY_MODEL", "google/gemini-2.5-flash");
+  const apiKey = Deno.env.get("LOVABLE_API_KEY") || getOptionalEnv("AI_GATEWAY_KEY", "");
 
   const payload = {
     model,
