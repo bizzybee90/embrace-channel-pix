@@ -192,13 +192,10 @@ export const Home = () => {
           </div>
         ) : (
           <>
-            {/* Header with greeting */}
+            {/* Header - logo only, greeting lives in banner */}
             <div className="flex items-center gap-4">
               <img src={bizzybeelogo} alt="BizzyBee" className="h-20 w-auto" />
               <div>
-                <h1 className="text-xl font-semibold text-foreground">
-                  {getGreeting()}
-                </h1>
                 <p className="text-sm text-muted-foreground">
                   {stats.clearedToday > 0 ? (
                     <>BizzyBee handled <span className="font-medium text-foreground">{stats.clearedToday}</span> messages today</>
@@ -225,19 +222,19 @@ export const Home = () => {
 
             {/* Action Cards - Priority order with visual hierarchy */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* At Risk - Most urgent, prominent styling */}
+              {/* At Risk - Only red when count > 0, neutral grey otherwise */}
               <Card 
                 className={`p-5 cursor-pointer transition-all hover:scale-[1.02] ${
                   stats.atRiskCount > 0 
                     ? 'bg-gradient-to-br from-destructive/10 via-destructive/5 to-background border-destructive/30 shadow-lg shadow-destructive/10' 
-                    : 'hover:bg-accent/50'
+                    : 'bg-muted/30 border-border hover:bg-muted/50'
                 }`}
                 onClick={() => navigate('/to-reply?filter=at-risk')}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-4">
-                    <div className={`p-3 rounded-xl ${stats.atRiskCount > 0 ? 'bg-destructive/20' : 'bg-destructive/10'}`}>
-                      <AlertTriangle className={`h-6 w-6 ${stats.atRiskCount > 0 ? 'text-destructive animate-pulse' : 'text-destructive/70'}`} />
+                    <div className={`p-3 rounded-xl ${stats.atRiskCount > 0 ? 'bg-destructive/20' : 'bg-muted'}`}>
+                      <AlertTriangle className={`h-6 w-6 ${stats.atRiskCount > 0 ? 'text-destructive animate-pulse' : 'text-muted-foreground/50'}`} />
                     </div>
                     <div>
                       <p className="text-3xl font-bold text-foreground">{stats.atRiskCount}</p>

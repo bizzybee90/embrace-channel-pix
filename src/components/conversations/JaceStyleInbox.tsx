@@ -276,124 +276,52 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
 
   const ConversationRow = ({ conversation }: { conversation: Conversation }) => {
     const conv = conversation as any;
-    const customerName = conv.customer?.name || conv.customer?.email?.split('@')[0] || 'Unknown';
+    const rawName = conv.customer?.name || conv.customer?.email?.split('@')[0] || '';
+    const customerName = (!rawName || rawName.includes('unknown.invalid') || rawName.startsWith('unknown@')) ? 'Unknown Sender' : rawName;
     const hasAiDraft = !!conv.ai_draft_response;
     const stateConfig = getStateConfig(conv.decision_bucket, hasAiDraft);
-    const messageCount = conv.message_count || 0;
     const isUrgent = conv.decision_bucket === 'act_now';
+    const snippet = conv.summary_for_human || conv.why_this_needs_you || '';
 
-    // Mobile: Two-line layout
-    if (isMobile) {
-      return (
-        <div
-          onClick={() => onSelect(conversation)}
-          className={cn(
-            "px-3 py-3 cursor-pointer border-b border-border/30 transition-all",
-            "border-l-4 hover:bg-muted/50",
-            stateConfig.border,
-            stateConfig.rowClass
-          )}
-        >
-          {/* Top row: Sender + Time */}
-          <div className="flex items-center justify-between gap-2 mb-1">
-            <div className="flex items-center gap-1.5 min-w-0 flex-1">
-              <ChannelIcon channel={conv.channel} className="h-3 w-3 flex-shrink-0 opacity-60" />
-              <span className={cn(
-                "text-sm text-foreground truncate",
-                isUrgent ? "font-semibold" : "font-medium"
-              )}>
-                {customerName}
-              </span>
-              {messageCount > 1 && (
-                <span className="text-[10px] font-medium text-muted-foreground bg-muted rounded-full h-4 min-w-4 px-1 flex items-center justify-center flex-shrink-0">
-                  {messageCount}
-                </span>
-              )}
-            </div>
-            <span className="text-xs text-muted-foreground whitespace-nowrap flex-shrink-0">
-              {formatTime(conv.updated_at || conv.created_at)}
-            </span>
-          </div>
-          
-          {/* Bottom row: Subject + Badge */}
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-sm text-muted-foreground truncate flex-1 min-w-0">
-              {conv.title || 'No subject'}
-            </p>
-            <div className="flex-shrink-0">
-              {stateConfig.badge}
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    // Desktop: Single-line layout with hover quick-actions
     return (
       <div
         onClick={() => onSelect(conversation)}
         className={cn(
-          "group flex items-center gap-2 px-3 py-2.5 cursor-pointer border-b border-border/30 transition-all",
-          "border-l-4 hover:bg-muted/50",
+          "px-4 py-3 cursor-pointer border-b border-border/30 transition-all",
+          "border-l-4 hover:bg-muted/50 flex flex-col items-start w-full gap-0.5",
           stateConfig.border,
           stateConfig.rowClass
         )}
       >
-        {/* Channel icon + Sender - fixed width, truncate */}
-        <div className="w-28 flex-shrink-0 min-w-0 flex items-center gap-1.5">
-          <ChannelIcon channel={conv.channel} className="h-3 w-3 flex-shrink-0 opacity-60" />
-          <span className={cn(
-            "text-sm text-foreground truncate",
-            isUrgent ? "font-semibold" : "font-medium"
-          )}>
-            {customerName}
-          </span>
-        </div>
-
-        {/* Subject + Preview - fills remaining space, single line with truncation */}
-        <div className="flex-1 min-w-0 overflow-hidden">
-          <p className="text-sm text-foreground truncate">
-            <span className={cn(isUrgent ? "font-semibold" : "font-medium")}>
-              {conv.title || 'No subject'}
-            </span>
-            {conv.summary_for_human && (
-              <span className="text-muted-foreground ml-1">· {conv.summary_for_human}</span>
-            )}
-          </p>
-        </div>
-
-        {/* Category + Confidence + State badge */}
-        <div className="flex items-center gap-1.5 flex-shrink-0">
-          <CategoryLabel 
-            classification={conv.email_classification} 
-            size="xs" 
-            editable={true}
-            onClick={(e) => handleCategoryClick(conversation, e)}
-          />
-          {conv.ai_confidence != null && (
+        {/* Row 1: Sender + Time */}
+        <div className="flex items-center justify-between gap-2 w-full">
+          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+            <ChannelIcon channel={conv.channel} className="h-3 w-3 flex-shrink-0 opacity-60" />
             <span className={cn(
-              "text-[10px] font-medium px-1.5 py-0.5 rounded-full",
-              conv.ai_confidence >= 0.9 ? "text-green-600 bg-green-100 dark:bg-green-900/30 dark:text-green-400" :
-              conv.ai_confidence >= 0.7 ? "text-amber-600 bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400" :
-              "text-red-600 bg-red-100 dark:bg-red-900/30 dark:text-red-400"
+              "text-sm text-foreground truncate",
+              isUrgent ? "font-semibold" : "font-semibold"
             )}>
-              {Math.round(conv.ai_confidence * 100)}%
+              {customerName}
             </span>
-          )}
-          {stateConfig.badge}
-        </div>
-
-        {/* Hover Quick Actions + Thread Count + Time */}
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <InboxQuickActions conversation={conversation} />
-          {messageCount > 1 && (
-            <span className="text-[10px] font-medium text-muted-foreground bg-muted rounded-full h-4 min-w-4 px-1 flex items-center justify-center">
-              {messageCount}
-            </span>
-          )}
-          <span className="text-xs text-muted-foreground whitespace-nowrap">
+          </div>
+          <span className="text-xs text-muted-foreground whitespace-nowrap flex-shrink-0">
             {formatTime(conv.updated_at || conv.created_at)}
           </span>
+        </div>
+
+        {/* Row 2: Subject */}
+        <p className="text-sm font-medium text-foreground/80 truncate w-full">
+          {conv.title || 'No subject'}
+        </p>
+
+        {/* Row 3: AI Summary + Badge */}
+        <div className="flex items-center justify-between gap-2 w-full">
+          <p className="text-sm text-muted-foreground truncate flex-1 min-w-0 line-clamp-1">
+            {snippet || '\u00A0'}
+          </p>
+          <div className="flex-shrink-0">
+            {stateConfig.badge}
+          </div>
         </div>
       </div>
     );
