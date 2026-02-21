@@ -84,8 +84,26 @@ function extractInlineMessage(payload: Record<string, unknown>): AurinkoMessage 
 
 Deno.serve(async (req) => {
   try {
+    // Aurinko sends GET to verify the webhook URL when creating/refreshing subscriptions
+    if (req.method === "GET") {
+      const url = new URL(req.url);
+      const validationToken = url.searchParams.get("validationToken");
+      if (validationToken) {
+        return new Response(validationToken, { status: 200, headers: { "Content-Type": "text/plain" } });
+      }
+      return new Response("OK", { status: 200 });
+    }
+
     if (req.method !== "POST") {
       throw new HttpError(405, "Method not allowed");
+    }
+
+    // Check for validation token in URL (Aurinko subscription verification via POST)
+    const url = new URL(req.url);
+    const validationToken = url.searchParams.get("validationToken");
+    if (validationToken) {
+      console.log("Aurinko subscription validation POST, echoing token");
+      return new Response(validationToken, { status: 200, headers: { "Content-Type": "text/plain" } });
     }
 
     const rawBody = await req.text();

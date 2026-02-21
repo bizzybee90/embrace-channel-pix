@@ -88,7 +88,8 @@ serve(async (req) => {
     console.log(`📧 Found ${configs.length} email config(s) to refresh`);
 
     const results: { configId: string; email: string; success: boolean; error?: string }[] = [];
-    const webhookUrl = `${SUPABASE_URL}/functions/v1/aurinko-webhook`;
+    const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const webhookUrl = `${SUPABASE_URL}/functions/v1/aurinko-webhook?apikey=${SUPABASE_ANON_KEY}`;
 
     for (const config of configs) {
       try {
