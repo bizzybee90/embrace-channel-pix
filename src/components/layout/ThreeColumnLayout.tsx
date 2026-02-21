@@ -17,7 +17,6 @@ export const ThreeColumnLayout = ({ sidebar, main }: ThreeColumnLayoutProps) => 
     return (
       <>
         <div className="flex h-screen w-full bg-background overflow-hidden flex-col">
-          {/* Mobile Header */}
           <header className="flex-shrink-0 h-14 border-b border-border bg-card px-4 flex items-center justify-between">
             <Button
               variant="ghost"
@@ -28,16 +27,12 @@ export const ThreeColumnLayout = ({ sidebar, main }: ThreeColumnLayoutProps) => 
               <Menu className="h-5 w-5" />
             </Button>
             <h1 className="text-lg font-semibold truncate">BizzyBee</h1>
-            <div className="w-9" /> {/* Spacer for center alignment */}
+            <div className="w-9" />
           </header>
-
-          {/* Main Content - Full Width on Mobile */}
           <main className="flex-1 overflow-y-auto">
             {main}
           </main>
         </div>
-
-        {/* Mobile Sidebar Overlay */}
         <MobileSidebarSheet
           open={sidebarOpen}
           onOpenChange={setSidebarOpen}
@@ -48,15 +43,17 @@ export const ThreeColumnLayout = ({ sidebar, main }: ThreeColumnLayoutProps) => 
   }
 
   return (
-    <div className="flex h-screen w-full bg-background overflow-hidden">
-      {/* Desktop Sidebar */}
-      <aside className="border-r border-border bg-card flex-shrink-0 overflow-y-auto relative z-50">
+    <div className="flex h-screen w-full bg-muted/30 overflow-hidden">
+      {/* Desktop Sidebar - icon rail */}
+      <aside className="border-r border-border/50 bg-card flex-shrink-0 overflow-y-auto relative z-50">
         {sidebar}
       </aside>
 
-      {/* Desktop Main Content */}
-      <main className="flex-1 flex flex-col overflow-y-auto min-w-0">
-        {main}
+      {/* Desktop Main Content - floating card */}
+      <main className="flex-1 flex flex-col overflow-y-auto min-w-0 p-4">
+        <div className="flex-1 bg-card rounded-2xl shadow-sm overflow-y-auto">
+          {main}
+        </div>
       </main>
     </div>
   );
