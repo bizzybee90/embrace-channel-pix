@@ -1185,8 +1185,10 @@ export type Database = {
           ai_draft_response: string | null
           ai_message_count: number | null
           ai_reason_for_escalation: string | null
+          ai_reasoning: string | null
           ai_resolution_summary: string | null
           ai_sentiment: string | null
+          ai_why_flagged: string | null
           assigned_to: string | null
           auto_handled_at: string | null
           auto_responded: boolean | null
@@ -1258,8 +1260,10 @@ export type Database = {
           ai_draft_response?: string | null
           ai_message_count?: number | null
           ai_reason_for_escalation?: string | null
+          ai_reasoning?: string | null
           ai_resolution_summary?: string | null
           ai_sentiment?: string | null
+          ai_why_flagged?: string | null
           assigned_to?: string | null
           auto_handled_at?: string | null
           auto_responded?: boolean | null
@@ -1331,8 +1335,10 @@ export type Database = {
           ai_draft_response?: string | null
           ai_message_count?: number | null
           ai_reason_for_escalation?: string | null
+          ai_reasoning?: string | null
           ai_resolution_summary?: string | null
           ai_sentiment?: string | null
+          ai_why_flagged?: string | null
           assigned_to?: string | null
           auto_handled_at?: string | null
           auto_responded?: boolean | null

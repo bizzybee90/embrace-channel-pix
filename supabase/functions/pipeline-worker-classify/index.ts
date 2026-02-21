@@ -281,6 +281,10 @@ async function applyClassification(params: {
     metadata: mergedMetadata,
     last_classified_message_id: params.job.target_message_id,
     updated_at: new Date().toISOString(),
+    ai_reasoning: params.result.reasoning || null,
+    ai_sentiment: params.result.sentiment || null,
+    ai_why_flagged: params.result.why_this_needs_you || null,
+    summary_for_human: params.result.summary_for_human || null,
   };
 
   if (conversation.channel === "email") {

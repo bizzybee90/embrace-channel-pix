@@ -88,6 +88,9 @@ export interface Conversation {
   why_this_needs_you?: string | null;
   cognitive_load?: CognitiveLoad | null;
   risk_level?: RiskLevel | null;
+  // AI classification enrichment
+  ai_reasoning?: string | null;
+  ai_why_flagged?: string | null;
   // Triage agent fields (secondary)
   urgency?: 'high' | 'medium' | 'low' | null;
   urgency_reason?: string | null;

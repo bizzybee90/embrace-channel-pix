@@ -1,6 +1,7 @@
 import { Conversation } from '@/lib/types';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { AlertCircle, FileText, Sparkles, ChevronDown, User } from 'lucide-react';
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
@@ -41,15 +42,33 @@ const PANEL_HEADER_CLASSES = "flex items-center justify-between w-full px-4 gap-
     switch (sentiment) {
       case 'positive': return '😊';
       case 'negative': return '😟';
+      case 'frustrated': return '😤';
       case 'neutral': return '😐';
       default: return '❓';
     }
   };
 
+  const getSentimentBadge = (sentiment: string | null | undefined) => {
+    if (!sentiment) return null;
+    const config: Record<string, { label: string; className: string }> = {
+      positive: { label: 'Positive', className: 'bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20' },
+      neutral: { label: 'Neutral', className: 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20' },
+      negative: { label: 'Negative', className: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20' },
+      frustrated: { label: 'Frustrated', className: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20' },
+    };
+    const c = config[sentiment];
+    if (!c) return null;
+    return (
+      <Badge variant="outline" className={cn("rounded-full text-[11px] px-2 py-0.5 font-medium", c.className)}>
+        {getSentimentEmoji(sentiment)} {c.label}
+      </Badge>
+    );
+  };
+
   // Dynamic title and color based on decision bucket
   const getBucketContext = () => {
     const bucket = (conversation as any).decision_bucket;
-    const whyText = (conversation as any).why_this_needs_you || conversation.ai_reason_for_escalation || conversation.summary_for_human;
+    const whyText = (conversation as any).ai_why_flagged || (conversation as any).why_this_needs_you || conversation.ai_reason_for_escalation || conversation.summary_for_human;
     
     switch (bucket) {
       case 'act_now':
@@ -84,6 +103,7 @@ const PANEL_HEADER_CLASSES = "flex items-center justify-between w-full px-4 gap-
               <span className="text-sm font-medium text-foreground">
                 {bucketContext.title}
               </span>
+              {getSentimentBadge(conversation.ai_sentiment)}
             </div>
             <ChevronDown
               className={cn(
