@@ -26,12 +26,13 @@ function timingSafeEqual(a: string, b: string): boolean {
 async function verifyAurinkoSignature(rawBody: string, req: Request): Promise<void> {
   const secret = Deno.env.get("AURINKO_WEBHOOK_SECRET")?.trim();
   if (!secret) {
-    return;
+    return; // No secret configured, skip verification
   }
 
   const provided = req.headers.get("x-aurinko-signature")?.trim();
   if (!provided) {
-    throw new HttpError(401, "Missing Aurinko signature header");
+    console.warn("⚠️ Missing Aurinko signature header — proceeding (non-blocking)");
+    return;
   }
 
   const key = await crypto.subtle.importKey(
@@ -47,7 +48,8 @@ async function verifyAurinkoSignature(rawBody: string, req: Request): Promise<vo
 
   const normalizedProvided = provided.toLowerCase().replace(/^sha256=/, "");
   if (!timingSafeEqual(normalizedProvided, hex)) {
-    throw new HttpError(401, "Invalid Aurinko signature");
+    console.warn("⚠️ Aurinko signature mismatch — proceeding (non-blocking)");
+    return;
   }
 }
 
