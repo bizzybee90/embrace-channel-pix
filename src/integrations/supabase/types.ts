@@ -1115,6 +1115,13 @@ export type Database = {
             foreignKeyName: "conversation_pairs_conversation_id_fkey"
             columns: ["conversation_id"]
             isOneToOne: false
+            referencedRelation: "bb_needs_classification"
+            referencedColumns: ["conversation_id"]
+          },
+          {
+            foreignKeyName: "conversation_pairs_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
             referencedRelation: "conversations"
             referencedColumns: ["id"]
           },
@@ -1123,6 +1130,51 @@ export type Database = {
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversation_refs: {
+        Row: {
+          channel: string
+          config_id: string
+          conversation_id: string
+          created_at: string
+          external_thread_id: string
+          id: string
+          workspace_id: string
+        }
+        Insert: {
+          channel: string
+          config_id: string
+          conversation_id: string
+          created_at?: string
+          external_thread_id: string
+          id?: string
+          workspace_id: string
+        }
+        Update: {
+          channel?: string
+          config_id?: string
+          conversation_id?: string
+          created_at?: string
+          external_thread_id?: string
+          id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_refs_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "bb_needs_classification"
+            referencedColumns: ["conversation_id"]
+          },
+          {
+            foreignKeyName: "conversation_refs_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
             referencedColumns: ["id"]
           },
         ]
@@ -1143,6 +1195,7 @@ export type Database = {
           channel: string
           cognitive_load: string | null
           confidence: number | null
+          config_id: string | null
           conversation_type: string | null
           created_at: string | null
           csat_requested_at: string | null
@@ -1163,6 +1216,12 @@ export type Database = {
           id: string
           is_escalated: boolean | null
           lane: string | null
+          last_classified_message_id: string | null
+          last_classify_enqueued_message_id: string | null
+          last_draft_enqueued_message_id: string | null
+          last_draft_message_id: string | null
+          last_inbound_message_at: string | null
+          last_inbound_message_id: string | null
           led_to_booking: boolean | null
           message_count: number | null
           metadata: Json | null
@@ -1209,6 +1268,7 @@ export type Database = {
           channel: string
           cognitive_load?: string | null
           confidence?: number | null
+          config_id?: string | null
           conversation_type?: string | null
           created_at?: string | null
           csat_requested_at?: string | null
@@ -1229,6 +1289,12 @@ export type Database = {
           id?: string
           is_escalated?: boolean | null
           lane?: string | null
+          last_classified_message_id?: string | null
+          last_classify_enqueued_message_id?: string | null
+          last_draft_enqueued_message_id?: string | null
+          last_draft_message_id?: string | null
+          last_inbound_message_at?: string | null
+          last_inbound_message_id?: string | null
           led_to_booking?: boolean | null
           message_count?: number | null
           metadata?: Json | null
@@ -1275,6 +1341,7 @@ export type Database = {
           channel?: string
           cognitive_load?: string | null
           confidence?: number | null
+          config_id?: string | null
           conversation_type?: string | null
           created_at?: string | null
           csat_requested_at?: string | null
@@ -1295,6 +1362,12 @@ export type Database = {
           id?: string
           is_escalated?: boolean | null
           lane?: string | null
+          last_classified_message_id?: string | null
+          last_classify_enqueued_message_id?: string | null
+          last_draft_enqueued_message_id?: string | null
+          last_draft_message_id?: string | null
+          last_inbound_message_at?: string | null
+          last_inbound_message_id?: string | null
           led_to_booking?: boolean | null
           message_count?: number | null
           metadata?: Json | null
@@ -1393,6 +1466,13 @@ export type Database = {
             foreignKeyName: "correction_examples_conversation_id_fkey"
             columns: ["conversation_id"]
             isOneToOne: false
+            referencedRelation: "bb_needs_classification"
+            referencedColumns: ["conversation_id"]
+          },
+          {
+            foreignKeyName: "correction_examples_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
             referencedRelation: "conversations"
             referencedColumns: ["id"]
           },
@@ -1451,6 +1531,50 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "customer_consents_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_identities: {
+        Row: {
+          created_at: string
+          customer_id: string
+          id: string
+          identifier_type: string
+          identifier_value: string
+          identifier_value_norm: string
+          source_channel: string | null
+          verified: boolean
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          customer_id: string
+          id?: string
+          identifier_type: string
+          identifier_value: string
+          identifier_value_norm: string
+          source_channel?: string | null
+          verified?: boolean
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string
+          id?: string
+          identifier_type?: string
+          identifier_value?: string
+          identifier_value_norm?: string
+          source_channel?: string | null
+          verified?: boolean
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_identities_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
@@ -1654,6 +1778,13 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "data_access_logs_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "bb_needs_classification"
+            referencedColumns: ["conversation_id"]
+          },
           {
             foreignKeyName: "data_access_logs_conversation_id_fkey"
             columns: ["conversation_id"]
@@ -1933,6 +2064,13 @@ export type Database = {
             foreignKeyName: "draft_edits_conversation_id_fkey"
             columns: ["conversation_id"]
             isOneToOne: false
+            referencedRelation: "bb_needs_classification"
+            referencedColumns: ["conversation_id"]
+          },
+          {
+            foreignKeyName: "draft_edits_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
             referencedRelation: "conversations"
             referencedColumns: ["id"]
           },
@@ -1986,6 +2124,13 @@ export type Database = {
           workspace_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "draft_verifications_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "bb_needs_classification"
+            referencedColumns: ["conversation_id"]
+          },
           {
             foreignKeyName: "draft_verifications_conversation_id_fkey"
             columns: ["conversation_id"]
@@ -2407,6 +2552,13 @@ export type Database = {
             foreignKeyName: "email_import_queue_conversation_id_fkey"
             columns: ["conversation_id"]
             isOneToOne: false
+            referencedRelation: "bb_needs_classification"
+            referencedColumns: ["conversation_id"]
+          },
+          {
+            foreignKeyName: "email_import_queue_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
             referencedRelation: "conversations"
             referencedColumns: ["id"]
           },
@@ -2509,6 +2661,13 @@ export type Database = {
           workspace_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "email_pairs_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "bb_needs_classification"
+            referencedColumns: ["conversation_id"]
+          },
           {
             foreignKeyName: "email_pairs_conversation_id_fkey"
             columns: ["conversation_id"]
@@ -2856,6 +3015,13 @@ export type Database = {
           workspace_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "email_thread_analysis_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "bb_needs_classification"
+            referencedColumns: ["conversation_id"]
+          },
           {
             foreignKeyName: "email_thread_analysis_conversation_id_fkey"
             columns: ["conversation_id"]
@@ -3887,6 +4053,140 @@ export type Database = {
           },
         ]
       }
+      message_events: {
+        Row: {
+          body: string | null
+          body_html: string | null
+          channel: string
+          config_id: string
+          created_at: string
+          direction: string
+          external_id: string
+          from_identifier: string
+          from_name: string | null
+          id: string
+          is_read: boolean
+          last_error: string | null
+          materialized_conversation_id: string | null
+          materialized_customer_id: string | null
+          materialized_message_id: string | null
+          metadata: Json
+          raw_payload: Json | null
+          run_id: string | null
+          status: string
+          subject: string | null
+          thread_id: string
+          timestamp: string
+          to_identifier: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          body?: string | null
+          body_html?: string | null
+          channel: string
+          config_id: string
+          created_at?: string
+          direction: string
+          external_id: string
+          from_identifier: string
+          from_name?: string | null
+          id?: string
+          is_read?: boolean
+          last_error?: string | null
+          materialized_conversation_id?: string | null
+          materialized_customer_id?: string | null
+          materialized_message_id?: string | null
+          metadata?: Json
+          raw_payload?: Json | null
+          run_id?: string | null
+          status?: string
+          subject?: string | null
+          thread_id: string
+          timestamp: string
+          to_identifier: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          body?: string | null
+          body_html?: string | null
+          channel?: string
+          config_id?: string
+          created_at?: string
+          direction?: string
+          external_id?: string
+          from_identifier?: string
+          from_name?: string | null
+          id?: string
+          is_read?: boolean
+          last_error?: string | null
+          materialized_conversation_id?: string | null
+          materialized_customer_id?: string | null
+          materialized_message_id?: string | null
+          metadata?: Json
+          raw_payload?: Json | null
+          run_id?: string | null
+          status?: string
+          subject?: string | null
+          thread_id?: string
+          timestamp?: string
+          to_identifier?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_events_materialized_conversation_id_fkey"
+            columns: ["materialized_conversation_id"]
+            isOneToOne: false
+            referencedRelation: "bb_needs_classification"
+            referencedColumns: ["conversation_id"]
+          },
+          {
+            foreignKeyName: "message_events_materialized_conversation_id_fkey"
+            columns: ["materialized_conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_events_materialized_customer_id_fkey"
+            columns: ["materialized_customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_events_materialized_message_id_fkey"
+            columns: ["materialized_message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_events_materialized_message_id_fkey"
+            columns: ["materialized_message_id"]
+            isOneToOne: false
+            referencedRelation: "training_pairs"
+            referencedColumns: ["inbound_id"]
+          },
+          {
+            foreignKeyName: "message_events_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "bb_pipeline_progress"
+            referencedColumns: ["run_id"]
+          },
+          {
+            foreignKeyName: "message_events_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       message_responses: {
         Row: {
           agent_id: string | null
@@ -3932,10 +4232,12 @@ export type Database = {
           audio_url: string | null
           body: string
           channel: string
+          config_id: string | null
           conversation_id: string | null
           created_at: string | null
           direction: string
           external_id: string | null
+          external_thread_id: string | null
           has_attachments: boolean | null
           id: string
           is_internal: boolean | null
@@ -3953,10 +4255,12 @@ export type Database = {
           audio_url?: string | null
           body: string
           channel: string
+          config_id?: string | null
           conversation_id?: string | null
           created_at?: string | null
           direction: string
           external_id?: string | null
+          external_thread_id?: string | null
           has_attachments?: boolean | null
           id?: string
           is_internal?: boolean | null
@@ -3974,10 +4278,12 @@ export type Database = {
           audio_url?: string | null
           body?: string
           channel?: string
+          config_id?: string | null
           conversation_id?: string | null
           created_at?: string | null
           direction?: string
           external_id?: string | null
+          external_thread_id?: string | null
           has_attachments?: boolean | null
           id?: string
           is_internal?: boolean | null
@@ -3993,6 +4299,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "bb_needs_classification"
+            referencedColumns: ["conversation_id"]
           },
           {
             foreignKeyName: "messages_conversation_id_fkey"
@@ -4283,6 +4596,108 @@ export type Database = {
           },
         ]
       }
+      pipeline_incidents: {
+        Row: {
+          context: Json
+          created_at: string
+          error: string
+          id: string
+          resolved_at: string | null
+          run_id: string | null
+          scope: string
+          severity: string
+          workspace_id: string
+        }
+        Insert: {
+          context?: Json
+          created_at?: string
+          error: string
+          id?: string
+          resolved_at?: string | null
+          run_id?: string | null
+          scope: string
+          severity: string
+          workspace_id: string
+        }
+        Update: {
+          context?: Json
+          created_at?: string
+          error?: string
+          id?: string
+          resolved_at?: string | null
+          run_id?: string | null
+          scope?: string
+          severity?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pipeline_incidents_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "bb_pipeline_progress"
+            referencedColumns: ["run_id"]
+          },
+          {
+            foreignKeyName: "pipeline_incidents_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pipeline_job_audit: {
+        Row: {
+          attempts: number
+          created_at: string
+          error: string | null
+          id: string
+          job_payload: Json
+          outcome: string
+          queue_name: string
+          run_id: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          error?: string | null
+          id?: string
+          job_payload: Json
+          outcome: string
+          queue_name: string
+          run_id?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          error?: string | null
+          id?: string
+          job_payload?: Json
+          outcome?: string
+          queue_name?: string
+          run_id?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pipeline_job_audit_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "bb_pipeline_progress"
+            referencedColumns: ["run_id"]
+          },
+          {
+            foreignKeyName: "pipeline_job_audit_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pipeline_locks: {
         Row: {
           function_name: string
@@ -4314,6 +4729,57 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      pipeline_runs: {
+        Row: {
+          channel: string
+          completed_at: string | null
+          config_id: string | null
+          created_at: string
+          id: string
+          last_error: string | null
+          last_heartbeat_at: string
+          metrics: Json
+          mode: string
+          params: Json
+          started_at: string
+          state: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          channel: string
+          completed_at?: string | null
+          config_id?: string | null
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          last_heartbeat_at?: string
+          metrics?: Json
+          mode: string
+          params?: Json
+          started_at?: string
+          state?: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          channel?: string
+          completed_at?: string | null
+          config_id?: string | null
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          last_heartbeat_at?: string
+          metrics?: Json
+          mode?: string
+          params?: Json
+          started_at?: string
+          state?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: []
       }
       price_list: {
         Row: {
@@ -4583,6 +5049,13 @@ export type Database = {
           workspace_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "response_feedback_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "bb_needs_classification"
+            referencedColumns: ["conversation_id"]
+          },
           {
             foreignKeyName: "response_feedback_conversation_id_fkey"
             columns: ["conversation_id"]
@@ -5237,6 +5710,13 @@ export type Database = {
             foreignKeyName: "triage_corrections_conversation_id_fkey"
             columns: ["conversation_id"]
             isOneToOne: false
+            referencedRelation: "bb_needs_classification"
+            referencedColumns: ["conversation_id"]
+          },
+          {
+            foreignKeyName: "triage_corrections_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
             referencedRelation: "conversations"
             referencedColumns: ["id"]
           },
@@ -5632,6 +6112,13 @@ export type Database = {
             foreignKeyName: "webhook_logs_conversation_id_fkey"
             columns: ["conversation_id"]
             isOneToOne: false
+            referencedRelation: "bb_needs_classification"
+            referencedColumns: ["conversation_id"]
+          },
+          {
+            foreignKeyName: "webhook_logs_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
             referencedRelation: "conversations"
             referencedColumns: ["id"]
           },
@@ -5982,6 +6469,183 @@ export type Database = {
       }
     }
     Views: {
+      bb_needs_classification: {
+        Row: {
+          channel: string | null
+          conversation_id: string | null
+          last_classified_message_id: string | null
+          last_classify_enqueued_message_id: string | null
+          last_inbound_message_id: string | null
+          status: string | null
+          updated_at: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          channel?: string | null
+          conversation_id?: string | null
+          last_classified_message_id?: string | null
+          last_classify_enqueued_message_id?: string | null
+          last_inbound_message_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          channel?: string | null
+          conversation_id?: string | null
+          last_classified_message_id?: string | null
+          last_classify_enqueued_message_id?: string | null
+          last_inbound_message_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversations_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bb_open_incidents: {
+        Row: {
+          context: Json | null
+          created_at: string | null
+          error: string | null
+          id: string | null
+          run_id: string | null
+          scope: string | null
+          severity: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          context?: Json | null
+          created_at?: string | null
+          error?: string | null
+          id?: string | null
+          run_id?: string | null
+          scope?: string | null
+          severity?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          context?: Json | null
+          created_at?: string | null
+          error?: string | null
+          id?: string | null
+          run_id?: string | null
+          scope?: string | null
+          severity?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pipeline_incidents_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "bb_pipeline_progress"
+            referencedColumns: ["run_id"]
+          },
+          {
+            foreignKeyName: "pipeline_incidents_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bb_pipeline_progress: {
+        Row: {
+          channel: string | null
+          classified_events: number | null
+          completed_at: string | null
+          config_id: string | null
+          decided_events: number | null
+          drafted_events: number | null
+          failed_events: number | null
+          heartbeat_age: unknown
+          last_error: string | null
+          last_heartbeat_at: string | null
+          materialized_events: number | null
+          metrics: Json | null
+          mode: string | null
+          received_events: number | null
+          run_id: string | null
+          started_at: string | null
+          state: string | null
+          total_events: number | null
+          workspace_id: string | null
+        }
+        Relationships: []
+      }
+      bb_queue_depths: {
+        Row: {
+          queue_name: string | null
+          visible_messages: number | null
+        }
+        Relationships: []
+      }
+      bb_stalled_events: {
+        Row: {
+          age: unknown
+          channel: string | null
+          config_id: string | null
+          created_at: string | null
+          external_id: string | null
+          id: string | null
+          run_id: string | null
+          status: string | null
+          thread_id: string | null
+          updated_at: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          age?: never
+          channel?: string | null
+          config_id?: string | null
+          created_at?: string | null
+          external_id?: string | null
+          id?: string | null
+          run_id?: string | null
+          status?: string | null
+          thread_id?: string | null
+          updated_at?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          age?: never
+          channel?: string | null
+          config_id?: string | null
+          created_at?: string | null
+          external_id?: string | null
+          id?: string | null
+          run_id?: string | null
+          status?: string | null
+          thread_id?: string | null
+          updated_at?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_events_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "bb_pipeline_progress"
+            referencedColumns: ["run_id"]
+          },
+          {
+            foreignKeyName: "message_events_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       competitor_market_intelligence: {
         Row: {
           avg_distance: number | null
@@ -6021,6 +6685,13 @@ export type Database = {
             foreignKeyName: "messages_conversation_id_fkey"
             columns: ["conversation_id"]
             isOneToOne: false
+            referencedRelation: "bb_needs_classification"
+            referencedColumns: ["conversation_id"]
+          },
+          {
+            foreignKeyName: "messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
             referencedRelation: "conversations"
             referencedColumns: ["id"]
           },
@@ -6035,6 +6706,108 @@ export type Database = {
           noise_threads: number
           threads_analyzed: number
         }[]
+      }
+      bb_ingest_unified_messages: {
+        Args: {
+          p_channel: string
+          p_config_id: string
+          p_messages: Json
+          p_run_id: string
+          p_workspace_id: string
+        }
+        Returns: {
+          enqueued_count: number
+          received_count: number
+          run_id: string
+        }[]
+      }
+      bb_materialize_event: {
+        Args: { p_event_id: string }
+        Returns: {
+          channel: string
+          config_id: string
+          conversation_id: string
+          did_work: boolean
+          message_id: string
+          needs_classify: boolean
+          run_id: string
+          target_message_id: string
+          workspace_id: string
+        }[]
+      }
+      bb_merge_customers: {
+        Args: {
+          p_loser_id: string
+          p_winner_id: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
+      bb_norm_identifier: {
+        Args: { p_type: string; p_value: string }
+        Returns: string
+      }
+      bb_queue_archive: {
+        Args: { msg_id: number; queue_name: string }
+        Returns: boolean
+      }
+      bb_queue_delete: {
+        Args: { msg_id: number; queue_name: string }
+        Returns: boolean
+      }
+      bb_queue_read: {
+        Args: { n: number; queue_name: string; vt_seconds: number }
+        Returns: {
+          enqueued_at: string
+          message: Json
+          msg_id: number
+          read_ct: number
+          vt: string
+        }[]
+      }
+      bb_queue_send: {
+        Args: { delay_seconds?: number; message: Json; queue_name: string }
+        Returns: number
+      }
+      bb_queue_send_batch: {
+        Args: { delay_seconds?: number; messages: Json[]; queue_name: string }
+        Returns: number[]
+      }
+      bb_queue_visible_count: {
+        Args: { p_queue_name: string }
+        Returns: number
+      }
+      bb_record_incident: {
+        Args: {
+          p_context?: Json
+          p_error: string
+          p_run_id: string
+          p_scope: string
+          p_severity: string
+          p_workspace_id: string
+        }
+        Returns: string
+      }
+      bb_schedule_pipeline_crons: { Args: never; Returns: undefined }
+      bb_touch_pipeline_run: {
+        Args: {
+          p_last_error?: string
+          p_mark_completed?: boolean
+          p_metrics_patch?: Json
+          p_run_id: string
+          p_state?: string
+        }
+        Returns: undefined
+      }
+      bb_trigger_worker: {
+        Args: { p_body?: Json; p_url_secret_name: string }
+        Returns: number
+      }
+      bb_try_timestamptz: { Args: { p_value: string }; Returns: string }
+      bb_unschedule_pipeline_crons: { Args: never; Returns: number }
+      bb_user_in_workspace: {
+        Args: { p_workspace_id: string }
+        Returns: boolean
       }
       bulk_update_email_classifications: {
         Args: { p_updates: Json }
