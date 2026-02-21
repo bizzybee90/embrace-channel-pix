@@ -6707,6 +6707,7 @@ export type Database = {
           threads_analyzed: number
         }[]
       }
+      bb_cleanup_old_queue_jobs: { Args: never; Returns: Json }
       bb_ingest_unified_messages: {
         Args: {
           p_channel: string
@@ -6808,6 +6809,10 @@ export type Database = {
       bb_user_in_workspace: {
         Args: { p_workspace_id: string }
         Returns: boolean
+      }
+      bb_wake_worker: {
+        Args: { p_url_secret_name: string }
+        Returns: undefined
       }
       bulk_update_email_classifications: {
         Args: { p_updates: Json }
