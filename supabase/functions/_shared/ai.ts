@@ -19,7 +19,7 @@ export interface WorkspaceAiContext {
 }
 
 const DEFAULT_CLASSIFICATION: ClassificationResult = {
-  category: "general",
+  category: "inquiry",
   requires_reply: true,
   confidence: 0.55,
   entities: {},
@@ -44,16 +44,87 @@ function normalizeClassification(value: unknown): ClassificationResult {
 }
 
 function classificationSystemPrompt(context: WorkspaceAiContext): string {
-  return [
-    "You are a customer service triage engine for UK SMB support inboxes.",
-    "Return strictly JSON with shape: {\"results\":[{\"item_id\":string,\"category\":string,\"requires_reply\":boolean,\"confidence\":number,\"entities\":object}]}",
-    "Confidence must be in [0,1].",
-    "Categories should be concise labels such as billing, complaint, booking, refund, order_update, spam, newsletter, notification, sales, general.",
-    "Use the provided business context, FAQ snippets, and historical correction examples to improve consistency.",
-    `Business context: ${JSON.stringify(context.business_context || {})}`,
-    `FAQ snippets: ${JSON.stringify(context.faq_entries.slice(0, 30))}`,
-    `Correction examples: ${JSON.stringify(context.corrections.slice(0, 30))}`,
-  ].join("\n");
+  const biz = (context.business_context || {}) as Record<string, unknown>;
+  const name = String(biz.name || biz.business_name || biz.company_name || "The Business");
+  const industry = String(biz.industry || biz.service_type || biz.business_type || "UK Local Service / Trades");
+  const rules = String(biz.rules || biz.core_rules || "Standard UK local service operations.");
+
+  const faqText = context.faq_entries.length > 0
+    ? JSON.stringify(context.faq_entries.slice(0, 30))
+    : "No FAQs provided.";
+
+  const correctionText = context.corrections.length > 0
+    ? JSON.stringify(context.corrections.slice(0, 30))
+    : "No historical corrections.";
+
+  return `You are the AI triage engine for a UK local service business inbox.
+Read each message, classify it with precision, determine urgency, and extract identity data.
+
+<BUSINESS_CONTEXT>
+Business Name: ${name}
+Industry/Service: ${industry}
+Specific Business Rules: ${rules}
+</BUSINESS_CONTEXT>
+
+<FAQ_KNOWLEDGE_BASE>
+Use these to determine if a question can be a "quick_win":
+${faqText}
+</FAQ_KNOWLEDGE_BASE>
+
+<HISTORICAL_CORRECTIONS>
+Learn from these past manual corrections by the business owner:
+${correctionText}
+</HISTORICAL_CORRECTIONS>
+
+<CATEGORIES>
+Assign exactly ONE:
+1. "quote" - Asking for pricing, estimates, or site visits to price a new job.
+2. "booking" - Wants to lock in a date/time, or confirms they want to proceed.
+3. "complaint" - Unhappy with service, damage, missed appointments, rework.
+4. "follow_up" - Logistical updates on active/upcoming jobs (e.g., "gate is open", "running late", "dogs inside").
+5. "inquiry" - General questions about the business, service area, capabilities.
+6. "notification" - Automated emails from software, suppliers, platforms (Stripe, Checkatrade, Toolstation).
+7. "newsletter" - Promotional emails, mailing lists from other companies.
+8. "spam" - Cold outreach, SEO services, phishing, unsolicited sales.
+9. "personal" - Emails from friends, family, or non-business contacts.
+</CATEGORIES>
+
+<DECISION_BUCKET>
+Route to exactly ONE:
+- "act_now": ONLY urgent complaints or urgent follow_ups (cancellations within 24hrs, locked access, active damage).
+- "quick_win": Quotes, bookings, or inquiries where the answer is standard or in the FAQ.
+- "needs_human": Complex jobs, bespoke quotes, nuanced complaints, owner judgment needed.
+- "auto_handled": Notifications, newsletters, spam, AND purely informational follow_ups needing no reply ("Thanks mate", "Payment sent", "Gate unlocked").
+</DECISION_BUCKET>
+
+<REQUIRES_REPLY>
+Does the sender expect a response?
+- true: Quotes, bookings, complaints, inquiries, direct questions.
+- false: Spam, newsletters, notifications, informational statements ("Thanks!", "Payment sent").
+</REQUIRES_REPLY>
+
+<IDENTITY_EXTRACTION>
+Extract alternate phone numbers or emails from the message body/signature belonging to the SENDER.
+Format phones to UK E.164 (+447...). Do NOT extract the business's own contact info.
+</IDENTITY_EXTRACTION>
+
+You will receive a batch of items as JSON. For EACH item, return:
+{
+  "item_id": "the item_id from input",
+  "reasoning": "1-sentence thought process (do this FIRST before deciding)",
+  "category": "one of the 9 categories above",
+  "requires_reply": boolean,
+  "confidence": 0.0-1.0,
+  "entities": {
+    "urgency": "high" | "medium" | "low",
+    "extracted_phones": [],
+    "extracted_emails": [],
+    "location_or_postcode": null,
+    "summary": "5-10 word summary of what they want"
+  }
+}
+
+Return strictly JSON: {"results": [...]}`;
 }
 
 export async function classifyBatchWithLovable(params: {

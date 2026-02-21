@@ -26,7 +26,18 @@ interface CategoryConfig {
 }
 
 const categoryConfigs: Record<string, CategoryConfig> = {
-  // Customer categories - be specific!
+  // New 9-category taxonomy (primary keys)
+  quote: { icon: Receipt, label: 'Quote', className: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20' },
+  booking: { icon: MessageCircle, label: 'Booking', className: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20' },
+  complaint: { icon: AlertTriangle, label: 'Complaint', className: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20' },
+  follow_up: { icon: MessageCircle, label: 'Follow-up', className: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20' },
+  inquiry: { icon: Mail, label: 'Enquiry', className: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20' },
+  notification: { icon: Bot, label: 'Auto', className: 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20' },
+  newsletter: { icon: Megaphone, label: 'Marketing', className: 'bg-pink-500/10 text-pink-600 dark:text-pink-400 border-pink-500/20' },
+  spam: { icon: Ban, label: 'Spam', className: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20' },
+  personal: { icon: Users, label: 'Personal', className: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20' },
+
+  // Legacy category keys (backwards compatibility)
   customer_inquiry: { icon: Mail, label: 'Inquiry', className: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20' },
   customer_complaint: { icon: AlertTriangle, label: 'Complaint', className: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20' },
   customer_feedback: { icon: ThumbsUp, label: 'Feedback', className: 'bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20' },

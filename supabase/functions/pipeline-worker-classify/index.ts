@@ -146,19 +146,30 @@ function decisionForClassification(
     };
   }
 
-  const noiseCategories = new Set(["notification", "newsletter", "spam"]);
+  const noiseCategories = new Set(["notification", "newsletter", "spam", "personal"]);
   const category = (result.category || "").toLowerCase();
 
+  // Noise → auto-handle and resolve
   if (noiseCategories.has(category)) {
     return { decisionBucket: "auto_handled", status: "resolved" };
   }
 
+  // Follow-ups that don't need reply → auto-handle
+  if (category === "follow_up" && !result.requires_reply) {
+    return { decisionBucket: "auto_handled", status: "resolved" };
+  }
+
+  // Low confidence → escalate to human
   if (result.confidence < 0.7) {
     return { decisionBucket: "needs_human", status: "escalated" };
   }
 
+  // Needs reply → act_now for complaints, quick_win for standard
   if (result.requires_reply) {
-    return { decisionBucket: "act_now", status: "ai_handling" };
+    if (category === "complaint") {
+      return { decisionBucket: "act_now", status: "ai_handling" };
+    }
+    return { decisionBucket: "quick_win", status: "open" };
   }
 
   return { decisionBucket: "quick_win", status: "open" };
@@ -233,7 +244,7 @@ async function applyClassification(params: {
   const { data: conversation, error: conversationError } = await supabase
     .from("conversations")
     .select(
-      "id, channel, status, metadata, last_inbound_message_id, last_classified_message_id, last_draft_enqueued_message_id",
+      "id, channel, status, metadata, customer_id, last_inbound_message_id, last_classified_message_id, last_draft_enqueued_message_id",
     )
     .eq("id", params.job.conversation_id)
     .single();
@@ -284,6 +295,46 @@ async function applyClassification(params: {
 
   if (updateConversationError) {
     throw new Error(`Conversation update failed: ${updateConversationError.message}`);
+  }
+
+  // Identity harvesting: extract phones/emails from AI entities into customer_identities
+  try {
+    const entities = (params.result.entities || {}) as Record<string, unknown>;
+    const extractedPhones = Array.isArray(entities.extracted_phones) ? entities.extracted_phones : [];
+    const extractedEmails = Array.isArray(entities.extracted_emails) ? entities.extracted_emails : [];
+    const customerId = conversation.customer_id;
+
+    if (customerId) {
+      for (const phone of extractedPhones) {
+        if (phone && typeof phone === "string" && phone.startsWith("+")) {
+          await supabase.from("customer_identities").upsert({
+            workspace_id: params.job.workspace_id,
+            customer_id: customerId,
+            identifier_type: "phone",
+            identifier_value: phone,
+            identifier_value_norm: phone,
+            verified: false,
+            source_channel: "email",
+          }, { onConflict: "workspace_id,identifier_type,identifier_value_norm" });
+        }
+      }
+
+      for (const email of extractedEmails) {
+        if (email && typeof email === "string" && email.includes("@")) {
+          await supabase.from("customer_identities").upsert({
+            workspace_id: params.job.workspace_id,
+            customer_id: customerId,
+            identifier_type: "email",
+            identifier_value: email,
+            identifier_value_norm: email.toLowerCase(),
+            verified: false,
+            source_channel: "email",
+          }, { onConflict: "workspace_id,identifier_type,identifier_value_norm" });
+        }
+      }
+    }
+  } catch (identityErr) {
+    console.warn("Identity harvesting error (non-fatal):", identityErr);
   }
 
   const { error: eventError } = await supabase
@@ -624,7 +675,7 @@ Deno.serve(async (req) => {
           const job = row.record.message;
           try {
             const result = classifications.get(job.event_id) || {
-              category: "general",
+              category: "inquiry",
               requires_reply: true,
               confidence: 0.55,
               entities: {},
