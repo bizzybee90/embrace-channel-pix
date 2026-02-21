@@ -1,83 +1,63 @@
 
 
-# Fix: Stop Auto-Firing FAQ Generation — Let Users Review Competitors First
+# Deploy Unified Communication Pipeline
 
-## Problem
+## Current State
+- The branch has been merged -- all migration SQL files and edge functions are in the codebase
+- The migrations have NOT been applied because the **pgmq extension is not enabled**
+- `pg_cron` and `pg_net` are already enabled
+- There are also 10 TypeScript build errors (simple casting fix needed across 4 edge functions)
 
-The Progress Screen has a race condition: when competitor discovery completes and sets status to `review_ready`, **two things happen simultaneously**:
-1. The `InlineCompetitorReview` panel appears (so users can review/add competitors)
-2. The `faq_generation` workflow auto-fires immediately (line 564)
+## Plan
 
-This means the scrape always starts before the user can review or add manual competitors. In your case, because the discovered competitors were lost from the earlier cleanup, only the 1 manually added competitor was sent to n8n instead of all 21.
+### Step 1: Fix build errors (TypeScript casting)
+Change all `as Record<string, unknown>` casts to `as unknown as Record<string, unknown>` in:
+- `pipeline-worker-classify/index.ts` (lines 379, 535, 544)
+- `pipeline-worker-draft/index.ts` (lines 97, 237, 254)
+- `pipeline-worker-import/index.ts` (lines 44, 58, 88)
+- `pipeline-worker-ingest/index.ts` (line 52)
 
-## Solution
+### Step 2: Enable pgmq extension
+Run `CREATE EXTENSION IF NOT EXISTS pgmq;` via the SQL tool. This is a prerequisite for the migration.
 
-Remove the auto-fire behaviour. Instead, when discovery completes:
-1. Show the `InlineCompetitorReview` panel with **all** discovered competitors listed (checkboxes, add/remove)
-2. The user reviews the list, optionally adds manual competitors
-3. The user clicks **"Start Analysis"** to trigger `faq_generation` with all selected competitors
-4. Only then does scraping begin
+### Step 3: Run the main pipeline migration
+Execute `20260221150000_unified_pipeline.sql` content via the SQL tool. This creates:
+- Tables: `pipeline_runs`, `pipeline_incidents`, `customer_identities`, `message_events`, `conversation_refs`, `pipeline_job_audit`
+- Columns on `conversations`: `last_inbound_message_id`, `last_inbound_message_at`, etc.
+- Columns on `messages`: `external_id`, `external_thread_id`, `config_id`
+- Queue wrapper functions: `bb_queue_send`, `bb_queue_read`, `bb_queue_delete`, etc.
+- Core functions: `bb_ingest_unified_messages`, `bb_materialize_event`, `bb_trigger_worker`, `bb_schedule_pipeline_crons`
+- 5 PGMQ queues: `bb_import_jobs`, `bb_ingest_jobs`, `bb_classify_jobs`, `bb_draft_jobs`, `bb_deadletter_jobs`
+- Views: `bb_open_incidents`, `bb_stalled_events`, `bb_pipeline_progress`, `bb_queue_depths`, `bb_needs_classification`
+- RLS policies on all new tables
 
-This is exactly what the `InlineCompetitorReview` component already supports — it has a "Start Analysis" button that calls `trigger-n8n-workflow` with `faq_generation`. The only change needed is to **stop bypassing it**.
+### Step 4: Run the fixes migration
+Execute `20260221160000_pipeline_fixes.sql` content via the SQL tool. This:
+- Fixes UK phone normalization (07... to +447...)
+- Backfills `customer_identities` from existing customers
+- Backfills `conversation_refs` from existing conversations
+- Creates `bb_merge_customers` function
 
-## Technical Changes
+### Step 5: Add Vault secrets
+Add 7 Vault secrets using the SQL tool:
+- `bb_worker_anon_key` -- the Supabase anon key
+- `bb_worker_token` -- a random token for worker auth
+- `bb_worker_import_url`, `bb_worker_ingest_url`, `bb_worker_classify_url`, `bb_worker_draft_url`, `bb_worker_supervisor_url` -- edge function URLs
 
-### 1. `src/components/onboarding/ProgressScreen.tsx`
+### Step 6: Set BB_WORKER_TOKEN env var
+The edge functions need `BB_WORKER_TOKEN` as an environment variable. This will be set as a secret.
 
-**Remove the auto-trigger block** (lines 562-571):
-```
-// DELETE this block:
-if (scrapeRecord?.status === 'review_ready' && !autoScrapeTriggeredRef.current) {
-  autoScrapeTriggeredRef.current = true;
-  supabase.functions.invoke('trigger-n8n-workflow', {
-    body: { workspace_id: workspaceId, workflow_type: 'faq_generation' },
-  }).catch(...);
-}
-```
+### Step 7: Verify
+Run verification queries to confirm:
+- Tables exist and backfills worked
+- `bb_norm_identifier` returns correct values
+- Queue depths show 0 (queues created)
 
-**Update `InlineCompetitorReview` rendering** (line 712-719): Remove the `autoStarted` prop (it will always be false now) and keep the panel visible until the user clicks "Start Analysis":
-- Pass `autoStarted={false}` so the "Start Analysis" button is always visible when `review_ready`
-- Remove the `autoScrapeTriggeredRef` since it's no longer needed
+### Step 8: Schedule cron jobs
+Run `SELECT bb_schedule_pipeline_crons()` to start the 5 cron workers.
 
-**Update `onStartAnalysis` callback**: Instead of just dismissing the panel, keep it visible but switch to showing the "Re-run Analysis" button after the first trigger (the existing `scrapeComplete` logic handles this).
-
-### 2. `supabase/functions/trigger-n8n-workflow/index.ts` — `faq_generation` branch
-
-**Filter by `is_selected`** (currently line ~258 only filters by `status != 'rejected'`). Add `.eq('is_selected', true)` so only user-confirmed competitors are sent to n8n. This ensures the checkbox selections in the UI are respected.
-
-### 3. No changes to `n8n-competitor-callback`
-
-The callback already correctly sets `review_ready` without auto-triggering. That's the right behaviour.
-
-## Summary of UX Flow After Fix
-
-```text
-Discovery completes
-       |
-       v
-Progress Screen shows "Finding Competitors: Complete"
-       |
-       v
-InlineCompetitorReview panel appears with all discovered
-competitors listed (checkboxes, sorted by relevance)
-       |
-       v
-User can: toggle selections, add manual URLs, remove entries
-       |
-       v
-User clicks "Start Analysis (N competitors)"
-       |
-       v
-faq_generation triggers with only is_selected=true competitors
-       |
-       v
-Scraping progress shown, panel switches to "Re-run Analysis"
-```
-
-## Files Modified
-
-| File | Change |
-|------|--------|
-| `src/components/onboarding/ProgressScreen.tsx` | Remove auto-trigger block, remove `autoScrapeTriggeredRef`, always show Start Analysis button on `review_ready` |
-| `supabase/functions/trigger-n8n-workflow/index.ts` | Add `is_selected = true` filter to `faq_generation` competitor query |
+## Important Notes
+- The migrations are large (1,400+ lines for the main one). They will be run via the SQL insert tool since they are data/schema operations.
+- Vault secrets cannot be created through the migration tool -- they'll be inserted directly via SQL.
+- The `BB_WORKER_TOKEN` secret needs to match what's stored in Vault as `bb_worker_token`.
 
