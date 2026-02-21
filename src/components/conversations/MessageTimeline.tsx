@@ -87,12 +87,17 @@ export const MessageTimeline = ({
   const displayedMessages = isExpanded ? messages : messages.slice(-COLLAPSED_MESSAGE_COUNT);
   const hiddenCount = messages.length - COLLAPSED_MESSAGE_COUNT;
 
-  const renderMessage = (message: Message) => {
+  const renderMessage = (message: Message, isNewest = false) => {
     const isCustomer = message.actor_type === 'customer';
     const isAI = message.actor_type === 'ai_agent';
     const isInternal = message.is_internal;
     const isHuman = message.actor_type === 'human_agent';
     const isEmail = message.channel === 'email';
+    
+    // Graceful sender name fallback
+    const actorName = message.actor_name && !message.actor_name.includes('unknown.invalid') && !message.actor_name.startsWith('unknown@')
+      ? message.actor_name
+      : (isCustomer ? 'Unknown Sender' : 'Agent');
     
     // Clean email content if it's an email message
     const cleanedBody = isEmail ? cleanEmailContent(message.body) : message.body;
@@ -181,15 +186,22 @@ export const MessageTimeline = ({
           <div className="flex items-center gap-2 mb-2">
             <ChannelIcon channel={message.channel} />
             <span className="text-xs font-medium">
-              {message.actor_name || (isCustomer ? 'Customer' : 'Agent')}
+              {actorName}
             </span>
             {isAI && <Badge variant="secondary" className="text-xs bg-primary/20">AI</Badge>}
             <span className="text-xs text-muted-foreground">
               {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
             </span>
           </div>
-          {/* Use EmailThread for email messages, plain text for others */}
-          {isEmail && !showOriginal ? (
+          {/* For newest message: show HTML if available, else show full text. For older: use EmailThread */}
+          {isNewest && hasHtmlContent ? (
+            <div 
+              className="text-sm leading-relaxed prose prose-sm max-w-none"
+              dangerouslySetInnerHTML={{ __html: message.raw_payload.body }}
+            />
+          ) : isNewest ? (
+            <p className="text-sm whitespace-pre-wrap leading-relaxed">{displayBody}</p>
+          ) : isEmail && !showOriginal ? (
             <EmailThread body={message.body} />
           ) : (
             <p className="text-sm whitespace-pre-wrap leading-relaxed">{displayBody}</p>
@@ -359,24 +371,27 @@ export const MessageTimeline = ({
         <div className="absolute left-8 top-4 bottom-4 w-0.5 bg-gradient-to-b from-primary/40 via-muted-foreground/20 to-transparent" />
         
         <div className="space-y-4">
-          {displayedMessages.map((message, index) => (
-            <div key={message.id} className="relative">
-              {/* Timeline dot */}
-              <div 
-                className={cn(
-                  "absolute left-0 top-4 w-2 h-2 rounded-full z-10 ring-2 ring-background",
-                  message.actor_type === 'customer' && "bg-muted-foreground",
-                  message.actor_type === 'ai_agent' && "bg-primary",
-                  message.actor_type === 'human_agent' && "bg-success",
-                  message.is_internal && "bg-warning"
-                )}
-              />
-              {/* Message content with left padding for timeline */}
-              <div className="pl-6">
-                {renderMessage(message)}
+          {displayedMessages.map((message, index) => {
+            const isNewest = index === displayedMessages.length - 1;
+            return (
+              <div key={message.id} className="relative">
+                {/* Timeline dot */}
+                <div 
+                  className={cn(
+                    "absolute left-0 top-4 w-2 h-2 rounded-full z-10 ring-2 ring-background",
+                    message.actor_type === 'customer' && "bg-muted-foreground",
+                    message.actor_type === 'ai_agent' && "bg-primary",
+                    message.actor_type === 'human_agent' && "bg-success",
+                    message.is_internal && "bg-warning"
+                  )}
+                />
+                {/* Message content with left padding for timeline */}
+                <div className="pl-6">
+                  {renderMessage(message, isNewest)}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>

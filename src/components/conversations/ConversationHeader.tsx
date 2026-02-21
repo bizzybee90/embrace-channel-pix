@@ -51,6 +51,9 @@ export const ConversationHeader = ({ conversation, onUpdate, onBack, hideBackBut
                 <span className="sm:hidden">Back</span>
               </Button>
             )}
+            <h2 className="text-sm font-semibold text-foreground truncate">
+              {conversation.title || 'No subject'}
+            </h2>
           </div>
           
           <div className="flex items-center gap-2">

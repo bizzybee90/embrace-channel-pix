@@ -4,10 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { AlertCircle, FileText, Sparkles, ChevronDown, User } from 'lucide-react';
 import { useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { CustomerIntelligence } from '@/components/customers/CustomerIntelligence';
 
@@ -19,17 +17,12 @@ interface AIContextPanelProps {
 
 export const AIContextPanel = ({ conversation, onUpdate, onUseDraft }: AIContextPanelProps) => {
   const [draftUsed, setDraftUsed] = useState(false);
-  const [isEscalationOpen, setIsEscalationOpen] = useState(true);
-  const [isSummaryOpen, setIsSummaryOpen] = useState(true);
   const [isDraftOpen, setIsDraftOpen] = useState(true);
-  const isMobile = useIsMobile();
 
-  // Fix: Read from both locations - AI agent writes to ai_draft_response directly
   const aiDraftResponse = (conversation as any).ai_draft_response as string | undefined || 
                           conversation.metadata?.ai_draft_response as string | undefined;
 
-// Shared header classes for consistent iOS-style rows
-const PANEL_HEADER_CLASSES = "flex items-center justify-between w-full px-4 gap-3 h-14";
+  const PANEL_HEADER_CLASSES = "flex items-center justify-between w-full px-4 gap-3 h-14";
 
   const handleUseDraft = () => {
     if (!aiDraftResponse) return;
@@ -65,178 +58,86 @@ const PANEL_HEADER_CLASSES = "flex items-center justify-between w-full px-4 gap-
     );
   };
 
-  // Dynamic title and color based on decision bucket
   const getBucketContext = () => {
     const bucket = (conversation as any).decision_bucket;
     const whyText = (conversation as any).ai_why_flagged || (conversation as any).why_this_needs_you || conversation.ai_reason_for_escalation || conversation.summary_for_human;
     
     switch (bucket) {
       case 'act_now':
-        return { title: 'Why This Needs You', color: 'destructive', icon: AlertCircle, emoji: '🔴', why: whyText || 'Urgent attention required' };
+        return { title: 'Why This Needs You', color: 'destructive', emoji: '🔴', why: whyText || 'Urgent attention required' };
       case 'quick_win':
-        return { title: 'Why This Is Quick', color: 'amber', icon: Sparkles, emoji: '🟡', why: whyText || 'Simple response needed' };
+        return { title: 'Why This Is Quick', color: 'amber', emoji: '🟡', why: whyText || 'Simple response needed' };
       case 'auto_handled':
-        return { title: 'Why This Was Handled', color: 'green', icon: FileText, emoji: '🟢', why: whyText || 'No action needed' };
+        return { title: 'Why This Was Handled', color: 'green', emoji: '🟢', why: whyText || 'No action needed' };
       case 'wait':
-        return { title: 'Why This Can Wait', color: 'blue', icon: FileText, emoji: '🔵', why: whyText || 'Deferred for later' };
+        return { title: 'Why This Can Wait', color: 'blue', emoji: '🔵', why: whyText || 'Deferred for later' };
       default:
-        return { title: 'Analyzing...', color: 'primary', icon: AlertCircle, emoji: '⏳', why: whyText || conversation.ai_reason_for_escalation || 'AI is processing this conversation. Refresh in a moment.' };
+        return { title: 'Analyzing...', color: 'primary', emoji: '⏳', why: whyText || 'AI is processing this conversation.' };
     }
   };
 
   const bucketContext = getBucketContext();
+  const briefingText = conversation.summary_for_human || bucketContext.why;
+  const sentimentBadge = getSentimentBadge(conversation.ai_sentiment);
 
   return (
     <div className="space-y-3 md:space-y-4 mobile-section-spacing">
-      {/* Dynamic Why Panel - Based on Decision Bucket */}
-      <Collapsible open={isEscalationOpen} onOpenChange={setIsEscalationOpen}>
-        <Card className={cn("card-elevation overflow-hidden", 
-          bucketContext.color === 'destructive' && "bg-destructive/5 border-destructive/20",
-          bucketContext.color === 'amber' && "bg-amber-500/5 border-amber-500/20",
-          bucketContext.color === 'green' && "bg-green-500/5 border-green-500/20",
-          bucketContext.color === 'blue' && "bg-blue-500/5 border-blue-500/20",
-          bucketContext.color === 'primary' && "bg-primary/5 border-primary/20"
-        )}>
-          <CollapsibleTrigger className={PANEL_HEADER_CLASSES}>
-            <div className="flex items-center gap-3">
-              <span className="text-lg">{bucketContext.emoji}</span>
-              <span className="text-sm font-medium text-foreground">
-                {bucketContext.title}
-              </span>
-              {getSentimentBadge(conversation.ai_sentiment)}
-            </div>
-            <ChevronDown
-              className={cn(
-                "h-4 w-4 text-muted-foreground transition-transform",
-                isEscalationOpen && "rotate-180"
-              )}
-            />
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <div className="px-4 pb-4">
-              <p className="text-sm text-foreground/80 leading-relaxed font-medium">
-                {bucketContext.why}
-              </p>
-            </div>
-          </CollapsibleContent>
-        </Card>
-      </Collapsible>
+      {/* Consolidated AI Briefing Banner */}
+      <div className={cn(
+        "flex items-start gap-3 px-4 py-3 rounded-2xl border",
+        bucketContext.color === 'destructive' && "bg-destructive/5 border-destructive/20",
+        bucketContext.color === 'amber' && "bg-amber-500/5 border-amber-500/20",
+        bucketContext.color === 'green' && "bg-green-500/5 border-green-500/20",
+        bucketContext.color === 'blue' && "bg-blue-500/5 border-blue-500/20",
+        bucketContext.color === 'primary' && "bg-primary/5 border-primary/20"
+      )}>
+        <span className="text-lg flex-shrink-0 mt-0.5">✨</span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-xs font-semibold text-foreground/70 uppercase tracking-wide">AI Briefing</span>
+            {sentimentBadge}
+          </div>
+          <p className="text-sm text-foreground/80 leading-relaxed">{briefingText}</p>
+        </div>
+      </div>
 
-      {/* AI Summary */}
-      <Collapsible open={isSummaryOpen} onOpenChange={setIsSummaryOpen}>
-        <Card className="card-elevation bg-primary/5 border-primary/20 overflow-hidden">
-          <CollapsibleTrigger className={PANEL_HEADER_CLASSES}>
-            <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary">
-                <FileText className="h-4 w-4" />
-              </div>
-              <span className="text-sm font-medium text-foreground">
-                Summary
-              </span>
-            </div>
-            <ChevronDown
-              className={cn(
-                "h-4 w-4 text-muted-foreground transition-transform",
-                isSummaryOpen && "rotate-180"
-              )}
-            />
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <div className="px-4 pb-4">
-              <p className="text-sm text-foreground/80 leading-relaxed">
-                {conversation.summary_for_human || (() => {
-                  const createdAt = conversation.created_at ? new Date(conversation.created_at) : null;
-                  const ageMinutes = createdAt ? (Date.now() - createdAt.getTime()) / 60000 : Infinity;
-                  return ageMinutes < 10 ? 'Summary being generated...' : 'No summary available';
-                })()}
-              </p>
-            </div>
-          </CollapsibleContent>
-        </Card>
-      </Collapsible>
-
-      {/* AI Draft Response - Only show if reply is needed */}
-      {(() => {
-        const requiresReply = (conversation as any).requires_reply !== false;
-        const decisionBucket = (conversation as any).decision_bucket;
-        const shouldShowDraft = requiresReply && 
-                                decisionBucket !== 'auto_handled' && 
-                                decisionBucket !== 'wait';
-
-        if (!shouldShowDraft && (decisionBucket === 'auto_handled' || !requiresReply)) {
-          return (
-            <Card className="p-4 bg-green-500/5 border-green-500/20">
-              <div className="flex items-center gap-3 text-green-600 dark:text-green-400">
-                <FileText className="h-5 w-5" />
-                <div>
-                  <p className="text-sm font-medium">No Reply Needed</p>
-                  <p className="text-xs mt-1 text-muted-foreground">This email was auto-handled</p>
+      {/* AI Draft Response - Only render if draft exists */}
+      {aiDraftResponse && (
+        <Collapsible open={isDraftOpen} onOpenChange={setIsDraftOpen}>
+          <Card className="relative overflow-hidden apple-shadow-lg border-0 rounded-[22px] bg-gradient-to-br from-blue-500/15 via-blue-400/10 to-purple-500/15 animate-fade-in">
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 via-transparent to-purple-500/20 blur-2xl" />
+            
+            <CollapsibleTrigger className={`${PANEL_HEADER_CLASSES} relative`}>
+              <div className="flex items-center gap-3">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-100 dark:bg-indigo-500/10 text-indigo-500">
+                  <Sparkles className="h-4 w-4" />
                 </div>
+                <span className="text-sm font-medium text-foreground">AI Suggested Reply</span>
               </div>
-            </Card>
-          );
-        }
-
-        if (aiDraftResponse) {
-          return (
-            <Collapsible open={isDraftOpen} onOpenChange={setIsDraftOpen}>
-              <Card className="relative overflow-hidden apple-shadow-lg border-0 rounded-[22px] md:rounded-[22px] rounded-[18px] bg-gradient-to-br from-blue-500/15 via-blue-400/10 to-purple-500/15 animate-fade-in">
-                {/* Glow effect */}
-                <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 via-transparent to-purple-500/20 blur-2xl" />
-                
-                <CollapsibleTrigger className={`${PANEL_HEADER_CLASSES} relative`}>
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-100 dark:bg-indigo-500/10 text-indigo-500">
-                      <Sparkles className="h-4 w-4" />
-                    </div>
-                    <span className="text-sm font-medium text-foreground">
-                      AI Suggested Reply
-                    </span>
-                  </div>
-                  <ChevronDown
-                    className={cn(
-                      "h-4 w-4 text-muted-foreground transition-transform",
-                      isDraftOpen && "rotate-180"
-                    )}
-                  />
-                </CollapsibleTrigger>
-                
-                <CollapsibleContent>
-                  <div className="relative px-4 pb-4">
-                    <div className="bg-background/90 backdrop-blur-sm rounded-[16px] p-3 mb-3 border border-border/30 apple-shadow-sm">
-                      <p className="text-sm whitespace-pre-wrap leading-relaxed text-foreground">{aiDraftResponse}</p>
-                    </div>
-
-                    <Button
-                      onClick={handleUseDraft}
-                      disabled={draftUsed}
-                      variant={draftUsed ? "outline" : "default"}
-                      size="sm"
-                      className="w-full smooth-transition spring-press rounded-[16px] h-10 font-semibold apple-shadow bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 border-0"
-                    >
-                      {draftUsed ? '✓ Draft Used' : '✨ Use This Draft'}
-                    </Button>
-                  </div>
-                </CollapsibleContent>
-              </Card>
-            </Collapsible>
-          );
-        }
-
-        return (
-          <Card className="p-4 bg-muted/30 border-muted">
-            <div className="flex items-center gap-3 text-muted-foreground">
-              <Sparkles className="h-5 w-5" />
-              <div>
-                <p className="text-sm font-medium">No AI Suggestion Available</p>
-                <p className="text-xs mt-1">AI may not have processed this conversation yet</p>
+              <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform", isDraftOpen && "rotate-180")} />
+            </CollapsibleTrigger>
+            
+            <CollapsibleContent>
+              <div className="relative px-4 pb-4">
+                <div className="bg-background/90 backdrop-blur-sm rounded-[16px] p-3 mb-3 border border-border/30 apple-shadow-sm">
+                  <p className="text-sm whitespace-pre-wrap leading-relaxed text-foreground">{aiDraftResponse}</p>
+                </div>
+                <Button
+                  onClick={handleUseDraft}
+                  disabled={draftUsed}
+                  variant={draftUsed ? "outline" : "default"}
+                  size="sm"
+                  className="w-full smooth-transition spring-press rounded-[16px] h-10 font-semibold apple-shadow bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 border-0"
+                >
+                  {draftUsed ? '✓ Draft Used' : '✨ Use This Draft'}
+                </Button>
               </div>
-            </div>
+            </CollapsibleContent>
           </Card>
-        );
-      })()}
+        </Collapsible>
+      )}
 
-      {/* Customer Intelligence - Stage 3 */}
+      {/* Customer Intelligence */}
       {conversation.customer_id && conversation.workspace_id && (
         <Collapsible>
           <Card className="card-elevation overflow-hidden">
@@ -245,9 +146,7 @@ const PANEL_HEADER_CLASSES = "flex items-center justify-between w-full px-4 gap-
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-500/10 text-blue-500">
                   <User className="h-4 w-4" />
                 </div>
-                <span className="text-sm font-medium text-foreground">
-                  Customer Profile
-                </span>
+                <span className="text-sm font-medium text-foreground">Customer Profile</span>
               </div>
               <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform ui-open:rotate-180" />
             </CollapsibleTrigger>

@@ -214,15 +214,17 @@ export async function generateDraftWithAnthropic(params: {
   businessContext: Record<string, unknown> | null;
   faqEntries: Array<Record<string, unknown>>;
 }): Promise<string> {
-  const apiKey = getRequiredEnv("ANTHROPIC_API_KEY");
-  const model = getOptionalEnv("ANTHROPIC_MODEL", "claude-3-5-sonnet-latest");
-  const endpoint = getOptionalEnv("ANTHROPIC_API_URL", "https://api.anthropic.com/v1/messages");
+  // Use Lovable AI Gateway (same as classify)
+  const endpoint = getOptionalEnv("AI_GATEWAY_URL", "https://ai.gateway.lovable.dev/v1/chat/completions");
+  const model = getOptionalEnv("LOVABLE_DRAFT_MODEL", "google/gemini-2.5-flash");
+  const apiKey = Deno.env.get("LOVABLE_API_KEY") || getOptionalEnv("AI_GATEWAY_KEY", "");
 
   const systemPrompt = [
     "You write concise, professional customer support replies for UK SMBs.",
     "Follow UK English spelling and tone.",
     "Do not invent policy details. If uncertain, ask a clear clarifying question.",
     "Use context and FAQ when relevant.",
+    "Return ONLY the reply text, no JSON wrapping.",
   ].join("\n");
 
   const userPrompt = JSON.stringify({
@@ -239,36 +241,42 @@ export async function generateDraftWithAnthropic(params: {
     },
   });
 
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (apiKey) {
+    headers.Authorization = `Bearer ${apiKey}`;
+  }
+
   const response = await fetchWithTimeout(endpoint, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-    },
+    headers,
     body: JSON.stringify({
       model,
       max_tokens: 700,
       temperature: 0.2,
-      system: systemPrompt,
-      messages: [{ role: "user", content: userPrompt }],
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
     }),
   }, 25_000);
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(`Anthropic draft request failed (${response.status}): ${text}`);
+    throw new Error(`Lovable draft request failed (${response.status}): ${text}`);
   }
 
   const data = await response.json();
-  const content = Array.isArray(data?.content) ? data.content : [];
-  const text = content
-    .map((part: { type?: string; text?: string }) => part?.type === "text" ? part.text || "" : "")
-    .join("\n")
-    .trim();
+  const content = data?.choices?.[0]?.message?.content || data?.output_text || data?.content || "";
+  const text = typeof content === "string"
+    ? content.trim()
+    : Array.isArray(content)
+      ? content.map((part: { text?: string }) => part?.text || "").join("\n").trim()
+      : String(content).trim();
 
   if (!text) {
-    throw new Error("Anthropic draft response was empty");
+    throw new Error("Lovable draft response was empty");
   }
 
   return text;

@@ -196,7 +196,10 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
 
   // Derive sender name from joined customer or title
   const conv = conversation as any;
-  const senderName = conv.customer?.name || conv.customer?.email || conversation.title || 'Unknown';
+  const rawSender = conv.customer?.name || conv.customer?.email || conversation.title || '';
+  const senderName = (!rawSender || rawSender.includes('unknown.invalid') || rawSender.startsWith('unknown@')) 
+    ? 'Unknown Sender' 
+    : rawSender;
 
   // AI snippet
   const snippet = conversation.summary_for_human || conversation.why_this_needs_you || 'Processing...';
