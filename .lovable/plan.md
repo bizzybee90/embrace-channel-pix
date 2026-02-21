@@ -1,63 +1,50 @@
 
+# Fix Pipeline Workers: Queue Read Error + Missing Environment Variables
 
-# Deploy Unified Communication Pipeline
+## Problem
+All 4 pipeline workers (import, ingest, classify, draft) are crashing every 10 seconds with the same error. There are also 2 missing environment variables that will block the import and classify workers once the queue error is fixed.
 
-## Current State
-- The branch has been merged -- all migration SQL files and edge functions are in the codebase
-- The migrations have NOT been applied because the **pgmq extension is not enabled**
-- `pg_cron` and `pg_net` are already enabled
-- There are also 10 TypeScript build errors (simple casting fix needed across 4 edge functions)
+### Issue 1: `bb_queue_read` SQL function incompatible with PGMQ
+The `pgmq.read()` function returns a named composite type (`pgmq.message_record`). Our wrapper tries to alias the output with a column definition list (`AS r(msg_id, ...)`), which Postgres rejects. This is blocking ALL workers.
 
-## Plan
+### Issue 2: Missing `AURINKO_API_BASE_URL`
+Used by `getRequiredEnv()` in the Aurinko shared module. Without it, the import worker and aurinko-webhook function will crash.
 
-### Step 1: Fix build errors (TypeScript casting)
-Change all `as Record<string, unknown>` casts to `as unknown as Record<string, unknown>` in:
-- `pipeline-worker-classify/index.ts` (lines 379, 535, 544)
-- `pipeline-worker-draft/index.ts` (lines 97, 237, 254)
-- `pipeline-worker-import/index.ts` (lines 44, 58, 88)
-- `pipeline-worker-ingest/index.ts` (line 52)
+### Issue 3: Missing `LOVABLE_AI_GATEWAY_URL`  
+Used by `getRequiredEnv()` in the AI shared module. Without it, the classify worker will crash.
 
-### Step 2: Enable pgmq extension
-Run `CREATE EXTENSION IF NOT EXISTS pgmq;` via the SQL tool. This is a prerequisite for the migration.
+---
 
-### Step 3: Run the main pipeline migration
-Execute `20260221150000_unified_pipeline.sql` content via the SQL tool. This creates:
-- Tables: `pipeline_runs`, `pipeline_incidents`, `customer_identities`, `message_events`, `conversation_refs`, `pipeline_job_audit`
-- Columns on `conversations`: `last_inbound_message_id`, `last_inbound_message_at`, etc.
-- Columns on `messages`: `external_id`, `external_thread_id`, `config_id`
-- Queue wrapper functions: `bb_queue_send`, `bb_queue_read`, `bb_queue_delete`, etc.
-- Core functions: `bb_ingest_unified_messages`, `bb_materialize_event`, `bb_trigger_worker`, `bb_schedule_pipeline_crons`
-- 5 PGMQ queues: `bb_import_jobs`, `bb_ingest_jobs`, `bb_classify_jobs`, `bb_draft_jobs`, `bb_deadletter_jobs`
-- Views: `bb_open_incidents`, `bb_stalled_events`, `bb_pipeline_progress`, `bb_queue_depths`, `bb_needs_classification`
-- RLS policies on all new tables
+## Step 1: Fix `bb_queue_read` function (SQL migration)
 
-### Step 4: Run the fixes migration
-Execute `20260221160000_pipeline_fixes.sql` content via the SQL tool. This:
-- Fixes UK phone normalization (07... to +447...)
-- Backfills `customer_identities` from existing customers
-- Backfills `conversation_refs` from existing conversations
-- Creates `bb_merge_customers` function
+Replace the function body to remove the column definition list from the `pgmq.read()` call:
 
-### Step 5: Add Vault secrets
-Add 7 Vault secrets using the SQL tool:
-- `bb_worker_anon_key` -- the Supabase anon key
-- `bb_worker_token` -- a random token for worker auth
-- `bb_worker_import_url`, `bb_worker_ingest_url`, `bb_worker_classify_url`, `bb_worker_draft_url`, `bb_worker_supervisor_url` -- edge function URLs
+```text
+CREATE OR REPLACE FUNCTION public.bb_queue_read(queue_name text, vt_seconds integer, n integer)
+ RETURNS TABLE(msg_id bigint, read_ct integer, enqueued_at timestamptz, vt timestamptz, message jsonb)
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pgmq', 'pg_catalog'
+AS $function$
+begin
+  return query
+  select r.msg_id, r.read_ct, r.enqueued_at, r.vt, r.message
+  from pgmq.read(queue_name, greatest(vt_seconds, 1), greatest(n, 1)) r;
+end;
+$function$;
+```
 
-### Step 6: Set BB_WORKER_TOKEN env var
-The edge functions need `BB_WORKER_TOKEN` as an environment variable. This will be set as a secret.
+The key change: `AS r(msg_id bigint, ...)` becomes just `r` -- letting Postgres use the named composite type columns directly.
 
-### Step 7: Verify
-Run verification queries to confirm:
-- Tables exist and backfills worked
-- `bb_norm_identifier` returns correct values
-- Queue depths show 0 (queues created)
+## Step 2: Add `AURINKO_API_BASE_URL` secret
 
-### Step 8: Schedule cron jobs
-Run `SELECT bb_schedule_pipeline_crons()` to start the 5 cron workers.
+Value: `https://api.aurinko.io` (no trailing `/v1` -- the code appends that).
 
-## Important Notes
-- The migrations are large (1,400+ lines for the main one). They will be run via the SQL insert tool since they are data/schema operations.
-- Vault secrets cannot be created through the migration tool -- they'll be inserted directly via SQL.
-- The `BB_WORKER_TOKEN` secret needs to match what's stored in Vault as `bb_worker_token`.
+## Step 3: Add `LOVABLE_AI_GATEWAY_URL` secret
 
+This is the Lovable AI gateway endpoint. Will check if it's auto-injected; if not, add it as a secret.
+
+## Step 4: Verify
+
+- Check worker logs to confirm queue reads succeed (no more "column definition list" error)
+- Confirm workers return `{"ok": true}` responses
