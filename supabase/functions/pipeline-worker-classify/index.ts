@@ -296,6 +296,47 @@ async function applyClassification(params: {
     throw new Error(`message_events decision update failed: ${eventError.message}`);
   }
 
+  // AUTO-CLEAN: If noise email was unread, mark it as read in the actual mailbox
+  if (
+    decision.decisionBucket === "auto_handled" &&
+    conversation.channel === "email"
+  ) {
+    try {
+      const { data: targetMsg } = await supabase
+        .from("messages")
+        .select("id, external_id, config_id")
+        .eq("id", params.job.target_message_id)
+        .maybeSingle();
+
+      if (targetMsg?.external_id && targetMsg?.config_id) {
+        const { data: emailConfig } = await supabase
+          .from("email_provider_configs")
+          .select("id, aurinko_access_token")
+          .eq("id", targetMsg.config_id)
+          .maybeSingle();
+
+        if (emailConfig?.aurinko_access_token) {
+          const aurinkoBaseUrl = Deno.env.get("AURINKO_API_BASE_URL") || "https://api.aurinko.io";
+          fetch(
+            `${aurinkoBaseUrl}/v1/email/messages/${targetMsg.external_id}`,
+            {
+              method: "PATCH",
+              headers: {
+                "Authorization": `Bearer ${emailConfig.aurinko_access_token}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ unread: false }),
+            },
+          ).catch((err) => {
+            console.warn("Auto-mark-read failed (non-fatal):", err.message);
+          });
+        }
+      }
+    } catch (err) {
+      console.warn("Auto-clean mark-as-read error (non-fatal):", err);
+    }
+  }
+
   if (params.result.requires_reply && decision.decisionBucket !== "auto_handled") {
     const { data: freshConversation, error: freshConversationError } = await supabase
       .from("conversations")

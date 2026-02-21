@@ -145,7 +145,7 @@ Deno.serve(async (req) => {
         const [{ data: targetMessage, error: targetMessageError }, { data: recentMessages, error: recentMessagesError }] = await Promise.all([
           supabase
             .from("messages")
-            .select("id, body")
+            .select("id, body, created_at")
             .eq("id", job.target_message_id)
             .single(),
           supabase
@@ -162,6 +162,47 @@ Deno.serve(async (req) => {
 
         if (recentMessagesError) {
           throw new Error(`Recent messages load failed: ${recentMessagesError.message}`);
+        }
+
+        // 7-day draft cutoff: skip AI draft for old messages during imports
+        const messageTimestamp = targetMessage.created_at
+          ? new Date(targetMessage.created_at)
+          : null;
+        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+        if (messageTimestamp && messageTimestamp < sevenDaysAgo) {
+          await supabase
+            .from("conversations")
+            .update({
+              last_draft_message_id: job.target_message_id,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", job.conversation_id)
+            .eq("last_inbound_message_id", job.target_message_id);
+
+          if (job.event_id) {
+            await supabase
+              .from("message_events")
+              .update({
+                status: "drafted",
+                last_error: null,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", job.event_id);
+          }
+
+          await queueDelete(supabase, QUEUE_NAME, record.msg_id);
+          await auditJob(supabase, {
+            workspaceId: job.workspace_id,
+            runId: job.run_id,
+            queueName: QUEUE_NAME,
+            jobPayload: job as unknown as Record<string, unknown>,
+            outcome: "processed",
+            error: "Skipped draft: message older than 7 days",
+            attempts: record.read_ct,
+          });
+          processed += 1;
+          continue;
         }
 
         const draftContext = await loadDraftContext(job.workspace_id);
