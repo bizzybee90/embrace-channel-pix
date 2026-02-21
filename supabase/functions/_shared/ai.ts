@@ -49,9 +49,10 @@ function normalizeClassification(value: unknown): ClassificationResult {
 
 function classificationSystemPrompt(context: WorkspaceAiContext): string {
   const biz = (context.business_context || {}) as Record<string, unknown>;
+  const flags = (biz.custom_flags || {}) as Record<string, unknown>;
   const name = String(biz.name || biz.business_name || biz.company_name || "The Business");
   const industry = String(biz.industry || biz.service_type || biz.business_type || "UK Local Service / Trades");
-  const rules = String(biz.rules || biz.core_rules || "Standard UK local service operations.");
+  const rules = String(biz.rules || biz.core_rules || flags.core_rules || "Standard UK local service operations.");
 
   const faqText = context.faq_entries.length > 0
     ? JSON.stringify(context.faq_entries.slice(0, 30))
