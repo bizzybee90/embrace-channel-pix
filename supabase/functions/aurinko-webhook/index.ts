@@ -57,6 +57,7 @@ function extractMessageId(payload: Record<string, unknown>): string | null {
   const candidates: unknown[] = [
     payload.message_id,
     payload.messageId,
+    payload.id,
     (payload.data as Record<string, unknown> | undefined)?.id,
     (payload.message as Record<string, unknown> | undefined)?.id,
   ];
