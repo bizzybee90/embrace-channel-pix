@@ -10,7 +10,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { useNavigate } from 'react-router-dom';
 import { 
   Mail, 
-  AlertTriangle, 
+  Flame, 
   CheckCircle2, 
   Clock, 
   Sparkles,
@@ -84,12 +84,12 @@ export const Home = () => {
             .eq('requires_reply', true)
             .in('status', ['new', 'open', 'waiting_internal', 'ai_handling', 'escalated'])
             .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()),
-          // At Risk (SLA breached or warning)
+          // Urgent (decision_bucket = act_now)
           supabase
             .from('conversations')
             .select('id', { count: 'exact', head: true })
             .eq('workspace_id', workspace.id)
-            .in('sla_status', ['warning', 'breached'])
+            .eq('decision_bucket', 'act_now')
             .in('status', ['new', 'open', 'waiting_internal', 'ai_handling', 'escalated']),
           // Review queue count
           supabase
@@ -230,11 +230,11 @@ export const Home = () => {
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-4">
                     <div className={`p-3 rounded-xl ${stats.atRiskCount > 0 ? 'bg-destructive/20' : 'bg-muted'}`}>
-                      <AlertTriangle className={`h-6 w-6 ${stats.atRiskCount > 0 ? 'text-destructive animate-pulse' : 'text-muted-foreground/50'}`} />
+                      <Flame className={`h-6 w-6 ${stats.atRiskCount > 0 ? 'text-destructive animate-pulse' : 'text-muted-foreground/50'}`} />
                     </div>
                     <div>
                       <p className="text-3xl font-bold text-foreground">{stats.atRiskCount}</p>
-                      <p className="text-sm font-medium text-muted-foreground">At Risk</p>
+                      <p className="text-sm font-medium text-muted-foreground">Urgent</p>
                     </div>
                   </div>
                   <ChevronRight className="h-5 w-5 text-muted-foreground/40" />

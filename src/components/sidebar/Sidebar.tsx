@@ -1,4 +1,4 @@
-import { Home, Mail, CheckCircle2, Clock, Send, Inbox, BarChart3, MessageSquare, Settings, ClipboardCheck, BookOpen, Eye, FileEdit } from 'lucide-react';
+import { Home, Mail, Archive, Clock, Send, Inbox, BarChart3, MessageSquare, Settings, ClipboardCheck, BookOpen, Zap, FileEdit } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { supabase } from '@/integrations/supabase/client';
@@ -104,12 +104,12 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
             {[
               { to: '/', icon: Home, label: 'Home', end: true },
               { to: '/all-open', icon: Inbox, label: 'Inbox' },
-              { to: '/to-reply', icon: Mail, label: 'Needs Action', count: viewCounts?.toReply, color: 'text-destructive' },
-              { to: '/unread', icon: Eye, label: 'Unread', count: viewCounts?.unread, color: 'text-blue-500' },
+              { to: '/to-reply', icon: Zap, label: 'Needs Action', count: viewCounts?.toReply, color: 'text-destructive' },
+              { to: '/unread', icon: Mail, label: 'Unread', count: viewCounts?.unread, color: 'text-blue-500' },
               { to: '/drafts', icon: FileEdit, label: 'Drafts', count: viewCounts?.drafts, color: 'text-amber-500' },
               { to: '/review', icon: ClipboardCheck, label: 'Training', count: viewCounts?.review, color: 'text-purple-500' },
               { to: '/snoozed', icon: Clock, label: 'Snoozed', count: viewCounts?.snoozed, color: 'text-amber-500' },
-              { to: '/done', icon: CheckCircle2, label: 'Cleared', count: viewCounts?.done, color: 'text-green-500' },
+              { to: '/done', icon: Archive, label: 'Cleared', count: viewCounts?.done, color: 'text-green-500' },
               { to: '/sent', icon: Send, label: 'Sent' },
               { to: '/channels', icon: MessageSquare, label: 'Channels' },
               { to: '/analytics', icon: BarChart3, label: 'Analytics' },
@@ -179,12 +179,12 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
         <nav className="flex flex-col items-center gap-1">
           <IconRailItem to="/" icon={Home} label="Home" end />
           <IconRailItem to="/all-open" icon={Inbox} label="Inbox" />
-          <IconRailItem to="/to-reply" icon={Mail} label="Needs Action" count={viewCounts?.toReply} color="text-destructive" />
-          <IconRailItem to="/unread" icon={Eye} label="Unread" count={viewCounts?.unread} color="text-blue-500" />
+          <IconRailItem to="/to-reply" icon={Zap} label="Needs Action" count={viewCounts?.toReply} color="text-destructive" />
+          <IconRailItem to="/unread" icon={Mail} label="Unread" count={viewCounts?.unread} color="text-blue-500" />
           <IconRailItem to="/drafts" icon={FileEdit} label="Drafts" count={viewCounts?.drafts} color="text-amber-500" />
           <IconRailItem to="/review" icon={ClipboardCheck} label="Training" count={viewCounts?.review} color="text-purple-500" />
           <IconRailItem to="/snoozed" icon={Clock} label="Snoozed" count={viewCounts?.snoozed} color="text-amber-500" />
-          <IconRailItem to="/done" icon={CheckCircle2} label="Cleared" count={viewCounts?.done} color="text-green-500" />
+          <IconRailItem to="/done" icon={Archive} label="Cleared" count={viewCounts?.done} color="text-green-500" />
           <IconRailItem to="/sent" icon={Send} label="Sent" color="text-blue-500" />
         </nav>
 
