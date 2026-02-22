@@ -587,12 +587,12 @@ export default function Review() {
             </div>
           </div>
           <div className="flex-shrink-0 border-t bg-background p-4 space-y-2">
-            <Button className="w-full h-12 bg-green-600 hover:bg-green-700 text-white text-base font-semibold" onClick={handleConfirm} disabled={confirmMutation.isPending}>
-              <Check className="h-5 w-5 mr-2" />Confirm ✓
+            <Button className="w-full h-12 bg-purple-600 hover:bg-purple-700 text-white text-base font-semibold shadow-sm rounded-lg" onClick={handleConfirm} disabled={confirmMutation.isPending}>
+              <Check className="h-5 w-5 mr-2" />Confirm Correct
             </Button>
             <div className="flex gap-2">
-              <Button variant="outline" className="flex-1 border-amber-300 text-amber-700 hover:bg-amber-50" onClick={() => setShowChangePicker(true)}>
-                <Pencil className="h-4 w-4 mr-1.5" />Wrong — Change
+              <Button variant="outline" className="flex-1 bg-white border border-amber-200 text-amber-700 hover:bg-amber-50 shadow-sm rounded-lg" onClick={() => setShowChangePicker(true)}>
+                <Pencil className="h-4 w-4 mr-1.5" />Change
               </Button>
               <Button variant="ghost" className="text-muted-foreground" onClick={handleSkip}>
                 <SkipForward className="h-4 w-4 mr-1.5" />Skip
@@ -613,7 +613,7 @@ export default function Review() {
             <h1 className="text-base font-semibold">AI Reconciliation</h1>
             <span className="text-xs text-muted-foreground">{confirmedTodayCount} of {totalItems} reconciled</span>
           </div>
-          <Progress value={progressPercent} className="h-2 [&>div]:bg-green-500" />
+          <Progress value={progressPercent} className="h-2 [&>div]:bg-purple-600" />
         </div>
         <div className="flex-1 overflow-y-auto">
           <div className="p-3 space-y-2">
@@ -647,16 +647,16 @@ export default function Review() {
   // ============ DESKTOP — ALL CAUGHT UP ============
   if (allCaughtUp) {
     return (
-      <div className="flex h-screen bg-muted/30">
+      <div className="flex h-screen bg-slate-50/50">
         <Sidebar />
         <div className="flex-1 flex flex-col items-center justify-center">
           <div className="text-center max-w-md px-6 animate-fade-in">
-            <div className="w-24 h-24 bg-gradient-to-br from-green-100 to-emerald-200 dark:from-green-900/40 dark:to-emerald-900/40 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-green-500/20">
-              <PartyPopper className="h-12 w-12 text-green-600" />
+            <div className="w-24 h-24 bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/40 dark:to-purple-900/30 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-purple-500/10">
+              <PartyPopper className="h-12 w-12 text-purple-600" />
             </div>
             <h2 className="text-2xl font-bold mb-2">All caught up! 🎉</h2>
             <p className="text-muted-foreground mb-6">
-              BizzyBee classified <strong>{weeklyStats?.totalProcessed || 0}</strong> emails with <strong className="text-green-600">{weeklyStats?.accuracy || 100}%</strong> accuracy this week.
+              BizzyBee classified <strong>{weeklyStats?.totalProcessed || 0}</strong> emails with <strong className="text-purple-600">{weeklyStats?.accuracy || 100}%</strong> accuracy this week.
             </p>
 
             {weeklyStats && (
@@ -698,31 +698,31 @@ export default function Review() {
     : '';
 
   return (
-    <div className="flex h-screen bg-muted/30">
+    <div className="flex h-screen bg-slate-50/50">
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Top Bar */}
-        <div className="px-6 py-2.5 flex-shrink-0 flex items-center justify-between border-b border-border/30 bg-card/50">
+        <div className="px-6 py-2.5 flex-shrink-0 flex items-center justify-between bg-white/80 backdrop-blur-sm border-b border-slate-100">
           <div className="flex items-center gap-3">
             <BackButton to="/" label="Home" />
             <h1 className="text-base font-semibold">AI Reconciliation</h1>
-            <Sparkles className="h-4 w-4 text-amber-500" />
+            <Sparkles className="h-4 w-4 text-purple-500" />
           </div>
           <div className="flex items-center gap-4">
             {weeklyStats && (
               <div className="flex items-center gap-1.5 text-sm">
-                <Trophy className="h-3.5 w-3.5 text-amber-500" />
+                <Trophy className="h-3.5 w-3.5 text-purple-500" />
                 <span className="text-muted-foreground">Accuracy:</span>
-                <span className="font-bold text-green-600">{weeklyStats.accuracy}%</span>
+                <span className="font-bold text-purple-600">{weeklyStats.accuracy}%</span>
                 <span className="text-muted-foreground text-xs">this week</span>
               </div>
             )}
             <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground">
-                <strong className="text-green-600">{confirmedTodayCount}</strong> of <strong>{totalItems}</strong> reconciled
+                <strong className="text-purple-600">{confirmedTodayCount}</strong> of <strong>{totalItems}</strong> reconciled
               </span>
               <div className="w-24">
-                <Progress value={progressPercent} className="h-2 [&>div]:bg-green-500" />
+                <Progress value={progressPercent} className="h-2 [&>div]:bg-purple-600" />
               </div>
             </div>
           </div>
@@ -731,9 +731,9 @@ export default function Review() {
         {/* 3-Column Layout */}
         <div className="flex-1 flex overflow-hidden gap-3 p-3">
           {/* Column 1: Reconciliation Queue (350px) */}
-          <div className="w-[350px] min-w-[350px] flex-shrink-0 flex flex-col bg-card rounded-2xl border border-border/40 shadow-sm overflow-hidden">
-            <div className="px-3 py-2 border-b bg-muted/30">
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          <div className="w-[350px] min-w-[350px] flex-shrink-0 flex flex-col bg-white rounded-xl shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] ring-1 ring-slate-900/5 overflow-hidden">
+            <div className="px-3 py-2 border-b border-slate-100">
+              <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">
                 Reconciliation Queue
               </span>
             </div>
@@ -742,8 +742,8 @@ export default function Review() {
               {/* To Review section */}
               {unreviewedQueue.length > 0 && (
                 <>
-                  <div className="px-3 py-1.5 bg-amber-500/10 border-b sticky top-0 z-10">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">
+                  <div className="px-3 py-1.5 bg-purple-50/80 border-b border-slate-100 sticky top-0 z-10">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700 dark:text-purple-400">
                       To Review ({unreviewedQueue.length})
                     </span>
                   </div>
@@ -757,9 +757,9 @@ export default function Review() {
                         key={conv.id}
                         onClick={() => { setCurrentIndex(idx); setShowChangePicker(false); }}
                         className={cn(
-                          "px-3 py-2.5 cursor-pointer border-b border-border/30 transition-all",
-                          "hover:bg-accent/50",
-                          idx === currentIndex && "bg-primary/10 border-l-[3px] border-l-primary",
+                         "px-3 py-2.5 cursor-pointer border-b border-slate-100 transition-all",
+                          "hover:bg-slate-50",
+                          idx === currentIndex && "bg-white shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] ring-1 ring-slate-900/5",
                           isFlashing && "bg-green-100 dark:bg-green-900/40 transition-colors duration-300"
                         )}
                       >
@@ -796,11 +796,11 @@ export default function Review() {
               {recentlyConfirmed.length > 0 && (
                 <Collapsible open={showConfirmedSection} onOpenChange={setShowConfirmedSection}>
                   <CollapsibleTrigger asChild>
-                    <button className="w-full px-3 py-1.5 bg-green-500/10 border-b border-t flex items-center justify-between sticky top-0 z-10 hover:bg-green-500/15 transition-colors">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-green-700 dark:text-green-400">
-                        Confirmed Today ({recentlyConfirmed.length})
+                   <button className="w-full px-3 py-1.5 bg-slate-50 border-b border-t border-slate-100 flex items-center justify-between sticky top-0 z-10 hover:bg-slate-100 transition-colors">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600">
+                        Confirmed ({recentlyConfirmed.length})
                       </span>
-                      {showConfirmedSection ? <ChevronDown className="h-3 w-3 text-green-600" /> : <ChevronRight className="h-3 w-3 text-green-600" />}
+                      {showConfirmedSection ? <ChevronDown className="h-3 w-3 text-slate-500" /> : <ChevronRight className="h-3 w-3 text-slate-500" />}
                     </button>
                   </CollapsibleTrigger>
                   <CollapsibleContent>
@@ -831,7 +831,7 @@ export default function Review() {
           </div>
 
           {/* Column 2: Email Preview + AI Reasoning (flex) */}
-          <div className="flex-1 flex flex-col overflow-hidden bg-card rounded-2xl border border-border/40 shadow-sm">
+          <div className="flex-1 flex flex-col overflow-hidden bg-white rounded-xl shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] ring-1 ring-slate-900/5">
             {currentConversation ? (
               <div className="flex-1 flex flex-col overflow-y-auto">
                 {/* Sender row */}
@@ -849,7 +849,7 @@ export default function Review() {
                 </div>
 
                 {/* AI context bento strip */}
-                <div className="px-6 py-3 border-b bg-muted/20 flex items-center gap-3 flex-wrap flex-shrink-0">
+                <div className="px-6 py-3 border-b border-slate-100 bg-slate-50/50 flex items-center gap-3 flex-wrap flex-shrink-0">
                   {currentConversation.summary_for_human && (
                     <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                       <Bot className="h-3.5 w-3.5 text-purple-500" />
@@ -879,13 +879,13 @@ export default function Review() {
 
                   {/* AI Draft */}
                   {currentConversation.ai_draft_response && (
-                    <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-4 border border-green-200 dark:border-green-800 mb-4">
+                    <div className="bg-purple-50/50 dark:bg-purple-900/20 rounded-lg p-4 ring-1 ring-purple-200/50 mb-4">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <Sparkles className="h-4 w-4 text-green-600" />
-                          <span className="text-sm font-medium text-green-700 dark:text-green-300">AI draft ready</span>
+                          <Sparkles className="h-4 w-4 text-purple-600" />
+                          <span className="text-sm font-medium text-purple-700 dark:text-purple-300">AI draft ready</span>
                         </div>
-                        <Button size="sm" variant="outline" className="h-7 text-xs gap-1.5 border-green-300 text-green-700 hover:bg-green-100" onClick={() => setShowDraftEditor(true)}>
+                        <Button size="sm" variant="outline" className="h-7 text-xs gap-1.5 bg-white border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm rounded-lg" onClick={() => setShowDraftEditor(true)}>
                           <Send className="h-3 w-3" />Edit & Send
                         </Button>
                       </div>
@@ -894,7 +894,7 @@ export default function Review() {
                   )}
 
                   {/* AI Reasoning card */}
-                  <div className="mt-4 bg-slate-50 dark:bg-slate-900/30 rounded-xl p-4 border border-slate-200 dark:border-slate-800">
+                  <div className="mt-4 bg-slate-50/80 dark:bg-slate-900/30 rounded-lg p-3 ring-1 ring-slate-900/5">
                     <div className="flex items-center gap-1.5 mb-2">
                       <Bot className="h-3.5 w-3.5 text-purple-500" />
                       <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">AI Reasoning</span>
@@ -922,7 +922,7 @@ export default function Review() {
           </div>
 
           {/* Column 3: Reconciliation Panel (300px) */}
-          <div className="w-[300px] min-w-[300px] flex-shrink-0 flex flex-col bg-card rounded-2xl border border-border/40 shadow-sm overflow-hidden">
+          <div className="w-[300px] min-w-[300px] flex-shrink-0 flex flex-col bg-white rounded-xl shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] ring-1 ring-slate-900/5 overflow-hidden">
             {currentConversation ? (
               <div className="flex-1 flex flex-col overflow-y-auto">
                 {/* The Verdict */}
@@ -941,9 +941,9 @@ export default function Review() {
                         <span className="text-muted-foreground">Confidence</span>
                         <span className={cn("font-bold text-sm", confidenceColor)}>{confidencePercent}%</span>
                       </div>
-                      <div className="h-3 w-full bg-muted rounded-full overflow-hidden">
+                      <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden">
                         <div
-                          className={cn("h-full rounded-full transition-all duration-700 ease-out", confidenceBarColor)}
+                          className="h-full rounded-full transition-all duration-700 ease-out bg-purple-600"
                           style={{ width: `${confidencePercent}%` }}
                         />
                       </div>
@@ -974,23 +974,23 @@ export default function Review() {
                     <>
                       {/* CONFIRM — the hero button */}
                       <Button
-                        className="w-full h-12 bg-green-600 hover:bg-green-700 text-white text-base font-semibold shadow-lg shadow-green-500/20 transition-all hover:shadow-green-500/30 hover:scale-[1.01] active:scale-[0.98]"
+                        className="w-full h-12 bg-purple-600 hover:bg-purple-700 text-white text-base font-semibold shadow-sm transition-all hover:scale-[1.01] active:scale-[0.98] rounded-lg"
                         onClick={handleConfirm}
                         disabled={confirmMutation.isPending}
                       >
                         <Check className="h-5 w-5 mr-2" />
-                        Confirm ✓
+                        Confirm Correct
                       </Button>
 
                       {/* CHANGE */}
                       <Button
                         variant="outline"
-                        className="w-full h-10 border-amber-300 text-amber-700 hover:bg-amber-50 hover:border-amber-400 font-medium"
+                        className="w-full h-10 bg-white border border-amber-200 text-amber-700 hover:bg-amber-50 shadow-sm rounded-lg font-medium"
                         onClick={() => setShowChangePicker(true)}
                         disabled={confirmMutation.isPending}
                       >
                         <Pencil className="h-4 w-4 mr-1.5" />
-                        Wrong — Change
+                        Change Classification
                       </Button>
 
                       {/* SKIP */}
@@ -1032,8 +1032,8 @@ export default function Review() {
                             onChange={e => setChangeReason(e.target.value)}
                             className="h-16 text-xs resize-none"
                           />
-                          <Button
-                            className="w-full bg-amber-600 hover:bg-amber-700 text-white"
+                      <Button
+                            className="w-full bg-purple-600 hover:bg-purple-700 text-white shadow-sm rounded-lg"
                             onClick={handleChange}
                             disabled={confirmMutation.isPending}
                           >

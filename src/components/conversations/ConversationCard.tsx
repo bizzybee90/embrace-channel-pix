@@ -218,18 +218,28 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
       return <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-medium tracking-wide uppercase">Archived</span>;
     }
     if (hasDraft || (conversation as any).ai_draft_response) {
-      return <span className="px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 text-[10px] font-medium flex items-center gap-1"><FileEdit className="h-2.5 w-2.5" />Draft</span>;
+      return <span className="px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 text-[10px] font-medium flex items-center gap-1 tracking-wide uppercase"><FileEdit className="h-2.5 w-2.5" />Draft</span>;
+    }
+    if (conversation.status === 'new') {
+      return <span className="px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 text-[10px] font-medium tracking-wide uppercase">New</span>;
     }
     return null;
   };
 
+  // Visual differentiation based on status (Directive 6)
+  const isAutoHandled = conversation.decision_bucket === 'auto_handled' || conversation.status === 'resolved';
+  const isUnread = conversation.status === 'new';
+
   // Inner content shared between tablet and desktop
   const cardInner = (padClass: string) => (
-    <div className={padClass}>
+    <div className={cn(padClass, isAutoHandled && "opacity-60")}>
       {/* Row 1: Status dot · Sender · [reopen] · time */}
       <div className="flex items-center gap-2 mb-1">
         <span className={cn('h-2 w-2 rounded-full flex-shrink-0', dotColor)} />
-        <span className="text-sm font-semibold text-foreground/90 truncate flex-1 min-w-0">
+        <span className={cn(
+          "text-sm truncate flex-1 min-w-0",
+          isUnread ? "font-bold text-foreground" : "font-semibold text-foreground/90"
+        )}>
           {senderName}
         </span>
         {isOverdue && (
@@ -251,7 +261,10 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
       </div>
 
       {/* Row 2: Subject/Title */}
-      <p className="text-sm font-medium text-foreground/80 truncate mb-1">
+      <p className={cn(
+        "text-sm truncate mb-1",
+        isUnread ? "font-semibold text-foreground" : "font-medium text-foreground/80"
+      )}>
         {conversation.title || 'No subject'}
       </p>
 
@@ -329,10 +342,11 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
     <div
       onClick={handleClick}
       className={cn(
-        "relative cursor-pointer transition-all duration-200 overflow-hidden",
+        "relative cursor-pointer transition-all duration-200 overflow-hidden mx-2 my-1 p-0 rounded-xl",
         selected
-          ? "bg-white rounded-xl border border-purple-200 shadow-sm mx-2 my-1 p-0 ring-1 ring-purple-50"
-          : "hover:bg-slate-50/50 mx-2 my-1 p-0 rounded-xl border border-transparent transition-colors"
+          ? "bg-white shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] ring-1 ring-slate-900/5"
+          : "hover:bg-slate-50/80 border border-transparent transition-colors",
+        isAutoHandled && !selected && "bg-slate-50"
       )}
     >
       {cardInner('p-3')}

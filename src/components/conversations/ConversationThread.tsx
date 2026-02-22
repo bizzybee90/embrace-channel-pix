@@ -385,9 +385,9 @@ export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackBut
 
       {/* Permanent right intelligence panel on wide screens */}
       {isWide && intelligencePanel && (
-        <div className="flex-shrink-0 w-[300px] border-l border-border overflow-y-auto bg-muted/20 p-4">
+        <div className="flex-shrink-0 w-[300px] overflow-y-auto bg-white p-4 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] ring-1 ring-slate-900/5 rounded-xl m-3 ml-0">
           <div className="flex items-center gap-2 mb-4">
-            <Brain className="h-4 w-4 text-indigo-600" />
+            <Brain className="h-4 w-4 text-purple-600" />
             <h3 className="text-sm font-semibold text-foreground">Intelligence</h3>
           </div>
           {intelligencePanel}

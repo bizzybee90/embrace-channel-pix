@@ -165,11 +165,9 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
     } else if (filter === 'sla-risk') {
       query = query.in('sla_status', ['warning', 'breached']).in('status', ['new', 'open', 'waiting_customer', 'waiting_internal', 'ai_handling', 'escalated']);
     } else if (filter === 'all-open') {
-      // Exclude waiting_customer - those are in "Awaiting Reply" view
-      // Also exclude auto-triaged emails that don't need reply
-      query = query
-        .in('status', ['new', 'open', 'waiting_internal', 'ai_handling', 'escalated'])
-        .or('requires_reply.is.null,requires_reply.eq.true');
+      // Directive 6: Show ALL conversations, not just needs-reply
+      // Sorted by updated_at DESC (already handled above)
+      // Visual differentiation handled in ConversationCard
     } else if (filter === 'awaiting-reply') {
       query = query.in('status', ['waiting_customer', 'waiting_internal']);
     } else if (filter === 'completed') {
