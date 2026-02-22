@@ -5,7 +5,7 @@ import { ConversationHeader } from './ConversationHeader';
 import { MessageTimeline } from './MessageTimeline';
 import { ReplyArea } from './ReplyArea';
 import { CustomerIntelligence } from '@/components/customers/CustomerIntelligence';
-import { Loader2, Brain, Sparkles } from 'lucide-react';
+import { Loader2, Brain, Sparkles, ChevronRight, TrendingUp, Tag } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
@@ -222,13 +222,18 @@ export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackBut
 
   const getSentimentLabel = (s: string | null) => {
     switch (s) {
-      case 'positive': return { emoji: '😊', label: 'Positive' };
-      case 'negative': return { emoji: '😟', label: 'Negative' };
-      case 'frustrated': return { emoji: '😤', label: 'Frustrated' };
-      case 'neutral': return { emoji: '😐', label: 'Neutral' };
+      case 'positive': return { emoji: '😊', label: 'Positive', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+      case 'negative': return { emoji: '😟', label: 'Negative', color: 'bg-red-50 text-red-700 border-red-200' };
+      case 'frustrated': return { emoji: '😤', label: 'Frustrated', color: 'bg-orange-50 text-orange-700 border-orange-200' };
+      case 'neutral': return { emoji: '😐', label: 'Neutral', color: 'bg-slate-50 text-slate-600 border-slate-200' };
       default: return null;
     }
   };
+
+  // Extract topics from conversation metadata
+  const topics = (conversation as any).extracted_entities?.topics 
+    || (conversation.metadata as any)?.topics 
+    || [];
 
   const sentiment = getSentimentLabel(conversation.ai_sentiment);
 
@@ -277,34 +282,52 @@ export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackBut
           </div>
         )}
 
-        {/* 2. Ambient AI Context Bento Strip */}
+        {/* 2. Elevated AI Bento Strip */}
         {briefingText && (
-          <div className="flex-shrink-0 mx-4 mt-3 mb-2 p-3 bg-indigo-50/50 dark:bg-indigo-950/20 rounded-xl border border-indigo-100 dark:border-indigo-800/40 flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between shadow-sm">
-            <div className="flex items-start gap-2 flex-1 min-w-0">
-              <Sparkles className="h-4 w-4 text-indigo-500 flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-indigo-950 dark:text-indigo-200 leading-relaxed line-clamp-2 flex-1">
+          <div className="flex-shrink-0 mx-4 mt-3 mb-4 p-4 bg-slate-50/50 dark:bg-slate-900/30 rounded-xl border border-slate-200 dark:border-slate-700/50 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] flex flex-col gap-3">
+            {/* Top row: AI Summary */}
+            <div className="flex items-start gap-2">
+              <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0 mt-0.5" />
+              <p className="text-sm text-slate-700 dark:text-slate-200 leading-relaxed line-clamp-2 font-medium flex-1">
                 {briefingText}
               </p>
             </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
+            {/* Bottom row: Intelligence pills + Deep Dive */}
+            <div className="flex items-center gap-2 flex-wrap">
+              {sentiment && (
+                <span className={cn("inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md border", sentiment.color)}>
+                  {sentiment.emoji} {sentiment.label}
+                </span>
+              )}
               {conversation.category && (
-                <span className="bg-white dark:bg-indigo-900/40 px-2 py-1 text-xs font-medium rounded-md border border-indigo-100 dark:border-indigo-700 text-indigo-700 dark:text-indigo-300">
+                <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md border border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">
+                  <Tag className="w-3 h-3" />
                   {conversation.category}
                 </span>
               )}
-              {sentiment && (
-                <span className="bg-white dark:bg-indigo-900/40 px-2 py-1 text-xs font-medium rounded-md border border-indigo-100 dark:border-indigo-700 text-indigo-700 dark:text-indigo-300">
-                  {sentiment.emoji} {sentiment.label}
+              {Array.isArray(topics) && topics.slice(0, 2).map((topic: string, i: number) => (
+                <span key={i} className="px-2 py-1 text-xs font-medium rounded-md border border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-700 dark:bg-blue-950/40 dark:text-blue-300">
+                  {topic}
+                </span>
+              ))}
+              {conversation.priority && conversation.priority !== 'medium' && (
+                <span className={cn(
+                  "inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md border",
+                  conversation.priority === 'high' ? 'border-red-200 bg-red-50 text-red-700' : 'border-slate-200 bg-slate-50 text-slate-600'
+                )}>
+                  <TrendingUp className="w-3 h-3" />
+                  {conversation.priority}
                 </span>
               )}
               {!isWide && (
                 <Button
+                  variant="ghost"
                   size="sm"
                   onClick={() => setIntelligenceDrawerOpen(true)}
-                  className="bg-white dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/80 border border-indigo-200 dark:border-indigo-700 shadow-sm rounded-lg flex items-center gap-1.5 h-8"
+                  className="ml-auto text-xs text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:text-indigo-200 dark:hover:bg-indigo-950/40 font-medium h-8 px-3"
                 >
-                  <Brain className="w-3.5 h-3.5" />
                   Deep Dive
+                  <ChevronRight className="w-3 h-3 ml-1" />
                 </Button>
               )}
             </div>
