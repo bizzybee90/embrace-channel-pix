@@ -91,13 +91,13 @@ export const Home = () => {
             .eq('workspace_id', workspace.id)
             .eq('decision_bucket', 'act_now')
             .in('status', ['new', 'open', 'waiting_internal', 'ai_handling', 'escalated']),
-          // Review queue count
+          // Training/reconciliation queue count (matches Review page query)
           supabase
             .from('conversations')
             .select('id', { count: 'exact', head: true })
             .eq('workspace_id', workspace.id)
-            .eq('needs_review', true)
-            .is('reviewed_at', null),
+            .eq('training_reviewed', false)
+            .not('email_classification', 'is', null),
           // Draft count
           supabase
             .from('conversations')
