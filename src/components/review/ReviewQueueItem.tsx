@@ -51,11 +51,11 @@ export const ReviewQueueItem = ({
     <div
       onClick={onClick}
       className={cn(
-        "px-3 py-2 cursor-pointer border-b border-border/30 transition-all",
-        "hover:bg-muted/50",
-        isActive && !isMultiSelectMode && "bg-primary/10 border-l-2 border-l-primary",
-        isSelected && "bg-primary/20 border-l-2 border-l-primary",
-        isReviewed && "opacity-60"
+        "px-3 py-2.5 cursor-pointer border-b border-border/30 transition-all",
+        "hover:bg-accent/50",
+        isActive && !isMultiSelectMode && "bg-primary/8 border-l-[3px] border-l-primary",
+        isSelected && "bg-primary/15 border-l-[3px] border-l-primary",
+        isReviewed && "opacity-50"
       )}
     >
       <div className="flex items-center gap-2">

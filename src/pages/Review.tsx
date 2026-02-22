@@ -1261,9 +1261,9 @@ export default function Review() {
         )}
 
         {/* Triage Review - Split panel layout */}
-        {activeTab === 'triage' && <div className="flex-1 flex overflow-hidden gap-[1px] p-4 pt-2">
+        {activeTab === 'triage' && <div className="flex-1 flex overflow-hidden gap-4 p-4 pt-2">
           {/* Left: Queue list */}
-          <div className="w-72 flex-shrink-0 flex flex-col bg-white rounded-2xl border border-border/40 shadow-sm overflow-hidden">
+          <div className="w-[340px] min-w-[340px] flex-shrink-0 flex flex-col bg-white rounded-2xl border border-border/40 shadow-sm overflow-hidden">
             {/* Queue header with batch actions */}
             <div className="px-3 py-2 border-b bg-muted/30 space-y-2">
               <div className="flex items-center justify-between">
@@ -1402,8 +1402,8 @@ export default function Review() {
                       key={conv.id}
                       onClick={() => { setSelectedRecentId(conv.id); }}
                       className={cn(
-                        "px-3 py-2 cursor-pointer border-b border-border/30 transition-all hover:bg-muted/50",
-                        selectedRecentId === conv.id && "bg-primary/10 border-l-2 border-l-primary"
+                        "px-3 py-2.5 cursor-pointer border-b border-border/30 transition-all hover:bg-accent/50",
+                        selectedRecentId === conv.id && "bg-primary/8 border-l-[3px] border-l-primary"
                       )}
                     >
                       <div className="flex items-center gap-2">
@@ -1441,7 +1441,7 @@ export default function Review() {
           </div>
 
           {/* Right: Detail + Decision */}
-          <div className="flex-1 flex flex-col overflow-hidden bg-white rounded-2xl border border-border/40 shadow-sm ml-4">
+          <div className="flex-1 flex flex-col overflow-hidden bg-white rounded-2xl border border-border/40 shadow-sm">
             {isLoading ? (
               <div className="flex-1 flex items-center justify-center">
                 <div className="animate-pulse text-muted-foreground">Loading...</div>
@@ -1496,7 +1496,7 @@ export default function Review() {
                         <RefreshCw className="h-4 w-4 mr-2" />
                         Correct Classification
                       </Button>
-                      <Button variant="ghost" onClick={() => navigate(`/conversations/${recentConv.id}`)}>
+                      <Button variant="ghost" onClick={() => navigate(`/conversation/${recentConv.id}`)}>
                         <Eye className="h-4 w-4 mr-2" />
                         View Full
                       </Button>
