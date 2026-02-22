@@ -24,6 +24,7 @@ interface MessageTimelineProps {
   defaultCollapsed?: boolean;
   workspaceId?: string;
   onDraftTextChange?: (text: string) => void;
+  conversationCustomerName?: string | null;
 }
 
 const COLLAPSED_MESSAGE_COUNT = 3;
@@ -32,7 +33,8 @@ export const MessageTimeline = ({
   messages, 
   defaultCollapsed = true,
   workspaceId,
-  onDraftTextChange
+  onDraftTextChange,
+  conversationCustomerName
 }: MessageTimelineProps) => {
   const [downloadingFile, setDownloadingFile] = useState<string | null>(null);
   const [isExpanded, setIsExpanded] = useState(!defaultCollapsed);
@@ -95,9 +97,9 @@ export const MessageTimeline = ({
     const isEmail = message.channel === 'email';
     
     // Graceful sender name fallback
-    const actorName = message.actor_name && !message.actor_name.includes('unknown.invalid') && !message.actor_name.startsWith('unknown@')
+    const actorName = message.actor_name && !message.actor_name.includes('unknown.invalid') && !message.actor_name.startsWith('unknown@') && message.actor_name !== 'Unknown Sender'
       ? message.actor_name
-      : (isCustomer ? 'Unknown Sender' : 'Agent');
+      : (isCustomer ? (conversationCustomerName || 'Unknown Sender') : 'Agent');
     
     // Clean email content if it's an email message
     const cleanedBody = isEmail ? cleanEmailContent(message.body) : message.body;
@@ -196,7 +198,7 @@ export const MessageTimeline = ({
           {/* For newest message: show full clean text natively. For older: use EmailThread */}
           {isNewest && hasHtmlContent ? (
             <div 
-              className="font-sans text-foreground antialiased text-base leading-relaxed max-w-none prose prose-sm prose-slate"
+              className="font-sans text-foreground antialiased text-base leading-relaxed max-w-none prose prose-sm prose-slate [&_*]:!font-[inherit] [&_font]:!font-[inherit] [&_td]:!font-[inherit] [&_span]:!font-[inherit]"
               dangerouslySetInnerHTML={{ __html: message.raw_payload.body }}
             />
           ) : isNewest ? (
