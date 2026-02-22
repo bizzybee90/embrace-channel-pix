@@ -192,21 +192,17 @@ export const Home = () => {
           </div>
         ) : (
           <>
-            {/* Header - logo only, greeting lives in banner */}
+            {/* Header - logo only, no duplicate greeting */}
             <div className="flex items-center gap-4">
-              <img src={bizzybeelogo} alt="BizzyBee" className="h-20 w-auto" />
-              <div>
+              <img src={bizzybeelogo} alt="BizzyBee" className="h-16 w-auto" />
+              {stats.clearedToday > 0 && (
                 <p className="text-sm text-muted-foreground">
-                  {stats.clearedToday > 0 ? (
-                    <>BizzyBee handled <span className="font-medium text-foreground">{stats.clearedToday}</span> messages today</>
-                  ) : (
-                    'BizzyBee is ready to help'
-                  )}
+                  Handled <span className="font-medium text-foreground">{stats.clearedToday}</span> messages today
                   {stats.lastHandled && (
                     <> • Last: {formatDistanceToNow(stats.lastHandled, { addSuffix: true })}</>
                   )}
                 </p>
-              </div>
+              )}
             </div>
 
             {/* Summary Banner - Calm, structured framing */}

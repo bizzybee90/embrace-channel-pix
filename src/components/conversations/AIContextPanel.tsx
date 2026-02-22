@@ -1,13 +1,6 @@
 import { Conversation } from '@/lib/types';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { AlertCircle, FileText, Sparkles, ChevronDown, User } from 'lucide-react';
-import { useState } from 'react';
-import { toast } from 'sonner';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
-import { CustomerIntelligence } from '@/components/customers/CustomerIntelligence';
 
 interface AIContextPanelProps {
   conversation: Conversation;
@@ -16,20 +9,6 @@ interface AIContextPanelProps {
 }
 
 export const AIContextPanel = ({ conversation, onUpdate, onUseDraft }: AIContextPanelProps) => {
-  const [draftUsed, setDraftUsed] = useState(false);
-  const [isDraftOpen, setIsDraftOpen] = useState(true);
-
-  const aiDraftResponse = (conversation as any).ai_draft_response as string | undefined || 
-                          conversation.metadata?.ai_draft_response as string | undefined;
-
-  const PANEL_HEADER_CLASSES = "flex items-center justify-between w-full px-4 gap-3 h-14";
-
-  const handleUseDraft = () => {
-    if (!aiDraftResponse) return;
-    onUseDraft?.(aiDraftResponse);
-    setDraftUsed(true);
-    toast.success('Draft loaded into reply box');
-  };
 
   const getSentimentEmoji = (sentiment: string | null) => {
     switch (sentiment) {
@@ -81,86 +60,25 @@ export const AIContextPanel = ({ conversation, onUpdate, onUseDraft }: AIContext
   const sentimentBadge = getSentimentBadge(conversation.ai_sentiment);
 
   return (
-    <div className="space-y-3 md:space-y-4 mobile-section-spacing">
-      {/* Consolidated AI Briefing Banner */}
+    <div>
+      {/* Whisper-style AI Briefing — borderless, soft tint */}
       <div className={cn(
-        "flex items-start gap-3 px-4 py-3 rounded-2xl border",
-        bucketContext.color === 'destructive' && "bg-destructive/5 border-destructive/20",
-        bucketContext.color === 'amber' && "bg-amber-500/5 border-amber-500/20",
-        bucketContext.color === 'green' && "bg-green-500/5 border-green-500/20",
-        bucketContext.color === 'blue' && "bg-blue-500/5 border-blue-500/20",
-        bucketContext.color === 'primary' && "bg-primary/5 border-primary/20"
+        "flex items-start gap-3 px-4 py-3 rounded-xl",
+        bucketContext.color === 'destructive' && "bg-destructive/5",
+        bucketContext.color === 'amber' && "bg-amber-50/50 dark:bg-amber-500/5",
+        bucketContext.color === 'green' && "bg-green-50/50 dark:bg-green-500/5",
+        bucketContext.color === 'blue' && "bg-blue-50/50 dark:bg-blue-500/5",
+        bucketContext.color === 'primary' && "bg-slate-50 dark:bg-slate-500/5"
       )}>
-        <span className="text-lg flex-shrink-0 mt-0.5">✨</span>
+        <span className="text-base flex-shrink-0 mt-0.5">✨</span>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-xs font-semibold text-foreground/70 uppercase tracking-wide">AI Briefing</span>
+          <div className="flex items-center gap-2 mb-0.5">
+            <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">AI Briefing</span>
             {sentimentBadge}
           </div>
-          <p className="text-sm text-foreground/80 leading-relaxed">{briefingText}</p>
+          <p className="text-sm text-foreground/70 leading-relaxed">{briefingText}</p>
         </div>
       </div>
-
-      {/* AI Draft Response - Only render if draft exists */}
-      {aiDraftResponse && (
-        <Collapsible open={isDraftOpen} onOpenChange={setIsDraftOpen}>
-          <Card className="relative overflow-hidden apple-shadow-lg border-0 rounded-[22px] bg-gradient-to-br from-blue-500/15 via-blue-400/10 to-purple-500/15 animate-fade-in">
-            <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 via-transparent to-purple-500/20 blur-2xl" />
-            
-            <CollapsibleTrigger className={`${PANEL_HEADER_CLASSES} relative`}>
-              <div className="flex items-center gap-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-100 dark:bg-indigo-500/10 text-indigo-500">
-                  <Sparkles className="h-4 w-4" />
-                </div>
-                <span className="text-sm font-medium text-foreground">AI Suggested Reply</span>
-              </div>
-              <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform", isDraftOpen && "rotate-180")} />
-            </CollapsibleTrigger>
-            
-            <CollapsibleContent>
-              <div className="relative px-4 pb-4">
-                <div className="bg-background/90 backdrop-blur-sm rounded-[16px] p-3 mb-3 border border-border/30 apple-shadow-sm">
-                  <p className="text-sm whitespace-pre-wrap leading-relaxed text-foreground">{aiDraftResponse}</p>
-                </div>
-                <Button
-                  onClick={handleUseDraft}
-                  disabled={draftUsed}
-                  variant={draftUsed ? "outline" : "default"}
-                  size="sm"
-                  className="w-full smooth-transition spring-press rounded-[16px] h-10 font-semibold apple-shadow bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 border-0"
-                >
-                  {draftUsed ? '✓ Draft Used' : '✨ Use This Draft'}
-                </Button>
-              </div>
-            </CollapsibleContent>
-          </Card>
-        </Collapsible>
-      )}
-
-      {/* Customer Intelligence */}
-      {conversation.customer_id && conversation.workspace_id && (
-        <Collapsible>
-          <Card className="card-elevation overflow-hidden">
-            <CollapsibleTrigger className={PANEL_HEADER_CLASSES}>
-              <div className="flex items-center gap-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-500/10 text-blue-500">
-                  <User className="h-4 w-4" />
-                </div>
-                <span className="text-sm font-medium text-foreground">Customer Profile</span>
-              </div>
-              <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform ui-open:rotate-180" />
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <div className="px-4 pb-4">
-                <CustomerIntelligence 
-                  workspaceId={conversation.workspace_id} 
-                  customerId={conversation.customer_id} 
-                />
-              </div>
-            </CollapsibleContent>
-          </Card>
-        </Collapsible>
-      )}
     </div>
   );
 };
