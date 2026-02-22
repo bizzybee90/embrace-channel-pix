@@ -1247,6 +1247,8 @@ export type Database = {
           summary_for_human: string | null
           thread_context: Json | null
           title: string | null
+          training_reviewed: boolean
+          training_reviewed_at: string | null
           triage_confidence: number | null
           triage_reasoning: string | null
           updated_at: string | null
@@ -1322,6 +1324,8 @@ export type Database = {
           summary_for_human?: string | null
           thread_context?: Json | null
           title?: string | null
+          training_reviewed?: boolean
+          training_reviewed_at?: string | null
           triage_confidence?: number | null
           triage_reasoning?: string | null
           updated_at?: string | null
@@ -1397,6 +1401,8 @@ export type Database = {
           summary_for_human?: string | null
           thread_context?: Json | null
           title?: string | null
+          training_reviewed?: boolean
+          training_reviewed_at?: string | null
           triage_confidence?: number | null
           triage_reasoning?: string | null
           updated_at?: string | null
