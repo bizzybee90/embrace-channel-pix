@@ -303,10 +303,10 @@ export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackBut
       {/* Customer Intelligence & Profile mini-cards */}
       {(conversation.customer_id || customer) && (
         <div className="flex-shrink-0 px-5 pb-2 max-h-[180px] overflow-y-auto">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
             {/* Customer Profile Mini-Card — iOS Contact Widget */}
             <div 
-              className="relative bg-slate-50/50 dark:bg-slate-800/30 rounded-xl border border-slate-100 dark:border-slate-700/50 p-4 shadow-sm cursor-pointer hover:bg-slate-100/60 dark:hover:bg-slate-800/50 transition-colors hover:shadow-md"
+              className="relative md:col-span-2 bg-slate-50/50 dark:bg-slate-800/30 rounded-xl border border-slate-100 dark:border-slate-700/50 p-4 shadow-sm cursor-pointer hover:bg-slate-100/60 dark:hover:bg-slate-800/50 transition-colors hover:shadow-md"
               onClick={() => setIntelligenceDrawerOpen(true)}
             >
               {conversation.status === 'open' && (
@@ -326,11 +326,11 @@ export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackBut
                   )}
                 </div>
               </div>
-              <p className="text-[10px] text-primary mt-2 flex items-center gap-0.5">View details <ChevronRight className="h-3 w-3" /></p>
+              <p className="text-xs font-medium text-primary mt-2 flex items-center gap-1 hover:underline">View details <ChevronRight className="h-3.5 w-3.5" /></p>
             </div>
             {/* Customer Intelligence Mini-Card — Bento Box */}
             <div 
-              className="bg-slate-50/50 dark:bg-slate-800/30 rounded-xl border border-slate-100 dark:border-slate-700/50 p-4 shadow-sm cursor-pointer hover:bg-slate-100/60 dark:hover:bg-slate-800/50 transition-colors hover:shadow-md"
+              className="md:col-span-3 bg-slate-50/50 dark:bg-slate-800/30 rounded-xl border border-slate-100 dark:border-slate-700/50 p-4 shadow-sm cursor-pointer hover:bg-slate-100/60 dark:hover:bg-slate-800/50 transition-colors hover:shadow-md"
               onClick={() => setIntelligenceDrawerOpen(true)}
             >
               <div className="flex items-center gap-2 mb-2.5">
@@ -367,10 +367,7 @@ export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackBut
                   )}
                 </div>
 
-                {/* AI Customer Summary */}
-                {(customer?.intelligence as any)?.summary && (
-                  <p className="text-xs text-muted-foreground leading-relaxed">{(customer.intelligence as any).summary}</p>
-                )}
+                {/* AI Customer Summary removed — already shown in AI Briefing banner above */}
 
                 {/* Communication Style */}
                 {(customer?.intelligence as any)?.communication_patterns && (
@@ -422,7 +419,7 @@ export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackBut
                 {!conversation.ai_sentiment && !conversation.category && !customer?.sentiment_trend && !(customer?.intelligence as any)?.summary && (
                   <p className="text-xs text-muted-foreground italic">No intelligence data yet</p>
                 )}
-                <p className="text-[10px] text-primary mt-1 flex items-center gap-0.5">View details <ChevronRight className="h-3 w-3" /></p>
+                <p className="text-xs font-medium text-primary mt-1 flex items-center gap-1 hover:underline">View details <ChevronRight className="h-3.5 w-3.5" /></p>
               </div>
             </div>
           </div>

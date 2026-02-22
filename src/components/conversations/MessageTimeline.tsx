@@ -14,6 +14,11 @@ import { HtmlEmailViewer } from './HtmlEmailViewer';
 import { ImageAnalysis } from './ImageAnalysis';
 import { VoicemailPlayer } from './VoicemailPlayer';
 
+const stripHtmlTags = (html: string): string => {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  return doc.body.textContent || '';
+};
+
 const getInitials = (name: string | null) => {
   if (!name) return '?';
   return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
@@ -97,15 +102,27 @@ export const MessageTimeline = ({
     const isEmail = message.channel === 'email';
     
     // Graceful sender name fallback
+    const rawFrom = message.raw_payload?.from;
+    const rawFromName = rawFrom?.name && rawFrom.name !== 'Unknown' ? rawFrom.name : null;
+    const rawFromAddress = rawFrom?.address && !rawFrom.address.includes('unknown.invalid') ? rawFrom.address : null;
     const actorName = message.actor_name && !message.actor_name.includes('unknown.invalid') && !message.actor_name.startsWith('unknown@') && message.actor_name !== 'Unknown Sender'
       ? message.actor_name
-      : (isCustomer ? (conversationCustomerName || 'Unknown Sender') : 'Agent');
+      : (rawFromName || (isCustomer ? (conversationCustomerName || rawFromAddress || 'Unknown Sender') : 'Agent'));
+    
+    // Derive display body — fallback to raw_payload when body is empty
+    const rawBody = message.body;
+    let effectiveBody = rawBody;
+    if (!rawBody && message.raw_payload) {
+      effectiveBody = message.raw_payload.bodySnippet 
+        || (typeof message.raw_payload.body === 'string' ? stripHtmlTags(message.raw_payload.body) : '') 
+        || '';
+    }
     
     // Clean email content if it's an email message
-    const cleanedBody = isEmail ? cleanEmailContent(message.body) : message.body;
+    const cleanedBody = isEmail ? cleanEmailContent(effectiveBody) : effectiveBody;
     const showOriginal = showOriginalIds.has(message.id);
-    const displayBody = showOriginal ? message.body : cleanedBody;
-    const canShowOriginal = isEmail && hasSignificantCleaning(message.body, cleanedBody);
+    const displayBody = showOriginal ? effectiveBody : cleanedBody;
+    const canShowOriginal = isEmail && hasSignificantCleaning(effectiveBody, cleanedBody);
     
     // Check if we have HTML content in raw_payload
     const hasHtmlContent = isEmail && message.raw_payload?.body && 
