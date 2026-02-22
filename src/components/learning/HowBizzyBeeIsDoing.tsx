@@ -1,9 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Card } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
 import { supabase } from '@/integrations/supabase/client';
 import { useWorkspace } from '@/hooks/useWorkspace';
-import { Zap, Target, Clock, Loader2 } from 'lucide-react';
+import { Clock, Loader2 } from 'lucide-react';
 
 interface Stats {
   autoHandled: number;
@@ -18,7 +16,7 @@ export const HowBizzyBeeIsDoing = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetch = async () => {
+    const fetchData = async () => {
       if (!workspace?.id) return;
       const weekAgo = new Date();
       weekAgo.setDate(weekAgo.getDate() - 7);
@@ -45,7 +43,6 @@ export const HowBizzyBeeIsDoing = () => {
       const all = convos.data || [];
       const auto = all.filter(c => c.decision_bucket === 'auto_handled').length;
       const rev = reviewed.data || [];
-      const confirmed = rev.filter(c => c.review_outcome === 'confirmed').length;
 
       setStats({
         autoHandled: auto,
@@ -55,16 +52,16 @@ export const HowBizzyBeeIsDoing = () => {
       });
       setLoading(false);
     };
-    fetch();
+    fetchData();
   }, [workspace?.id]);
 
   if (loading || !stats) {
     return (
-      <Card className="p-6">
+      <div className="bg-white rounded-xl ring-1 ring-slate-900/5 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] p-6">
         <div className="flex items-center justify-center py-8">
-          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
         </div>
-      </Card>
+      </div>
     );
   }
 
@@ -74,38 +71,63 @@ export const HowBizzyBeeIsDoing = () => {
   const accuracyPct = stats.totalReviewed > 0
     ? Math.round(((stats.totalReviewed - stats.correctionsCount) / stats.totalReviewed) * 100)
     : 100;
-  const timeSavedHours = Math.round((stats.autoHandled * 2) / 60);
+  const timeSavedMinutes = stats.autoHandled * 2;
+  const timeSavedDisplay = timeSavedMinutes >= 60
+    ? `~${Math.round(timeSavedMinutes / 60)} hour${Math.round(timeSavedMinutes / 60) !== 1 ? 's' : ''}`
+    : `~${timeSavedMinutes} min`;
+
+  // SVG progress ring
+  const radius = 36;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference - (automationPct / 100) * circumference;
 
   return (
-    <Card className="p-6">
-      <h2 className="text-base font-semibold text-foreground mb-5">How BizzyBee is doing</h2>
+    <div className="bg-white rounded-xl ring-1 ring-slate-900/5 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] p-6">
+      <h2 className="text-base font-semibold text-slate-900 mb-6">How BizzyBee is doing</h2>
 
-      <div className="space-y-5">
-        {/* Automation rate */}
-        <div className="flex items-start gap-3">
-          <div className="p-2 rounded-lg bg-amber-500/10 mt-0.5">
-            <Zap className="h-4 w-4 text-amber-500" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-baseline justify-between mb-1.5">
-              <span className="text-sm text-foreground font-medium">Emails handled automatically</span>
-              <span className="text-sm font-semibold text-foreground">{stats.autoHandled} of {stats.totalEmails} ({automationPct}%)</span>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
+        {/* Automation rate with progress ring */}
+        <div className="flex items-center gap-4">
+          <div className="relative flex-shrink-0">
+            <svg width="84" height="84" viewBox="0 0 84 84" className="-rotate-90">
+              <circle
+                cx="42" cy="42" r={radius}
+                fill="none"
+                stroke="hsl(var(--muted))"
+                strokeWidth="6"
+              />
+              <circle
+                cx="42" cy="42" r={radius}
+                fill="none"
+                stroke="hsl(270 60% 55%)"
+                strokeWidth="6"
+                strokeLinecap="round"
+                strokeDasharray={circumference}
+                strokeDashoffset={strokeDashoffset}
+                className="transition-all duration-700 ease-out"
+              />
+            </svg>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="text-lg font-bold text-slate-900">{automationPct}%</span>
             </div>
-            <Progress value={automationPct} className="h-2" />
+          </div>
+          <div>
+            <p className="text-sm text-slate-500 font-medium">Emails handled automatically</p>
+            <p className="text-2xl font-bold text-slate-900 tracking-tight mt-0.5">
+              {stats.autoHandled} of {stats.totalEmails}
+            </p>
           </div>
         </div>
 
         {/* Accuracy */}
-        <div className="flex items-start gap-3">
-          <div className="p-2 rounded-lg bg-green-500/10 mt-0.5">
-            <Target className="h-4 w-4 text-green-600" />
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0">
+            <div className="w-3 h-3 rounded-full bg-emerald-500" />
           </div>
-          <div className="flex-1">
-            <div className="flex items-baseline justify-between">
-              <span className="text-sm text-foreground font-medium">Accuracy</span>
-              <span className="text-sm font-semibold text-foreground">{accuracyPct}%</span>
-            </div>
-            <p className="text-xs text-muted-foreground mt-0.5">
+          <div>
+            <p className="text-sm text-slate-500 font-medium">Accuracy</p>
+            <p className="text-2xl font-bold text-slate-900 tracking-tight mt-0.5">{accuracyPct}%</p>
+            <p className="text-xs text-slate-400">
               {stats.correctionsCount === 0
                 ? '0 corrections needed'
                 : `${stats.correctionsCount} correction${stats.correctionsCount !== 1 ? 's' : ''} this week`}
@@ -114,22 +136,20 @@ export const HowBizzyBeeIsDoing = () => {
         </div>
 
         {/* Time saved */}
-        <div className="flex items-start gap-3">
-          <div className="p-2 rounded-lg bg-purple-500/10 mt-0.5">
-            <Clock className="h-4 w-4 text-purple-500" />
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center flex-shrink-0">
+            <Clock className="w-5 h-5 text-blue-500" />
           </div>
-          <div className="flex-1">
-            <div className="flex items-baseline justify-between">
-              <span className="text-sm text-foreground font-medium">Time saved this week</span>
-              <span className="text-sm font-semibold text-foreground">~{timeSavedHours > 0 ? `${timeSavedHours} hour${timeSavedHours !== 1 ? 's' : ''}` : 'a few minutes'}</span>
-            </div>
+          <div>
+            <p className="text-sm text-slate-500 font-medium">Time saved this week</p>
+            <p className="text-2xl font-bold text-slate-900 tracking-tight mt-0.5">{timeSavedDisplay}</p>
           </div>
         </div>
       </div>
 
-      <p className="text-xs text-muted-foreground mt-5 leading-relaxed">
+      <p className="text-sm text-slate-500 mt-6 leading-relaxed">
         BizzyBee is handling most of your email automatically. The more you review, the smarter it gets.
       </p>
-    </Card>
+    </div>
   );
 };
