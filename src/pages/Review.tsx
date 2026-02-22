@@ -35,8 +35,10 @@ import {
   CheckCheck,
   X,
   Send,
-  Home
+  Home,
+  Pencil
 } from 'lucide-react';
+import { cleanEmailContent } from '@/utils/emailParser';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useReviewFeedback } from '@/hooks/useReviewFeedback';
@@ -73,23 +75,34 @@ interface ReviewConversation {
   messages: {
     body: string;
     created_at: string;
+    actor_name?: string | null;
     raw_payload?: { body?: string } | null;
   }[];
 }
+
+// Helper: get sender name from message or customer fallback
+const getSenderName = (conv: ReviewConversation): string => {
+  const msg = conv.messages?.[0];
+  return msg?.actor_name || conv.customer?.name || conv.customer?.email?.split('@')[0] || 'Unknown Sender';
+};
+
+const getSenderEmail = (conv: ReviewConversation): string => {
+  return conv.customer?.email || 'No email';
+};
 
 // New state-based labels
 const bucketLabels: Record<string, string> = {
   act_now: 'Needs attention',
   quick_win: 'Needs reply',
   wait: 'FYI',
-  auto_handled: 'Done',
+  auto_handled: 'Auto-handled',
 };
 
 const bucketColors: Record<string, string> = {
   act_now: 'bg-red-500 text-white',
   quick_win: 'bg-amber-500 text-white',
   wait: 'bg-slate-500 text-white',
-  auto_handled: 'bg-green-500 text-white',
+  auto_handled: 'bg-slate-400 text-white',
 };
 
 type AutomationLevel = 'auto' | 'draft_first' | 'always_review';
@@ -160,7 +173,7 @@ export default function Review() {
           email_classification,
           ai_draft_response,
           customer:customers(name, email),
-          messages(body, created_at, raw_payload)
+          messages(body, created_at, raw_payload, actor_name)
         `)
         .eq('workspace_id', userData.workspace_id)
         .eq('needs_review', true)
@@ -209,7 +222,7 @@ export default function Review() {
           ai_draft_response,
           requires_reply,
           customer:customers(name, email),
-          messages(body, created_at, raw_payload)
+          messages(body, created_at, raw_payload, actor_name)
         `)
         .eq('workspace_id', userData.workspace_id)
         .not('email_classification', 'is', null)
@@ -833,7 +846,7 @@ export default function Review() {
   if (isMobile) {
     const conv = currentConversation;
     const rawEmailBody = conv?.messages?.[0]?.raw_payload?.body || conv?.messages?.[0]?.body || '';
-    const emailBody = stripHtml(rawEmailBody);
+    const emailBody = cleanEmailContent(stripHtml(rawEmailBody));
     
     // Mobile Detail View
     if (mobileShowDetail && conv) {
@@ -857,9 +870,9 @@ export default function Review() {
               {/* Header */}
               <div>
                 <h2 className="font-semibold text-base break-words">
-                  {conv.customer?.name || conv.customer?.email || 'Unknown Sender'}
+                  {getSenderName(conv)}
                 </h2>
-                <p className="text-xs text-muted-foreground">{conv.customer?.email || 'No email'}</p>
+                <p className="text-xs text-muted-foreground">{getSenderEmail(conv)}</p>
               </div>
               
               {/* Title */}
@@ -1036,7 +1049,7 @@ export default function Review() {
                   <div className="flex items-start gap-3">
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-sm break-words">
-                        {conv.customer?.name || conv.customer?.email || 'Unknown'}
+                        {getSenderName(conv)}
                       </p>
                       <p className="text-xs text-muted-foreground break-words line-clamp-2 mt-0.5">
                         {conv.title || conv.summary_for_human}
@@ -1082,9 +1095,20 @@ export default function Review() {
               </div>
               <ReviewExplainer />
             </div>
-            <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
+            <div className="hidden md:flex items-center gap-1.5 text-xs text-muted-foreground">
               <Keyboard className="h-3.5 w-3.5" />
-              <span>↑↓ navigate • L confirm • H change • S skip</span>
+              <kbd className="bg-background border border-border rounded px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground shadow-sm">↑</kbd>
+              <kbd className="bg-background border border-border rounded px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground shadow-sm">↓</kbd>
+              <span>navigate</span>
+              <span className="mx-0.5">•</span>
+              <kbd className="bg-background border border-border rounded px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground shadow-sm">L</kbd>
+              <span>confirm</span>
+              <span className="mx-0.5">•</span>
+              <kbd className="bg-background border border-border rounded px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground shadow-sm">H</kbd>
+              <span>change</span>
+              <span className="mx-0.5">•</span>
+              <kbd className="bg-background border border-border rounded px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground shadow-sm">S</kbd>
+              <span>skip</span>
             </div>
           </div>
           <div className="flex items-center gap-4 mt-3">
@@ -1096,32 +1120,35 @@ export default function Review() {
               }
             </span>
           </div>
-          {/* Tabs */}
-          <div className="flex gap-1 mt-3">
-            <Button
-              variant={activeTab === 'triage' ? 'default' : 'ghost'}
-              size="sm"
-              className="h-7 text-xs"
+          <div className="inline-flex bg-muted p-1 rounded-lg mt-3 gap-0.5">
+            <button
+              className={cn(
+                "px-3 py-1.5 rounded-md text-xs font-medium transition-all",
+                activeTab === 'triage'
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
               onClick={() => setActiveTab('triage')}
             >
-              <Eye className="h-3 w-3 mr-1" />
               Triage Review
               {reviewQueue.length > 0 && (
                 <Badge variant="secondary" className="ml-1.5 h-4 px-1 text-[10px]">{reviewQueue.length}</Badge>
               )}
-            </Button>
-            <Button
-              variant={activeTab === 'low_confidence' ? 'default' : 'ghost'}
-              size="sm"
-              className="h-7 text-xs"
+            </button>
+            <button
+              className={cn(
+                "px-3 py-1.5 rounded-md text-xs font-medium transition-all",
+                activeTab === 'low_confidence'
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
               onClick={() => setActiveTab('low_confidence')}
             >
-              <Bot className="h-3 w-3 mr-1" />
               Low Confidence
               {lowConfidenceEmails.length > 0 && (
                 <Badge variant="secondary" className="ml-1.5 h-4 px-1 text-[10px]">{lowConfidenceEmails.length}</Badge>
               )}
-            </Button>
+            </button>
           </div>
         </div>
 
@@ -1424,7 +1451,7 @@ export default function Review() {
             ) : selectedRecentId ? (() => {
               const recentConv = recentClassifications.find(c => c.id === selectedRecentId);
               if (!recentConv) return null;
-              const recentEmailBody = stripHtml(recentConv.messages?.[0]?.raw_payload?.body || recentConv.messages?.[0]?.body || '');
+              const recentEmailBody = cleanEmailContent(stripHtml(recentConv.messages?.[0]?.raw_payload?.body || recentConv.messages?.[0]?.body || ''));
               return (
                 <div className="flex-1 flex flex-col overflow-y-auto p-6">
                   <Card className="flex-1 flex flex-col max-w-3xl mx-auto w-full p-6">
@@ -1434,8 +1461,8 @@ export default function Review() {
                           <ChannelIcon channel={recentConv.channel} className="h-4 w-4" />
                         )}
                         <div>
-                          <p className="font-medium">{recentConv.customer?.name || 'Unknown Sender'}</p>
-                          <p className="text-sm text-muted-foreground">{recentConv.customer?.email || 'No email'}</p>
+                          <p className="font-medium">{getSenderName(recentConv)}</p>
+                          <p className="text-sm text-muted-foreground">{getSenderEmail(recentConv)}</p>
                         </div>
                       </div>
                       <span className="text-sm text-muted-foreground">
@@ -1443,10 +1470,10 @@ export default function Review() {
                       </span>
                     </div>
                     <h3 className="font-semibold text-lg mb-4">{recentConv.title || 'No subject'}</h3>
-                    <div className="text-sm text-muted-foreground whitespace-pre-wrap mb-4 max-h-64 overflow-y-auto">
+                    <div className="text-sm whitespace-pre-wrap mb-4 max-h-64 overflow-y-auto text-foreground/80">
                       {recentEmailBody.substring(0, 800) || 'No content'}
                     </div>
-                    <div className="bg-muted/30 rounded-lg p-4 border mb-4">
+                    <div className="bg-muted/30 rounded-xl p-4 border-t border-border/50 mb-4">
                       <div className="flex items-center gap-2 mb-2">
                         <Sparkles className="h-4 w-4 text-purple-500" />
                         <span className="text-sm font-medium">AI Classification</span>
@@ -1490,10 +1517,10 @@ export default function Review() {
                       )}
                       <div>
                         <p className="font-medium">
-                          {currentConversation.customer?.name || 'Unknown Sender'}
+                          {getSenderName(currentConversation)}
                         </p>
                         <p className="text-sm text-muted-foreground">
-                          {currentConversation.customer?.email || 'No email'}
+                          {getSenderEmail(currentConversation)}
                         </p>
                       </div>
                     </div>
@@ -1503,7 +1530,7 @@ export default function Review() {
                   </div>
 
                   {/* Subject */}
-                  <h3 className="font-semibold text-lg mb-4">
+                  <h3 className="text-xl font-semibold text-foreground mb-2">
                     {currentConversation.title || 'No subject'}
                   </h3>
 
@@ -1542,15 +1569,15 @@ export default function Review() {
                   )}
 
                   {/* BizzyBee's decision */}
-                  <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4 border border-purple-200 dark:border-purple-800 mb-4">
+                  <div className="bg-muted/30 rounded-xl p-4 mt-6 border-t border-border/50">
                     <div className="flex items-center gap-2 mb-2">
                       <Sparkles className="h-4 w-4 text-purple-500" />
-                      <span className="text-sm font-medium text-purple-700 dark:text-purple-300">
+                      <span className="text-sm font-medium">
                         BizzyBee thinks:
                       </span>
                     </div>
                     <div className="flex items-center gap-3 flex-wrap">
-                      <Badge className={bucketColors[currentConversation.decision_bucket] || 'bg-gray-500'}>
+                      <Badge className={bucketColors[currentConversation.decision_bucket] || 'bg-muted'}>
                         {bucketLabels[currentConversation.decision_bucket] || currentConversation.decision_bucket}
                       </Badge>
                       {/* Editable classification type */}
@@ -1653,27 +1680,26 @@ export default function Review() {
                   </Collapsible>
 
                   {/* Actions */}
-                  <div className="flex items-center gap-3 pt-2">
+                  <div className="flex items-center gap-3 pt-4">
                     {!showChangePicker ? (
                       <>
-                        <Button 
-                          onClick={handleConfirm}
-                          className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-                          disabled={reviewMutation.isPending}
-                        >
-                          <Check className="h-4 w-4 mr-2" />
-                          Looks right
-                          <span className="ml-2 text-xs opacity-70">(L)</span>
-                        </Button>
                         <Button 
                           variant="outline"
                           onClick={() => setShowChangePicker(true)}
                           className="flex-1"
                           disabled={reviewMutation.isPending}
                         >
-                          <RefreshCw className="h-4 w-4 mr-2" />
-                          Handle differently
-                          <span className="ml-2 text-xs opacity-70">(H)</span>
+                          <Pencil className="h-4 w-4 mr-2" />
+                          ✏️ Change
+                          <kbd className="ml-2 bg-background border border-border rounded px-1 py-0.5 text-[10px] font-mono text-muted-foreground shadow-sm">H</kbd>
+                        </Button>
+                        <Button 
+                          onClick={handleConfirm}
+                          className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-medium"
+                          disabled={reviewMutation.isPending}
+                        >
+                          ✨ Looks Good
+                          <kbd className="ml-2 bg-purple-500/30 border border-purple-400/30 rounded px-1 py-0.5 text-[10px] font-mono text-white/80 shadow-sm">L</kbd>
                         </Button>
                       </>
                     ) : (
@@ -1717,7 +1743,7 @@ export default function Review() {
                             disabled={reviewMutation.isPending}
                           >
                             <span className="w-2 h-2 rounded-full bg-green-500 mr-2" />
-                            Done
+                            Auto-handled
                             <span className="ml-auto text-xs opacity-50">(4)</span>
                           </Button>
                         </div>
