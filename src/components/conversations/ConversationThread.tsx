@@ -30,6 +30,7 @@ export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackBut
   const [isWide, setIsWide] = useState(false);
   const { toast } = useToast();
   const draftSaveTimeoutRef = useRef<NodeJS.Timeout>();
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Track wide viewport for permanent intelligence panel
   useEffect(() => {
@@ -39,9 +40,10 @@ export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackBut
     return () => window.removeEventListener('resize', check);
   }, []);
 
-  // Reset AI draft when conversation changes
+  // Reset AI draft and scroll position when conversation changes
   useEffect(() => {
     setDraftText('');
+    scrollContainerRef.current?.scrollTo(0, 0);
   }, [conversation.id]);
 
   // Fetch real customer data
@@ -343,7 +345,7 @@ export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackBut
         )}
 
         {/* 3. Email body — naked canvas, fills remaining space */}
-        <div className="flex-1 min-h-[200px] overflow-y-auto">
+        <div ref={scrollContainerRef} className="flex-1 min-h-[200px] overflow-y-auto">
           <MessageTimeline
             messages={messages}
             workspaceId={conversation.workspace_id}
