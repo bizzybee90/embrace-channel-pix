@@ -361,6 +361,7 @@ export type Database = {
       }
       classification_corrections: {
         Row: {
+          conversation_id: string | null
           corrected_category: string | null
           corrected_requires_reply: boolean | null
           created_at: string | null
@@ -368,9 +369,12 @@ export type Database = {
           id: string
           original_category: string | null
           original_text: string | null
+          sender_email: string | null
+          subject: string | null
           workspace_id: string
         }
         Insert: {
+          conversation_id?: string | null
           corrected_category?: string | null
           corrected_requires_reply?: boolean | null
           created_at?: string | null
@@ -378,9 +382,12 @@ export type Database = {
           id?: string
           original_category?: string | null
           original_text?: string | null
+          sender_email?: string | null
+          subject?: string | null
           workspace_id: string
         }
         Update: {
+          conversation_id?: string | null
           corrected_category?: string | null
           corrected_requires_reply?: boolean | null
           created_at?: string | null
@@ -388,9 +395,25 @@ export type Database = {
           id?: string
           original_category?: string | null
           original_text?: string | null
+          sender_email?: string | null
+          subject?: string | null
           workspace_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "classification_corrections_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "bb_needs_classification"
+            referencedColumns: ["conversation_id"]
+          },
+          {
+            foreignKeyName: "classification_corrections_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "classification_corrections_workspace_id_fkey"
             columns: ["workspace_id"]
@@ -6760,6 +6783,7 @@ export type Database = {
         Args: { p_type: string; p_value: string }
         Returns: string
       }
+      bb_purge_archived_queues: { Args: never; Returns: undefined }
       bb_queue_archive: {
         Args: { msg_id: number; queue_name: string }
         Returns: boolean
