@@ -137,7 +137,7 @@ serve(async (req) => {
           }
         }
 
-        // Create new subscription for email messages
+        // Create new subscription for email messages (created + updated events)
         const createResponse = await fetch(
           'https://api.aurinko.io/v1/subscriptions',
           {
@@ -149,6 +149,7 @@ serve(async (req) => {
             body: JSON.stringify({
               resource: '/email/messages',
               notificationUrl: webhookUrl,
+              events: ['message.created', 'message.updated'],
             }),
           }
         );

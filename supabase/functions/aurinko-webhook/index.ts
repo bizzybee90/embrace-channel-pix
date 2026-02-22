@@ -161,7 +161,9 @@ Deno.serve(async (req) => {
 
     // Aurinko v2 webhook format: { subscription, resource, accountId, payloads: [{...}, ...] }
     const payloads = Array.isArray(payload.payloads) ? payload.payloads as Record<string, unknown>[] : [payload];
-    console.log(`📬 Processing ${payloads.length} payload(s) from Aurinko webhook`);
+    const resource = String(payload.resource || "").toLowerCase();
+    const subscriptionResource = String(payload.subscription?.resource || "").toLowerCase();
+    console.log(`📬 Processing ${payloads.length} payload(s) from Aurinko webhook, resource: ${resource || subscriptionResource}`);
 
     const results: unknown[] = [];
 
@@ -179,6 +181,37 @@ Deno.serve(async (req) => {
           accessToken,
           messageId: messageId!,
         });
+      }
+
+      // Handle message.updated events: sync read status from Gmail → BizzyBee
+      const eventType = String(item.type || item.event || payload.type || "").toLowerCase();
+      if (eventType === "message.updated" || eventType === "updated") {
+        const sysLabels = Array.isArray(aurinkoMessage.sysLabels) ? aurinkoMessage.sysLabels : [];
+        const isUnread = sysLabels.includes("unread") || sysLabels.includes("UNREAD");
+        const externalId = String(aurinkoMessage.id || messageId || "");
+
+        if (externalId) {
+          // Update message read status
+          const { data: msgRow } = await supabase
+            .from("messages")
+            .select("id, conversation_id")
+            .eq("external_id", externalId)
+            .maybeSingle();
+
+          if (msgRow) {
+            // If email was read in Gmail, update conversation status accordingly
+            if (!isUnread) {
+              await supabase
+                .from("conversations")
+                .update({ status: "open", updated_at: new Date().toISOString() })
+                .eq("id", msgRow.conversation_id)
+                .eq("status", "new"); // Only transition from 'new' to 'open'
+              console.log(`📖 Gmail read sync: conversation ${msgRow.conversation_id} marked as read`);
+            }
+            results.push({ external_id: externalId, type: "read_sync", is_unread: isUnread });
+            continue;
+          }
+        }
       }
 
       const direction = inferDirectionFromOwner(aurinkoMessage, ownerEmail, aliases);

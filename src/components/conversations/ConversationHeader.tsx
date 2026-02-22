@@ -40,7 +40,7 @@ export const ConversationHeader = ({ conversation, onUpdate, onBack, hideBackBut
   const handleMarkCleared = async () => {
     await supabase.from('conversations').update({ status: 'resolved', resolved_at: new Date().toISOString() }).eq('id', conversation.id);
     if (conversation.channel === 'email') {
-      supabase.functions.invoke('mark-email-read', { body: { conversationId: conversation.id, markAsRead: true } }).catch(console.error);
+      supabase.functions.invoke('mark-email-read', { body: { conversationId: conversation.id, markAsRead: true, archive: true } }).catch(console.error);
     }
     toast({ title: "Cleared" });
     onUpdate();

@@ -19,21 +19,25 @@ serve(async (req) => {
       status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }
-  const supabaseAuth = createClient(
-    Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_ANON_KEY')!,
-    { global: { headers: { Authorization: authHeader } } }
-  );
-  const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
-  if (authError || !user) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-      status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+
+  const isServiceRole = authHeader?.includes(Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+  if (!isServiceRole) {
+    const supabaseAuth = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
   }
   // --- END AUTH CHECK ---
 
   try {
-    const { conversationId, markAsRead = true } = await req.json();
+    const { conversationId, markAsRead = true, archive = false } = await req.json();
 
     if (!conversationId) {
       return new Response(
@@ -42,7 +46,7 @@ serve(async (req) => {
       );
     }
 
-    console.log(`mark-email-read: conversationId=${conversationId}, markAsRead=${markAsRead}`);
+    console.log(`mark-email-read: conversationId=${conversationId}, markAsRead=${markAsRead}, archive=${archive}`);
 
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
@@ -72,28 +76,63 @@ serve(async (req) => {
       );
     }
 
-    const metadata = conversation.metadata || {};
-    const aurinkoMessageId = metadata.aurinko_message_id;
-    const aurinkoAccountId = metadata.aurinko_account_id;
+    // Try to find external_id from messages table (more reliable than metadata)
+    let aurinkoMessageId: string | null = null;
+    let configId: string | null = null;
+
+    // First try: get from the latest inbound message
+    const { data: latestMsg } = await supabase
+      .from('messages')
+      .select('external_id, config_id')
+      .eq('conversation_id', conversationId)
+      .eq('direction', 'inbound')
+      .not('external_id', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (latestMsg?.external_id) {
+      aurinkoMessageId = latestMsg.external_id;
+      configId = latestMsg.config_id;
+    } else {
+      // Fallback to metadata
+      const metadata = conversation.metadata || {};
+      aurinkoMessageId = (metadata as Record<string, unknown>).aurinko_message_id as string || null;
+    }
 
     if (!aurinkoMessageId) {
-      console.log('No aurinko_message_id in metadata, skipping');
+      console.log('No external message ID found, skipping');
       return new Response(
-        JSON.stringify({ success: true, message: 'No aurinko message ID' }),
+        JSON.stringify({ success: true, message: 'No external message ID' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     // Fetch the email provider config
-    const { data: emailConfig, error: configError } = await supabase
-      .from('email_provider_configs')
-      .select('id, account_id, email_address')
-      .eq('workspace_id', conversation.workspace_id)
-      .eq('account_id', aurinkoAccountId?.toString())
-      .single();
+    let emailConfig: Record<string, unknown> | null = null;
 
-    if (configError || !emailConfig) {
-      console.error('Email config not found:', configError);
+    if (configId) {
+      const { data } = await supabase
+        .from('email_provider_configs')
+        .select('id, account_id, email_address')
+        .eq('id', configId)
+        .maybeSingle();
+      emailConfig = data;
+    }
+
+    if (!emailConfig) {
+      // Fallback: get any config for this workspace
+      const { data } = await supabase
+        .from('email_provider_configs')
+        .select('id, account_id, email_address')
+        .eq('workspace_id', conversation.workspace_id)
+        .limit(1)
+        .maybeSingle();
+      emailConfig = data;
+    }
+
+    if (!emailConfig) {
+      console.error('Email config not found');
       return new Response(
         JSON.stringify({ error: 'Email configuration not found' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -102,7 +141,7 @@ serve(async (req) => {
 
     // Get decrypted access token securely
     const { data: tokenData, error: tokenError } = await supabase
-      .rpc('get_decrypted_access_token', { config_id: emailConfig.id });
+      .rpc('get_decrypted_access_token', { p_config_id: emailConfig.id });
 
     if (tokenError || !tokenData) {
       console.error('Failed to get access token:', tokenError);
@@ -113,32 +152,43 @@ serve(async (req) => {
     }
 
     const accessToken = tokenData;
+    const aurinkoBaseUrl = Deno.env.get('AURINKO_API_BASE_URL') || 'https://api.aurinko.io';
 
-    // Mark email as read/unread in Aurinko
-    console.log(`Marking email ${aurinkoMessageId} as ${markAsRead ? 'read' : 'unread'}`);
+    // Build the PATCH body
+    const patchBody: Record<string, unknown> = {
+      unread: !markAsRead,
+    };
+
+    // If archiving, also remove Inbox and Unread labels
+    if (archive) {
+      patchBody.removeSysLabels = ["\\Inbox", "\\Unread"];
+    }
+
+    // Mark email as read/unread (and optionally archive) in Aurinko/Gmail
+    console.log(`Patching email ${aurinkoMessageId}: ${JSON.stringify(patchBody)}`);
     
-    const response = await fetch(`https://api.aurinko.io/v1/email/messages/${aurinkoMessageId}`, {
+    const response = await fetch(`${aurinkoBaseUrl}/v1/email/messages/${aurinkoMessageId}`, {
       method: 'PATCH',
       headers: {
         'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ unread: !markAsRead }),
+      body: JSON.stringify(patchBody),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Failed to update email read status:', response.status, errorText);
+      console.error('Failed to update email:', response.status, errorText);
       return new Response(
-        JSON.stringify({ error: 'Failed to update email read status', details: errorText }),
+        JSON.stringify({ error: 'Failed to update email', details: errorText }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log(`Email ${aurinkoMessageId} marked as ${markAsRead ? 'read' : 'unread'} successfully`);
+    console.log(`Email ${aurinkoMessageId} updated successfully (read=${markAsRead}, archive=${archive})`);
 
     return new Response(
-      JSON.stringify({ success: true, messageId: aurinkoMessageId, markedAsRead: markAsRead }),
+      JSON.stringify({ success: true, messageId: aurinkoMessageId, markedAsRead: markAsRead, archived: archive }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
