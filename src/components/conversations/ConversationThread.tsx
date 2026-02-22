@@ -269,8 +269,8 @@ export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackBut
         <ConversationHeader conversation={conversation} onUpdate={onUpdate} onBack={onBack} hideBackButton={hideBackButton} />
       </div>
       
-      {/* AI Context — capped height, independently scrollable */}
-      <div className="flex-shrink-0 max-h-[45vh] overflow-y-auto p-5 border-b border-border">
+      {/* AI Briefing — whisper-style, no border */}
+      <div className="flex-shrink-0 px-5 pt-3 pb-1">
         <AIContextPanel 
           conversation={conversation} 
           onUpdate={onUpdate}
@@ -292,9 +292,9 @@ export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackBut
           <ReplyArea
           conversationId={conversation.id}
           channel={conversation.channel}
-          aiDraftResponse={conversation.metadata?.ai_draft_response as string}
+          aiDraftResponse={(conversation as any).ai_draft_response || conversation.metadata?.ai_draft_response as string}
           onSend={handleReply}
-          externalDraftText={draftText}  // Only pass draftText from AI, not replyText
+          externalDraftText={draftText || ((conversation as any).ai_draft_response as string) || (conversation.metadata?.ai_draft_response as string) || ''}
           onDraftTextCleared={() => {
             setDraftText('');
           }}

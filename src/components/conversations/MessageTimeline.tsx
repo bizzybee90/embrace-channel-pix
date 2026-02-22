@@ -177,10 +177,10 @@ export const MessageTimeline = ({
 
         <div
           className={cn(
-            'max-w-[70%] rounded-lg p-3.5 card-elevation transition-all hover:shadow-md',
-            isCustomer && 'bg-muted',
-            isAI && 'bg-primary/10 border border-primary/20',
-            isHuman && 'bg-success/10 border border-success/20'
+            'max-w-[85%] rounded-xl p-4 transition-all',
+            isCustomer && (isNewest ? 'bg-transparent' : 'bg-muted/40'),
+            isAI && 'bg-primary/5',
+            isHuman && 'bg-success/5'
           )}
         >
           <div className="flex items-center gap-2 mb-2">
@@ -193,50 +193,39 @@ export const MessageTimeline = ({
               {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
             </span>
           </div>
-          {/* For newest message: show HTML if available, else show full text. For older: use EmailThread */}
+          {/* For newest message: show full clean text natively. For older: use EmailThread */}
           {isNewest && hasHtmlContent ? (
             <div 
-              className="text-sm leading-relaxed prose prose-sm max-w-none"
+              className="font-sans text-foreground antialiased text-base leading-relaxed max-w-none prose prose-sm prose-slate"
               dangerouslySetInnerHTML={{ __html: message.raw_payload.body }}
             />
           ) : isNewest ? (
-            <p className="text-sm whitespace-pre-wrap leading-relaxed">{displayBody}</p>
+            <p className="font-sans text-foreground antialiased text-base whitespace-pre-wrap leading-relaxed">{displayBody}</p>
           ) : isEmail && !showOriginal ? (
             <EmailThread body={message.body} />
           ) : (
             <p className="text-sm whitespace-pre-wrap leading-relaxed">{displayBody}</p>
           )}
           
-          {/* Email action buttons */}
-          {(canShowOriginal || hasHtmlContent) && (
+          {/* Email action buttons - only show original toggle, remove 'View formatted' for newest */}
+          {canShowOriginal && !isNewest && (
             <div className="mt-2 flex items-center gap-3">
-              {canShowOriginal && (
-                <button
-                  onClick={() => toggleShowOriginal(message.id)}
-                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  {showOriginal ? (
-                    <>
-                      <EyeOff className="h-3 w-3" />
-                      Show threaded
-                    </>
-                  ) : (
-                    <>
-                      <Eye className="h-3 w-3" />
-                      Show original
-                    </>
-                  )}
-                </button>
-              )}
-              {hasHtmlContent && (
-                <button
-                  onClick={() => setHtmlViewerMessage(message)}
-                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  <FileText className="h-3 w-3" />
-                  View formatted
-                </button>
-              )}
+              <button
+                onClick={() => toggleShowOriginal(message.id)}
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {showOriginal ? (
+                  <>
+                    <EyeOff className="h-3 w-3" />
+                    Show threaded
+                  </>
+                ) : (
+                  <>
+                    <Eye className="h-3 w-3" />
+                    Show original
+                  </>
+                )}
+              </button>
             </div>
           )}
           

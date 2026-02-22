@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Send, Paperclip, X } from 'lucide-react';
+import { Send, Paperclip, X, Sparkles, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useIsTablet } from '@/hooks/use-tablet';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -201,7 +201,17 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend, ex
 
           <TabsContent value="reply" className="mt-0">
             <div className="space-y-2">
-              <div className="flex items-end gap-2">
+              {/* AI pre-filled indicator */}
+              {replyBody && draftUsed && (
+                <div className="flex items-center gap-1.5 px-1 mb-1">
+                  <Sparkles className="h-3 w-3 text-purple-500" />
+                  <span className="text-[11px] font-medium text-purple-600 dark:text-purple-400">AI pre-filled draft</span>
+                </div>
+              )}
+              <div className={cn(
+                "flex items-end gap-2 rounded-xl transition-all duration-200",
+                replyBody && draftUsed && "ring-2 ring-purple-500/30 bg-purple-50/10 dark:bg-purple-500/5 rounded-xl p-1"
+              )}>
                 <Textarea
                   ref={replyTextareaRef}
                   placeholder="Type your reply..."
@@ -221,14 +231,27 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend, ex
                     "w-full resize-none rounded-xl border-0 bg-muted/30 focus-visible:ring-1 focus-visible:ring-primary/30 leading-relaxed placeholder:text-muted-foreground/50 shadow-[inset_0_1px_2px_rgba(0,0,0,0.02)] transition-all duration-200 flex-1 overflow-y-auto"
                   )}
                 />
-                <Button
-                  onClick={handleSendReply}
-                  disabled={sending || uploading || (!replyBody.trim() && attachments.length === 0)}
-                  size="icon"
-                  className="h-10 w-10 rounded-[12px] bg-foreground text-background hover:bg-foreground/90 shadow-sm flex-shrink-0 mb-1"
-                >
-                  <Send className="h-4 w-4" />
-                </Button>
+                <div className="flex flex-col gap-1 mb-1">
+                  {replyBody && draftUsed && (
+                    <Button
+                      onClick={() => { setReplyBody(''); setDraftUsed(false); onDraftTextCleared?.(); }}
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 rounded-lg text-muted-foreground hover:text-destructive flex-shrink-0"
+                      title="Discard draft"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                  <Button
+                    onClick={handleSendReply}
+                    disabled={sending || uploading || (!replyBody.trim() && attachments.length === 0)}
+                    size="icon"
+                    className="h-10 w-10 rounded-[12px] bg-foreground text-background hover:bg-foreground/90 shadow-sm flex-shrink-0"
+                  >
+                    <Send className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
 
               {attachments.length > 0 && (
