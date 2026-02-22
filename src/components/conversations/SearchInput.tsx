@@ -9,7 +9,7 @@ interface SearchInputProps {
   placeholder?: string;
 }
 
-export const SearchInput = ({ value, onChange, placeholder = "Search conversations..." }: SearchInputProps) => {
+export const SearchInput = ({ value, onChange, placeholder = "Search..." }: SearchInputProps) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const hadFocusRef = useRef(false);
 

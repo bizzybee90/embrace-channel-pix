@@ -25,6 +25,15 @@ export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerMod
   const isMobile = useIsMobile();
   const [customerPanelOpen, setCustomerPanelOpen] = useState(false);
 
+  // Clear selected conversation when filter changes (folder navigation)
+  useEffect(() => {
+    setSelectedConversation(null);
+    setCustomerPanelOpen(false);
+    const newParams = new URLSearchParams(searchParams);
+    newParams.delete('conversation');
+    setSearchParams(newParams, { replace: true });
+  }, [filter, channelFilter]);
+
   // Handle conversation query parameter to auto-select
   useEffect(() => {
     const conversationId = searchParams.get('conversation');
