@@ -278,12 +278,54 @@ export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackBut
         />
       </div>
 
+      {/* Customer Intelligence & Profile mini-cards */}
+      {conversation.customer_id && conversation.workspace_id && (
+        <div className="flex-shrink-0 px-5 pb-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {/* Customer Profile Mini-Card */}
+            <div className="bg-slate-50/50 dark:bg-slate-800/30 rounded-xl border border-slate-100 dark:border-slate-700/50 p-4 shadow-sm">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Profile</span>
+              </div>
+              <div className="space-y-1.5">
+                <p className="text-sm font-medium text-foreground">{(conversation as any).customer?.name || 'Unknown'}</p>
+                <p className="text-xs text-muted-foreground">{(conversation as any).customer?.email || ''}</p>
+                {(conversation as any).customer?.phone && (
+                  <p className="text-xs text-muted-foreground">{(conversation as any).customer.phone}</p>
+                )}
+              </div>
+            </div>
+            {/* Customer Intelligence Mini-Card */}
+            <div className="bg-slate-50/50 dark:bg-slate-800/30 rounded-xl border border-slate-100 dark:border-slate-700/50 p-4 shadow-sm">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Intelligence</span>
+              </div>
+              <div className="space-y-1.5">
+                {conversation.ai_sentiment && (
+                  <p className="text-xs text-muted-foreground">Sentiment: <span className="font-medium text-foreground capitalize">{conversation.ai_sentiment}</span></p>
+                )}
+                {conversation.category && (
+                  <p className="text-xs text-muted-foreground">Category: <span className="font-medium text-foreground capitalize">{conversation.category}</span></p>
+                )}
+                {conversation.priority && (
+                  <p className="text-xs text-muted-foreground">Priority: <span className="font-medium text-foreground capitalize">{conversation.priority}</span></p>
+                )}
+                {!conversation.ai_sentiment && !conversation.category && !conversation.priority && (
+                  <p className="text-xs text-muted-foreground italic">No intelligence data yet</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Message Timeline — always gets remaining space */}
       <div className="flex-1 min-h-[200px] overflow-y-auto p-5">
         <MessageTimeline 
           messages={messages} 
           workspaceId={conversation.workspace_id}
           onDraftTextChange={setDraftText}
+          conversationCustomerName={(conversation as any).customer?.name}
         />
       </div>
 

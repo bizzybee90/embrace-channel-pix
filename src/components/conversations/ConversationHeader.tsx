@@ -37,24 +37,23 @@ export const ConversationHeader = ({ conversation, onUpdate, onBack, hideBackBut
   return (
     <>
       <div className="border-b border-border/30 p-3 bg-card/95 backdrop-blur-lg shadow-sm sticky top-0 z-20">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0 flex-1">
-            {showBackButton && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onBack}
-                className="flex-shrink-0 gap-1 text-muted-foreground hover:text-foreground"
-              >
-                <ChevronLeft className="h-4 w-4" />
-                <span className="hidden sm:inline">Back to {listName}</span>
-                <span className="sm:hidden">Back</span>
-              </Button>
-            )}
-            <h2 className="text-sm font-semibold text-foreground truncate">
-              {conversation.title || 'No subject'}
-            </h2>
-          </div>
+        <div className="relative flex items-center justify-between gap-2">
+          {showBackButton && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onBack}
+              className="flex-shrink-0 gap-1 text-muted-foreground hover:text-foreground z-10"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              <span className="hidden sm:inline">Back</span>
+            </Button>
+          )}
+          {!showBackButton && <div className="w-1" />}
+          <h2 className="absolute left-1/2 -translate-x-1/2 text-sm font-semibold text-foreground truncate max-w-[60%] text-center">
+            {conversation.title || 'No subject'}
+          </h2>
+          <div className="w-1" />
           
           <div className="flex items-center gap-2">
             {(conversation as any).ai_confidence != null && (
