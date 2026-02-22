@@ -44,7 +44,7 @@ export const ReviewQueueItem = ({
   onClick,
   onToggleSelect 
 }: ReviewQueueItemProps) => {
-  const senderName = conversation.customer?.name || conversation.customer?.email?.split('@')[0] || 'Unknown';
+  const senderName = conversation.customer?.name || conversation.customer?.email?.split('@')[0] || 'Unknown Sender';
 
   return (
     <div
