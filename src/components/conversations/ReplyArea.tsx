@@ -40,7 +40,7 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend, ex
   const adjustTextareaHeight = (textarea: HTMLTextAreaElement | null) => {
     if (textarea) {
       textarea.style.height = 'auto';
-      textarea.style.height = `${Math.min(textarea.scrollHeight, 300)}px`;
+      textarea.style.height = `${textarea.scrollHeight}px`;
     }
   };
 
