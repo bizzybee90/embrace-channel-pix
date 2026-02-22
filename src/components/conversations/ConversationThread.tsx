@@ -5,10 +5,12 @@ import { ConversationHeader } from './ConversationHeader';
 import { AIContextPanel } from './AIContextPanel';
 import { MessageTimeline } from './MessageTimeline';
 import { ReplyArea } from './ReplyArea';
-import { Loader2 } from 'lucide-react';
+import { CustomerIntelligence } from '@/components/customers/CustomerIntelligence';
+import { Loader2, ChevronRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 
 interface ConversationThreadProps {
   conversation: Conversation;
@@ -22,6 +24,7 @@ export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackBut
   const [loading, setLoading] = useState(true);
   const [draftText, setDraftText] = useState<string>('');  // Only for AI-generated drafts
   const [customer, setCustomer] = useState<any>(null);
+  const [intelligenceDrawerOpen, setIntelligenceDrawerOpen] = useState(false);
   const { toast } = useToast();
   const draftSaveTimeoutRef = useRef<NodeJS.Timeout>();
 
@@ -302,7 +305,10 @@ export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackBut
         <div className="flex-shrink-0 px-5 pb-2">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {/* Customer Profile Mini-Card — iOS Contact Widget */}
-            <div className="relative bg-slate-50/50 dark:bg-slate-800/30 rounded-xl border border-slate-100 dark:border-slate-700/50 p-4 shadow-sm">
+            <div 
+              className="relative bg-slate-50/50 dark:bg-slate-800/30 rounded-xl border border-slate-100 dark:border-slate-700/50 p-4 shadow-sm cursor-pointer hover:bg-slate-100/60 dark:hover:bg-slate-800/50 transition-colors hover:shadow-md"
+              onClick={() => setIntelligenceDrawerOpen(true)}
+            >
               {conversation.status === 'open' && (
                 <span className="absolute top-3 right-3 inline-flex items-center gap-1 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-[10px] font-medium px-2 py-0.5 rounded-full">
                   ✨ New Lead
@@ -320,9 +326,13 @@ export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackBut
                   )}
                 </div>
               </div>
+              <p className="text-[10px] text-primary mt-2 flex items-center gap-0.5">View details <ChevronRight className="h-3 w-3" /></p>
             </div>
             {/* Customer Intelligence Mini-Card — Bento Box */}
-            <div className="bg-slate-50/50 dark:bg-slate-800/30 rounded-xl border border-slate-100 dark:border-slate-700/50 p-4 shadow-sm">
+            <div 
+              className="bg-slate-50/50 dark:bg-slate-800/30 rounded-xl border border-slate-100 dark:border-slate-700/50 p-4 shadow-sm cursor-pointer hover:bg-slate-100/60 dark:hover:bg-slate-800/50 transition-colors hover:shadow-md"
+              onClick={() => setIntelligenceDrawerOpen(true)}
+            >
               <div className="flex items-center gap-2 mb-2.5">
                 <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Intelligence</span>
                 {customer?.vip_status && (
@@ -412,11 +422,31 @@ export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackBut
                 {!conversation.ai_sentiment && !conversation.category && !customer?.sentiment_trend && !(customer?.intelligence as any)?.summary && (
                   <p className="text-xs text-muted-foreground italic">No intelligence data yet</p>
                 )}
+                <p className="text-[10px] text-primary mt-1 flex items-center gap-0.5">View details <ChevronRight className="h-3 w-3" /></p>
               </div>
             </div>
           </div>
         </div>
       )}
+
+      {/* Intelligence Slide-Over Drawer */}
+      <Sheet open={intelligenceDrawerOpen} onOpenChange={setIntelligenceDrawerOpen}>
+        <SheetContent side="right" className="w-[400px] sm:w-[450px] overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
+              Customer Intelligence
+            </SheetTitle>
+          </SheetHeader>
+          <div className="mt-4">
+            {conversation.workspace_id && (conversation.customer_id || customer?.id) && (
+              <CustomerIntelligence 
+                workspaceId={conversation.workspace_id}
+                customerId={conversation.customer_id || customer?.id}
+              />
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {/* Message Timeline — always gets remaining space */}
       <div className="flex-1 min-h-[200px] overflow-y-auto p-5">

@@ -263,6 +263,16 @@ All colors MUST be HSL.
   }
 }
 
+/* Nuclear font override for raw HTML emails */
+.raw-email-content * {
+  font-family: inherit !important;
+  font-size: 15px !important;
+  color: hsl(var(--foreground)) !important;
+}
+.dark .raw-email-content * {
+  color: hsl(var(--foreground)) !important;
+}
+
 /* Custom animations */
 @keyframes slide {
   0% {

@@ -198,7 +198,7 @@ export const MessageTimeline = ({
           {/* For newest message: show full clean text natively. For older: use EmailThread */}
           {isNewest && hasHtmlContent ? (
             <div 
-              className="font-sans text-foreground antialiased text-[15px] leading-relaxed max-w-none prose prose-sm prose-slate [&_*]:!font-sans [&_*]:!font-family-inherit [&_*]:!text-gray-800 [&_*]:!text-[15px] [&_*]:!leading-relaxed [&_font]:!font-sans [&_td]:!font-sans [&_span]:!font-sans [&_p]:!font-sans [&_div]:!font-sans [&_a]:!font-sans"
+              className="raw-email-content font-sans text-foreground antialiased text-[15px] leading-relaxed max-w-none prose prose-sm prose-slate"
               dangerouslySetInnerHTML={{ __html: message.raw_payload.body }}
             />
           ) : isNewest ? (

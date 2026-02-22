@@ -93,7 +93,7 @@ export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerMod
           ) : (
             <>
               {/* Conversation List - floating card */}
-              <div className="w-[400px] flex-shrink-0 min-h-0 bg-card rounded-2xl shadow-sm overflow-hidden hidden md:flex flex-col">
+              <div className="w-[380px] min-w-[380px] flex-shrink-0 min-h-0 bg-card rounded-2xl shadow-sm overflow-hidden hidden md:flex flex-col">
                 <JaceStyleInbox
                   filter={filter}
                   onSelect={handleSelectConversation}
