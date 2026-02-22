@@ -302,7 +302,7 @@ export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackBut
 
       {/* Customer Intelligence & Profile mini-cards */}
       {(conversation.customer_id || customer) && (
-        <div className="flex-shrink-0 px-5 pb-2">
+        <div className="flex-shrink-0 px-5 pb-2 max-h-[180px] overflow-y-auto">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {/* Customer Profile Mini-Card — iOS Contact Widget */}
             <div 
@@ -450,7 +450,7 @@ export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackBut
       </Sheet>
 
       {/* Message Timeline — always gets remaining space */}
-      <div className="flex-1 min-h-[200px] overflow-y-auto p-5">
+      <div className="flex-1 min-h-[120px] overflow-y-auto p-5">
         <MessageTimeline 
           messages={messages} 
           workspaceId={conversation.workspace_id}
