@@ -168,16 +168,6 @@ export const Home = () => {
       onClick: () => navigate('/to-reply?filter=at-risk'),
     },
     {
-      label: 'Training',
-      count: stats.reviewCount,
-      icon: Sparkles,
-      iconColor: 'text-purple-600',
-      iconBoxBg: 'bg-purple-100',
-      cardBg: 'bg-gradient-to-b from-purple-50/80 to-white',
-      cardBorder: 'border border-purple-100',
-      onClick: () => navigate('/review'),
-    },
-    {
       label: 'To Reply',
       count: stats.toReplyCount,
       icon: Mail,
@@ -196,6 +186,16 @@ export const Home = () => {
       cardBg: 'bg-gradient-to-b from-amber-50/80 to-white',
       cardBorder: 'border border-amber-100',
       onClick: () => navigate('/to-reply?filter=drafts'),
+    },
+    {
+      label: 'Training',
+      count: stats.reviewCount,
+      icon: Sparkles,
+      iconColor: 'text-purple-600',
+      iconBoxBg: 'bg-purple-100',
+      cardBg: 'bg-gradient-to-b from-purple-50/80 to-white',
+      cardBorder: 'border border-purple-100',
+      onClick: () => navigate('/review'),
     },
   ];
 
