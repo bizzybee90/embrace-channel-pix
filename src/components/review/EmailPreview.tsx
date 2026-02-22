@@ -63,7 +63,7 @@ export function EmailPreview({ body, summary, maxLength = 500, rawHtmlBody }: Em
       )}
       
       <div className="bg-muted/50 rounded-lg p-4 mb-4 flex-1 max-h-64 overflow-y-auto">
-        <p className="text-sm text-muted-foreground whitespace-pre-line leading-relaxed">
+        <p className="text-sm whitespace-pre-wrap leading-relaxed text-foreground/80">
           {mainContent}
         </p>
         
