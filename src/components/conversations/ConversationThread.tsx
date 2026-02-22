@@ -325,9 +325,13 @@ export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackBut
             <div className="bg-slate-50/50 dark:bg-slate-800/30 rounded-xl border border-slate-100 dark:border-slate-700/50 p-4 shadow-sm">
               <div className="flex items-center gap-2 mb-2.5">
                 <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Intelligence</span>
+                {customer?.vip_status && (
+                  <span className="bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 font-medium px-2 py-0.5 rounded-full text-[10px]">⭐ VIP</span>
+                )}
               </div>
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 flex-wrap">
+              <div className="space-y-2.5">
+                {/* Conversation tags */}
+                <div className="flex items-center gap-1.5 flex-wrap">
                   {conversation.category && (
                     <span className="bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 font-medium px-2.5 py-0.5 rounded-full text-xs">{conversation.category}</span>
                   )}
@@ -339,16 +343,55 @@ export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackBut
                       conversation.priority === 'low' && "bg-slate-100 dark:bg-slate-500/20 text-slate-600 dark:text-slate-400"
                     )}>{conversation.priority}</span>
                   )}
-                  {conversation.ai_sentiment && (
+                  {(customer?.sentiment_trend || conversation.ai_sentiment) && (
                     <span className={cn(
                       "font-medium px-2.5 py-0.5 rounded-full text-xs",
-                      conversation.ai_sentiment === 'positive' && "bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-300",
-                      conversation.ai_sentiment === 'negative' && "bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300",
-                      conversation.ai_sentiment === 'frustrated' && "bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300",
-                      conversation.ai_sentiment === 'neutral' && "bg-slate-100 dark:bg-slate-500/20 text-slate-600 dark:text-slate-400"
-                    )}>{conversation.ai_sentiment}</span>
+                      (customer?.sentiment_trend || conversation.ai_sentiment) === 'positive' && "bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-300",
+                      (customer?.sentiment_trend || conversation.ai_sentiment) === 'negative' && "bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300",
+                      (customer?.sentiment_trend || conversation.ai_sentiment) === 'frustrated' && "bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300",
+                      (customer?.sentiment_trend || conversation.ai_sentiment) === 'neutral' && "bg-slate-100 dark:bg-slate-500/20 text-slate-600 dark:text-slate-400"
+                    )}>{customer?.sentiment_trend || conversation.ai_sentiment}</span>
+                  )}
+                  {customer?.response_preference && (
+                    <span className="bg-violet-100 dark:bg-violet-500/20 text-violet-700 dark:text-violet-300 font-medium px-2.5 py-0.5 rounded-full text-xs capitalize">{customer.response_preference}</span>
                   )}
                 </div>
+
+                {/* AI Customer Summary */}
+                {(customer?.intelligence as any)?.summary && (
+                  <p className="text-xs text-muted-foreground leading-relaxed">{(customer.intelligence as any).summary}</p>
+                )}
+
+                {/* Communication Style */}
+                {(customer?.intelligence as any)?.communication_patterns && (
+                  <div>
+                    <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Communication Style</span>
+                    <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                      {(customer.intelligence as any).communication_patterns.tone && (
+                        <span className="bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 rounded-md px-2 py-0.5 text-xs capitalize">{(customer.intelligence as any).communication_patterns.tone}</span>
+                      )}
+                      {(customer.intelligence as any).communication_patterns.message_length && (
+                        <span className="bg-slate-100 dark:bg-slate-700/50 text-slate-700 dark:text-slate-300 rounded-md px-2 py-0.5 text-xs capitalize">{(customer.intelligence as any).communication_patterns.message_length} msgs</span>
+                      )}
+                      {(customer.intelligence as any).communication_patterns.typical_response_time && (
+                        <span className="bg-slate-100 dark:bg-slate-700/50 text-slate-700 dark:text-slate-300 rounded-md px-2 py-0.5 text-xs">Responds {(customer.intelligence as any).communication_patterns.typical_response_time}</span>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Topics Discussed */}
+                {customer?.topics_discussed && (customer.topics_discussed as string[]).length > 0 && (
+                  <div>
+                    <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Topics</span>
+                    <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                      {(customer.topics_discussed as string[]).slice(0, 6).map((topic: string, i: number) => (
+                        <span key={i} className="bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 rounded-md px-2 py-0.5 text-xs">{topic}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Extracted Context Tags */}
                 {conversation.extracted_entities && Object.keys(conversation.extracted_entities as object).length > 0 && (
                   <div>
@@ -360,7 +403,13 @@ export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackBut
                     </div>
                   </div>
                 )}
-                {!conversation.ai_sentiment && !conversation.category && !conversation.priority && (
+
+                {/* Last Analyzed */}
+                {customer?.last_analyzed_at && (
+                  <p className="text-[10px] text-muted-foreground/60">Last analyzed {new Date(customer.last_analyzed_at).toLocaleDateString()}</p>
+                )}
+
+                {!conversation.ai_sentiment && !conversation.category && !customer?.sentiment_trend && !(customer?.intelligence as any)?.summary && (
                   <p className="text-xs text-muted-foreground italic">No intelligence data yet</p>
                 )}
               </div>
