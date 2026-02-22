@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useState } from 'react';
+import DOMPurify from 'dompurify';
 import { Button } from '@/components/ui/button';
 import { cleanEmailContent, hasSignificantCleaning } from '@/utils/emailParser';
 import { EmailThread } from './EmailThread';
@@ -204,17 +205,34 @@ export const MessageTimeline = ({
       );
     }
 
+    // Check for raw HTML body
+    const rawHtmlBody = message.raw_payload?.body;
+    const hasHtmlBody = isEmail && typeof rawHtmlBody === 'string' && rawHtmlBody.includes('<');
+
     // Customer / inbound messages — naked email canvas style
     return (
       <div key={message.id} className="animate-fade-in">
-        {/* Naked email content — clean typography, no bubble */}
-        <div className="prose prose-sm max-w-none text-foreground leading-relaxed">
-          {isEmail && !showOriginal ? (
-            <EmailThread body={displayBody || ''} />
-          ) : (
-            <p className="text-sm whitespace-pre-wrap leading-relaxed m-0">{displayBody}</p>
-          )}
-        </div>
+        {/* Naked email content — render HTML faithfully */}
+        {hasHtmlBody && !showOriginal ? (
+          <div
+            className="prose prose-sm md:prose-base max-w-none text-foreground leading-relaxed [&_a]:text-blue-600 hover:[&_a]:text-blue-800 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-border [&_td]:p-2 [&_img]:max-w-full [&_img]:h-auto break-words"
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(rawHtmlBody, {
+              ALLOWED_TAGS: ['table', 'tr', 'td', 'th', 'tbody', 'thead', 'tfoot', 'caption', 'colgroup', 'col', 'div', 'span', 'img', 'a', 'b', 'i', 'strong', 'em', 'br', 'p', 'hr', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'blockquote', 'pre', 'code', 'font', 'center', 'u', 's', 'strike', 'sub', 'sup', 'small', 'big', 'style'],
+              ALLOWED_ATTR: ['style', 'class', 'href', 'src', 'alt', 'title', 'width', 'height', 'cellpadding', 'cellspacing', 'border', 'align', 'valign', 'bgcolor', 'color', 'face', 'size', 'target', 'rel', 'colspan', 'rowspan'],
+              ALLOW_DATA_ATTR: false,
+              FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'input', 'button', 'select', 'textarea'],
+              FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover'],
+            }) }}
+          />
+        ) : (
+          <div className="prose prose-sm max-w-none text-foreground leading-relaxed">
+            {isEmail && !showOriginal ? (
+              <EmailThread body={displayBody || ''} />
+            ) : (
+              <p className="text-sm whitespace-pre-wrap leading-relaxed m-0">{displayBody}</p>
+            )}
+          </div>
+        )}
         
         {/* Show original toggle */}
         {canShowOriginal && (
