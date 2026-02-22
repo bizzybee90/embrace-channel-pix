@@ -204,25 +204,37 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
   // AI snippet
   const snippet = conversation.summary_for_human || conversation.why_this_needs_you || 'Processing...';
 
-  // Inner content shared between tablet and desktop (differs only in padding)
+  // Strip HTML tags from snippet
+  const stripHtml = (text: string) => {
+    if (!text) return text;
+    return text.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim();
+  };
+
+  const cleanSnippet = stripHtml(snippet);
+
+  // Status badge
+  const getStatusBadge = () => {
+    if (conversation.status === 'resolved' || conversation.decision_bucket === 'auto_handled') {
+      return <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-medium tracking-wide uppercase">Archived</span>;
+    }
+    if (hasDraft || (conversation as any).ai_draft_response) {
+      return <span className="px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 text-[10px] font-medium flex items-center gap-1"><FileEdit className="h-2.5 w-2.5" />Draft</span>;
+    }
+    return null;
+  };
+
+  // Inner content shared between tablet and desktop
   const cardInner = (padClass: string) => (
     <div className={padClass}>
-      {/* Row 1: Status dot · Sender · [overdue dot] · [reopen] · time */}
+      {/* Row 1: Status dot · Sender · [reopen] · time */}
       <div className="flex items-center gap-2 mb-1">
-        {/* Status dot */}
         <span className={cn('h-2 w-2 rounded-full flex-shrink-0', dotColor)} />
-
-        {/* Sender name */}
         <span className="text-sm font-semibold text-foreground/90 truncate flex-1 min-w-0">
           {senderName}
         </span>
-
-        {/* Overdue red dot */}
         {isOverdue && (
           <span className="h-2 w-2 rounded-full bg-destructive flex-shrink-0" title="Overdue" />
         )}
-
-        {/* Reopen ghost button */}
         {isResolvable && (
           <Button
             variant="ghost"
@@ -235,8 +247,6 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
             Reopen
           </Button>
         )}
-
-        {/* Short timestamp */}
         <span className="text-xs text-foreground/40 flex-shrink-0">{timeStr}</span>
       </div>
 
@@ -248,10 +258,10 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
       {/* Row 3: AI snippet + indicators */}
       <div className="flex items-center gap-2">
         <p className="text-xs text-foreground/50 truncate flex-1 min-w-0">
-          {snippet}
+          {cleanSnippet}
         </p>
-        <div className="flex items-center gap-1 flex-shrink-0">
-          {hasDraft && <FileEdit className="h-3 w-3 text-primary/60" />}
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {getStatusBadge()}
           {conversation.channel !== 'email' && (
             <ChannelIcon channel={conversation.channel} className="h-3 w-3 opacity-60" />
           )}
@@ -319,12 +329,13 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
     <div
       onClick={handleClick}
       className={cn(
-        "relative cursor-pointer transition-all duration-300 ease-out rounded-[22px] mb-2 overflow-hidden",
-        "bg-card ring-1 ring-black/[0.04] apple-shadow hover:apple-shadow-lg spring-press spring-bounce",
-        selected && "ring-primary/40 bg-primary/[0.03]"
+        "relative cursor-pointer transition-all duration-200 overflow-hidden",
+        selected
+          ? "bg-white rounded-xl border border-purple-200 shadow-sm mx-2 my-1 p-0 ring-1 ring-purple-50"
+          : "hover:bg-slate-50/50 mx-2 my-1 p-0 rounded-xl border border-transparent transition-colors"
       )}
     >
-      {cardInner('p-4')}
+      {cardInner('p-3')}
     </div>
   );
 };

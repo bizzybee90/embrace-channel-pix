@@ -5,7 +5,7 @@ import { ConversationHeader } from './ConversationHeader';
 import { MessageTimeline } from './MessageTimeline';
 import { ReplyArea } from './ReplyArea';
 import { CustomerIntelligence } from '@/components/customers/CustomerIntelligence';
-import { Loader2, Brain, Sparkles, ChevronRight, TrendingUp, Tag } from 'lucide-react';
+import { Loader2, Brain, Sparkles, ChevronRight, TrendingUp, Tag, Reply } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
@@ -263,14 +263,21 @@ export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackBut
         </div>
 
         {/* 1. Sender Info Row — first thing after nav */}
-        {(conversation.customer_id || customer) && (
+        {(conversation.customer_id || customer) && (() => {
+          // Prioritize actual sender name from first inbound message
+          const firstInbound = messages.find(m => m.actor_type === 'customer');
+          const rawFrom = (firstInbound as any)?.raw_payload?.from;
+          const senderDisplayName = rawFrom?.name || firstInbound?.actor_name || customer?.name || 'Unknown';
+          const senderInitials = senderDisplayName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
+          
+          return (
           <div className="flex-shrink-0 px-4 py-2.5 border-b border-border/40 flex items-center justify-between bg-background">
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white text-[11px] font-semibold flex-shrink-0 shadow-sm">
-                {(customer?.name || 'U').split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
+                {senderInitials}
               </div>
               <div className="min-w-0 flex items-center gap-2">
-                <span className="text-sm font-semibold text-foreground truncate">{customer?.name || 'Unknown'}</span>
+                <span className="text-sm font-semibold text-foreground truncate">{senderDisplayName}</span>
                 {customer?.email && (
                   <span className="text-xs text-muted-foreground truncate hidden sm:inline">{'<'}{customer.email}{'>'}</span>
                 )}
@@ -280,7 +287,8 @@ export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackBut
               {conversation.created_at ? new Date(conversation.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}
             </span>
           </div>
-        )}
+          );
+        })()}
 
         {/* 2. Elevated AI Bento Strip */}
         {briefingText && (
@@ -344,9 +352,19 @@ export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackBut
           />
         </div>
 
-        {/* Reply area at bottom */}
-        {!isCompleted && (
-          <div className="flex-shrink-0">
+        {/* Reply area at bottom — always render */}
+        <div className="flex-shrink-0">
+          {isCompleted ? (
+            <div className="flex-shrink-0 px-4 pb-4">
+              <button
+                onClick={handleReopen}
+                className="border border-slate-200 rounded-full py-3 px-4 text-muted-foreground cursor-pointer shadow-sm bg-white hover:border-purple-300 transition-all flex items-center gap-3 w-full text-left text-sm"
+              >
+                <Reply className="w-4 h-4" />
+                Reopen &amp; reply...
+              </button>
+            </div>
+          ) : (
             <ReplyArea
               conversationId={conversation.id}
               channel={conversation.channel}
@@ -359,9 +377,10 @@ export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackBut
                   localStorage.setItem(`draft-${conversation.id}`, text);
                 }
               }}
+              senderName={customer?.name || 'sender'}
             />
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Permanent right intelligence panel on wide screens */}
