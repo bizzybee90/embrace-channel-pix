@@ -479,13 +479,6 @@ export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackBut
         </div>
       )}
 
-      {isCompleted && (
-        <div className="flex-shrink-0 border-t border-border p-4 bg-muted/30">
-          <Button onClick={handleReopen} className="w-full">
-            Reopen Ticket
-          </Button>
-        </div>
-      )}
     </div>
   );
 };

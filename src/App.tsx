@@ -51,8 +51,8 @@ const RouterContent = () => {
         } 
       />
 
-      {/* Redirect old /inbox to /to-reply */}
-      <Route path="/inbox" element={<Navigate to="/to-reply" replace />} />
+      {/* Redirect old /inbox to /all-open (Inbox) */}
+      <Route path="/inbox" element={<Navigate to="/all-open" replace />} />
       
       {/* To Reply - Primary view */}
       <Route 

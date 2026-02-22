@@ -103,14 +103,14 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
           <nav className="space-y-1 flex-1">
             {[
               { to: '/', icon: Home, label: 'Home', end: true },
-              { to: '/to-reply', icon: Inbox, label: 'Inbox', count: viewCounts?.toReply, color: 'text-destructive' },
+              { to: '/all-open', icon: Inbox, label: 'Inbox' },
+              { to: '/to-reply', icon: Mail, label: 'Needs Action', count: viewCounts?.toReply, color: 'text-destructive' },
               { to: '/unread', icon: Eye, label: 'Unread', count: viewCounts?.unread, color: 'text-blue-500' },
               { to: '/drafts', icon: FileEdit, label: 'Drafts', count: viewCounts?.drafts, color: 'text-amber-500' },
               { to: '/review', icon: ClipboardCheck, label: 'Training', count: viewCounts?.review, color: 'text-purple-500' },
               { to: '/snoozed', icon: Clock, label: 'Snoozed', count: viewCounts?.snoozed, color: 'text-amber-500' },
-              { to: '/done', icon: CheckCircle2, label: 'Done', count: viewCounts?.done, color: 'text-green-500' },
+              { to: '/done', icon: CheckCircle2, label: 'Cleared', count: viewCounts?.done, color: 'text-green-500' },
               { to: '/sent', icon: Send, label: 'Sent' },
-              { to: '/all-open', icon: Inbox, label: 'Inbox (All)' },
               { to: '/channels', icon: MessageSquare, label: 'Channels' },
               { to: '/analytics', icon: BarChart3, label: 'Analytics' },
               { to: '/knowledge-base', icon: BookOpen, label: 'Knowledge Base' },
@@ -178,12 +178,13 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
         {/* Primary nav - top anchored */}
         <nav className="flex flex-col items-center gap-1">
           <IconRailItem to="/" icon={Home} label="Home" end />
-          <IconRailItem to="/to-reply" icon={Inbox} label="Inbox" count={viewCounts?.toReply} color="text-destructive" />
+          <IconRailItem to="/all-open" icon={Inbox} label="Inbox" />
+          <IconRailItem to="/to-reply" icon={Mail} label="Needs Action" count={viewCounts?.toReply} color="text-destructive" />
           <IconRailItem to="/unread" icon={Eye} label="Unread" count={viewCounts?.unread} color="text-blue-500" />
           <IconRailItem to="/drafts" icon={FileEdit} label="Drafts" count={viewCounts?.drafts} color="text-amber-500" />
           <IconRailItem to="/review" icon={ClipboardCheck} label="Training" count={viewCounts?.review} color="text-purple-500" />
           <IconRailItem to="/snoozed" icon={Clock} label="Snoozed" count={viewCounts?.snoozed} color="text-amber-500" />
-          <IconRailItem to="/done" icon={CheckCircle2} label="Done" count={viewCounts?.done} color="text-green-500" />
+          <IconRailItem to="/done" icon={CheckCircle2} label="Cleared" count={viewCounts?.done} color="text-green-500" />
           <IconRailItem to="/sent" icon={Send} label="Sent" color="text-blue-500" />
         </nav>
 

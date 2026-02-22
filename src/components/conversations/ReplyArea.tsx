@@ -193,8 +193,8 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend, ex
         : "px-5 pb-4 pt-2"
     }>
       <div className={cn(
-        !useMobileStyle && "bg-card rounded-2xl overflow-hidden",
-        !useMobileStyle && replyBody && draftUsed && "ring-2 ring-inset ring-purple-200 dark:ring-purple-500/30 shadow-sm focus-within:ring-2 focus-within:ring-purple-500 transition-all",
+        !useMobileStyle && "bg-card rounded-2xl",
+        !useMobileStyle && replyBody && draftUsed && "ring-1 ring-inset ring-purple-300 shadow-sm focus-within:ring-2 focus-within:ring-purple-500 transition-all",
         !useMobileStyle && !(replyBody && draftUsed) && "ring-1 ring-inset ring-border shadow-sm focus-within:ring-2 focus-within:ring-primary transition-all"
       )}>
       <Tabs defaultValue="reply" orientation={isMobile ? "vertical" : "horizontal"}>
