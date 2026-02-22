@@ -10,6 +10,7 @@ import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Checkbox } from '@/components/ui/checkbox';
 import { ReviewQueueItem } from '@/components/review/ReviewQueueItem';
 import { ChannelIcon } from '@/components/shared/ChannelIcon';
 import { CategoryLabel } from '@/components/shared/CategoryLabel';
@@ -1083,706 +1084,515 @@ export default function Review() {
   const reviewQueueIds = new Set(reviewQueue.map(c => c.id));
   const filteredRecentClassifications = recentClassifications.filter(c => !reviewQueueIds.has(c.id));
 
+  // Get currently selected conversation (from either queue)
+  const selectedConv = selectedRecentId 
+    ? recentClassifications.find(c => c.id === selectedRecentId) || null
+    : currentConversation || null;
+
+  const selectedEmailBody = selectedConv 
+    ? cleanEmailContent(stripHtml(selectedConv.messages?.[0]?.raw_payload?.body || selectedConv.messages?.[0]?.body || ''))
+    : '';
+
+  const confidencePercent = selectedConv?.triage_confidence != null ? Math.round(selectedConv.triage_confidence * 100) : null;
+  const confidenceColor = confidencePercent != null
+    ? confidencePercent >= 90 ? 'text-green-600' : confidencePercent >= 70 ? 'text-amber-600' : 'text-red-600'
+    : 'text-muted-foreground';
+
+  // Sender pattern count
+  const selectedSenderEmail = selectedConv?.customer?.email;
+  const selectedSenderDomain = selectedSenderEmail?.split('@')[1];
+  const senderEmailCount = selectedSenderDomain
+    ? [...reviewQueue, ...filteredRecentClassifications].filter(c => c.customer?.email?.endsWith(`@${selectedSenderDomain}`)).length
+    : 0;
+  const senderClassifications = selectedSenderDomain
+    ? [...reviewQueue, ...filteredRecentClassifications]
+        .filter(c => c.customer?.email?.endsWith(`@${selectedSenderDomain}`))
+        .map(c => c.email_classification)
+        .filter(Boolean)
+    : [];
+  const dominantClassification = senderClassifications.length > 0
+    ? senderClassifications.sort((a, b) =>
+        senderClassifications.filter(v => v === b).length - senderClassifications.filter(v => v === a).length
+      )[0]
+    : null;
+
+  // Accuracy metric (from reviewed items)
+  const accuracyPercent = reviewedIds.size > 0 ? Math.round(((reviewedIds.size - (reviewQueue.filter(c => reviewedIds.has(c.id)).length * 0.1)) / reviewedIds.size) * 100) : null;
+
   return (
     <div className="flex h-screen bg-muted/30">
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Compact Header */}
-        <div className="px-6 py-3 flex-shrink-0 flex items-center justify-between">
+        {/* Compact Top Bar */}
+        <div className="px-6 py-2.5 flex-shrink-0 flex items-center justify-between border-b border-border/30">
           <div className="flex items-center gap-3">
             <BackButton to="/" label="Home" />
-            <div>
-              <h1 className="text-lg font-semibold">Teach BizzyBee ✨</h1>
-              <p className="text-xs text-muted-foreground">Your feedback helps BizzyBee work more independently over time</p>
-            </div>
+            <h1 className="text-base font-semibold">Teach BizzyBee</h1>
             <ReviewExplainer />
           </div>
           <div className="flex items-center gap-4">
-            <div className="bg-card p-1 rounded-lg inline-flex items-center gap-1">
-              <button
-                className={cn(
-                  "px-4 py-1.5 rounded-md text-xs font-medium transition-all",
-                  activeTab === 'triage'
-                    ? "bg-white text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-                onClick={() => setActiveTab('triage')}
-              >
-                Triage Review
-                {reviewQueue.length > 0 && (
-                  <span className="ml-1.5 text-[10px] font-semibold text-muted-foreground">({reviewQueue.length})</span>
-                )}
-              </button>
-              <button
-                className={cn(
-                  "px-4 py-1.5 rounded-md text-xs font-medium transition-all",
-                  activeTab === 'low_confidence'
-                    ? "bg-white text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-                onClick={() => setActiveTab('low_confidence')}
-              >
-                Low Confidence
-                {lowConfidenceEmails.length > 0 && (
-                  <span className="ml-1.5 text-[10px] font-semibold text-muted-foreground">({lowConfidenceEmails.length})</span>
-                )}
-              </button>
-            </div>
-            <span className="text-xs text-muted-foreground whitespace-nowrap">
-              {activeTab === 'triage' 
-                ? `${totalCount - reviewedCount} remaining`
-                : `${lowConfidenceEmails.length} items`
-              }
+            {accuracyPercent != null && (
+              <div className="flex items-center gap-1.5 text-sm">
+                <Sparkles className="h-3.5 w-3.5 text-purple-500" />
+                <span className="font-medium">BizzyBee accuracy:</span>
+                <span className="font-semibold text-green-600">{accuracyPercent}%</span>
+                <span className="text-muted-foreground text-xs">this week</span>
+              </div>
+            )}
+            <span className="text-xs text-muted-foreground">
+              <strong className="text-foreground">{reviewedCount}</strong> reviewed today · <strong className="text-foreground">{totalCount - reviewedCount}</strong> remaining
             </span>
-            <div className="hidden lg:flex items-center gap-1 text-[10px] text-muted-foreground">
-              <kbd className="bg-white border border-border rounded px-1 py-0.5 font-mono shadow-sm">↑↓</kbd>
-              <span>nav</span>
-              <span className="mx-0.5">·</span>
-              <kbd className="bg-white border border-border rounded px-1 py-0.5 font-mono shadow-sm">L</kbd>
-              <span>confirm</span>
-              <span className="mx-0.5">·</span>
-              <kbd className="bg-white border border-border rounded px-1 py-0.5 font-mono shadow-sm">H</kbd>
-              <span>change</span>
-              <span className="mx-0.5">·</span>
-              <kbd className="bg-white border border-border rounded px-1 py-0.5 font-mono shadow-sm">S</kbd>
-              <span>skip</span>
-            </div>
           </div>
         </div>
 
-        {/* Low Confidence Tab */}
-        {activeTab === 'low_confidence' && (
-          <div className="flex-1 flex overflow-hidden gap-[1px] p-4 pt-2">
-            {/* Left: Low-confidence list */}
-            <div className="w-72 flex-shrink-0 flex flex-col bg-white rounded-2xl border border-border/40 shadow-sm overflow-hidden">
-              <div className="px-3 py-2 border-b bg-muted/30">
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Low Confidence Emails
-                </span>
-              </div>
-              <ScrollArea className="flex-1">
-                {lcLoading ? (
-                  <div className="p-4 text-center text-muted-foreground animate-pulse">Loading...</div>
-                ) : lowConfidenceEmails.length === 0 ? (
-                  <div className="p-4 text-center text-muted-foreground text-sm">
-                    No low-confidence emails to review
-                  </div>
+        {/* 3-Column Layout */}
+        <div className="flex-1 flex overflow-hidden gap-4 p-4 pt-3">
+          {/* Column 1: Classification Queue (350px) */}
+          <div className="w-[350px] min-w-[350px] flex-shrink-0 flex flex-col bg-card rounded-2xl border border-border/40 shadow-sm overflow-hidden">
+            {/* Queue header */}
+            <div className="px-3 py-2 border-b bg-muted/30 flex items-center justify-between">
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Classification Queue
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-xs"
+                onClick={() => {
+                  setIsMultiSelectMode(!isMultiSelectMode);
+                  if (isMultiSelectMode) setSelectedIds(new Set());
+                }}
+              >
+                {isMultiSelectMode ? (
+                  <><X className="h-3 w-3 mr-1" />Cancel</>
                 ) : (
-                  lowConfidenceEmails.map((email, idx) => (
-                    <div
-                      key={email.id}
-                      className={cn(
-                        "px-3 py-2.5 border-b cursor-pointer transition-colors",
-                        idx === lcIndex ? "bg-accent" : "hover:bg-muted/50"
-                      )}
-                      onClick={() => setLcIndex(idx)}
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-medium truncate max-w-[160px]">
-                          {email.from_email || 'Unknown'}
-                        </span>
-                        <Badge variant="outline" className="text-[10px] px-1 h-4">
-                          {Math.round((email.confidence || 0) * 100)}%
-                        </Badge>
-                      </div>
-                      <p className="text-xs text-muted-foreground truncate">{email.subject || '(no subject)'}</p>
-                      <Badge variant="secondary" className="text-[10px] mt-1">{email.category}</Badge>
-                    </div>
-                  ))
+                  <><CheckCheck className="h-3 w-3 mr-1" />Select</>
                 )}
-              </ScrollArea>
+              </Button>
             </div>
 
-            {/* Right: Detail + actions */}
-            <div className="flex-1 flex flex-col overflow-hidden bg-white rounded-2xl border border-border/40 shadow-sm ml-4">
-              {lowConfidenceEmails[lcIndex] ? (() => {
-                const lcEmail = lowConfidenceEmails[lcIndex];
-                return (
+            {/* Multi-select batch actions */}
+            {isMultiSelectMode && (
+              <div className="px-3 py-1.5 border-b bg-muted/20 flex flex-wrap gap-1">
+                <Button variant="outline" size="sm" className="h-6 px-2 text-xs" onClick={selectAll}>Select all</Button>
+                {selectedIds.size > 0 && (
                   <>
-                    <div className="p-6 border-b">
-                      <div className="flex items-center justify-between mb-2">
-                        <div>
-                          <h2 className="font-semibold text-lg">{lcEmail.subject || '(no subject)'}</h2>
-                          <p className="text-sm text-muted-foreground">From: {lcEmail.from_email}</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline">
-                            AI classified: <span className="font-semibold ml-1">{lcEmail.category}</span>
-                          </Badge>
-                          <Badge variant="secondary">
-                            {Math.round((lcEmail.confidence || 0) * 100)}% confident
-                          </Badge>
-                        </div>
-                      </div>
-                    </div>
-                    <ScrollArea className="flex-1 p-6">
-                      <div className="max-w-2xl">
-                        <p className="text-sm whitespace-pre-wrap">{(lcEmail.body || '').substring(0, 1000)}</p>
-                      </div>
-                    </ScrollArea>
-                    <div className="border-t p-4 flex items-center gap-3">
-                      <Button
-                        onClick={() => lcConfirmMutation.mutate(lcEmail.id)}
-                        disabled={lcConfirmMutation.isPending}
-                        className="gap-1.5"
-                      >
-                        <Check className="h-4 w-4" />
-                        Looks right
-                      </Button>
-                      <div className="flex items-center gap-1.5 ml-2">
-                        <span className="text-sm text-muted-foreground">Change to:</span>
-                        {['inquiry', 'booking', 'quote', 'complaint', 'follow_up', 'spam', 'notification', 'personal'].filter(c => c !== lcEmail.category).map(cat => (
-                          <Button
-                            key={cat}
-                            variant="outline"
-                            size="sm"
-                            className="h-7 text-xs"
-                            onClick={() => lcCorrectionMutation.mutate({
-                              emailId: lcEmail.id,
-                              correctedCategory: cat,
-                              correctedRequiresReply: !['spam', 'notification'].includes(cat),
-                            })}
-                            disabled={lcCorrectionMutation.isPending}
-                          >
-                            {cat.replace('_', ' ')}
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
+                    <Button variant="outline" size="sm" className="h-6 px-2 text-xs bg-green-50 hover:bg-green-100 text-green-700 border-green-200" onClick={handleBatchConfirm} disabled={batchReviewMutation.isPending}>
+                      <Check className="h-3 w-3 mr-1" />Approve ({selectedIds.size})
+                    </Button>
+                    <Button variant="outline" size="sm" className="h-6 px-2 text-xs" onClick={() => handleBatchAction('auto_handled')} disabled={batchReviewMutation.isPending}>
+                      Mark done ({selectedIds.size})
+                    </Button>
                   </>
-                );
-              })() : (
-                <div className="flex-1 flex items-center justify-center text-muted-foreground">
-                  No low-confidence emails to review
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+                )}
+              </div>
+            )}
 
-        {/* Triage Review - Split panel layout */}
-        {activeTab === 'triage' && <div className="flex-1 flex overflow-hidden gap-4 p-4 pt-2">
-          {/* Left: Queue list */}
-          <div className="w-[340px] min-w-[340px] flex-shrink-0 flex flex-col bg-white rounded-2xl border border-border/40 shadow-sm overflow-hidden">
-            {/* Queue header with batch actions */}
-            <div className="px-3 py-2 border-b bg-muted/30 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Training Queue
-                </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 px-2 text-xs"
-                  onClick={() => {
-                    setIsMultiSelectMode(!isMultiSelectMode);
-                    if (isMultiSelectMode) {
-                      setSelectedIds(new Set());
-                    }
-                  }}
-                >
-                  {isMultiSelectMode ? (
-                    <>
-                      <X className="h-3 w-3 mr-1" />
-                      Cancel
-                    </>
-                  ) : (
-                    <>
-                      <CheckCheck className="h-3 w-3 mr-1" />
-                      Select
-                    </>
-                  )}
+            {/* Domain batch action */}
+            {!isMultiSelectMode && senderDomain && sameDomainConversations.length > 1 && (
+              <div className="px-3 py-1.5 border-b bg-muted/20">
+                <Button variant="outline" size="sm" className="w-full h-7 text-xs justify-start" onClick={handleBatchApproveDomain} disabled={batchReviewMutation.isPending}>
+                  <CheckCheck className="h-3 w-3 mr-1.5" />Approve all from @{senderDomain} ({sameDomainConversations.length})
                 </Button>
               </div>
-
-              {/* Multi-select mode actions */}
-              {isMultiSelectMode && (
-                <div className="flex flex-wrap gap-1">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-6 px-2 text-xs"
-                    onClick={selectAll}
-                  >
-                    Select all
-                  </Button>
-                  {selectedIds.size > 0 && (
-                    <>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-6 px-2 text-xs bg-green-50 hover:bg-green-100 text-green-700 border-green-200"
-                        onClick={handleBatchConfirm}
-                        disabled={batchReviewMutation.isPending}
-                      >
-                        <Check className="h-3 w-3 mr-1" />
-                        Approve ({selectedIds.size})
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-6 px-2 text-xs"
-                        onClick={() => handleBatchAction('auto_handled')}
-                        disabled={batchReviewMutation.isPending}
-                      >
-                        Mark done ({selectedIds.size})
-                      </Button>
-                    </>
-                  )}
-                </div>
-              )}
-
-              {/* Domain batch action */}
-              {!isMultiSelectMode && senderDomain && sameDomainConversations.length > 1 && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full h-7 text-xs justify-start"
-                  onClick={handleBatchApproveDomain}
-                  disabled={batchReviewMutation.isPending}
-                >
-                  <CheckCheck className="h-3 w-3 mr-1.5" />
-                  Approve all from @{senderDomain} ({sameDomainConversations.length})
-                </Button>
-              )}
-            </div>
+            )}
 
             {/* Smart batch actions */}
             {!isMultiSelectMode && (
               <SmartBatchActions
                 reviewQueue={reviewQueue}
                 reviewedIds={reviewedIds}
-                onBatchApprove={(ids) => {
-                  batchReviewMutation.mutate({
-                    conversationIds: ids,
-                    outcome: 'confirmed',
-                  });
-                }}
+                onBatchApprove={(ids) => batchReviewMutation.mutate({ conversationIds: ids, outcome: 'confirmed' })}
                 isPending={batchReviewMutation.isPending}
               />
             )}
+
             <ScrollArea className="flex-1">
               {/* Needs Review section */}
               {isLoading ? (
-                <div className="p-4 text-center text-muted-foreground animate-pulse">
-                  Loading...
-                </div>
+                <div className="p-4 text-center text-muted-foreground animate-pulse">Loading...</div>
               ) : reviewQueue.length > 0 ? (
                 <>
-                  <div className="px-3 py-1.5 bg-destructive/10 border-b">
+                  <div className="px-3 py-1.5 bg-destructive/10 border-b sticky top-0 z-10">
                     <span className="text-[10px] font-semibold uppercase tracking-wider text-destructive">
                       Needs Review ({reviewQueue.length})
                     </span>
                   </div>
-                  {reviewQueue.map((conv, idx) => (
-                    <ReviewQueueItem
-                      key={conv.id}
-                      conversation={conv}
-                      isActive={idx === currentIndex && !isMultiSelectMode && !selectedRecentId}
-                      isReviewed={reviewedIds.has(conv.id)}
-                      isSelected={selectedIds.has(conv.id)}
-                      isMultiSelectMode={isMultiSelectMode}
-                      onClick={(e) => { setSelectedRecentId(null); handleItemClick(idx, e); }}
-                      onToggleSelect={() => toggleSelection(conv.id)}
-                    />
-                  ))}
+                  {reviewQueue.map((conv, idx) => {
+                    const conf = conv.triage_confidence != null ? Math.round(conv.triage_confidence * 100) : null;
+                    const confColor = conf != null ? (conf >= 90 ? 'text-green-600' : conf >= 70 ? 'text-amber-600' : 'text-red-500') : '';
+                    return (
+                      <div
+                        key={conv.id}
+                        onClick={(e) => { setSelectedRecentId(null); handleItemClick(idx, e); }}
+                        className={cn(
+                          "px-3 py-2.5 cursor-pointer border-b border-border/30 transition-all",
+                          "hover:bg-accent/50",
+                          idx === currentIndex && !isMultiSelectMode && !selectedRecentId && "bg-primary/10 border-l-[3px] border-l-primary",
+                          selectedIds.has(conv.id) && "bg-primary/15 border-l-[3px] border-l-primary",
+                          reviewedIds.has(conv.id) && "opacity-50"
+                        )}
+                      >
+                        <div className="flex items-center gap-2">
+                          {isMultiSelectMode && (
+                            <Checkbox checked={selectedIds.has(conv.id)} onCheckedChange={() => toggleSelection(conv.id)} onClick={(e) => e.stopPropagation()} className="h-4 w-4 flex-shrink-0" />
+                          )}
+                          {reviewedIds.has(conv.id) && !isMultiSelectMode && (
+                            <Check className="h-3.5 w-3.5 text-green-600 flex-shrink-0" />
+                          )}
+                          {conv.channel && !reviewedIds.has(conv.id) && !isMultiSelectMode && (
+                            <ChannelIcon channel={conv.channel} className="h-3 w-3 flex-shrink-0" />
+                          )}
+                          {/* Avatar circle */}
+                          <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                            <span className="text-xs font-semibold text-primary">
+                              {(getSenderName(conv))[0]?.toUpperCase() || '?'}
+                            </span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <span className={cn("text-sm truncate block", idx === currentIndex && !selectedRecentId ? "font-medium" : "text-foreground/80")}>
+                              {getSenderName(conv)}
+                            </span>
+                          </div>
+                          {conf != null && (
+                            <span className={cn("text-[10px] font-semibold flex-shrink-0", confColor)}>{conf}%</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5 mt-0.5 pl-9">
+                          <p className="text-xs text-muted-foreground truncate flex-1">
+                            {conv.title || 'No subject'}
+                          </p>
+                          {conv.email_classification && (
+                            <Badge variant="secondary" className="text-[9px] px-1.5 py-0 h-4 flex-shrink-0 capitalize">
+                              {conv.email_classification.replace(/_/g, ' ')}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </>
               ) : null}
 
               {/* Recent Classifications section */}
               {filteredRecentClassifications.length > 0 && (
                 <>
-                  <div className="px-3 py-1.5 bg-muted/50 border-b border-t">
+                  <div className="px-3 py-1.5 bg-muted/50 border-b border-t sticky top-0 z-10">
                     <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                       Recent Classifications ({filteredRecentClassifications.length})
                     </span>
                   </div>
-                  {filteredRecentClassifications.map((conv) => (
-                    <div
-                      key={conv.id}
-                      onClick={() => { setSelectedRecentId(conv.id); }}
-                      className={cn(
-                        "px-3 py-2.5 cursor-pointer border-b border-border/30 transition-all hover:bg-accent/50",
-                        selectedRecentId === conv.id && "bg-primary/8 border-l-[3px] border-l-primary"
-                      )}
-                    >
-                      <div className="flex items-center gap-2">
-                        {conv.channel && (
-                          <ChannelIcon channel={conv.channel} className="h-3 w-3 flex-shrink-0" />
+                  {filteredRecentClassifications.map((conv) => {
+                    const conf = conv.triage_confidence != null ? Math.round(conv.triage_confidence * 100) : null;
+                    const confColor = conf != null ? (conf >= 90 ? 'text-green-600' : conf >= 70 ? 'text-amber-600' : 'text-red-500') : '';
+                    return (
+                      <div
+                        key={conv.id}
+                        onClick={() => { setSelectedRecentId(conv.id); }}
+                        className={cn(
+                          "px-3 py-2.5 cursor-pointer border-b border-border/30 transition-all hover:bg-accent/50",
+                          selectedRecentId === conv.id && "bg-primary/10 border-l-[3px] border-l-primary"
                         )}
-                        <span className="text-sm truncate flex-1 text-foreground/80">
-                          {conv.messages?.[0]?.actor_name || conv.customer?.name || conv.customer?.email?.split('@')[0] || 'Unknown Sender'}
-                        </span>
-                        <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 flex-shrink-0">
-                          {Math.round((conv.triage_confidence || 0) * 100)}%
-                        </Badge>
+                      >
+                        <div className="flex items-center gap-2">
+                          {conv.channel && <ChannelIcon channel={conv.channel} className="h-3 w-3 flex-shrink-0" />}
+                          <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                            <span className="text-xs font-semibold text-muted-foreground">
+                              {(conv.messages?.[0]?.actor_name || conv.customer?.name || '?')[0]?.toUpperCase()}
+                            </span>
+                          </div>
+                          <span className="text-sm truncate flex-1 text-foreground/80">
+                            {conv.messages?.[0]?.actor_name || conv.customer?.name || conv.customer?.email?.split('@')[0] || 'Unknown'}
+                          </span>
+                          {conf != null && (
+                            <span className={cn("text-[10px] font-semibold flex-shrink-0", confColor)}>{conf}%</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5 mt-0.5 pl-9">
+                          <p className="text-xs text-muted-foreground truncate flex-1">{conv.title || 'No subject'}</p>
+                          {conv.email_classification && (
+                            <Badge variant="secondary" className="text-[9px] px-1.5 py-0 h-4 flex-shrink-0 capitalize">
+                              {conv.email_classification.replace(/_/g, ' ')}
+                            </Badge>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                        <p className="text-xs text-muted-foreground truncate flex-1">
-                          {conv.title || 'No subject'}
-                        </p>
-                        {conv.email_classification && (
-                          <Badge variant="secondary" className="text-[9px] px-1 py-0 h-4 flex-shrink-0">
-                            {conv.email_classification.replace(/_/g, ' ')}
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </>
               )}
 
               {reviewQueue.length === 0 && filteredRecentClassifications.length === 0 && !isLoading && (
-                <div className="p-4 text-center text-muted-foreground text-sm">
-                  No classified conversations yet
-                </div>
+                <div className="p-4 text-center text-muted-foreground text-sm">No classified conversations yet</div>
               )}
             </ScrollArea>
           </div>
 
-          {/* Right: Detail + Decision */}
-          <div className="flex-1 flex flex-col overflow-hidden bg-white rounded-2xl border border-border/40 shadow-sm">
-            {isLoading ? (
-              <div className="flex-1 flex items-center justify-center">
-                <div className="animate-pulse text-muted-foreground">Loading...</div>
-              </div>
-            ) : selectedRecentId ? (() => {
-              const recentConv = recentClassifications.find(c => c.id === selectedRecentId);
-              if (!recentConv) return null;
-              const recentEmailBody = cleanEmailContent(stripHtml(recentConv.messages?.[0]?.raw_payload?.body || recentConv.messages?.[0]?.body || ''));
-              return (
-                <div className="flex-1 flex flex-col overflow-y-auto p-6">
-                  <Card className="flex-1 flex flex-col max-w-3xl mx-auto w-full p-6">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex items-center gap-2">
-                        {recentConv.channel && (
-                          <ChannelIcon channel={recentConv.channel} className="h-4 w-4" />
-                        )}
-                        <div>
-                          <p className="font-medium">{getSenderName(recentConv)}</p>
-                          <p className="text-sm text-muted-foreground">{getSenderEmail(recentConv)}</p>
-                        </div>
-                      </div>
-                      <span className="text-sm text-muted-foreground">
-                        {format(new Date(recentConv.created_at), 'MMM d, h:mm a')}
-                      </span>
+          {/* Column 2: Email Preview (flex) */}
+          <div className="flex-1 flex flex-col overflow-hidden bg-card rounded-2xl border border-border/40 shadow-sm">
+            {selectedConv ? (
+              <div className="flex-1 flex flex-col overflow-y-auto">
+                {/* Sender row */}
+                <div className="px-6 py-4 border-b flex items-start justify-between flex-shrink-0">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <span className="text-sm font-semibold text-primary">{(getSenderName(selectedConv))[0]?.toUpperCase() || '?'}</span>
                     </div>
-                    <h3 className="font-semibold text-lg mb-4">{recentConv.title || 'No subject'}</h3>
-                    <div className="text-sm whitespace-pre-wrap mb-4 max-h-64 overflow-y-auto text-foreground/80">
-                      {recentEmailBody.substring(0, 800) || 'No content'}
+                    <div>
+                      <p className="font-semibold">{getSenderName(selectedConv)}</p>
+                      <p className="text-xs text-muted-foreground">{getSenderEmail(selectedConv)}</p>
                     </div>
-                    <div className="bg-muted/30 rounded-xl p-4 border-t border-border/50 mb-4">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Sparkles className="h-4 w-4 text-purple-500" />
-                        <span className="text-sm font-medium">AI Classification</span>
-                      </div>
-                      <div className="flex items-center gap-3 flex-wrap">
-                        <Badge className={bucketColors[recentConv.decision_bucket] || 'bg-muted'}>
-                          {bucketLabels[recentConv.decision_bucket] || recentConv.decision_bucket || 'Unknown'}
-                        </Badge>
-                        {recentConv.email_classification && (
-                          <Badge variant="outline">{recentConv.email_classification.replace(/_/g, ' ')}</Badge>
-                        )}
-                        {recentConv.triage_confidence != null && (
-                          <Badge variant="secondary">{Math.round(recentConv.triage_confidence * 100)}% confident</Badge>
-                        )}
-                      </div>
-                      {recentConv.why_this_needs_you && (
-                        <p className="text-xs text-muted-foreground mt-2">{recentConv.why_this_needs_you}</p>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Button variant="outline" className="flex-1" onClick={() => setShowRecentCorrectionFlow(true)}>
-                        <RefreshCw className="h-4 w-4 mr-2" />
-                        Correct Classification
-                      </Button>
-                      <Button variant="ghost" onClick={() => navigate(`/conversation/${recentConv.id}`)}>
-                        <Eye className="h-4 w-4 mr-2" />
-                        View Full
-                      </Button>
-                    </div>
-                  </Card>
-                </div>
-              );
-            })() : currentConversation ? (
-              <div className="flex-1 flex flex-col overflow-y-auto p-6">
-                <Card className="flex-1 flex flex-col max-w-3xl mx-auto w-full p-6">
-                  {/* Sender info */}
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center gap-2">
-                      {currentConversation.channel && (
-                        <ChannelIcon channel={currentConversation.channel} className="h-4 w-4" />
-                      )}
-                      <div>
-                        <p className="font-medium">
-                          {getSenderName(currentConversation)}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {getSenderEmail(currentConversation)}
-                        </p>
-                      </div>
-                    </div>
-                    <span className="text-sm text-muted-foreground">
-                      {format(new Date(currentConversation.created_at), 'MMM d, h:mm a')}
-                    </span>
                   </div>
+                  <span className="text-xs text-muted-foreground">{format(new Date(selectedConv.created_at), 'MMM d, h:mm a')}</span>
+                </div>
 
-                  {/* Subject */}
-                  <h3 className="text-xl font-semibold text-foreground mb-2">
-                    {currentConversation.title || 'No subject'}
-                  </h3>
+                {/* AI context bento strip */}
+                <div className="px-6 py-3 border-b bg-muted/20 flex items-center gap-3 flex-wrap flex-shrink-0">
+                  {selectedConv.summary_for_human && (
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Bot className="h-3.5 w-3.5 text-purple-500" />
+                      <span className="line-clamp-1">{selectedConv.summary_for_human}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-1.5 ml-auto">
+                    {selectedConv.email_classification && (
+                      <CategoryLabel classification={selectedConv.email_classification} size="sm" />
+                    )}
+                    <Badge className={cn("text-[10px]", bucketColors[selectedConv.decision_bucket || 'wait'])}>
+                      {bucketLabels[selectedConv.decision_bucket || 'wait']}
+                    </Badge>
+                  </div>
+                </div>
 
-                  {/* Preview */}
+                {/* Subject */}
+                <div className="px-6 pt-4 pb-2 flex-shrink-0">
+                  <h2 className="text-lg font-semibold">{selectedConv.title || 'No subject'}</h2>
+                </div>
+
+                {/* Email body */}
+                <div className="flex-1 px-6 pb-4 overflow-y-auto">
                   <EmailPreview
-                    body={currentConversation.messages[0]?.body || ''}
-                    summary={currentConversation.summary_for_human}
-                    maxLength={600}
-                    rawHtmlBody={(currentConversation.messages[0]?.raw_payload as { body?: string })?.body}
+                    body={selectedConv.messages[0]?.body || ''}
+                    summary={selectedConv.summary_for_human}
+                    maxLength={2000}
+                    rawHtmlBody={(selectedConv.messages[0]?.raw_payload as { body?: string })?.body}
                   />
 
-                  {/* AI Draft Available */}
-                  {currentConversation.ai_draft_response && (
-                    <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 border border-green-200 dark:border-green-800 mb-4">
+                  {/* AI Draft */}
+                  {selectedConv.ai_draft_response && (
+                    <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-4 border border-green-200 dark:border-green-800 mb-4">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <Sparkles className="h-4 w-4 text-green-600" />
-                          <span className="text-sm font-medium text-green-700 dark:text-green-300">
-                            AI draft ready
-                          </span>
+                          <span className="text-sm font-medium text-green-700 dark:text-green-300">AI draft ready</span>
                         </div>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7 text-xs gap-1.5 border-green-300 text-green-700 hover:bg-green-100"
-                          onClick={() => setShowDraftEditor(true)}
-                        >
-                          <Send className="h-3 w-3" />
-                          Edit & Send Reply
+                        <Button size="sm" variant="outline" className="h-7 text-xs gap-1.5 border-green-300 text-green-700 hover:bg-green-100" onClick={() => setShowDraftEditor(true)}>
+                          <Send className="h-3 w-3" />Edit & Send
                         </Button>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-2 line-clamp-2">
-                        {currentConversation.ai_draft_response.substring(0, 150)}...
-                      </p>
+                      <p className="text-xs text-muted-foreground mt-2 line-clamp-2">{selectedConv.ai_draft_response.substring(0, 200)}...</p>
                     </div>
                   )}
 
-                  {/* BizzyBee's decision */}
-                  <div className="bg-muted/30 rounded-xl p-4 mt-6 border-t border-border/50">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Sparkles className="h-4 w-4 text-purple-500" />
-                      <span className="text-sm font-medium">
-                        BizzyBee thinks:
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <Badge className={bucketColors[currentConversation.decision_bucket] || 'bg-muted'}>
-                        {bucketLabels[currentConversation.decision_bucket] || currentConversation.decision_bucket}
-                      </Badge>
-                      {/* Editable classification type */}
-                      <CategoryLabel 
-                        classification={currentConversation.email_classification} 
-                        size="sm" 
-                        editable={true}
-                        onClick={() => setShowCorrectionFlow(true)}
-                      />
-                      <span className="text-sm text-muted-foreground">
-                        {currentConversation.why_this_needs_you || 'No explanation provided'}
-                      </span>
-                    </div>
-                    {currentConversation.triage_confidence && (
-                      <p className="text-xs text-muted-foreground mt-2">
-                        Confidence: {Math.round(currentConversation.triage_confidence * 100)}%
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Teach BizzyBee More - Collapsible */}
-                  <Collapsible open={showTeachMore} onOpenChange={setShowTeachMore} className="mb-4">
-                    <CollapsibleTrigger asChild>
-                      <Button variant="ghost" className="w-full justify-between text-muted-foreground hover:text-foreground">
-                        <span className="flex items-center gap-2">
-                          <Sparkles className="h-4 w-4" />
-                          Teach BizzyBee more (optional)
-                        </span>
-                        {showTeachMore ? (
-                          <ChevronDown className="h-4 w-4" />
-                        ) : (
-                          <ChevronRight className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent className="space-y-4 pt-4">
-                      <div className="bg-muted/30 rounded-lg p-4 space-y-4">
-                        {senderDomain && (
-                          <p className="text-sm font-medium text-muted-foreground">
-                            For emails from @{senderDomain}:
-                          </p>
-                        )}
-                        
-                        {/* Automation Level */}
-                        <div className="space-y-3">
-                          <Label className="text-sm font-medium">How should BizzyBee handle these?</Label>
-                          <RadioGroup 
-                            value={automationLevel} 
-                            onValueChange={(val) => setAutomationLevel(val as AutomationLevel)}
-                            className="space-y-2"
-                          >
-                            <div className="flex items-center space-x-3 p-2 rounded-md hover:bg-muted/50">
-                              <RadioGroupItem value="auto" id="auto" />
-                              <Label htmlFor="auto" className="flex items-center gap-2 cursor-pointer font-normal">
-                                <Bot className="h-4 w-4 text-green-500" />
-                                Always auto-handle (don't bother me)
-                              </Label>
-                            </div>
-                            <div className="flex items-center space-x-3 p-2 rounded-md hover:bg-muted/50">
-                              <RadioGroupItem value="draft_first" id="draft_first" />
-                              <Label htmlFor="draft_first" className="flex items-center gap-2 cursor-pointer font-normal">
-                                <FileEdit className="h-4 w-4 text-amber-500" />
-                                Draft replies but ask me first
-                              </Label>
-                            </div>
-                            <div className="flex items-center space-x-3 p-2 rounded-md hover:bg-muted/50">
-                              <RadioGroupItem value="always_review" id="always_review" />
-                              <Label htmlFor="always_review" className="flex items-center gap-2 cursor-pointer font-normal">
-                                <Eye className="h-4 w-4 text-blue-500" />
-                                Always show in Review first
-                              </Label>
-                            </div>
-                          </RadioGroup>
-                        </div>
-
-                        {/* Tone Preference */}
-                        <div className="space-y-3 pt-2 border-t border-border/50">
-                          <Label className="text-sm font-medium">Tone preference:</Label>
-                          <RadioGroup 
-                            value={tonePreference} 
-                            onValueChange={(val) => setTonePreference(val as TonePreference)}
-                            className="flex flex-wrap gap-4"
-                          >
-                            <div className="flex items-center space-x-2">
-                              <RadioGroupItem value="keep_current" id="keep_current" />
-                              <Label htmlFor="keep_current" className="cursor-pointer font-normal">Keep current</Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <RadioGroupItem value="more_formal" id="more_formal" />
-                              <Label htmlFor="more_formal" className="cursor-pointer font-normal">More formal</Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <RadioGroupItem value="more_brief" id="more_brief" />
-                              <Label htmlFor="more_brief" className="cursor-pointer font-normal">More brief</Label>
-                            </div>
-                          </RadioGroup>
-                        </div>
+                  {/* AI Reasoning */}
+                  {selectedConv.why_this_needs_you && (
+                    <div className="mt-4 pt-4 border-t border-border/50">
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <Bot className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">AI Reasoning</span>
                       </div>
-                    </CollapsibleContent>
-                  </Collapsible>
-
-                  {/* Actions */}
-                  <div className="grid grid-cols-2 gap-4 mt-6 border-t border-slate-100 pt-6">
-                    {!showChangePicker ? (
-                      <>
-                        <Button 
-                          variant="outline"
-                          onClick={() => setShowChangePicker(true)}
-                          className="w-full text-slate-700 bg-white hover:bg-slate-50 border-slate-200 shadow-sm h-11 font-medium"
-                          disabled={reviewMutation.isPending}
-                        >
-                          ✏️ Change
-                          <kbd className="ml-2 bg-white border border-slate-200 rounded px-1.5 py-0.5 text-[11px] font-mono text-slate-500 shadow-sm uppercase font-semibold">H</kbd>
-                        </Button>
-                        <Button 
-                          onClick={handleConfirm}
-                          className="w-full bg-purple-600 text-white hover:bg-purple-700 shadow-sm h-11 font-medium text-base"
-                          disabled={reviewMutation.isPending}
-                        >
-                          ✨ Looks Good
-                          <kbd className="ml-2 bg-purple-500/30 border border-purple-400/30 rounded px-1.5 py-0.5 text-[11px] font-mono text-white/80 shadow-sm uppercase font-semibold">L</kbd>
-                        </Button>
-                      </>
-                    ) : (
-                      <div className="flex-1 space-y-3">
-                        <p className="text-sm font-medium">Where should this go?</p>
-                        <div className="grid grid-cols-2 gap-2">
-                          <Button
-                            variant="outline"
-                            className="justify-start"
-                            onClick={() => handleChange('act_now')}
-                            disabled={reviewMutation.isPending}
-                          >
-                            <span className="w-2 h-2 rounded-full bg-red-500 mr-2" />
-                            Needs attention
-                            <span className="ml-auto text-xs opacity-50">(1)</span>
-                          </Button>
-                          <Button
-                            variant="outline"
-                            className="justify-start"
-                            onClick={() => handleChange('quick_win')}
-                            disabled={reviewMutation.isPending}
-                          >
-                            <span className="w-2 h-2 rounded-full bg-amber-500 mr-2" />
-                            Needs reply
-                            <span className="ml-auto text-xs opacity-50">(2)</span>
-                          </Button>
-                          <Button
-                            variant="outline"
-                            className="justify-start"
-                            onClick={() => handleChange('wait')}
-                            disabled={reviewMutation.isPending}
-                          >
-                            <span className="w-2 h-2 rounded-full bg-slate-500 mr-2" />
-                            FYI
-                            <span className="ml-auto text-xs opacity-50">(3)</span>
-                          </Button>
-                          <Button
-                            variant="outline"
-                            className="justify-start"
-                            onClick={() => handleChange('auto_handled')}
-                            disabled={reviewMutation.isPending}
-                          >
-                            <span className="w-2 h-2 rounded-full bg-green-500 mr-2" />
-                            Auto-handled
-                            <span className="ml-auto text-xs opacity-50">(4)</span>
-                          </Button>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setShowChangePicker(false)}
-                          className="w-full"
-                        >
-                          Cancel (Esc)
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Skip option */}
-                  {!showChangePicker && currentIndex < reviewQueue.length - 1 && (
-                    <div className="text-center mt-4">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleSkip}
-                        className="text-muted-foreground"
-                      >
-                        <SkipForward className="h-4 w-4 mr-2" />
-                        Skip for now
-                        <span className="ml-2 text-xs opacity-70">(S)</span>
-                      </Button>
+                      <p className="text-xs text-muted-foreground leading-relaxed">{selectedConv.why_this_needs_you}</p>
+                      {selectedConv.triage_confidence != null && (
+                        <p className="text-[11px] text-muted-foreground/70 mt-1">
+                          Classification confidence: <span className={cn("font-semibold", confidenceColor)}>{confidencePercent}%</span>
+                          {selectedConv.email_classification && <> · Category: <span className="font-medium capitalize">{selectedConv.email_classification.replace(/_/g, ' ')}</span></>}
+                        </p>
+                      )}
                     </div>
                   )}
-                </Card>
+                </div>
               </div>
             ) : (
               <div className="flex-1 flex items-center justify-center">
                 <div className="text-center max-w-xs">
                   <Sparkles className="h-8 w-8 text-muted-foreground/30 mx-auto mb-3" />
-                  <p className="text-sm text-muted-foreground">Select an email from the left to review</p>
+                  <p className="text-sm text-muted-foreground">Select an email from the queue to preview</p>
                 </div>
               </div>
             )}
           </div>
-        </div>}
+
+          {/* Column 3: Classification Panel (300px) */}
+          <div className="w-[300px] min-w-[300px] flex-shrink-0 flex flex-col bg-card rounded-2xl border border-border/40 shadow-sm overflow-hidden">
+            {selectedConv ? (
+              <div className="flex-1 flex flex-col overflow-y-auto">
+                {/* Category + Confidence */}
+                <div className="p-4 border-b space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Badge className={cn("text-xs px-2 py-1", bucketColors[selectedConv.decision_bucket || 'wait'])}>
+                      {bucketLabels[selectedConv.decision_bucket || 'wait']}
+                    </Badge>
+                    {selectedConv.email_classification && (
+                      <Badge variant="outline" className="text-xs capitalize">{selectedConv.email_classification.replace(/_/g, ' ')}</Badge>
+                    )}
+                  </div>
+                  {confidencePercent != null && (
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">Confidence</span>
+                        <span className={cn("font-semibold", confidenceColor)}>{confidencePercent}%</span>
+                      </div>
+                      <Progress value={confidencePercent} className="h-2" />
+                    </div>
+                  )}
+                  <div className="text-xs text-muted-foreground">
+                    {selectedConv.decision_bucket === 'auto_handled' || selectedConv.decision_bucket === 'wait'
+                      ? '✓ Auto-handled'
+                      : '⚡ Needs action'}
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                {!selectedRecentId && !reviewedIds.has(selectedConv.id) ? (
+                  <div className="p-4 border-b space-y-3">
+                    {!showChangePicker ? (
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button
+                          variant="outline"
+                          className="border-green-300 text-green-700 hover:bg-green-50 hover:border-green-400 h-10"
+                          onClick={handleConfirm}
+                          disabled={reviewMutation.isPending}
+                        >
+                          <Check className="h-4 w-4 mr-1.5" />Correct
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="border-amber-300 text-amber-700 hover:bg-amber-50 hover:border-amber-400 h-10"
+                          onClick={() => setShowChangePicker(true)}
+                          disabled={reviewMutation.isPending}
+                        >
+                          <Pencil className="h-4 w-4 mr-1.5" />Change
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium text-muted-foreground">Select correct category:</p>
+                        {[
+                          { key: 'act_now', label: 'Needs attention', dot: 'bg-red-500' },
+                          { key: 'quick_win', label: 'Needs reply', dot: 'bg-amber-500' },
+                          { key: 'wait', label: 'FYI', dot: 'bg-slate-500' },
+                          { key: 'auto_handled', label: 'Auto-handled', dot: 'bg-green-500' },
+                        ].map(opt => (
+                          <Button
+                            key={opt.key}
+                            variant="outline"
+                            size="sm"
+                            className="w-full justify-start h-8 text-xs"
+                            onClick={() => handleChange(opt.key)}
+                            disabled={reviewMutation.isPending}
+                          >
+                            <span className={cn("w-2 h-2 rounded-full mr-2", opt.dot)} />
+                            {opt.label}
+                          </Button>
+                        ))}
+                        <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => setShowChangePicker(false)}>Cancel</Button>
+                      </div>
+                    )}
+
+                    {/* Skip */}
+                    {!showChangePicker && currentIndex < reviewQueue.length - 1 && (
+                      <Button variant="ghost" size="sm" className="w-full text-xs text-muted-foreground" onClick={handleSkip}>
+                        <SkipForward className="h-3.5 w-3.5 mr-1.5" />Skip for now
+                      </Button>
+                    )}
+                  </div>
+                ) : selectedRecentId ? (
+                  <div className="p-4 border-b">
+                    <Button variant="outline" className="w-full" onClick={() => setShowRecentCorrectionFlow(true)}>
+                      <RefreshCw className="h-4 w-4 mr-2" />Correct Classification
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="p-4 border-b">
+                    <div className="flex items-center gap-2 text-green-600 text-sm">
+                      <Check className="h-4 w-4" />
+                      <span className="font-medium">Reviewed</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Sender Patterns */}
+                {selectedSenderDomain && (
+                  <div className="p-4 border-b space-y-2">
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Sender Patterns</span>
+                    <p className="text-xs text-foreground/80">
+                      <strong>{senderEmailCount}</strong> email{senderEmailCount !== 1 ? 's' : ''} from <span className="font-medium">@{selectedSenderDomain}</span>
+                      {dominantClassification && (
+                        <> — mostly <Badge variant="secondary" className="text-[9px] px-1 py-0 h-4 capitalize inline ml-1">{dominantClassification.replace(/_/g, ' ')}</Badge></>
+                      )}
+                    </p>
+                  </div>
+                )}
+
+                {/* Teach More */}
+                <Collapsible open={showTeachMore} onOpenChange={setShowTeachMore}>
+                  <CollapsibleTrigger asChild>
+                    <button className="w-full px-4 py-3 flex items-center justify-between text-xs text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors border-b">
+                      <span className="flex items-center gap-1.5">
+                        <Sparkles className="h-3.5 w-3.5" />Teach more (optional)
+                      </span>
+                      {showTeachMore ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                    </button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="px-4 py-3 border-b space-y-3">
+                    <div className="space-y-2">
+                      <Label className="text-xs font-medium">Handle these emails:</Label>
+                      <RadioGroup value={automationLevel} onValueChange={(val) => setAutomationLevel(val as AutomationLevel)} className="space-y-1">
+                        {[
+                          { value: 'auto', label: 'Auto-handle', icon: <Bot className="h-3.5 w-3.5 text-green-500" /> },
+                          { value: 'draft_first', label: 'Draft first', icon: <FileEdit className="h-3.5 w-3.5 text-amber-500" /> },
+                          { value: 'always_review', label: 'Always review', icon: <Eye className="h-3.5 w-3.5 text-blue-500" /> },
+                        ].map(opt => (
+                          <div key={opt.value} className="flex items-center space-x-2 p-1.5 rounded hover:bg-muted/50">
+                            <RadioGroupItem value={opt.value} id={`auto-${opt.value}`} />
+                            <Label htmlFor={`auto-${opt.value}`} className="flex items-center gap-1.5 cursor-pointer text-xs font-normal">
+                              {opt.icon}{opt.label}
+                            </Label>
+                          </div>
+                        ))}
+                      </RadioGroup>
+                    </div>
+                    <div className="space-y-2 pt-2 border-t border-border/50">
+                      <Label className="text-xs font-medium">Tone:</Label>
+                      <RadioGroup value={tonePreference} onValueChange={(val) => setTonePreference(val as TonePreference)} className="flex flex-wrap gap-3">
+                        {[{ value: 'keep_current', label: 'Keep' }, { value: 'more_formal', label: 'Formal' }, { value: 'more_brief', label: 'Brief' }].map(opt => (
+                          <div key={opt.value} className="flex items-center space-x-1.5">
+                            <RadioGroupItem value={opt.value} id={`tone-${opt.value}`} />
+                            <Label htmlFor={`tone-${opt.value}`} className="cursor-pointer text-xs font-normal">{opt.label}</Label>
+                          </div>
+                        ))}
+                      </RadioGroup>
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+
+                {/* Keyboard shortcuts hint */}
+                <div className="mt-auto p-3 border-t bg-muted/20">
+                  <div className="flex items-center justify-center gap-3 text-[10px] text-muted-foreground">
+                    <span><kbd className="bg-card border border-border rounded px-1 py-0.5 font-mono shadow-sm">↑↓</kbd> nav</span>
+                    <span><kbd className="bg-card border border-border rounded px-1 py-0.5 font-mono shadow-sm">L</kbd> confirm</span>
+                    <span><kbd className="bg-card border border-border rounded px-1 py-0.5 font-mono shadow-sm">H</kbd> change</span>
+                    <span><kbd className="bg-card border border-border rounded px-1 py-0.5 font-mono shadow-sm">S</kbd> skip</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex-1 flex items-center justify-center p-6">
+                <p className="text-xs text-muted-foreground text-center">Select an email to see classification details</p>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Draft Reply Editor Sheet */}
