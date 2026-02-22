@@ -44,7 +44,7 @@ export const SearchInput = ({ value, onChange, placeholder = "Search conversatio
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="pl-9 pr-9"
+        className="pl-9 pr-9 text-ellipsis"
       />
       {value && (
         <Button
