@@ -7,6 +7,7 @@ import { MessageTimeline } from './MessageTimeline';
 import { ReplyArea } from './ReplyArea';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
 interface ConversationThreadProps {
@@ -282,33 +283,64 @@ export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackBut
       {conversation.customer_id && conversation.workspace_id && (
         <div className="flex-shrink-0 px-5 pb-2">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {/* Customer Profile Mini-Card */}
-            <div className="bg-slate-50/50 dark:bg-slate-800/30 rounded-xl border border-slate-100 dark:border-slate-700/50 p-4 shadow-sm">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Profile</span>
-              </div>
-              <div className="space-y-1.5">
-                <p className="text-sm font-medium text-foreground">{(conversation as any).customer?.name || 'Unknown'}</p>
-                <p className="text-xs text-muted-foreground">{(conversation as any).customer?.email || ''}</p>
-                {(conversation as any).customer?.phone && (
-                  <p className="text-xs text-muted-foreground">{(conversation as any).customer.phone}</p>
-                )}
+            {/* Customer Profile Mini-Card — iOS Contact Widget */}
+            <div className="relative bg-slate-50/50 dark:bg-slate-800/30 rounded-xl border border-slate-100 dark:border-slate-700/50 p-4 shadow-sm">
+              {conversation.status === 'open' && (
+                <span className="absolute top-3 right-3 inline-flex items-center gap-1 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-[10px] font-medium px-2 py-0.5 rounded-full">
+                  ✨ New Lead
+                </span>
+              )}
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white text-sm font-semibold flex-shrink-0">
+                  {((conversation as any).customer?.name || 'U').split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-lg font-semibold text-foreground truncate">{(conversation as any).customer?.name || 'Unknown'}</p>
+                  <p className="text-xs text-muted-foreground truncate">{(conversation as any).customer?.email || ''}</p>
+                  {(conversation as any).customer?.phone && (
+                    <p className="text-xs text-muted-foreground">{(conversation as any).customer.phone}</p>
+                  )}
+                </div>
               </div>
             </div>
-            {/* Customer Intelligence Mini-Card */}
+            {/* Customer Intelligence Mini-Card — Bento Box */}
             <div className="bg-slate-50/50 dark:bg-slate-800/30 rounded-xl border border-slate-100 dark:border-slate-700/50 p-4 shadow-sm">
-              <div className="flex items-center gap-2 mb-2">
+              <div className="flex items-center gap-2 mb-2.5">
                 <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Intelligence</span>
               </div>
-              <div className="space-y-1.5">
-                {conversation.ai_sentiment && (
-                  <p className="text-xs text-muted-foreground">Sentiment: <span className="font-medium text-foreground capitalize">{conversation.ai_sentiment}</span></p>
-                )}
-                {conversation.category && (
-                  <p className="text-xs text-muted-foreground">Category: <span className="font-medium text-foreground capitalize">{conversation.category}</span></p>
-                )}
-                {conversation.priority && (
-                  <p className="text-xs text-muted-foreground">Priority: <span className="font-medium text-foreground capitalize">{conversation.priority}</span></p>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {conversation.category && (
+                    <span className="bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 font-medium px-2.5 py-0.5 rounded-full text-xs">{conversation.category}</span>
+                  )}
+                  {conversation.priority && (
+                    <span className={cn(
+                      "font-medium px-2.5 py-0.5 rounded-full text-xs",
+                      conversation.priority === 'high' && "bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-300",
+                      conversation.priority === 'medium' && "bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300",
+                      conversation.priority === 'low' && "bg-slate-100 dark:bg-slate-500/20 text-slate-600 dark:text-slate-400"
+                    )}>{conversation.priority}</span>
+                  )}
+                  {conversation.ai_sentiment && (
+                    <span className={cn(
+                      "font-medium px-2.5 py-0.5 rounded-full text-xs",
+                      conversation.ai_sentiment === 'positive' && "bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-300",
+                      conversation.ai_sentiment === 'negative' && "bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300",
+                      conversation.ai_sentiment === 'frustrated' && "bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300",
+                      conversation.ai_sentiment === 'neutral' && "bg-slate-100 dark:bg-slate-500/20 text-slate-600 dark:text-slate-400"
+                    )}>{conversation.ai_sentiment}</span>
+                  )}
+                </div>
+                {/* Extracted Context Tags */}
+                {conversation.extracted_entities && Object.keys(conversation.extracted_entities as object).length > 0 && (
+                  <div>
+                    <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Extracted Context</span>
+                    <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                      {Object.entries(conversation.extracted_entities as Record<string, any>).slice(0, 6).map(([key, val]) => (
+                        <span key={key} className="bg-slate-100 dark:bg-slate-700/50 text-slate-700 dark:text-slate-300 rounded-md px-2 py-1 text-xs">{String(val)}</span>
+                      ))}
+                    </div>
+                  </div>
                 )}
                 {!conversation.ai_sentiment && !conversation.category && !conversation.priority && (
                   <p className="text-xs text-muted-foreground italic">No intelligence data yet</p>
