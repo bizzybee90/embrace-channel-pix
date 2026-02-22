@@ -421,7 +421,7 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
             <SearchInput
               value={searchQuery}
               onChange={setSearchQuery}
-              placeholder="Search or ask BizzyBee a question..."
+              placeholder="Search or ask BizzyBee..."
             />
           </div>
           <div className="flex items-center justify-end gap-2 text-xs text-muted-foreground">
