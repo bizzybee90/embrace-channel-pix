@@ -163,14 +163,6 @@ export const CustomerIntelligence = ({ workspaceId, customerId }: CustomerIntell
           <Brain className="h-5 w-5 text-primary" />
           Customer Intelligence
         </CardTitle>
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          onClick={analyzeCustomer}
-          disabled={analyzing}
-        >
-          {analyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-        </Button>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Status Badges */}
@@ -274,24 +266,19 @@ export const CustomerIntelligence = ({ workspaceId, customerId }: CustomerIntell
           </p>
         )}
 
-        {/* No Data State */}
+        {/* Ambient AI Loading State */}
         {!intelligence?.summary && insights.length === 0 && (
-          <div className="text-center py-6">
-            <Brain className="h-12 w-12 mx-auto text-muted-foreground/30 mb-3" />
-            <p className="text-sm text-muted-foreground mb-3">Intelligence builds automatically with each conversation</p>
-            <Button onClick={analyzeCustomer} disabled={analyzing} variant="ghost" size="sm">
-              {analyzing ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  Analyzing...
-                </>
-              ) : (
-                <>
-                  <Brain className="h-4 w-4 mr-2" />
-                  Analyze Customer
-                </>
-              )}
-            </Button>
+          <div className="space-y-4 animate-pulse">
+            <div className="flex gap-2">
+              <div className="h-5 w-16 bg-muted rounded-full" />
+              <div className="h-5 w-20 bg-muted rounded-full" />
+            </div>
+            <div className="h-12 bg-muted rounded-lg" />
+            <div className="space-y-2">
+              <div className="h-4 w-3/4 bg-muted rounded" />
+              <div className="h-4 w-1/2 bg-muted rounded" />
+            </div>
+            <p className="text-xs text-muted-foreground text-center pt-2">Building intelligence profile…</p>
           </div>
         )}
       </CardContent>

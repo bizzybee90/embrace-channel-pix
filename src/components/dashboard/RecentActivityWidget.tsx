@@ -30,7 +30,7 @@ export const RecentActivityWidget = () => {
   const fetchRecentActivity = async () => {
     setLoading(true);
     
-    // Fetch recent inbound messages with conversation data for category
+    // Fetch 5 most recent inbound messages — true chronological feed
     const { data: messages } = await supabase
       .from('messages')
       .select(`
@@ -42,57 +42,11 @@ export const RecentActivityWidget = () => {
       .order('created_at', { ascending: false })
       .limit(5);
 
-    // Fetch recent escalations (today)
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const { data: escalations } = await supabase
-      .from('conversations')
-      .select('id, title, channel, escalated_at, email_classification')
-      .eq('is_escalated', true)
-      .gte('escalated_at', today.toISOString())
-      .order('escalated_at', { ascending: false })
-      .limit(5);
-
-    // Fetch recent resolutions (today)
-    const { data: resolutions } = await supabase
-      .from('conversations')
-      .select('id, title, channel, resolved_at, email_classification')
-      .eq('status', 'resolved')
-      .gte('resolved_at', today.toISOString())
-      .order('resolved_at', { ascending: false })
-      .limit(5);
-
-    // Merge and sort by timestamp
-    const combined: RecentActivity[] = [
-      ...(messages?.map(m => ({ 
-        ...m, 
-        type: 'message' as const,
-        category: (m.conversations as any)?.email_classification
-      })) || []),
-      ...(escalations?.map(e => ({ 
-        id: e.id, 
-        type: 'escalation' as const,
-        body: e.title || 'New escalation',
-        actor_name: null,
-        actor_type: 'system',
-        channel: e.channel,
-        created_at: e.escalated_at!,
-        conversation_id: e.id,
-        category: e.email_classification
-      })) || []),
-      ...(resolutions?.map(r => ({ 
-        id: r.id, 
-        type: 'resolution' as const,
-        body: r.title || 'Conversation resolved',
-        actor_name: null,
-        actor_type: 'system',
-        channel: r.channel,
-        created_at: r.resolved_at!,
-        conversation_id: r.id,
-        category: r.email_classification
-      })) || [])
-    ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-     .slice(0, 10);
+    const combined: RecentActivity[] = (messages?.map(m => ({
+      ...m,
+      type: 'message' as const,
+      category: (m.conversations as any)?.email_classification
+    })) || []);
 
     setActivities(combined);
     setLoading(false);
