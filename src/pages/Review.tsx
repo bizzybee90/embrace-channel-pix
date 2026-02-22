@@ -1079,12 +1079,16 @@ export default function Review() {
   }
 
   // Desktop layout
+  // Deduplicate: filter recent classifications to exclude items already in review queue
+  const reviewQueueIds = new Set(reviewQueue.map(c => c.id));
+  const filteredRecentClassifications = recentClassifications.filter(c => !reviewQueueIds.has(c.id));
+
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex h-screen bg-muted/30">
       <Sidebar />
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="border-b px-6 py-4">
+        <div className="px-6 py-4 flex-shrink-0">
           <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-3">
               <BackButton to="/" label="Home" />
@@ -1120,7 +1124,7 @@ export default function Review() {
               }
             </span>
           </div>
-          <div className="bg-slate-100 p-1 rounded-lg inline-flex items-center gap-1 mb-6 mt-3">
+          <div className="bg-slate-100 p-1 rounded-lg inline-flex items-center gap-1 mt-3">
             <button
               className={cn(
                 "px-4 py-1.5 rounded-md text-xs font-medium transition-all",
@@ -1154,9 +1158,9 @@ export default function Review() {
 
         {/* Low Confidence Tab */}
         {activeTab === 'low_confidence' && (
-          <div className="flex-1 flex overflow-hidden">
+          <div className="flex-1 flex overflow-hidden gap-[1px] p-4 pt-2">
             {/* Left: Low-confidence list */}
-            <div className="w-72 border-r flex-shrink-0 flex flex-col bg-muted/20">
+            <div className="w-72 flex-shrink-0 flex flex-col bg-white rounded-2xl border border-border/40 shadow-sm overflow-hidden">
               <div className="px-3 py-2 border-b bg-muted/30">
                 <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Low Confidence Emails
@@ -1196,7 +1200,7 @@ export default function Review() {
             </div>
 
             {/* Right: Detail + actions */}
-            <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="flex-1 flex flex-col overflow-hidden bg-white rounded-2xl border border-border/40 shadow-sm ml-4">
               {lowConfidenceEmails[lcIndex] ? (() => {
                 const lcEmail = lowConfidenceEmails[lcIndex];
                 return (
@@ -1263,9 +1267,9 @@ export default function Review() {
         )}
 
         {/* Triage Review - Split panel layout */}
-        {activeTab === 'triage' && <div className="flex-1 flex overflow-hidden">
+        {activeTab === 'triage' && <div className="flex-1 flex overflow-hidden gap-[1px] p-4 pt-2">
           {/* Left: Queue list */}
-          <div className="w-72 border-r flex-shrink-0 flex flex-col bg-muted/20">
+          <div className="w-72 flex-shrink-0 flex flex-col bg-white rounded-2xl border border-border/40 shadow-sm overflow-hidden">
             {/* Queue header with batch actions */}
             <div className="px-3 py-2 border-b bg-muted/30 space-y-2">
               <div className="flex items-center justify-between">
@@ -1392,14 +1396,14 @@ export default function Review() {
               ) : null}
 
               {/* Recent Classifications section */}
-              {recentClassifications.length > 0 && (
+              {filteredRecentClassifications.length > 0 && (
                 <>
                   <div className="px-3 py-1.5 bg-muted/50 border-b border-t">
                     <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                      Recent Classifications ({recentClassifications.length})
+                      Recent Classifications ({filteredRecentClassifications.length})
                     </span>
                   </div>
-                  {recentClassifications.map((conv) => (
+                  {filteredRecentClassifications.map((conv) => (
                     <div
                       key={conv.id}
                       onClick={() => { setSelectedRecentId(conv.id); }}
@@ -1434,7 +1438,7 @@ export default function Review() {
                 </>
               )}
 
-              {reviewQueue.length === 0 && recentClassifications.length === 0 && !isLoading && (
+              {reviewQueue.length === 0 && filteredRecentClassifications.length === 0 && !isLoading && (
                 <div className="p-4 text-center text-muted-foreground text-sm">
                   No classified conversations yet
                 </div>
@@ -1443,7 +1447,7 @@ export default function Review() {
           </div>
 
           {/* Right: Detail + Decision */}
-          <div className="flex-1 flex flex-col overflow-hidden">
+          <div className="flex-1 flex flex-col overflow-hidden bg-white rounded-2xl border border-border/40 shadow-sm ml-4">
             {isLoading ? (
               <div className="flex-1 flex items-center justify-center">
                 <div className="animate-pulse text-muted-foreground">Loading...</div>
