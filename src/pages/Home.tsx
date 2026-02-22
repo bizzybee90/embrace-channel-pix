@@ -161,32 +161,40 @@ export const Home = () => {
       label: 'Urgent',
       count: stats.atRiskCount,
       icon: Flame,
-      iconBg: 'bg-red-50',
-      iconColor: 'text-red-500',
+      iconColor: 'text-red-600',
+      iconBoxBg: 'bg-red-100',
+      cardBg: 'bg-gradient-to-b from-red-50/80 to-white',
+      cardBorder: 'border border-red-100',
       onClick: () => navigate('/to-reply?filter=at-risk'),
     },
     {
       label: 'Training',
       count: stats.reviewCount,
       icon: Sparkles,
-      iconBg: 'bg-purple-50',
-      iconColor: 'text-purple-500',
+      iconColor: 'text-purple-600',
+      iconBoxBg: 'bg-purple-100',
+      cardBg: 'bg-gradient-to-b from-purple-50/80 to-white',
+      cardBorder: 'border border-purple-100',
       onClick: () => navigate('/review'),
     },
     {
       label: 'To Reply',
       count: stats.toReplyCount,
       icon: Mail,
-      iconBg: 'bg-blue-50',
-      iconColor: 'text-blue-500',
+      iconColor: 'text-blue-600',
+      iconBoxBg: 'bg-blue-100',
+      cardBg: 'bg-gradient-to-b from-blue-50/80 to-white',
+      cardBorder: 'border border-blue-100',
       onClick: () => navigate('/to-reply?filter=to-reply'),
     },
     {
       label: 'Drafts',
       count: stats.draftCount,
       icon: FileEdit,
-      iconBg: 'bg-amber-50',
-      iconColor: 'text-amber-500',
+      iconColor: 'text-amber-600',
+      iconBoxBg: 'bg-amber-100',
+      cardBg: 'bg-gradient-to-b from-amber-50/80 to-white',
+      cardBorder: 'border border-amber-100',
       onClick: () => navigate('/to-reply?filter=drafts'),
     },
   ];
@@ -206,32 +214,30 @@ export const Home = () => {
           </div>
         ) : (
           <>
-            {/* ── Hero Banner ── */}
-            <div className="w-full bg-gradient-to-br from-indigo-50/50 via-white to-purple-50/50 rounded-2xl p-6 ring-1 ring-indigo-100/50 shadow-sm relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center flex-shrink-0">
-                  <Sparkles className="w-5 h-5 text-indigo-500" />
+            {/* ── Hero Copilot Banner ── */}
+            <div className="w-full bg-gradient-to-r from-amber-100/50 via-purple-50/50 to-blue-100/30 rounded-3xl p-8 ring-1 ring-slate-900/5 shadow-sm relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-2">
+              <div>
+                <div className="flex items-center gap-3">
+                  <span className="text-3xl">🐝</span>
+                  <h1 className="text-3xl font-bold text-slate-900 tracking-tight">{getGreeting()}!</h1>
                 </div>
-                <div>
-                  <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">{getGreeting()}</h1>
-                  <p className="text-slate-600 mt-1 text-sm">
-                    {stats.atRiskCount > 0
-                      ? `You have ${stats.atRiskCount} urgent item${stats.atRiskCount !== 1 ? 's' : ''} that need attention.`
-                      : stats.toReplyCount > 0
-                        ? `${stats.toReplyCount} conversation${stats.toReplyCount !== 1 ? 's' : ''} waiting for your reply.`
-                        : 'BizzyBee is keeping your inbox under control.'}
-                  </p>
-                </div>
+                <p className="text-lg text-slate-700 max-w-2xl mt-2 leading-relaxed">
+                  {stats.atRiskCount > 0
+                    ? `You have ${stats.atRiskCount} urgent item${stats.atRiskCount !== 1 ? 's' : ''} that need attention.`
+                    : stats.toReplyCount > 0
+                      ? `${stats.toReplyCount} conversation${stats.toReplyCount !== 1 ? 's' : ''} waiting for your reply.`
+                      : 'Here is what BizzyBee has lined up for you.'}
+                </p>
               </div>
               {stats.clearedToday > 0 && (
-                <div className="inline-flex items-center gap-1.5 bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-full text-sm font-medium shadow-sm whitespace-nowrap self-start md:self-center">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                  {stats.clearedToday} messages auto-handled
+                <div className="bg-white/80 backdrop-blur-md border border-emerald-200 text-emerald-800 px-5 py-2.5 rounded-2xl shadow-sm font-semibold flex items-center gap-2 text-sm whitespace-nowrap self-start md:self-center">
+                  <CheckCircle2 className="w-5 h-5" />
+                  {stats.clearedToday} messages auto-handled today
                 </div>
               )}
             </div>
 
-            {/* ── Bento Metric Cards ── */}
+            {/* ── Tinted Glass Metric Cards ── */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               {metrics.map(m => {
                 const active = m.count > 0;
@@ -241,20 +247,20 @@ export const Home = () => {
                     key={m.label}
                     onClick={m.onClick}
                     className={cn(
-                      'rounded-2xl p-5 cursor-pointer transition-all duration-200',
+                      'rounded-3xl p-6 cursor-pointer transition-all duration-200',
                       active
-                        ? 'bg-white ring-1 ring-slate-900/5 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] hover:-translate-y-1 hover:shadow-md'
-                        : 'bg-slate-50/50 ring-1 ring-slate-200 opacity-50 grayscale shadow-none'
+                        ? `${m.cardBg} ${m.cardBorder} shadow-sm hover:shadow-md hover:-translate-y-1`
+                        : 'bg-slate-50/80 border border-slate-100 opacity-60 grayscale shadow-none'
                     )}
                   >
                     <div className={cn(
-                      'w-10 h-10 rounded-full flex items-center justify-center',
-                      active ? m.iconBg : 'bg-slate-100'
+                      'w-12 h-12 rounded-2xl flex items-center justify-center',
+                      active ? m.iconBoxBg : 'bg-slate-100'
                     )}>
                       <Icon className={cn('h-5 w-5', active ? m.iconColor : 'text-slate-400')} />
                     </div>
-                    <p className="text-4xl font-bold tracking-tight text-slate-900 mt-4">{m.count}</p>
-                    <p className="text-sm font-medium text-slate-500 uppercase tracking-wide mt-1">{m.label}</p>
+                    <p className="text-5xl font-extrabold tracking-tight text-slate-900 mt-5 mb-1">{m.count}</p>
+                    <p className="text-sm font-medium text-slate-500 uppercase tracking-wide">{m.label}</p>
                   </div>
                 );
               })}
@@ -274,7 +280,7 @@ export const Home = () => {
             {/* ── Widget Grid ── */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Pending Drafts */}
-              <div className="bg-white rounded-2xl ring-1 ring-slate-900/5 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] p-5 flex flex-col">
+              <div className="bg-white rounded-3xl border border-slate-100/80 shadow-sm p-5 flex flex-col">
                 <div className="flex items-center gap-2 mb-4">
                   <FileEdit className="h-4 w-4 text-amber-500" />
                   <h2 className="font-semibold text-slate-900">Pending Drafts</h2>
@@ -293,7 +299,7 @@ export const Home = () => {
               </div>
 
               {/* Recent Activity */}
-              <div className="bg-white rounded-2xl ring-1 ring-slate-900/5 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] p-5 flex flex-col">
+              <div className="bg-white rounded-3xl border border-slate-100/80 shadow-sm p-5 flex flex-col">
                 <div className="flex items-center gap-2 mb-4">
                   <Activity className="h-4 w-4 text-blue-500" />
                   <h2 className="font-semibold text-slate-900">Recent Activity</h2>

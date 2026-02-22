@@ -61,7 +61,7 @@ export const InsightsWidget = ({ workspaceId }: InsightsWidgetProps) => {
 
   if (loading) {
     return (
-      <div className="bg-white rounded-2xl ring-1 ring-slate-900/5 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] p-5">
+      <div className="bg-white rounded-3xl border border-slate-100/80 shadow-sm p-5">
         <div className="flex items-center gap-2 mb-4">
           <Lightbulb className="h-4 w-4 text-slate-400" />
           <h2 className="font-semibold text-slate-900">Insights</h2>
@@ -75,17 +75,15 @@ export const InsightsWidget = ({ workspaceId }: InsightsWidgetProps) => {
   }
 
   return (
-    <div className="bg-white rounded-2xl ring-1 ring-slate-900/5 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] p-5">
+    <div className="bg-white rounded-3xl border border-slate-100/80 shadow-sm p-5">
       <div className="flex items-center gap-2 mb-4">
         <Lightbulb className="h-4 w-4 text-indigo-500" />
         <h2 className="font-semibold text-slate-900">Insights</h2>
       </div>
 
       {insights.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-12 text-center">
-          <div className="w-12 h-12 rounded-full bg-slate-50 flex items-center justify-center mb-3">
-            <Sparkles className="w-5 h-5 text-slate-400" />
-          </div>
+        <div className="flex flex-col items-center justify-center h-48 rounded-2xl bg-gradient-to-br from-slate-50 to-purple-50/30 border border-purple-100/50 border-dashed m-4">
+          <Sparkles className="w-5 h-5 text-purple-500 animate-pulse mb-3" />
           <p className="text-sm font-medium text-slate-600">Gathering Intelligence...</p>
           <p className="text-xs text-slate-400 mt-1 max-w-[200px]">
             Insights will appear here as BizzyBee analyzes patterns.
