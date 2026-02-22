@@ -82,10 +82,10 @@ export const HowBizzyBeeIsDoing = () => {
   const strokeDashoffset = circumference - (automationPct / 100) * circumference;
 
   return (
-    <div className="bg-white rounded-xl ring-1 ring-slate-900/5 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] p-6">
+    <div className="w-full bg-gradient-to-r from-purple-50/50 via-white to-emerald-50/40 rounded-3xl p-8 ring-1 ring-slate-900/5 shadow-sm mb-8">
       <h2 className="text-base font-semibold text-slate-900 mb-6">How BizzyBee is doing</h2>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
+      <div className="flex flex-col md:flex-row gap-8 items-center justify-between">
         {/* Automation rate with progress ring */}
         <div className="flex items-center gap-4">
           <div className="relative flex-shrink-0">
@@ -113,8 +113,8 @@ export const HowBizzyBeeIsDoing = () => {
           </div>
           <div>
             <p className="text-sm text-slate-500 font-medium">Emails handled automatically</p>
-            <p className="text-2xl font-bold text-slate-900 tracking-tight mt-0.5">
-              {stats.autoHandled} of {stats.totalEmails}
+            <p className="text-5xl font-extrabold tracking-tight text-slate-900 mt-0.5">
+              {stats.autoHandled} <span className="text-lg font-medium text-slate-400">of {stats.totalEmails}</span>
             </p>
           </div>
         </div>
@@ -126,7 +126,7 @@ export const HowBizzyBeeIsDoing = () => {
           </div>
           <div>
             <p className="text-sm text-slate-500 font-medium">Accuracy</p>
-            <p className="text-2xl font-bold text-slate-900 tracking-tight mt-0.5">{accuracyPct}%</p>
+            <p className="text-5xl font-extrabold tracking-tight text-slate-900 mt-0.5">{accuracyPct}%</p>
             <p className="text-xs text-slate-400">
               {stats.correctionsCount === 0
                 ? '0 corrections needed'
@@ -142,7 +142,7 @@ export const HowBizzyBeeIsDoing = () => {
           </div>
           <div>
             <p className="text-sm text-slate-500 font-medium">Time saved this week</p>
-            <p className="text-2xl font-bold text-slate-900 tracking-tight mt-0.5">{timeSavedDisplay}</p>
+            <p className="text-5xl font-extrabold tracking-tight text-slate-900 mt-0.5">{timeSavedDisplay}</p>
           </div>
         </div>
       </div>

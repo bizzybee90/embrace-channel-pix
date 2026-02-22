@@ -126,7 +126,7 @@ export const YourRules = forwardRef<YourRulesHandle>((_, ref) => {
 
   if (loading) {
     return (
-      <div className="bg-white rounded-xl ring-1 ring-slate-900/5 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] p-5">
+      <div className="bg-white rounded-3xl ring-1 ring-slate-900/5 shadow-sm p-6">
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
         </div>
@@ -135,7 +135,7 @@ export const YourRules = forwardRef<YourRulesHandle>((_, ref) => {
   }
 
   return (
-    <div className="bg-white rounded-xl ring-1 ring-slate-900/5 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] p-5 flex flex-col">
+    <div className="bg-white rounded-3xl ring-1 ring-slate-900/5 shadow-sm p-6 flex flex-col">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <BookOpen className="h-4 w-4 text-slate-500" />
