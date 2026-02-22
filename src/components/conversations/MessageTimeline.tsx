@@ -169,8 +169,8 @@ export const MessageTimeline = ({
               </Avatar>
             ) : (
               <Avatar className="h-8 w-8">
-                <AvatarFallback className="bg-muted text-xs font-medium">
-                  {getInitials(message.actor_name)}
+                <AvatarFallback className="bg-gradient-to-br from-blue-400 to-indigo-500 text-white text-xs font-medium">
+                  {getInitials(actorName)}
                 </AvatarFallback>
               </Avatar>
             )}
@@ -198,7 +198,7 @@ export const MessageTimeline = ({
           {/* For newest message: show full clean text natively. For older: use EmailThread */}
           {isNewest && hasHtmlContent ? (
             <div 
-              className="font-sans text-foreground antialiased text-base leading-relaxed max-w-none prose prose-sm prose-slate [&_*]:!font-[inherit] [&_font]:!font-[inherit] [&_td]:!font-[inherit] [&_span]:!font-[inherit]"
+              className="font-sans text-foreground antialiased text-[15px] leading-relaxed max-w-none prose prose-sm prose-slate [&_*]:!font-sans [&_*]:!font-family-inherit [&_*]:!text-gray-800 [&_*]:!text-[15px] [&_*]:!leading-relaxed [&_font]:!font-sans [&_td]:!font-sans [&_span]:!font-sans [&_p]:!font-sans [&_div]:!font-sans [&_a]:!font-sans"
               dangerouslySetInnerHTML={{ __html: message.raw_payload.body }}
             />
           ) : isNewest ? (
@@ -356,30 +356,14 @@ export const MessageTimeline = ({
         </div>
       )}
 
-      {/* Messages with timeline connector */}
-      <div className="relative py-2 px-4">
-        {/* Vertical timeline line */}
-        <div className="absolute left-8 top-4 bottom-4 w-0.5 bg-gradient-to-b from-primary/40 via-muted-foreground/20 to-transparent" />
-        
+      {/* Messages — clean, no timeline line */}
+      <div className="py-2 px-4">
         <div className="space-y-4">
           {displayedMessages.map((message, index) => {
             const isNewest = index === displayedMessages.length - 1;
             return (
-              <div key={message.id} className="relative">
-                {/* Timeline dot */}
-                <div 
-                  className={cn(
-                    "absolute left-0 top-4 w-2 h-2 rounded-full z-10 ring-2 ring-background",
-                    message.actor_type === 'customer' && "bg-muted-foreground",
-                    message.actor_type === 'ai_agent' && "bg-primary",
-                    message.actor_type === 'human_agent' && "bg-success",
-                    message.is_internal && "bg-warning"
-                  )}
-                />
-                {/* Message content with left padding for timeline */}
-                <div className="pl-6">
-                  {renderMessage(message, isNewest)}
-                </div>
+              <div key={message.id}>
+                {renderMessage(message, isNewest)}
               </div>
             );
           })}

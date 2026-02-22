@@ -190,8 +190,11 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend, ex
     <div className={
       useMobileStyle
         ? "p-3 m-3 bg-card/80 rounded-[22px] backdrop-blur-sm"
-        : "px-5 py-4 bg-transparent"
+        : "px-5 py-4"
     }>
+      <div className={cn(
+        !useMobileStyle && "bg-card rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-purple-100 dark:border-purple-500/20 overflow-hidden"
+      )}>
       <Tabs defaultValue="reply" orientation={isMobile ? "vertical" : "horizontal"}>
         <div className={isMobile ? "flex flex-col gap-2" : ""}>
           <TabsList className={isMobile ? "w-full h-auto grid grid-cols-2 bg-muted/50" : "h-10 bg-muted/50"}>
@@ -228,7 +231,7 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend, ex
                   }}
                   className={cn(
                     useMobileStyle ? "min-h-[80px] text-sm" : "min-h-[56px] text-base",
-                    "w-full resize-none rounded-xl border-0 bg-muted/30 focus-visible:ring-1 focus-visible:ring-primary/30 leading-relaxed placeholder:text-muted-foreground/50 shadow-[inset_0_1px_2px_rgba(0,0,0,0.02)] transition-all duration-200 flex-1 overflow-y-auto"
+                    "w-full resize-none rounded-xl border-0 bg-purple-50/30 dark:bg-purple-500/5 focus-visible:ring-1 focus-visible:ring-purple-300/50 leading-relaxed placeholder:text-muted-foreground/50 transition-all duration-200 flex-1 overflow-y-auto"
                   )}
                 />
                 <div className="flex flex-col gap-1 mb-1">
@@ -246,10 +249,10 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend, ex
                   <Button
                     onClick={handleSendReply}
                     disabled={sending || uploading || (!replyBody.trim() && attachments.length === 0)}
-                    size="icon"
-                    className="h-10 w-10 rounded-[12px] bg-foreground text-background hover:bg-foreground/90 shadow-sm flex-shrink-0"
+                    className="rounded-xl bg-purple-600 hover:bg-purple-700 text-white px-5 py-2.5 font-medium shadow-sm flex-shrink-0 gap-1.5"
                   >
-                    <Send className="h-4 w-4" />
+                    <Sparkles className="h-3.5 w-3.5" />
+                    {draftUsed ? 'Approve & Send' : 'Send'}
                   </Button>
                 </div>
               </div>
@@ -320,6 +323,8 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend, ex
           </TabsContent>
         </div>
       </Tabs>
+      {!useMobileStyle && <>{/* close wrapper */}</>}
+      </div>
     </div>
   );
 };
