@@ -243,6 +243,11 @@ All colors MUST be HSL.
       0px 0px 0px 1px rgba(0, 0, 0, 0.02);
   }
 
+  /* God Prompt: Premium panel elevation */
+  .panel-elevated {
+    @apply bg-white dark:bg-card shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] ring-1 ring-slate-900/5 rounded-xl;
+  }
+
   /* SPRING PHYSICS — corrected bezier curve */
   .spring-bounce {
     transition-timing-function: cubic-bezier(0.175, 0.885, 0.32, 1.275);
