@@ -125,6 +125,8 @@ export default function Review() {
   const [mobileShowDetail, setMobileShowDetail] = useState(false);
   const [activeTab, setActiveTab] = useState<ReviewTab>('triage');
   const [lcIndex, setLcIndex] = useState(0);
+  const [selectedRecentId, setSelectedRecentId] = useState<string | null>(null);
+  const [showRecentCorrectionFlow, setShowRecentCorrectionFlow] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { celebrateConfirmation, celebratePatternLearned, celebrateQueueComplete } = useReviewFeedback();
@@ -165,6 +167,54 @@ export default function Review() {
         .is('reviewed_at', null)
         .order('created_at', { ascending: false })
         .limit(50);
+
+      if (error) throw error;
+
+      return (data || []).map(c => ({
+        ...c,
+        customer: c.customer?.[0] || null,
+        messages: c.messages || [],
+      })) as ReviewConversation[];
+    },
+    staleTime: 30000,
+  });
+
+  // Fetch recent classified conversations (last 20, regardless of confidence)
+  const { data: recentClassifications = [], isLoading: recentLoading } = useQuery({
+    queryKey: ['recent-classifications'],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return [];
+
+      const { data: userData } = await supabase
+        .from('users')
+        .select('workspace_id')
+        .eq('id', user.id)
+        .single();
+
+      if (!userData?.workspace_id) return [];
+
+      const { data, error } = await supabase
+        .from('conversations')
+        .select(`
+          id,
+          title,
+          summary_for_human,
+          decision_bucket,
+          why_this_needs_you,
+          triage_confidence,
+          created_at,
+          channel,
+          email_classification,
+          ai_draft_response,
+          requires_reply,
+          customer:customers(name, email),
+          messages(body, created_at, raw_payload)
+        `)
+        .eq('workspace_id', userData.workspace_id)
+        .not('email_classification', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(20);
 
       if (error) throw error;
 
@@ -724,8 +774,8 @@ export default function Review() {
     }
   }, [currentIndex, reviewQueue.length]);
 
-  // Empty state - Celebration when training is complete
-  if (!isLoading && reviewQueue.length === 0) {
+  // Empty state - only show if BOTH review queue AND recent classifications are empty
+  if (!isLoading && !recentLoading && reviewQueue.length === 0 && recentClassifications.length === 0) {
     if (isMobile) {
       return (
         <div className="flex flex-col h-screen bg-background overflow-hidden">
@@ -1287,23 +1337,80 @@ export default function Review() {
               />
             )}
             <ScrollArea className="flex-1">
+              {/* Needs Review section */}
               {isLoading ? (
                 <div className="p-4 text-center text-muted-foreground animate-pulse">
                   Loading...
                 </div>
-              ) : (
-                reviewQueue.map((conv, idx) => (
-                  <ReviewQueueItem
-                    key={conv.id}
-                    conversation={conv}
-                    isActive={idx === currentIndex && !isMultiSelectMode}
-                    isReviewed={reviewedIds.has(conv.id)}
-                    isSelected={selectedIds.has(conv.id)}
-                    isMultiSelectMode={isMultiSelectMode}
-                    onClick={(e) => handleItemClick(idx, e)}
-                    onToggleSelect={() => toggleSelection(conv.id)}
-                  />
-                ))
+              ) : reviewQueue.length > 0 ? (
+                <>
+                  <div className="px-3 py-1.5 bg-destructive/10 border-b">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-destructive">
+                      Needs Review ({reviewQueue.length})
+                    </span>
+                  </div>
+                  {reviewQueue.map((conv, idx) => (
+                    <ReviewQueueItem
+                      key={conv.id}
+                      conversation={conv}
+                      isActive={idx === currentIndex && !isMultiSelectMode && !selectedRecentId}
+                      isReviewed={reviewedIds.has(conv.id)}
+                      isSelected={selectedIds.has(conv.id)}
+                      isMultiSelectMode={isMultiSelectMode}
+                      onClick={(e) => { setSelectedRecentId(null); handleItemClick(idx, e); }}
+                      onToggleSelect={() => toggleSelection(conv.id)}
+                    />
+                  ))}
+                </>
+              ) : null}
+
+              {/* Recent Classifications section */}
+              {recentClassifications.length > 0 && (
+                <>
+                  <div className="px-3 py-1.5 bg-muted/50 border-b border-t">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Recent Classifications ({recentClassifications.length})
+                    </span>
+                  </div>
+                  {recentClassifications.map((conv) => (
+                    <div
+                      key={conv.id}
+                      onClick={() => { setSelectedRecentId(conv.id); }}
+                      className={cn(
+                        "px-3 py-2 cursor-pointer border-b border-border/30 transition-all hover:bg-muted/50",
+                        selectedRecentId === conv.id && "bg-primary/10 border-l-2 border-l-primary"
+                      )}
+                    >
+                      <div className="flex items-center gap-2">
+                        {conv.channel && (
+                          <ChannelIcon channel={conv.channel} className="h-3 w-3 flex-shrink-0" />
+                        )}
+                        <span className="text-sm truncate flex-1 text-foreground/80">
+                          {conv.customer?.name || conv.customer?.email?.split('@')[0] || 'Unknown'}
+                        </span>
+                        <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 flex-shrink-0">
+                          {Math.round((conv.triage_confidence || 0) * 100)}%
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <p className="text-xs text-muted-foreground truncate flex-1">
+                          {conv.title || 'No subject'}
+                        </p>
+                        {conv.email_classification && (
+                          <Badge variant="secondary" className="text-[9px] px-1 py-0 h-4 flex-shrink-0">
+                            {conv.email_classification.replace(/_/g, ' ')}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
+
+              {reviewQueue.length === 0 && recentClassifications.length === 0 && !isLoading && (
+                <div className="p-4 text-center text-muted-foreground text-sm">
+                  No classified conversations yet
+                </div>
               )}
             </ScrollArea>
           </div>
@@ -1314,7 +1421,65 @@ export default function Review() {
               <div className="flex-1 flex items-center justify-center">
                 <div className="animate-pulse text-muted-foreground">Loading...</div>
               </div>
-            ) : currentConversation ? (
+            ) : selectedRecentId ? (() => {
+              const recentConv = recentClassifications.find(c => c.id === selectedRecentId);
+              if (!recentConv) return null;
+              const recentEmailBody = stripHtml(recentConv.messages?.[0]?.raw_payload?.body || recentConv.messages?.[0]?.body || '');
+              return (
+                <div className="flex-1 flex flex-col overflow-y-auto p-6">
+                  <Card className="flex-1 flex flex-col max-w-3xl mx-auto w-full p-6">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-center gap-2">
+                        {recentConv.channel && (
+                          <ChannelIcon channel={recentConv.channel} className="h-4 w-4" />
+                        )}
+                        <div>
+                          <p className="font-medium">{recentConv.customer?.name || 'Unknown Sender'}</p>
+                          <p className="text-sm text-muted-foreground">{recentConv.customer?.email || 'No email'}</p>
+                        </div>
+                      </div>
+                      <span className="text-sm text-muted-foreground">
+                        {format(new Date(recentConv.created_at), 'MMM d, h:mm a')}
+                      </span>
+                    </div>
+                    <h3 className="font-semibold text-lg mb-4">{recentConv.title || 'No subject'}</h3>
+                    <div className="text-sm text-muted-foreground whitespace-pre-wrap mb-4 max-h-64 overflow-y-auto">
+                      {recentEmailBody.substring(0, 800) || 'No content'}
+                    </div>
+                    <div className="bg-muted/30 rounded-lg p-4 border mb-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Sparkles className="h-4 w-4 text-purple-500" />
+                        <span className="text-sm font-medium">AI Classification</span>
+                      </div>
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <Badge className={bucketColors[recentConv.decision_bucket] || 'bg-muted'}>
+                          {bucketLabels[recentConv.decision_bucket] || recentConv.decision_bucket || 'Unknown'}
+                        </Badge>
+                        {recentConv.email_classification && (
+                          <Badge variant="outline">{recentConv.email_classification.replace(/_/g, ' ')}</Badge>
+                        )}
+                        {recentConv.triage_confidence != null && (
+                          <Badge variant="secondary">{Math.round(recentConv.triage_confidence * 100)}% confident</Badge>
+                        )}
+                      </div>
+                      {recentConv.why_this_needs_you && (
+                        <p className="text-xs text-muted-foreground mt-2">{recentConv.why_this_needs_you}</p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Button variant="outline" className="flex-1" onClick={() => setShowRecentCorrectionFlow(true)}>
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Correct Classification
+                      </Button>
+                      <Button variant="ghost" onClick={() => navigate(`/conversations/${recentConv.id}`)}>
+                        <Eye className="h-4 w-4 mr-2" />
+                        View Full
+                      </Button>
+                    </div>
+                  </Card>
+                </div>
+              );
+            })() : currentConversation ? (
               <div className="flex-1 flex flex-col overflow-y-auto p-6">
                 <Card className="flex-1 flex flex-col max-w-3xl mx-auto w-full p-6">
                   {/* Sender info */}
@@ -1629,6 +1794,30 @@ export default function Review() {
           }}
         />
       )}
+
+      {/* Recent Classification Correction Dialog */}
+      {selectedRecentId && (() => {
+        const recentConv = recentClassifications.find(c => c.id === selectedRecentId);
+        if (!recentConv) return null;
+        return (
+          <TriageCorrectionFlow
+            conversation={{
+              id: recentConv.id,
+              title: recentConv.title,
+              channel: recentConv.channel || 'email',
+              email_classification: recentConv.email_classification,
+              requires_reply: recentConv.decision_bucket !== 'auto_handled' && recentConv.decision_bucket !== 'wait',
+              customer: recentConv.customer,
+            } as any}
+            open={showRecentCorrectionFlow}
+            onOpenChange={setShowRecentCorrectionFlow}
+            onUpdate={() => {
+              queryClient.invalidateQueries({ queryKey: ['recent-classifications'] });
+              queryClient.invalidateQueries({ queryKey: ['review-queue'] });
+            }}
+          />
+        );
+      })()}
     </div>
   );
 }
