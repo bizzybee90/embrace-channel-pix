@@ -1,58 +1,57 @@
 
+# Inbox Conversation View Polish
 
-## Upgrade Classification Prompt and Decision Engine
+## Problem Summary
+Based on the screenshots and database investigation, there are several issues with the conversation reading pane:
 
-This plan implements the three changes from your Gemini-reviewed prompt: a structured classification system prompt with chain-of-thought reasoning and identity extraction, an updated decision engine handling all 9 categories, and passive identity harvesting into `customer_identities`.
+1. **Empty message bodies**: Imported emails store content only in `raw_payload.body` (HTML) and `raw_payload.bodySnippet`, but the `body` column is empty. The MessageTimeline renders blank messages because it only reads `message.body`.
+2. **Unknown sender names**: Actor names are stored as `unknown@unknown.invalid` -- needs fallback to customer name or `raw_payload.from.address`.
+3. **Duplicated AI summary**: The AI briefing banner already shows the summary at the top, but the Intelligence mini-card repeats the same text below it.
+4. **"View details" too subtle**: The tiny 10px "View details" link is easy to miss.
+5. **Card proportions wrong**: Contact card and Intelligence card are equal width (50/50), but the intelligence card needs more space for its tags and text.
 
-### Changes
+---
 
-**1. Replace classification system prompt (`supabase/functions/_shared/ai.ts`)**
+## Changes
 
-Replace `classificationSystemPrompt()` with the new structured prompt that:
-- Extracts business name/industry/rules from the `business_context` record
-- Injects FAQ knowledge base and historical corrections
-- Defines 9 precise categories: `quote`, `booking`, `complaint`, `follow_up`, `inquiry`, `notification`, `newsletter`, `spam`, `personal`
-- Adds chain-of-thought `reasoning` field (generated before the classification decision)
-- Requests identity extraction: `extracted_phones`, `extracted_emails`, `location_or_postcode`, `summary`
-- Preserves the existing batch input/output contract (`{items: [...]}` in, `{results: [...]}` out)
+### 1. Fix empty message bodies (MessageTimeline.tsx)
+When `message.body` is empty but `raw_payload` exists, extract readable content:
+- Use `raw_payload.bodySnippet` as plain text fallback
+- If neither exists, strip HTML from `raw_payload.body` to get text
+- This ensures all imported emails display their actual content
 
-Also update `DEFAULT_CLASSIFICATION` to use `category: "inquiry"` instead of `"general"` to match the new category set.
+### 2. Fix sender name fallback (MessageTimeline.tsx)
+Update the `actorName` logic to also check:
+- `raw_payload.from.name` or `raw_payload.from.address`
+- Then `conversationCustomerName`
+- Then 'Unknown Sender' as last resort
 
-**2. Update decision engine (`supabase/functions/pipeline-worker-classify/index.ts`)**
+### 3. Remove duplicated AI summary from inline Intelligence card (ConversationThread.tsx)
+Remove the `(customer?.intelligence as any)?.summary` paragraph from the inline Intelligence mini-card since the AI Briefing banner already displays the same information.
 
-Replace `decisionForClassification()` to handle all 9 categories:
-- `notification`, `newsletter`, `spam`, `personal` -> `auto_handled` / `resolved`
-- `follow_up` where `requires_reply === false` -> `auto_handled` / `resolved`
-- Low confidence (< 0.7) -> `needs_human` / `escalated`
-- `complaint` -> `act_now` / `ai_handling`
-- Everything else needing reply -> `quick_win` / `open`
+### 4. Make "View details" more prominent (ConversationThread.tsx)
+Replace the tiny "View details" text with a more visible button-like element:
+- Use `text-xs font-medium text-primary` with a hover underline
+- Make the entire card more obviously clickable with a subtle "tap to explore" CTA
 
-**3. Add identity harvesting (`supabase/functions/pipeline-worker-classify/index.ts`)**
+### 5. Adjust card proportions (ConversationThread.tsx)
+Change the grid from equal `grid-cols-2` to asymmetric layout:
+- Contact card: narrower (about 40%)
+- Intelligence card: wider (about 60%)
+- Use `grid-cols-5` with contact taking `col-span-2` and intelligence taking `col-span-3`
 
-After `applyClassification` successfully updates a conversation, extract `extracted_phones` and `extracted_emails` from the AI response entities and upsert them into `customer_identities`. This passively enriches the cross-channel identity graph with every classified email -- phones formatted to E.164, emails lowercased, all linked to the conversation's `customer_id`.
+---
 
-**4. Update UI category labels (`src/components/shared/CategoryLabel.tsx`)**
+## Technical Details
 
-Add direct mappings for the new category keys so they render proper pills in the inbox:
-- `quote` -> amber Quote pill
-- `booking` -> blue Booking pill
-- `complaint` -> red Complaint pill
-- `follow_up` -> orange Follow-up pill
-- `inquiry` -> blue Enquiry pill
-- `notification` -> slate Auto pill
-- `newsletter` -> pink Marketing pill
-- `spam` -> red Spam pill
-- `personal` -> purple Personal pill
+**File: `src/components/conversations/MessageTimeline.tsx`**
+- Around line 104-108, add logic to derive `displayBody` from `raw_payload` when `message.body` is empty
+- Add a simple `stripHtmlTags()` helper to extract text from HTML body
+- Update `actorName` derivation (line 100-102) to check `raw_payload.from`
 
-### Technical Details
-
-**Files modified:**
-- `supabase/functions/_shared/ai.ts` -- new system prompt, updated default category
-- `supabase/functions/pipeline-worker-classify/index.ts` -- updated `decisionForClassification`, identity harvesting after `applyClassification`
-- `src/components/shared/CategoryLabel.tsx` -- new category config entries
-
-**Edge functions redeployed:**
-- `pipeline-worker-classify`
-
-**No database migration needed** -- `customer_identities` table and its unique constraint already exist.
-
+**File: `src/components/conversations/ConversationThread.tsx`**
+- Line 306: Change grid from `grid-cols-2` to `grid-cols-5`
+- Line 308: Add `col-span-2` to contact card
+- Line 332: Add `col-span-3` to intelligence card
+- Lines 370-373: Remove the AI summary paragraph (duplicate of briefing)
+- Lines 329, 425: Make "View details" more prominent with button-style styling
