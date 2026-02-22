@@ -442,6 +442,7 @@ export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackBut
               <CustomerIntelligence 
                 workspaceId={conversation.workspace_id}
                 customerId={conversation.customer_id || customer?.id}
+                conversationId={conversation.id}
               />
             )}
           </div>

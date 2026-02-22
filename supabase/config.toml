@@ -299,3 +299,6 @@ verify_jwt = false
 [functions.convert-emails-to-conversations]
 verify_jwt = false
 
+[functions.ai-enrich-conversation]
+verify_jwt = false
+
