@@ -55,48 +55,46 @@ function FAQCard({ faq, onDelete }: { faq: FAQ; onDelete: () => void }) {
   };
 
   return (
-    <Card className="transition-all hover:shadow-md">
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-2">
-              {getSourceIcon(faq)}
-              {getPriorityBadge(faq.priority ?? 0)}
-            </div>
-            
-            <h3 className="font-medium text-foreground mb-2">{faq.question}</h3>
-            
-            <p className={`text-sm text-muted-foreground ${!expanded && faq.answer.length > 150 ? 'line-clamp-2' : ''}`}>
-              {faq.answer}
-            </p>
-            
-            {faq.answer.length > 150 && (
-              <Button
-                variant="link"
-                size="sm"
-                onClick={() => setExpanded(!expanded)}
-                className="px-0 h-auto mt-1"
-              >
-                {expanded ? (
-                  <span className="flex items-center gap-1">Show less <ChevronUp className="h-3 w-3" /></span>
-                ) : (
-                  <span className="flex items-center gap-1">Show more <ChevronDown className="h-3 w-3" /></span>
-                )}
-              </Button>
-            )}
+    <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm hover:shadow-md transition-all mb-4">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-2">
+            {getSourceIcon(faq)}
+            {getPriorityBadge(faq.priority ?? 0)}
           </div>
-
-          <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <Edit className="h-4 w-4" />
+          
+          <h3 className="font-medium text-foreground mb-2">{faq.question}</h3>
+          
+          <p className={`text-sm text-muted-foreground ${!expanded && faq.answer.length > 150 ? 'line-clamp-2' : ''}`}>
+            {faq.answer}
+          </p>
+          
+          {faq.answer.length > 150 && (
+            <Button
+              variant="link"
+              size="sm"
+              onClick={() => setExpanded(!expanded)}
+              className="px-0 h-auto mt-1"
+            >
+              {expanded ? (
+                <span className="flex items-center gap-1">Show less <ChevronUp className="h-3 w-3" /></span>
+              ) : (
+                <span className="flex items-center gap-1">Show more <ChevronDown className="h-3 w-3" /></span>
+              )}
             </Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={handleDelete}>
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </div>
+          )}
         </div>
-      </CardContent>
-    </Card>
+
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" className="h-8 w-8">
+            <Edit className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={handleDelete}>
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -265,89 +263,54 @@ export default function KnowledgeBase() {
   }
 
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex h-screen bg-slate-50/50">
       {/* Sidebar */}
-      <div className="hidden md:flex border-r border-border bg-card">
+      <div className="hidden md:flex">
         <Sidebar />
       </div>
 
       {/* Main Content */}
       <div className="flex-1 overflow-auto">
         <div className="max-w-5xl mx-auto p-6 space-y-6">
-          {/* Back Button */}
-          <Link to="/" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
-            <ArrowLeft className="h-4 w-4" />
-            <span className="text-sm">Back to Dashboard</span>
-          </Link>
-
           {/* Header */}
           <div className="flex items-center justify-between">
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
-                  <Brain className="h-5 w-5 text-primary" />
-                </div>
-                <h1 className="text-2xl font-bold">Knowledge Base</h1>
-              </div>
-              <p className="text-muted-foreground">
-                Everything BizzyBee knows about your business
-              </p>
-            </div>
+            <h1 className="text-xl font-semibold text-slate-900 tracking-tight">Knowledge Base</h1>
             <Button className="gap-2" onClick={() => setShowAddFaq(true)}>
               <Plus className="h-4 w-4" />
               Add FAQ
             </Button>
           </div>
 
-          {/* Stats Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <Globe className="h-8 w-8 text-blue-500" />
-                  <div>
-                    <p className="text-2xl font-bold">{groupedFaqs.website.length}</p>
-                    <p className="text-xs text-muted-foreground">From Your Website</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <Users className="h-8 w-8 text-purple-500" />
-                  <div>
-                    <p className="text-2xl font-bold">{groupedFaqs.competitor.length}</p>
-                    <p className="text-xs text-muted-foreground">From Competitors</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <FileText className="h-8 w-8 text-amber-500" />
-                  <div>
-                    <p className="text-2xl font-bold">{groupedFaqs.document.length}</p>
-                    <p className="text-xs text-muted-foreground">From Documents</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <BookOpen className="h-8 w-8 text-green-500" />
-                  <div>
-                    <p className="text-2xl font-bold">{faqs.length}</p>
-                    <p className="text-xs text-muted-foreground">Total FAQs</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+          {/* Tinted Glass Metric Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <div className="bg-gradient-to-b from-blue-50/80 to-white border border-blue-100 rounded-3xl p-6 shadow-sm">
+              <div className="bg-blue-100 text-blue-600 rounded-2xl w-12 h-12 flex items-center justify-center">
+                <Globe className="h-5 w-5" />
+              </div>
+              <p className="text-4xl font-extrabold tracking-tight text-slate-900 mt-4">{groupedFaqs.website.length}</p>
+              <p className="text-sm font-medium text-slate-500 uppercase tracking-wide mt-1">Website</p>
+            </div>
+            <div className="bg-gradient-to-b from-purple-50/80 to-white border border-purple-100 rounded-3xl p-6 shadow-sm">
+              <div className="bg-purple-100 text-purple-600 rounded-2xl w-12 h-12 flex items-center justify-center">
+                <Users className="h-5 w-5" />
+              </div>
+              <p className="text-4xl font-extrabold tracking-tight text-slate-900 mt-4">{groupedFaqs.competitor.length}</p>
+              <p className="text-sm font-medium text-slate-500 uppercase tracking-wide mt-1">Competitors</p>
+            </div>
+            <div className="bg-gradient-to-b from-amber-50/80 to-white border border-amber-100 rounded-3xl p-6 shadow-sm">
+              <div className="bg-amber-100 text-amber-600 rounded-2xl w-12 h-12 flex items-center justify-center">
+                <FileText className="h-5 w-5" />
+              </div>
+              <p className="text-4xl font-extrabold tracking-tight text-slate-900 mt-4">{groupedFaqs.document.length}</p>
+              <p className="text-sm font-medium text-slate-500 uppercase tracking-wide mt-1">Documents</p>
+            </div>
+            <div className="bg-gradient-to-b from-emerald-50/80 to-white border border-emerald-100 rounded-3xl p-6 shadow-sm">
+              <div className="bg-emerald-100 text-emerald-600 rounded-2xl w-12 h-12 flex items-center justify-center">
+                <BookOpen className="h-5 w-5" />
+              </div>
+              <p className="text-4xl font-extrabold tracking-tight text-slate-900 mt-4">{faqs.length}</p>
+              <p className="text-sm font-medium text-slate-500 uppercase tracking-wide mt-1">Total FAQs</p>
+            </div>
           </div>
 
           {/* Search */}

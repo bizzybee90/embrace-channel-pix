@@ -649,12 +649,12 @@ export default function Review() {
     return (
       <div className="flex h-screen bg-slate-50/50">
         <Sidebar />
-        <div className="flex-1 flex flex-col items-center justify-center">
+      <div className="flex-1 flex flex-col items-center justify-center">
           <div className="text-center max-w-md px-6 animate-fade-in">
-            <div className="w-24 h-24 bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/40 dark:to-purple-900/30 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-purple-500/10">
-              <PartyPopper className="h-12 w-12 text-purple-600" />
+            <div className="w-24 h-24 bg-gradient-to-br from-emerald-50 to-emerald-100/50 rounded-full flex items-center justify-center mx-auto mb-6 ring-8 ring-emerald-50/50">
+              <Sparkles className="w-10 h-10 text-emerald-500" />
             </div>
-            <h2 className="text-2xl font-bold mb-2">All caught up! 🎉</h2>
+            <h2 className="text-2xl font-bold text-slate-900 tracking-tight">You're all caught up!</h2>
             <p className="text-muted-foreground mb-6">
               BizzyBee classified <strong>{weeklyStats?.totalProcessed || 0}</strong> emails with <strong className="text-purple-600">{weeklyStats?.accuracy || 100}%</strong> accuracy this week.
             </p>
@@ -894,7 +894,7 @@ export default function Review() {
                   )}
 
                   {/* AI Reasoning card */}
-                  <div className="mt-4 bg-slate-50/80 dark:bg-slate-900/30 rounded-lg p-3 ring-1 ring-slate-900/5">
+                  <div className="mt-4 bg-purple-50/50 border border-purple-100/50 rounded-2xl p-5">
                     <div className="flex items-center gap-1.5 mb-2">
                       <Bot className="h-3.5 w-3.5 text-purple-500" />
                       <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">AI Reasoning</span>
@@ -974,7 +974,7 @@ export default function Review() {
                     <>
                       {/* CONFIRM — the hero button */}
                       <Button
-                        className="w-full h-12 bg-purple-600 hover:bg-purple-700 text-white text-base font-semibold shadow-sm transition-all hover:scale-[1.01] active:scale-[0.98] rounded-lg"
+                        className="w-full h-11 bg-purple-600 hover:bg-purple-700 text-white font-medium shadow-sm rounded-xl"
                         onClick={handleConfirm}
                         disabled={confirmMutation.isPending}
                       >
@@ -985,7 +985,7 @@ export default function Review() {
                       {/* CHANGE */}
                       <Button
                         variant="outline"
-                        className="w-full h-10 bg-white border border-amber-200 text-amber-700 hover:bg-amber-50 shadow-sm rounded-lg font-medium"
+                        className="w-full h-11 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm rounded-xl font-medium"
                         onClick={() => setShowChangePicker(true)}
                         disabled={confirmMutation.isPending}
                       >

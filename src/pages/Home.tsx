@@ -228,6 +228,25 @@ export const Home = () => {
                       ? `${stats.toReplyCount} conversation${stats.toReplyCount !== 1 ? 's' : ''} waiting for your reply.`
                       : 'Here is what BizzyBee has lined up for you.'}
                 </p>
+                {/* Frosted-glass AI Briefing Panel */}
+                <div className="mt-6 p-5 bg-white/40 backdrop-blur-md rounded-2xl border border-white/60 text-slate-800 text-[15px] leading-relaxed shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
+                  {stats.clearedToday > 0 ? (
+                    <p>
+                      Since this morning, BizzyBee auto-handled <strong>{stats.clearedToday}</strong> message{stats.clearedToday !== 1 ? 's' : ''}
+                      {stats.draftCount > 0 && <>, prepared <strong>{stats.draftCount}</strong> draft{stats.draftCount !== 1 ? 's' : ''} for your review</>}
+                      {stats.reviewCount > 0 && <>, and flagged <strong>{stats.reviewCount}</strong> for training</>}.
+                      {stats.toReplyCount === 0 && stats.atRiskCount === 0
+                        ? ' Your inbox is clear — go grab a coffee ☕'
+                        : ' Here\'s what still needs your attention.'}
+                    </p>
+                  ) : (
+                    <p>
+                      {stats.toReplyCount > 0
+                        ? `You have ${stats.toReplyCount} conversation${stats.toReplyCount !== 1 ? 's' : ''} waiting. BizzyBee is learning your style — the more you review, the smarter it gets.`
+                        : 'BizzyBee is monitoring your inbox. Nothing needs your attention right now — enjoy your day!'}
+                    </p>
+                  )}
+                </div>
               </div>
               {stats.clearedToday > 0 && (
                 <div className="bg-white/80 backdrop-blur-md border border-emerald-200 text-emerald-800 px-5 py-2.5 rounded-2xl shadow-sm font-semibold flex items-center gap-2 text-sm whitespace-nowrap self-start md:self-center">
@@ -268,12 +287,12 @@ export const Home = () => {
 
             {/* ── All caught up ── */}
             {stats.toReplyCount === 0 && stats.reviewCount === 0 && stats.atRiskCount === 0 && (
-              <div className="bg-white rounded-2xl ring-1 ring-slate-900/5 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] p-4 flex items-center gap-3">
-                <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-                <div>
-                  <p className="font-medium text-slate-900">You're all caught up!</p>
-                  <p className="text-sm text-slate-500">BizzyBee is handling your inbox</p>
+              <div className="flex flex-col items-center justify-center h-[60vh] text-center">
+                <div className="w-24 h-24 bg-gradient-to-br from-emerald-50 to-emerald-100/50 rounded-full flex items-center justify-center mb-6 ring-8 ring-emerald-50/50 mx-auto">
+                  <Sparkles className="w-10 h-10 text-emerald-500" />
                 </div>
+                <h3 className="text-2xl font-bold text-slate-900 tracking-tight">You're all caught up!</h3>
+                <p className="text-slate-500 mt-2 max-w-sm mx-auto text-lg">BizzyBee is actively monitoring your inbox. Go grab a coffee.</p>
               </div>
             )}
 
