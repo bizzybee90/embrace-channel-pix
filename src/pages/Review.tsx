@@ -1062,17 +1062,12 @@ export default function Review() {
                   </div>
                 )}
 
-                {/* Teach More (collapsed) */}
-                <Collapsible open={showTeachMore} onOpenChange={setShowTeachMore}>
-                  <CollapsibleTrigger asChild>
-                    <button className="w-full px-4 py-3 flex items-center justify-between text-xs text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors border-b">
-                      <span className="flex items-center gap-1.5">
-                        <Zap className="h-3.5 w-3.5 text-amber-500" />Teach more (optional)
-                      </span>
-                      {showTeachMore ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-                    </button>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="px-4 py-3 border-b space-y-3">
+                {/* Teach More (always visible) */}
+                <div className="border-b">
+                  <div className="px-4 py-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Zap className="h-3.5 w-3.5 text-amber-500" />Teach more (optional)
+                  </div>
+                  <div className="px-4 pb-3 space-y-3">
                     <div className="space-y-2">
                       <Label className="text-xs font-medium">Handle all from this sender:</Label>
                       <RadioGroup value={automationLevel} onValueChange={(val) => setAutomationLevel(val as AutomationLevel)} className="space-y-1">
@@ -1101,8 +1096,8 @@ export default function Review() {
                         ))}
                       </RadioGroup>
                     </div>
-                  </CollapsibleContent>
-                </Collapsible>
+                  </div>
+                </div>
 
                 {/* Keyboard shortcuts */}
                 <div className="mt-auto p-3 border-t bg-muted/20">
