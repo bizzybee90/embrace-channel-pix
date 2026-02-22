@@ -1,7 +1,7 @@
 import { Message } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
-import { Bot, StickyNote, Paperclip, ChevronDown, ChevronUp, MessageCircle, Eye, EyeOff, FileText } from 'lucide-react';
+import { Bot, StickyNote, Paperclip, ChevronDown, ChevronUp, Eye, EyeOff } from 'lucide-react';
 import { ChannelIcon } from '@/components/shared/ChannelIcon';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
@@ -123,16 +123,11 @@ export const MessageTimeline = ({
     const showOriginal = showOriginalIds.has(message.id);
     const displayBody = showOriginal ? effectiveBody : cleanedBody;
     const canShowOriginal = isEmail && hasSignificantCleaning(effectiveBody, cleanedBody);
-    
-    // Check if we have HTML content in raw_payload
-    const hasHtmlContent = isEmail && message.raw_payload?.body && 
-      typeof message.raw_payload.body === 'string' && 
-      message.raw_payload.body.includes('<');
 
     if (isInternal) {
       return (
         <div key={message.id} className="w-full animate-fade-in">
-          <div className="bg-warning/10 border border-warning/30 rounded-lg p-3.5 card-elevation">
+          <div className="bg-warning/10 border border-warning/30 rounded-lg p-3.5">
             <div className="flex items-center gap-2 mb-2">
               <StickyNote className="h-4 w-4 text-warning" />
               <Badge variant="outline" className="text-xs bg-warning/20 border-warning">Internal Note</Badge>
@@ -168,148 +163,135 @@ export const MessageTimeline = ({
       );
     }
 
-    return (
-      <div
-        key={message.id}
-        className={cn(
-          'flex gap-3 animate-fade-in',
-          (isCustomer || isAI) ? 'justify-start' : 'justify-end'
-        )}
-      >
-        {(isCustomer || isAI) && (
-          <div className="flex-shrink-0">
-            {isAI ? (
-              <Avatar className="h-8 w-8">
-                <AvatarFallback className="bg-primary/10">
-                  <Bot className="h-4 w-4 text-primary" />
-                </AvatarFallback>
-              </Avatar>
-            ) : (
-              <Avatar className="h-8 w-8">
-                <AvatarFallback className="bg-gradient-to-br from-blue-400 to-indigo-500 text-white text-xs font-medium">
-                  {getInitials(actorName)}
-                </AvatarFallback>
-              </Avatar>
-            )}
-          </div>
-        )}
-
+    // For outbound (agent/AI) messages, keep the bubble style
+    if (isHuman || isAI) {
+      return (
         <div
+          key={message.id}
           className={cn(
-            'max-w-[85%] rounded-xl p-4 transition-all',
-            isCustomer && (isNewest ? 'bg-transparent' : 'bg-muted/40'),
-            isAI && 'bg-primary/5',
-            isHuman && 'bg-success/5'
+            'flex gap-3 animate-fade-in',
+            'justify-end'
           )}
         >
-          <div className="flex items-center gap-2 mb-2">
-            <ChannelIcon channel={message.channel} />
-            <span className="text-xs font-medium">
-              {actorName}
-            </span>
-            {isAI && <Badge variant="secondary" className="text-xs bg-primary/20">AI</Badge>}
-            <span className="text-xs text-muted-foreground">
-              {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
-            </span>
+          <div
+            className={cn(
+              'max-w-[85%] rounded-xl p-4 transition-all',
+              isAI && 'bg-primary/5',
+              isHuman && 'bg-accent/50'
+            )}
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <ChannelIcon channel={message.channel} />
+              <span className="text-xs font-medium">{actorName}</span>
+              {isAI && <Badge variant="secondary" className="text-xs bg-primary/20">AI</Badge>}
+              <span className="text-xs text-muted-foreground">
+                {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
+              </span>
+            </div>
+            <p className="text-sm whitespace-pre-wrap leading-relaxed">{displayBody}</p>
           </div>
-          {/* Render email content with quoted content collapsed */}
+          <div className="flex-shrink-0">
+            <Avatar className="h-8 w-8">
+              <AvatarFallback className={cn(
+                "text-xs font-medium",
+                isAI ? "bg-primary/10" : "bg-accent text-accent-foreground"
+              )}>
+                {isAI ? <Bot className="h-4 w-4 text-primary" /> : getInitials(message.actor_name)}
+              </AvatarFallback>
+            </Avatar>
+          </div>
+        </div>
+      );
+    }
+
+    // Customer / inbound messages — naked email canvas style
+    return (
+      <div key={message.id} className="animate-fade-in">
+        {/* Naked email content — clean typography, no bubble */}
+        <div className="prose prose-sm max-w-none text-foreground leading-relaxed">
           {isEmail && !showOriginal ? (
             <EmailThread body={displayBody || ''} />
           ) : (
-            <p className="text-sm whitespace-pre-wrap leading-relaxed">{displayBody}</p>
-          )}
-          
-          {/* Email action buttons - only show original toggle, remove 'View formatted' for newest */}
-          {canShowOriginal && !isNewest && (
-            <div className="mt-2 flex items-center gap-3">
-              <button
-                onClick={() => toggleShowOriginal(message.id)}
-                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-              >
-                {showOriginal ? (
-                  <>
-                    <EyeOff className="h-3 w-3" />
-                    Show threaded
-                  </>
-                ) : (
-                  <>
-                    <Eye className="h-3 w-3" />
-                    Show original
-                  </>
-                )}
-              </button>
-            </div>
-          )}
-          
-          {message.attachments && Array.isArray(message.attachments) && message.attachments.length > 0 && (
-            <div className="mt-2 space-y-2">
-              {message.attachments.map((attachment: any, idx: number) => {
-                const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(attachment.name || '');
-                const isAudio = /\.(mp3|wav|m4a|ogg|webm)$/i.test(attachment.name || '');
-                
-                // Get full URL for the attachment
-                const { data: urlData } = supabase.storage
-                  .from('message-attachments')
-                  .getPublicUrl(attachment.path);
-                const attachmentUrl = urlData?.publicUrl || '';
-
-                // Render ImageAnalysis for images
-                if (isImage && workspaceId && attachmentUrl) {
-                  return (
-                    <ImageAnalysis
-                      key={idx}
-                      workspaceId={workspaceId}
-                      messageId={message.id}
-                      imageUrl={attachmentUrl}
-                      customerMessage={message.body}
-                      onSuggestedResponse={onDraftTextChange}
-                    />
-                  );
-                }
-
-                // Render VoicemailPlayer for audio
-                if (isAudio && workspaceId && attachmentUrl) {
-                  return (
-                    <VoicemailPlayer
-                      key={idx}
-                      workspaceId={workspaceId}
-                      messageId={message.id}
-                      audioUrl={attachmentUrl}
-                      customerName={message.actor_name || undefined}
-                      onSuggestedResponse={onDraftTextChange}
-                    />
-                  );
-                }
-
-                // Default file download button
-                return (
-                  <button
-                    key={idx}
-                    onClick={() => handleDownloadAttachment(attachment.path, attachment.name)}
-                    disabled={downloadingFile === attachment.path}
-                    className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
-                  >
-                    {downloadingFile === attachment.path ? (
-                      <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
-                    ) : (
-                      <Paperclip className="h-4 w-4" />
-                    )}
-                    <span className="truncate">{attachment.name}</span>
-                    <span className="text-xs">({Math.round((attachment.size || 0) / 1024)}KB)</span>
-                  </button>
-                );
-              })}
-            </div>
+            <p className="text-sm whitespace-pre-wrap leading-relaxed m-0">{displayBody}</p>
           )}
         </div>
+        
+        {/* Show original toggle */}
+        {canShowOriginal && (
+          <div className="mt-2 flex items-center gap-3">
+            <button
+              onClick={() => toggleShowOriginal(message.id)}
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {showOriginal ? (
+                <>
+                  <EyeOff className="h-3 w-3" />
+                  Show threaded
+                </>
+              ) : (
+                <>
+                  <Eye className="h-3 w-3" />
+                  Show original
+                </>
+              )}
+            </button>
+          </div>
+        )}
+        
+        {message.attachments && Array.isArray(message.attachments) && message.attachments.length > 0 && (
+          <div className="mt-3 space-y-2">
+            {message.attachments.map((attachment: any, idx: number) => {
+              const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(attachment.name || '');
+              const isAudio = /\.(mp3|wav|m4a|ogg|webm)$/i.test(attachment.name || '');
+              
+              const { data: urlData } = supabase.storage
+                .from('message-attachments')
+                .getPublicUrl(attachment.path);
+              const attachmentUrl = urlData?.publicUrl || '';
 
-        {isHuman && (
-          <div className="flex-shrink-0">
-            <Avatar className="h-8 w-8">
-              <AvatarFallback className="bg-success/10 text-xs font-medium text-success">
-                {getInitials(message.actor_name)}
-              </AvatarFallback>
-            </Avatar>
+              if (isImage && workspaceId && attachmentUrl) {
+                return (
+                  <ImageAnalysis
+                    key={idx}
+                    workspaceId={workspaceId}
+                    messageId={message.id}
+                    imageUrl={attachmentUrl}
+                    customerMessage={message.body}
+                    onSuggestedResponse={onDraftTextChange}
+                  />
+                );
+              }
+
+              if (isAudio && workspaceId && attachmentUrl) {
+                return (
+                  <VoicemailPlayer
+                    key={idx}
+                    workspaceId={workspaceId}
+                    messageId={message.id}
+                    audioUrl={attachmentUrl}
+                    customerName={message.actor_name || undefined}
+                    onSuggestedResponse={onDraftTextChange}
+                  />
+                );
+              }
+
+              return (
+                <button
+                  key={idx}
+                  onClick={() => handleDownloadAttachment(attachment.path, attachment.name)}
+                  disabled={downloadingFile === attachment.path}
+                  className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+                >
+                  {downloadingFile === attachment.path ? (
+                    <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
+                  ) : (
+                    <Paperclip className="h-4 w-4" />
+                  )}
+                  <span className="truncate">{attachment.name}</span>
+                  <span className="text-xs">({Math.round((attachment.size || 0) / 1024)}KB)</span>
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
@@ -327,20 +309,14 @@ export const MessageTimeline = ({
         />
       )}
       
-      {/* Header with expand/collapse toggle */}
-      <div className="flex items-center justify-between px-4 pt-2">
-        <div className="flex items-center gap-2">
-          <MessageCircle className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm font-medium text-muted-foreground">
-            Conversation ({messages.length} message{messages.length !== 1 ? 's' : ''})
-          </span>
-        </div>
-        {hasMoreMessages && (
+      {/* Collapsed messages indicator */}
+      {hasMoreMessages && (
+        <div className="px-4 pt-2">
           <Button
             variant="ghost"
             size="sm"
             onClick={() => setIsExpanded(!isExpanded)}
-            className="h-8 text-xs gap-1.5"
+            className="w-full h-8 text-xs gap-1.5 text-muted-foreground hover:text-foreground"
           >
             {isExpanded ? (
               <>
@@ -350,25 +326,16 @@ export const MessageTimeline = ({
             ) : (
               <>
                 <ChevronDown className="h-3.5 w-3.5" />
-                Show all ({hiddenCount} more)
+                {hiddenCount} earlier message{hiddenCount !== 1 ? 's' : ''}
               </>
             )}
           </Button>
-        )}
-      </div>
-
-      {/* Collapsed indicator */}
-      {!isExpanded && hasMoreMessages && (
-        <div className="px-4">
-          <div className="text-center py-2 text-xs text-muted-foreground bg-muted/30 rounded-lg border border-dashed border-border">
-            {hiddenCount} earlier message{hiddenCount !== 1 ? 's' : ''} hidden
-          </div>
         </div>
       )}
 
-      {/* Messages — clean, no timeline line */}
+      {/* Messages — clean layout */}
       <div className="py-2 px-4">
-        <div className="space-y-4">
+        <div className="space-y-6">
           {displayedMessages.map((message, index) => {
             const isNewest = index === displayedMessages.length - 1;
             return (
