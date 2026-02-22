@@ -11,6 +11,7 @@ interface ReviewQueueItemProps {
     decision_bucket: string;
     customer: { name: string; email: string } | null;
     channel?: string;
+    messages?: { actor_name?: string | null }[];
   };
   isActive: boolean;
   isReviewed: boolean;
@@ -44,7 +45,7 @@ export const ReviewQueueItem = ({
   onClick,
   onToggleSelect 
 }: ReviewQueueItemProps) => {
-  const senderName = conversation.customer?.name || conversation.customer?.email?.split('@')[0] || 'Unknown Sender';
+  const senderName = conversation.messages?.[0]?.actor_name || conversation.customer?.name || conversation.customer?.email?.split('@')[0] || 'Unknown Sender';
 
   return (
     <div

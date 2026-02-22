@@ -1413,7 +1413,7 @@ export default function Review() {
                           <ChannelIcon channel={conv.channel} className="h-3 w-3 flex-shrink-0" />
                         )}
                         <span className="text-sm truncate flex-1 text-foreground/80">
-                          {conv.customer?.name || conv.customer?.email?.split('@')[0] || 'Unknown'}
+                          {conv.messages?.[0]?.actor_name || conv.customer?.name || conv.customer?.email?.split('@')[0] || 'Unknown Sender'}
                         </span>
                         <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 flex-shrink-0">
                           {Math.round((conv.triage_confidence || 0) * 100)}%
