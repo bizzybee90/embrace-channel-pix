@@ -1097,17 +1097,17 @@ export default function Review() {
             </div>
             <div className="hidden md:flex items-center gap-1.5 text-xs text-muted-foreground">
               <Keyboard className="h-3.5 w-3.5" />
-              <kbd className="bg-background border border-border rounded px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground shadow-sm">↑</kbd>
-              <kbd className="bg-background border border-border rounded px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground shadow-sm">↓</kbd>
+              <kbd className="bg-white border border-slate-200 rounded px-1.5 py-0.5 text-[11px] font-mono text-slate-500 shadow-sm mx-1 uppercase font-semibold">↑</kbd>
+              <kbd className="bg-white border border-slate-200 rounded px-1.5 py-0.5 text-[11px] font-mono text-slate-500 shadow-sm mx-1 uppercase font-semibold">↓</kbd>
               <span>navigate</span>
               <span className="mx-0.5">•</span>
-              <kbd className="bg-background border border-border rounded px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground shadow-sm">L</kbd>
+              <kbd className="bg-white border border-slate-200 rounded px-1.5 py-0.5 text-[11px] font-mono text-slate-500 shadow-sm mx-1 uppercase font-semibold">L</kbd>
               <span>confirm</span>
               <span className="mx-0.5">•</span>
-              <kbd className="bg-background border border-border rounded px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground shadow-sm">H</kbd>
+              <kbd className="bg-white border border-slate-200 rounded px-1.5 py-0.5 text-[11px] font-mono text-slate-500 shadow-sm mx-1 uppercase font-semibold">H</kbd>
               <span>change</span>
               <span className="mx-0.5">•</span>
-              <kbd className="bg-background border border-border rounded px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground shadow-sm">S</kbd>
+              <kbd className="bg-white border border-slate-200 rounded px-1.5 py-0.5 text-[11px] font-mono text-slate-500 shadow-sm mx-1 uppercase font-semibold">S</kbd>
               <span>skip</span>
             </div>
           </div>
@@ -1120,33 +1120,33 @@ export default function Review() {
               }
             </span>
           </div>
-          <div className="inline-flex bg-muted p-1 rounded-lg mt-3 gap-0.5">
+          <div className="bg-slate-100 p-1 rounded-lg inline-flex items-center gap-1 mb-6 mt-3">
             <button
               className={cn(
-                "px-3 py-1.5 rounded-md text-xs font-medium transition-all",
+                "px-4 py-1.5 rounded-md text-xs font-medium transition-all",
                 activeTab === 'triage'
-                  ? "bg-background text-foreground shadow-sm"
+                  ? "bg-white text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
               )}
               onClick={() => setActiveTab('triage')}
             >
               Triage Review
               {reviewQueue.length > 0 && (
-                <Badge variant="secondary" className="ml-1.5 h-4 px-1 text-[10px]">{reviewQueue.length}</Badge>
+                <span className="ml-1.5 text-[10px] font-semibold text-muted-foreground">({reviewQueue.length})</span>
               )}
             </button>
             <button
               className={cn(
-                "px-3 py-1.5 rounded-md text-xs font-medium transition-all",
+                "px-4 py-1.5 rounded-md text-xs font-medium transition-all",
                 activeTab === 'low_confidence'
-                  ? "bg-background text-foreground shadow-sm"
+                  ? "bg-white text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
               )}
               onClick={() => setActiveTab('low_confidence')}
             >
               Low Confidence
               {lowConfidenceEmails.length > 0 && (
-                <Badge variant="secondary" className="ml-1.5 h-4 px-1 text-[10px]">{lowConfidenceEmails.length}</Badge>
+                <span className="ml-1.5 text-[10px] font-semibold text-muted-foreground">({lowConfidenceEmails.length})</span>
               )}
             </button>
           </div>
@@ -1680,26 +1680,25 @@ export default function Review() {
                   </Collapsible>
 
                   {/* Actions */}
-                  <div className="flex items-center gap-3 pt-4">
+                  <div className="grid grid-cols-2 gap-4 mt-6 border-t border-slate-100 pt-6">
                     {!showChangePicker ? (
                       <>
                         <Button 
                           variant="outline"
                           onClick={() => setShowChangePicker(true)}
-                          className="flex-1"
+                          className="w-full text-slate-700 bg-white hover:bg-slate-50 border-slate-200 shadow-sm h-11 font-medium"
                           disabled={reviewMutation.isPending}
                         >
-                          <Pencil className="h-4 w-4 mr-2" />
                           ✏️ Change
-                          <kbd className="ml-2 bg-background border border-border rounded px-1 py-0.5 text-[10px] font-mono text-muted-foreground shadow-sm">H</kbd>
+                          <kbd className="ml-2 bg-white border border-slate-200 rounded px-1.5 py-0.5 text-[11px] font-mono text-slate-500 shadow-sm uppercase font-semibold">H</kbd>
                         </Button>
                         <Button 
                           onClick={handleConfirm}
-                          className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-medium"
+                          className="w-full bg-purple-600 text-white hover:bg-purple-700 shadow-sm h-11 font-medium text-base"
                           disabled={reviewMutation.isPending}
                         >
                           ✨ Looks Good
-                          <kbd className="ml-2 bg-purple-500/30 border border-purple-400/30 rounded px-1 py-0.5 text-[10px] font-mono text-white/80 shadow-sm">L</kbd>
+                          <kbd className="ml-2 bg-purple-500/30 border border-purple-400/30 rounded px-1.5 py-0.5 text-[11px] font-mono text-white/80 shadow-sm uppercase font-semibold">L</kbd>
                         </Button>
                       </>
                     ) : (
