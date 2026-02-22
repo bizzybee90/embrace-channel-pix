@@ -705,6 +705,29 @@ Deno.serve(async (req) => {
               },
             });
 
+            // Auto-trigger customer intelligence enrichment (fire-and-forget)
+            try {
+              const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+              const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+              if (supabaseUrl && serviceRoleKey) {
+                fetch(`${supabaseUrl}/functions/v1/ai-enrich-conversation`, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${serviceRoleKey}`,
+                  },
+                  body: JSON.stringify({
+                    conversation_id: job.conversation_id,
+                    workspace_id: job.workspace_id,
+                  }),
+                }).catch((err) => {
+                  console.warn("Auto-enrich trigger failed (non-fatal):", err.message);
+                });
+              }
+            } catch (enrichErr) {
+              console.warn("Auto-enrich error (non-fatal):", enrichErr);
+            }
+
             processed += 1;
           } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
