@@ -212,16 +212,9 @@ export const MessageTimeline = ({
               {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
             </span>
           </div>
-          {/* For newest message: show full clean text natively. For older: use EmailThread */}
-          {isNewest && hasHtmlContent ? (
-            <div 
-              className="raw-email-content font-sans text-foreground antialiased text-[15px] leading-relaxed max-w-none prose prose-sm prose-slate"
-              dangerouslySetInnerHTML={{ __html: message.raw_payload.body }}
-            />
-          ) : isNewest ? (
-            <p className="font-sans text-foreground antialiased text-base whitespace-pre-wrap leading-relaxed">{displayBody}</p>
-          ) : isEmail && !showOriginal ? (
-            <EmailThread body={message.body} />
+          {/* Render email content with quoted content collapsed */}
+          {isEmail && !showOriginal ? (
+            <EmailThread body={displayBody || ''} />
           ) : (
             <p className="text-sm whitespace-pre-wrap leading-relaxed">{displayBody}</p>
           )}
