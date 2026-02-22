@@ -1087,72 +1087,66 @@ export default function Review() {
     <div className="flex h-screen bg-muted/30">
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Header */}
-        <div className="px-6 py-4 flex-shrink-0">
-          <div className="flex items-center justify-between mb-1">
-            <div className="flex items-center gap-3">
-              <BackButton to="/" label="Home" />
-              <Sparkles className="h-5 w-5 text-purple-500" />
-              <div>
-                <h1 className="text-xl font-semibold">Teach BizzyBee ✨</h1>
-                <p className="text-sm text-muted-foreground">Your feedback helps BizzyBee work more independently over time</p>
-              </div>
-              <ReviewExplainer />
+        {/* Compact Header */}
+        <div className="px-6 py-3 flex-shrink-0 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <BackButton to="/" label="Home" />
+            <div>
+              <h1 className="text-lg font-semibold">Teach BizzyBee ✨</h1>
+              <p className="text-xs text-muted-foreground">Your feedback helps BizzyBee work more independently over time</p>
             </div>
-            <div className="hidden md:flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Keyboard className="h-3.5 w-3.5" />
-              <kbd className="bg-white border border-slate-200 rounded px-1.5 py-0.5 text-[11px] font-mono text-slate-500 shadow-sm mx-1 uppercase font-semibold">↑</kbd>
-              <kbd className="bg-white border border-slate-200 rounded px-1.5 py-0.5 text-[11px] font-mono text-slate-500 shadow-sm mx-1 uppercase font-semibold">↓</kbd>
-              <span>navigate</span>
-              <span className="mx-0.5">•</span>
-              <kbd className="bg-white border border-slate-200 rounded px-1.5 py-0.5 text-[11px] font-mono text-slate-500 shadow-sm mx-1 uppercase font-semibold">L</kbd>
-              <span>confirm</span>
-              <span className="mx-0.5">•</span>
-              <kbd className="bg-white border border-slate-200 rounded px-1.5 py-0.5 text-[11px] font-mono text-slate-500 shadow-sm mx-1 uppercase font-semibold">H</kbd>
-              <span>change</span>
-              <span className="mx-0.5">•</span>
-              <kbd className="bg-white border border-slate-200 rounded px-1.5 py-0.5 text-[11px] font-mono text-slate-500 shadow-sm mx-1 uppercase font-semibold">S</kbd>
-              <span>skip</span>
-            </div>
+            <ReviewExplainer />
           </div>
-          <div className="flex items-center gap-4 mt-3">
-            <Progress value={activeTab === 'triage' ? progress : 0} className="flex-1 h-2" />
-            <span className="text-sm text-muted-foreground whitespace-nowrap">
+          <div className="flex items-center gap-4">
+            <div className="bg-card p-1 rounded-lg inline-flex items-center gap-1">
+              <button
+                className={cn(
+                  "px-4 py-1.5 rounded-md text-xs font-medium transition-all",
+                  activeTab === 'triage'
+                    ? "bg-white text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+                onClick={() => setActiveTab('triage')}
+              >
+                Triage Review
+                {reviewQueue.length > 0 && (
+                  <span className="ml-1.5 text-[10px] font-semibold text-muted-foreground">({reviewQueue.length})</span>
+                )}
+              </button>
+              <button
+                className={cn(
+                  "px-4 py-1.5 rounded-md text-xs font-medium transition-all",
+                  activeTab === 'low_confidence'
+                    ? "bg-white text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+                onClick={() => setActiveTab('low_confidence')}
+              >
+                Low Confidence
+                {lowConfidenceEmails.length > 0 && (
+                  <span className="ml-1.5 text-[10px] font-semibold text-muted-foreground">({lowConfidenceEmails.length})</span>
+                )}
+              </button>
+            </div>
+            <span className="text-xs text-muted-foreground whitespace-nowrap">
               {activeTab === 'triage' 
-                ? `${totalCount - reviewedCount} training examples remaining`
-                : `${lowConfidenceEmails.length} low-confidence items`
+                ? `${totalCount - reviewedCount} remaining`
+                : `${lowConfidenceEmails.length} items`
               }
             </span>
-          </div>
-          <div className="bg-slate-100 p-1 rounded-lg inline-flex items-center gap-1 mt-3">
-            <button
-              className={cn(
-                "px-4 py-1.5 rounded-md text-xs font-medium transition-all",
-                activeTab === 'triage'
-                  ? "bg-white text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-              onClick={() => setActiveTab('triage')}
-            >
-              Triage Review
-              {reviewQueue.length > 0 && (
-                <span className="ml-1.5 text-[10px] font-semibold text-muted-foreground">({reviewQueue.length})</span>
-              )}
-            </button>
-            <button
-              className={cn(
-                "px-4 py-1.5 rounded-md text-xs font-medium transition-all",
-                activeTab === 'low_confidence'
-                  ? "bg-white text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-              onClick={() => setActiveTab('low_confidence')}
-            >
-              Low Confidence
-              {lowConfidenceEmails.length > 0 && (
-                <span className="ml-1.5 text-[10px] font-semibold text-muted-foreground">({lowConfidenceEmails.length})</span>
-              )}
-            </button>
+            <div className="hidden lg:flex items-center gap-1 text-[10px] text-muted-foreground">
+              <kbd className="bg-white border border-border rounded px-1 py-0.5 font-mono shadow-sm">↑↓</kbd>
+              <span>nav</span>
+              <span className="mx-0.5">·</span>
+              <kbd className="bg-white border border-border rounded px-1 py-0.5 font-mono shadow-sm">L</kbd>
+              <span>confirm</span>
+              <span className="mx-0.5">·</span>
+              <kbd className="bg-white border border-border rounded px-1 py-0.5 font-mono shadow-sm">H</kbd>
+              <span>change</span>
+              <span className="mx-0.5">·</span>
+              <kbd className="bg-white border border-border rounded px-1 py-0.5 font-mono shadow-sm">S</kbd>
+              <span>skip</span>
+            </div>
           </div>
         </div>
 
@@ -1779,7 +1773,14 @@ export default function Review() {
                   )}
                 </Card>
               </div>
-            ) : null}
+            ) : (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center max-w-xs">
+                  <Sparkles className="h-8 w-8 text-muted-foreground/30 mx-auto mb-3" />
+                  <p className="text-sm text-muted-foreground">Select an email from the left to review</p>
+                </div>
+              </div>
+            )}
           </div>
         </div>}
       </div>
