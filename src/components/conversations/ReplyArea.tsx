@@ -193,28 +193,29 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend, ex
         : "px-5 py-4"
     }>
       <div className={cn(
-        !useMobileStyle && "bg-card rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-purple-100 dark:border-purple-500/20 overflow-hidden"
+        !useMobileStyle && "bg-card rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] overflow-hidden",
+        !useMobileStyle && replyBody && draftUsed && "ring-2 ring-purple-400/40 border border-purple-200 dark:border-purple-500/30",
+        !useMobileStyle && !(replyBody && draftUsed) && "border border-slate-200 dark:border-slate-700/50"
       )}>
       <Tabs defaultValue="reply" orientation={isMobile ? "vertical" : "horizontal"}>
-        <div className={isMobile ? "flex flex-col gap-2" : ""}>
-          <TabsList className={isMobile ? "w-full h-auto grid grid-cols-2 bg-muted/50" : "h-10 bg-muted/50"}>
-            <TabsTrigger value="reply" className="text-sm rounded-lg data-[state=active]:bg-card data-[state=active]:shadow-sm transition-all duration-150">Reply</TabsTrigger>
-            <TabsTrigger value="note" className="text-sm rounded-lg data-[state=active]:bg-card data-[state=active]:shadow-sm transition-all duration-150">Note</TabsTrigger>
-          </TabsList>
+        <div className={isMobile ? "flex flex-col gap-2" : "p-3"}>
+          <div className="flex items-center gap-2 mb-2">
+            <TabsList className={isMobile ? "w-full h-auto grid grid-cols-2 bg-muted/50" : "h-9 bg-muted/50"}>
+              <TabsTrigger value="reply" className="text-sm rounded-lg data-[state=active]:bg-card data-[state=active]:shadow-sm transition-all duration-150">Reply</TabsTrigger>
+              <TabsTrigger value="note" className="text-sm rounded-lg data-[state=active]:bg-card data-[state=active]:shadow-sm transition-all duration-150">Note</TabsTrigger>
+            </TabsList>
+            {/* AI pre-filled indicator next to tabs */}
+            {replyBody && draftUsed && (
+              <div className="flex items-center gap-1.5">
+                <Sparkles className="h-3 w-3 text-purple-500" />
+                <span className="text-[11px] font-medium text-purple-600 dark:text-purple-400">AI pre-filled draft</span>
+              </div>
+            )}
+          </div>
 
           <TabsContent value="reply" className="mt-0">
             <div className="space-y-2">
-              {/* AI pre-filled indicator */}
-              {replyBody && draftUsed && (
-                <div className="flex items-center gap-1.5 px-1 mb-1">
-                  <Sparkles className="h-3 w-3 text-purple-500" />
-                  <span className="text-[11px] font-medium text-purple-600 dark:text-purple-400">AI pre-filled draft</span>
-                </div>
-              )}
-              <div className={cn(
-                "flex items-end gap-2 rounded-xl transition-all duration-200",
-                replyBody && draftUsed && "ring-2 ring-purple-500/30 bg-purple-50/10 dark:bg-purple-500/5 rounded-xl p-1"
-              )}>
+              <div className="flex items-end gap-2 rounded-xl transition-all duration-200">
                 <Textarea
                   ref={replyTextareaRef}
                   placeholder="Type your reply..."

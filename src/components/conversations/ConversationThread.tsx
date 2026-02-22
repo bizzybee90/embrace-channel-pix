@@ -21,6 +21,7 @@ export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackBut
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [draftText, setDraftText] = useState<string>('');  // Only for AI-generated drafts
+  const [customer, setCustomer] = useState<any>(null);
   const { toast } = useToast();
   const draftSaveTimeoutRef = useRef<NodeJS.Timeout>();
 
@@ -28,6 +29,23 @@ export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackBut
   useEffect(() => {
     setDraftText('');
   }, [conversation.id]);
+
+  // Fetch real customer data
+  useEffect(() => {
+    const fetchCustomer = async () => {
+      if (!conversation.customer_id) {
+        setCustomer((conversation as any).customer || null);
+        return;
+      }
+      const { data } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('id', conversation.customer_id)
+        .single();
+      setCustomer(data || (conversation as any).customer || null);
+    };
+    fetchCustomer();
+  }, [conversation.id, conversation.customer_id]);
 
   useEffect(() => {
     const fetchMessages = async () => {
@@ -280,7 +298,7 @@ export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackBut
       </div>
 
       {/* Customer Intelligence & Profile mini-cards */}
-      {conversation.customer_id && conversation.workspace_id && (
+      {(conversation.customer_id || customer) && (
         <div className="flex-shrink-0 px-5 pb-2">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {/* Customer Profile Mini-Card — iOS Contact Widget */}
@@ -292,13 +310,13 @@ export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackBut
               )}
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white text-sm font-semibold flex-shrink-0">
-                  {((conversation as any).customer?.name || 'U').split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
+                  {(customer?.name || 'U').split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
                 </div>
                 <div className="min-w-0">
-                  <p className="text-lg font-semibold text-foreground truncate">{(conversation as any).customer?.name || 'Unknown'}</p>
-                  <p className="text-xs text-muted-foreground truncate">{(conversation as any).customer?.email || ''}</p>
-                  {(conversation as any).customer?.phone && (
-                    <p className="text-xs text-muted-foreground">{(conversation as any).customer.phone}</p>
+                  <p className="text-lg font-semibold text-foreground truncate">{customer?.name || 'Unknown'}</p>
+                  <p className="text-xs text-muted-foreground truncate">{customer?.email || ''}</p>
+                  {customer?.phone && (
+                    <p className="text-xs text-muted-foreground">{customer.phone}</p>
                   )}
                 </div>
               </div>
@@ -357,7 +375,7 @@ export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackBut
           messages={messages} 
           workspaceId={conversation.workspace_id}
           onDraftTextChange={setDraftText}
-          conversationCustomerName={(conversation as any).customer?.name}
+          conversationCustomerName={customer?.name}
         />
       </div>
 
