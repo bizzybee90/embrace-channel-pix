@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Send, Paperclip, X, Sparkles, Trash2 } from 'lucide-react';
+import { Send, Paperclip, X, Sparkles, Trash2, Reply, Minimize2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useIsTablet } from '@/hooks/use-tablet';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -17,9 +17,10 @@ interface ReplyAreaProps {
   externalDraftText?: string;
   onDraftTextCleared?: () => void;
   onDraftChange?: (text: string) => void;
+  senderName?: string;
 }
 
-export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend, externalDraftText, onDraftTextCleared, onDraftChange }: ReplyAreaProps) => {
+export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend, externalDraftText, onDraftTextCleared, onDraftChange, senderName }: ReplyAreaProps) => {
   const [replyBody, setReplyBody] = useState('');
   const [noteBody, setNoteBody] = useState('');
   const [selectedChannel, setSelectedChannel] = useState(channel);
@@ -27,6 +28,7 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend, ex
   const [draftUsed, setDraftUsed] = useState(false);
   const [attachments, setAttachments] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true);
   const { toast } = useToast();
   const isTablet = useIsTablet();
   const isMobile = useIsMobile();
@@ -48,15 +50,17 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend, ex
     console.log('📖 Loading draft for conversation:', { conversationId, savedDraft });
     setReplyBody(savedDraft || '');
     setDraftUsed(false);
+    // Auto-expand if there's a saved draft
+    setIsCollapsed(!savedDraft);
   }, [conversationId]);
 
   // Handle AI-generated draft from "Use Draft" button
   useEffect(() => {
     console.log('📝 ReplyArea external draft updated:', { externalDraftText, currentReplyBody: replyBody });
-    // Only update if it's different and not just from user typing
     if (externalDraftText && externalDraftText !== replyBody && !draftUsed) {
       setReplyBody(externalDraftText);
       setDraftUsed(true);
+      setIsCollapsed(false); // Auto-expand when AI draft arrives
       setTimeout(() => adjustTextareaHeight(replyTextareaRef.current), 0);
     }
   }, [externalDraftText]);
@@ -186,6 +190,21 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend, ex
   // Use mobile styling for both mobile and tablet
   const useMobileStyle = isMobile || isTablet;
 
+  // Collapsed pill state — show when no draft and user hasn't expanded
+  if (isCollapsed) {
+    return (
+      <div className="flex-shrink-0 px-4 pb-4">
+        <button
+          onClick={() => setIsCollapsed(false)}
+          className="mt-auto border border-slate-200 rounded-full py-3 px-4 text-muted-foreground cursor-text shadow-sm bg-white hover:border-purple-300 transition-all flex items-center gap-3 w-full text-left text-sm"
+        >
+          <Reply className="w-4 h-4" />
+          Reply to {senderName || 'sender'}...
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className={
       useMobileStyle
@@ -193,10 +212,20 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend, ex
         : "px-5 pb-4 pt-2"
     }>
       <div className={cn(
+        "relative",
         !useMobileStyle && "bg-card rounded-2xl",
         !useMobileStyle && replyBody && draftUsed && "ring-1 ring-inset ring-purple-300 shadow-sm focus-within:ring-2 focus-within:ring-purple-500 transition-all",
         !useMobileStyle && !(replyBody && draftUsed) && "ring-1 ring-inset ring-border shadow-sm focus-within:ring-2 focus-within:ring-primary transition-all"
       )}>
+        {/* Collapse toggle */}
+        <button
+          onClick={() => setIsCollapsed(true)}
+          className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 bg-white rounded-md p-1 z-10"
+          title="Collapse"
+        >
+          <Minimize2 className="w-4 h-4" />
+        </button>
+
       <Tabs defaultValue="reply" orientation={isMobile ? "vertical" : "horizontal"}>
         <div className={isMobile ? "flex flex-col gap-2" : "p-3"}>
           <div className="flex items-center gap-2 mb-2">
@@ -204,7 +233,6 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend, ex
               <TabsTrigger value="reply" className="text-sm rounded-lg data-[state=active]:bg-card data-[state=active]:shadow-sm transition-all duration-150">Reply</TabsTrigger>
               <TabsTrigger value="note" className="text-sm rounded-lg data-[state=active]:bg-card data-[state=active]:shadow-sm transition-all duration-150">Note</TabsTrigger>
             </TabsList>
-            {/* AI pre-filled indicator next to tabs */}
             {replyBody && draftUsed && (
               <div className="flex items-center gap-1.5">
                 <Sparkles className="h-3 w-3 text-purple-500" />
@@ -324,7 +352,6 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend, ex
           </TabsContent>
         </div>
       </Tabs>
-      {!useMobileStyle && <>{/* close wrapper */}</>}
       </div>
     </div>
   );
