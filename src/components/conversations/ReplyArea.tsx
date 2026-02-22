@@ -50,8 +50,7 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend, ex
     console.log('📖 Loading draft for conversation:', { conversationId, savedDraft });
     setReplyBody(savedDraft || '');
     setDraftUsed(false);
-    // Auto-expand if there's a saved draft
-    setIsCollapsed(!savedDraft);
+    setIsCollapsed(true);
   }, [conversationId]);
 
   // Handle AI-generated draft from "Use Draft" button
@@ -60,7 +59,6 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend, ex
     if (externalDraftText && externalDraftText !== replyBody && !draftUsed) {
       setReplyBody(externalDraftText);
       setDraftUsed(true);
-      setIsCollapsed(false); // Auto-expand when AI draft arrives
       setTimeout(() => adjustTextareaHeight(replyTextareaRef.current), 0);
     }
   }, [externalDraftText]);
