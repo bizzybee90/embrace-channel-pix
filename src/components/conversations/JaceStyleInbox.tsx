@@ -122,6 +122,11 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
         .gt('snoozed_until', new Date().toISOString());
     } else if (filter === 'sent') {
       query = query.eq('status', 'resolved');
+    } else if (filter === 'all-open') {
+      // Inbox: all active conversations, exclude auto-handled/resolved
+      query = query
+        .neq('decision_bucket', 'auto_handled')
+        .in('status', ['new', 'open', 'waiting_internal', 'ai_handling', 'escalated']);
     }
 
     // When searching, fetch more items so search works beyond the first page
@@ -357,11 +362,12 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
     if (subFilter === 'at-risk') return 'At Risk';
     if (subFilter === 'drafts') return 'Drafts Ready';
     if (subFilter === 'to-reply') return 'To Reply';
-    if (filter === 'cleared') return 'Done';
+    if (filter === 'cleared') return 'Cleared';
     if (filter === 'snoozed') return 'Snoozed';
     if (filter === 'sent') return 'Sent';
     if (filter === 'unread') return 'Unread';
     if (filter === 'drafts-ready') return 'Drafts';
+    if (filter === 'needs-me') return 'Needs Action';
     return 'Inbox';
   };
 
