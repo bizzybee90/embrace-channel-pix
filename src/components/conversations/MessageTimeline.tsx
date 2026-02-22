@@ -205,9 +205,23 @@ export const MessageTimeline = ({
       );
     }
 
-    // Check for raw HTML body
+    // Check for raw HTML body — always prefer HTML rendering for emails
     const rawHtmlBody = message.raw_payload?.body;
     const hasHtmlBody = isEmail && typeof rawHtmlBody === 'string' && rawHtmlBody.includes('<');
+
+    // Sanitize and clean up HTML for inline rendering
+    const sanitizedEmailHtml = hasHtmlBody ? (() => {
+      let html = DOMPurify.sanitize(rawHtmlBody, {
+        ALLOWED_TAGS: ['table', 'tr', 'td', 'th', 'tbody', 'thead', 'tfoot', 'caption', 'colgroup', 'col', 'div', 'span', 'img', 'a', 'b', 'i', 'strong', 'em', 'br', 'p', 'hr', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'blockquote', 'pre', 'code', 'font', 'center', 'u', 's', 'strike', 'sub', 'sup', 'small', 'big'],
+        ALLOWED_ATTR: ['style', 'class', 'href', 'src', 'alt', 'title', 'width', 'height', 'cellpadding', 'cellspacing', 'border', 'align', 'valign', 'color', 'face', 'size', 'target', 'rel', 'colspan', 'rowspan'],
+        ALLOW_DATA_ATTR: false,
+        FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'input', 'button', 'select', 'textarea', 'style', 'html', 'head', 'meta', 'body'],
+        FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'bgcolor', 'background'],
+      });
+      // Strip inline background styles that create ugly grey blocks
+      html = html.replace(/background(-color)?\s*:\s*[^;"']+/gi, '');
+      return html;
+    })() : '';
 
     // Customer / inbound messages — naked email canvas style
     return (
@@ -216,13 +230,7 @@ export const MessageTimeline = ({
         {hasHtmlBody && !showOriginal ? (
           <div
             className="prose prose-sm md:prose-base max-w-none text-foreground leading-relaxed [&_a]:text-blue-600 hover:[&_a]:text-blue-800 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-border [&_td]:p-2 [&_img]:max-w-full [&_img]:h-auto break-words"
-            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(rawHtmlBody, {
-              ALLOWED_TAGS: ['table', 'tr', 'td', 'th', 'tbody', 'thead', 'tfoot', 'caption', 'colgroup', 'col', 'div', 'span', 'img', 'a', 'b', 'i', 'strong', 'em', 'br', 'p', 'hr', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'blockquote', 'pre', 'code', 'font', 'center', 'u', 's', 'strike', 'sub', 'sup', 'small', 'big', 'style'],
-              ALLOWED_ATTR: ['style', 'class', 'href', 'src', 'alt', 'title', 'width', 'height', 'cellpadding', 'cellspacing', 'border', 'align', 'valign', 'bgcolor', 'color', 'face', 'size', 'target', 'rel', 'colspan', 'rowspan'],
-              ALLOW_DATA_ATTR: false,
-              FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'input', 'button', 'select', 'textarea'],
-              FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover'],
-            }) }}
+            dangerouslySetInnerHTML={{ __html: sanitizedEmailHtml }}
           />
         ) : (
           <div className="prose prose-sm max-w-none text-foreground leading-relaxed">
