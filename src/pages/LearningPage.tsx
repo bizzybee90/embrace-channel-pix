@@ -4,13 +4,13 @@ import { Sidebar } from '@/components/sidebar/Sidebar';
 import { MobileHeader } from '@/components/sidebar/MobileHeader';
 import { MobileSidebarSheet } from '@/components/sidebar/MobileSidebarSheet';
 import { BackButton } from '@/components/shared/BackButton';
-import { LearningSystemPanel } from '@/components/settings/LearningSystemPanel';
-import { LearningAnalyticsDashboard } from '@/components/settings/LearningAnalyticsDashboard';
-import { TriageLearningPanel } from '@/components/settings/TriageLearningPanel';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Brain } from 'lucide-react';
 import { useState } from 'react';
+import { HowBizzyBeeIsDoing } from '@/components/learning/HowBizzyBeeIsDoing';
+import { YourRules } from '@/components/learning/YourRules';
+import { RecentLearning } from '@/components/learning/RecentLearning';
 
 export default function LearningPage() {
   const navigate = useNavigate();
@@ -19,8 +19,7 @@ export default function LearningPage() {
 
   const mainContent = (
     <ScrollArea className="h-[calc(100vh-4rem)]">
-      <div className="p-4 md:p-6 space-y-6">
-        {/* Header - only show on desktop, mobile uses MobileHeader */}
+      <div className="p-4 md:p-6 space-y-4 max-w-2xl mx-auto">
         {!isMobile && (
           <div className="flex items-center gap-4">
             <BackButton to="/" />
@@ -30,13 +29,12 @@ export default function LearningPage() {
               </div>
               <div>
                 <h1 className="text-xl font-semibold text-foreground">Learning & Training</h1>
-                <p className="text-sm text-muted-foreground">Help BizzyBee learn your patterns</p>
+                <p className="text-sm text-muted-foreground">How BizzyBee is learning your patterns</p>
               </div>
             </div>
           </div>
         )}
 
-        {/* Mobile page title */}
         {isMobile && (
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-xl bg-purple-500/10">
@@ -44,19 +42,14 @@ export default function LearningPage() {
             </div>
             <div>
               <h1 className="text-lg font-semibold text-foreground">Learning & Training</h1>
-              <p className="text-xs text-muted-foreground">Help BizzyBee learn</p>
+              <p className="text-xs text-muted-foreground">How BizzyBee is learning</p>
             </div>
           </div>
         )}
 
-        {/* Learning Analytics */}
-        <LearningAnalyticsDashboard />
-
-        {/* Triage Learning */}
-        <TriageLearningPanel />
-
-        {/* Learning System */}
-        <LearningSystemPanel />
+        <HowBizzyBeeIsDoing />
+        <YourRules />
+        <RecentLearning />
       </div>
     </ScrollArea>
   );
