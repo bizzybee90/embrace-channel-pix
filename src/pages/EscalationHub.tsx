@@ -21,6 +21,11 @@ export const EscalationHub = ({ filter = 'all-open' }: EscalationHubProps) => {
   const isMobile = useIsMobile();
   const isTablet = useIsTablet();
   
+  // Clear selected conversation when filter changes (folder navigation)
+  useEffect(() => {
+    setSelectedConversation(null);
+  }, [filter]);
+
   useSLANotifications();
 
   const handleUpdate = async () => {
