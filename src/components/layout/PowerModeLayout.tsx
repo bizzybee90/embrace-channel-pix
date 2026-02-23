@@ -73,7 +73,7 @@ export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerMod
   };
 
   return (
-    <div className="flex flex-col h-screen w-full bg-muted/30 overflow-hidden">
+    <div className="flex flex-col h-screen w-full bg-slate-50/50 overflow-hidden">
       {/* Mobile Header */}
       {isMobile && (
         <>
