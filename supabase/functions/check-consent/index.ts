@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { validateAuth, AuthError, authErrorResponse } from "../_shared/auth.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,6 +13,9 @@ serve(async (req) => {
   }
 
   try {
+    // Validate authentication
+    const { workspaceId } = await validateAuth(req);
+
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
@@ -27,10 +31,11 @@ serve(async (req) => {
 
     console.log('Checking consent for:', customer_identifier, 'on channel:', channel);
 
-    // Find customer by email or phone using safe parameterized queries
+    // Find customer by email or phone, scoped to workspace
     let { data: customer } = await supabase
       .from('customers')
       .select('id')
+      .eq('workspace_id', workspaceId)
       .eq('email', customer_identifier)
       .maybeSingle();
 
@@ -38,6 +43,7 @@ serve(async (req) => {
       const result = await supabase
         .from('customers')
         .select('id')
+        .eq('workspace_id', workspaceId)
         .eq('phone', customer_identifier)
         .maybeSingle();
       customer = result.data;
@@ -79,9 +85,12 @@ serve(async (req) => {
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error: any) {
+    if (error instanceof AuthError) {
+      return authErrorResponse(error);
+    }
     console.error('Error checking consent:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: 'Internal server error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

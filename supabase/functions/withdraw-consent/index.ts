@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { validateAuth, AuthError, authErrorResponse } from "../_shared/auth.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -20,6 +21,9 @@ serve(async (req) => {
   }
 
   try {
+    // Validate authentication
+    const { workspaceId } = await validateAuth(req);
+
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
@@ -27,11 +31,11 @@ serve(async (req) => {
     const body: WithdrawConsentRequest = await req.json();
     console.log('📤 [withdraw-consent] Processing request:', JSON.stringify(body, null, 2));
 
-    // Find customer by ID, email, or phone
+    // Find customer by ID, email, or phone - scoped to workspace
     let customerId = body.customer_id;
     
     if (!customerId && (body.customer_email || body.customer_phone)) {
-      const query = supabase.from('customers').select('id');
+      const query = supabase.from('customers').select('id').eq('workspace_id', workspaceId);
       
       if (body.customer_email) {
         query.eq('email', body.customer_email);
@@ -59,6 +63,23 @@ serve(async (req) => {
       );
     }
 
+    // Verify customer belongs to caller's workspace
+    if (body.customer_id) {
+      const { data: customerCheck } = await supabase
+        .from('customers')
+        .select('id')
+        .eq('id', customerId)
+        .eq('workspace_id', workspaceId)
+        .maybeSingle();
+      
+      if (!customerCheck) {
+        return new Response(
+          JSON.stringify({ error: 'Customer not found' }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
     console.log('👤 [withdraw-consent] Found customer:', customerId);
 
     // Find existing consent record
@@ -72,7 +93,6 @@ serve(async (req) => {
     const now = new Date().toISOString();
 
     if (existingConsent) {
-      // Update existing consent to withdrawn
       const { error: updateError } = await supabase
         .from('customer_consents')
         .update({
@@ -90,7 +110,6 @@ serve(async (req) => {
 
       console.log('✅ [withdraw-consent] Consent updated to withdrawn');
     } else {
-      // Create new withdrawn consent record
       const { error: insertError } = await supabase
         .from('customer_consents')
         .insert({
@@ -150,9 +169,12 @@ serve(async (req) => {
     );
 
   } catch (error: any) {
+    if (error instanceof AuthError) {
+      return authErrorResponse(error);
+    }
     console.error('❌ [withdraw-consent] Error:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: 'Internal server error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
