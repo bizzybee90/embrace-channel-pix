@@ -238,40 +238,35 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
   const getStateConfig = (bucket: string, hasAiDraft: boolean) => {
     if (bucket === 'act_now') {
       return { 
-        border: 'border-l-red-500', 
-        badge: <Badge variant="destructive" className={`${BADGE_CLASS} font-medium`}>Needs attention</Badge>,
-        rowClass: 'bg-red-50/50 dark:bg-red-950/20' // Subtle urgency tint
+        badge: <Badge className={`bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 ${BADGE_CLASS} font-medium`}>Needs attention</Badge>,
+        rowClass: 'bg-red-50/30 border-red-100 rounded-xl'
       };
     }
     if (bucket === 'quick_win' && hasAiDraft) {
       return { 
-        border: 'border-l-purple-500', 
-        badge: <Badge className={`bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 hover:bg-purple-200 ${BADGE_CLASS}`}>Draft ready</Badge>,
+        badge: <Badge className={`bg-purple-50 text-purple-600 border border-purple-200 hover:bg-purple-100 ${BADGE_CLASS}`}>Draft ready</Badge>,
         rowClass: ''
       };
     }
     if (bucket === 'quick_win') {
       return { 
-        border: 'border-l-amber-500', 
-        badge: <Badge className={`bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 hover:bg-amber-200 ${BADGE_CLASS}`}>Needs reply</Badge>,
+        badge: <Badge className={`bg-amber-50 text-amber-600 border border-amber-200 hover:bg-amber-100 ${BADGE_CLASS}`}>Needs reply</Badge>,
         rowClass: ''
       };
     }
     if (bucket === 'wait') {
       return { 
-        border: 'border-l-slate-400', 
         badge: <Badge className={`bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 hover:bg-slate-200 ${BADGE_CLASS}`}>FYI</Badge>,
         rowClass: ''
       };
     }
     if (bucket === 'auto_handled') {
       return { 
-        border: 'border-l-green-500', 
-        badge: <Badge className={`bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 hover:bg-green-200 ${BADGE_CLASS}`}>Done</Badge>,
+        badge: <Badge className={`bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100 ${BADGE_CLASS}`}>Done</Badge>,
         rowClass: ''
       };
     }
-    return { border: 'border-l-transparent', badge: null, rowClass: '' };
+    return { badge: null, rowClass: '' };
   };
 
   const formatTime = (dateStr: string) => {
@@ -292,9 +287,9 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
       <div
         onClick={() => onSelect(conversation)}
         className={cn(
-          "px-4 py-3 cursor-pointer border-b border-border/30 transition-all",
-          "border-l-4 hover:bg-muted/50 flex flex-col items-start w-full gap-0.5",
-          stateConfig.border,
+          "mx-2 my-1 px-4 py-3 cursor-pointer rounded-xl transition-all",
+          "flex flex-col items-start w-full gap-0.5",
+          "hover:bg-slate-50/80 border border-transparent hover:border-slate-200",
           stateConfig.rowClass
         )}
       >
