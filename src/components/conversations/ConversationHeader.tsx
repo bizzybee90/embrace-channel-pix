@@ -94,7 +94,7 @@ export const ConversationHeader = ({ conversation, onUpdate, onBack, hideBackBut
               </span>
             )}
 
-            {/* Native Action Bar */}
+            {/* Minimal action bar — Archive/Inbox only */}
             {isCleared ? (
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -114,24 +114,6 @@ export const ConversationHeader = ({ conversation, onUpdate, onBack, hideBackBut
                 <TooltipContent>Mark Cleared</TooltipContent>
               </Tooltip>
             )}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" onClick={handleMarkUnread}>
-                  <MailOpen className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Mark Unread</TooltipContent>
-            </Tooltip>
-
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowTeachModal(true)}
-              className="gap-1 text-muted-foreground hover:text-foreground"
-            >
-              <Sparkles className="h-4 w-4" />
-              <span className="hidden sm:inline">Teach</span>
-            </Button>
             <SLABadge conversation={conversation} />
           </div>
         </div>

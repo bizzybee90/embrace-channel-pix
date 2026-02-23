@@ -223,51 +223,40 @@ export const MessageTimeline = ({
       return html;
     })() : '';
 
+    // Derive clean plain text — always show something
+    const plainText = (() => {
+      if (displayBody && displayBody.trim()) return displayBody;
+      // Fallback: strip HTML from raw payload body
+      if (typeof rawHtmlBody === 'string' && rawHtmlBody.trim()) return stripHtmlTags(rawHtmlBody);
+      return '(No message content)';
+    })();
+
     // Customer / inbound messages — clean text + View Formatted (matching Review page)
     return (
       <div key={message.id} className="animate-fade-in">
         {/* Clean plain text rendering in soft container */}
-        <div className="text-slate-700 whitespace-pre-wrap leading-relaxed bg-slate-50/50 rounded-xl p-6 border border-slate-100 text-[15px]">
-          <p className="text-[15px] whitespace-pre-wrap leading-relaxed text-foreground/80 m-0">
-            {isEmail ? (
-              <EmailThread body={displayBody || ''} />
-            ) : (
-              displayBody
-            )}
-          </p>
+        <div className="text-slate-800 whitespace-pre-wrap leading-relaxed bg-slate-50/50 rounded-xl p-6 border border-slate-100 text-[15px] font-sans">
+          {isEmail ? (
+            <EmailThread body={plainText} />
+          ) : (
+            plainText
+          )}
         </div>
         
-        {/* Button row — Show previous messages + View formatted (matching Review page) */}
-        <div className="mt-3 pt-2 flex items-center gap-3">
-          {canShowOriginal && (
-            <button
-              onClick={() => toggleShowOriginal(message.id)}
-              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-            >
-              {showOriginal ? (
-                <>
-                  <ChevronDown className="h-3 w-3" />
-                  <span>Hide original</span>
-                </>
-              ) : (
-                <>
-                  <ChevronRight className="h-3 w-3" />
-                  <span>Show original</span>
-                </>
-              )}
-            </button>
-          )}
-          
-          {hasHtmlBody && (
-            <button
+        {/* Single button row — View formatted only */}
+        {hasHtmlBody && (
+          <div className="mt-3">
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => setHtmlViewerMessage(message)}
-              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm"
+              className="bg-white shadow-sm text-slate-700"
             >
-              <FileText className="h-3.5 w-3.5" />
-              <span>View formatted</span>
-            </button>
-          )}
-        </div>
+              <FileText className="w-4 h-4 mr-2" />
+              View formatted
+            </Button>
+          </div>
+        )}
         
         {message.attachments && Array.isArray(message.attachments) && message.attachments.length > 0 && (
           <div className="mt-3 space-y-2">
