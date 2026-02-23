@@ -281,64 +281,46 @@ export const JaceStyleInbox = ({ onSelect, selectedId, filter = 'needs-me' }: Ja
     const customerName = (!rawName || rawName.includes('unknown.invalid') || rawName.startsWith('unknown@')) ? 'Unknown Sender' : rawName;
     const hasAiDraft = !!conv.ai_draft_response;
     const stateConfig = getStateConfig(conv.decision_bucket, hasAiDraft);
-    const isUrgent = conv.decision_bucket === 'act_now';
-    const snippet = conv.summary_for_human || conv.why_this_needs_you || '';
     const isSelected = selectedId === conv.id;
+    const initial = customerName.charAt(0).toUpperCase();
 
     return (
       <div
         onClick={() => onSelect(conversation)}
         className={cn(
-          "mx-3 my-2 p-4 rounded-xl transition-all cursor-pointer group",
-          "flex flex-col items-start w-full gap-0.5",
+          "px-3 py-2.5 cursor-pointer transition-all",
           isSelected
-            ? "bg-purple-50/50 border border-purple-200 ring-1 ring-purple-100 shadow-sm"
-            : "bg-white border border-transparent hover:bg-slate-50 hover:border-slate-200 hover:shadow-sm",
-          !isSelected && stateConfig.rowClass
+            ? "bg-white shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] ring-1 ring-slate-900/5 z-10"
+            : "border-b border-slate-100 hover:bg-slate-50"
         )}
       >
-        {/* Row 1: Sender + Time */}
-        <div className="flex items-center justify-between gap-2 w-full">
-          <div className="flex items-center gap-1.5 min-w-0 flex-1">
-            <ChannelIcon channel={conv.channel} className="h-3 w-3 flex-shrink-0 opacity-60" />
-            <span className={cn(
-              "text-sm text-foreground truncate",
-              isUrgent ? "font-semibold" : "font-semibold"
-            )}>
-              {customerName}
-            </span>
+        {/* Row 1: Avatar + Sender + Time */}
+        <div className="flex items-center gap-2 mb-0.5">
+          <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+            <span className="text-[10px] font-bold text-primary">{initial}</span>
           </div>
-          <span className="text-xs text-muted-foreground whitespace-nowrap flex-shrink-0">
+          <span className="text-sm font-semibold text-slate-900 truncate flex-1 min-w-0">
+            {customerName}
+          </span>
+          <span className="text-[11px] text-muted-foreground whitespace-nowrap flex-shrink-0">
             {formatTime(conv.updated_at || conv.created_at)}
           </span>
         </div>
-
-        {/* Row 2: Subject */}
-        <p className="text-sm font-medium text-foreground/80 truncate w-full">
-          {conv.title || 'No subject'}
-        </p>
-
-        {/* Row 3: AI Summary + Badge */}
-        <div className="flex items-center justify-between gap-2 w-full">
-          <p className="text-sm text-muted-foreground truncate flex-1 min-w-0 line-clamp-1">
-            {snippet || '\u00A0'}
-          </p>
-          <div className="flex-shrink-0">
-            {stateConfig.badge}
-          </div>
-        </div>
-
-        {/* Row 4: Category pill bottom-right */}
-        {conv.category && (
-          <div className="mt-1.5 flex justify-end w-full">
+        {/* Row 2: Subject + Category + Badge (indented under avatar) */}
+        <div className="pl-9 flex items-center gap-2">
+          <span className="text-xs text-slate-500 truncate flex-1 min-w-0">
+            {conv.title || 'No subject'}
+          </span>
+          {conv.category && (
             <CategoryLabel
               classification={conv.category}
               size="xs"
               editable
               onClick={(e) => handleCategoryClick(conversation, e)}
             />
-          </div>
-        )}
+          )}
+          <div className="flex-shrink-0">{stateConfig.badge}</div>
+        </div>
       </div>
     );
   };
@@ -347,8 +329,8 @@ export const JaceStyleInbox = ({ onSelect, selectedId, filter = 'needs-me' }: Ja
     if (conversations.length === 0) return null;
     return (
       <div>
-        <div className="px-4 py-2 bg-muted/30 border-b border-border/50">
-          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+        <div className="px-3 py-1.5 bg-purple-50/80 border-b border-slate-100">
+          <span className="text-[10px] font-bold text-purple-700 uppercase tracking-wider">
             {title}
           </span>
         </div>
