@@ -22,15 +22,16 @@ interface ReviewQueueItemProps {
 }
 
 const getStateBadge = (bucket: string) => {
+  const base = "bg-slate-100 text-slate-500 px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider flex-shrink-0 whitespace-nowrap";
   switch (bucket) {
     case 'act_now':
-      return <Badge variant="destructive" className="text-[9px] px-1 py-0 h-4 flex-shrink-0 whitespace-nowrap">Urgent</Badge>;
+      return <Badge className={base}>Urgent</Badge>;
     case 'quick_win':
-      return <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 text-[9px] px-1 py-0 h-4 flex-shrink-0 whitespace-nowrap">Reply</Badge>;
+      return <Badge className={base}>Reply</Badge>;
     case 'wait':
-      return <Badge className="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 text-[9px] px-1 py-0 h-4 flex-shrink-0 whitespace-nowrap">FYI</Badge>;
+      return <Badge className={base}>FYI</Badge>;
     case 'auto_handled':
-      return <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 text-[9px] px-1 py-0 h-4 flex-shrink-0 whitespace-nowrap">Done</Badge>;
+      return <Badge className={base}>Done</Badge>;
     default:
       return null;
   }
@@ -51,10 +52,10 @@ export const ReviewQueueItem = ({
     <div
       onClick={onClick}
       className={cn(
-        "px-3 py-2.5 cursor-pointer border-b border-border/30 transition-all",
-        "hover:bg-accent/50",
-        isActive && !isMultiSelectMode && "bg-primary/8 border-l-[3px] border-l-primary",
-        isSelected && "bg-primary/15 border-l-[3px] border-l-primary",
+        "rounded-xl mx-2 my-1 p-3 cursor-pointer transition-all",
+        isActive && !isMultiSelectMode && "bg-white shadow-sm border border-purple-200 ring-1 ring-purple-50",
+        !isActive && !isSelected && "border border-transparent hover:bg-slate-50/80",
+        isSelected && "bg-white shadow-sm border border-purple-200 ring-1 ring-purple-50",
         isReviewed && "opacity-50"
       )}
     >
