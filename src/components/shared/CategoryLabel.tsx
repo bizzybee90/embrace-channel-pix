@@ -128,9 +128,20 @@ const getConfigByKeyword = (classification: string): CategoryConfig | null => {
   return null;
 };
 
+// British English spelling normalisation
+const toBritishLabel = (label: string): string => {
+  const map: Record<string, string> = {
+    'Inquiry': 'Enquiry',
+    'inquiry': 'enquiry',
+  };
+  return map[label] || label;
+};
+
 export const getCategoryConfig = (classification: string | null | undefined): CategoryConfig | null => {
   if (!classification) return null;
-  return categoryConfigs[classification] || getConfigByKeyword(classification);
+  const config = categoryConfigs[classification] || getConfigByKeyword(classification);
+  if (!config) return null;
+  return { ...config, label: toBritishLabel(config.label) };
 };
 
 interface CategoryLabelProps {

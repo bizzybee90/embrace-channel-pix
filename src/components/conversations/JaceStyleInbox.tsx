@@ -327,6 +327,18 @@ export const JaceStyleInbox = ({ onSelect, selectedId, filter = 'needs-me' }: Ja
             {stateConfig.badge}
           </div>
         </div>
+
+        {/* Row 4: Category pill bottom-right */}
+        {conv.category && (
+          <div className="mt-1.5 flex justify-end w-full">
+            <CategoryLabel
+              classification={conv.category}
+              size="xs"
+              editable
+              onClick={(e) => handleCategoryClick(conversation, e)}
+            />
+          </div>
+        )}
       </div>
     );
   };
