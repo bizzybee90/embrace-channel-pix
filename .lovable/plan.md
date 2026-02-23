@@ -1,57 +1,52 @@
 
-# Inbox Conversation View Polish
 
-## Problem Summary
-Based on the screenshots and database investigation, there are several issues with the conversation reading pane:
+# Match Inbox List Items to Review Page Layout
 
-1. **Empty message bodies**: Imported emails store content only in `raw_payload.body` (HTML) and `raw_payload.bodySnippet`, but the `body` column is empty. The MessageTimeline renders blank messages because it only reads `message.body`.
-2. **Unknown sender names**: Actor names are stored as `unknown@unknown.invalid` -- needs fallback to customer name or `raw_payload.from.address`.
-3. **Duplicated AI summary**: The AI briefing banner already shows the summary at the top, but the Intelligence mini-card repeats the same text below it.
-4. **"View details" too subtle**: The tiny 10px "View details" link is easy to miss.
-5. **Card proportions wrong**: Contact card and Intelligence card are equal width (50/50), but the intelligence card needs more space for its tags and text.
+## What Changes
 
----
+The left message list pane across all inbox routes (`/to-reply`, `/drafts`, `/all-open`, `/done`, `/snoozed`, `/sent`, `/unread`) will be restyled to match the compact, clean layout used on the Review (AI Reconciliation) page.
 
-## Changes
+## Current vs Target
 
-### 1. Fix empty message bodies (MessageTimeline.tsx)
-When `message.body` is empty but `raw_payload` exists, extract readable content:
-- Use `raw_payload.bodySnippet` as plain text fallback
-- If neither exists, strip HTML from `raw_payload.body` to get text
-- This ensures all imported emails display their actual content
+**Current (JaceStyleInbox):** Heavy card-style rows with large padding (`mx-3 my-2 p-4`), rounded borders, 4-row vertical stack (sender, subject, summary, category pill), and prominent hover/active card effects.
 
-### 2. Fix sender name fallback (MessageTimeline.tsx)
-Update the `actorName` logic to also check:
-- `raw_payload.from.name` or `raw_payload.from.address`
-- Then `conversationCustomerName`
-- Then 'Unknown Sender' as last resort
+**Target (Review page style):** Compact rows with a coloured avatar circle, sender name inline with metadata, subject line below indented under the avatar, minimal spacing (`px-3 py-2.5`), and a subtle active state using `shadow + ring-1 ring-slate-900/5` instead of heavy purple borders.
 
-### 3. Remove duplicated AI summary from inline Intelligence card (ConversationThread.tsx)
-Remove the `(customer?.intelligence as any)?.summary` paragraph from the inline Intelligence mini-card since the AI Briefing banner already displays the same information.
+## Specific Changes
 
-### 4. Make "View details" more prominent (ConversationThread.tsx)
-Replace the tiny "View details" text with a more visible button-like element:
-- Use `text-xs font-medium text-primary` with a hover underline
-- Make the entire card more obviously clickable with a subtle "tap to explore" CTA
+### 1. Restyle `ConversationRow` in `JaceStyleInbox.tsx`
 
-### 5. Adjust card proportions (ConversationThread.tsx)
-Change the grid from equal `grid-cols-2` to asymmetric layout:
-- Contact card: narrower (about 40%)
-- Intelligence card: wider (about 60%)
-- Use `grid-cols-5` with contact taking `col-span-2` and intelligence taking `col-span-3`
+- Replace the heavy card container (`mx-3 my-2 p-4 rounded-xl border ...`) with the Review page's compact row style: `px-3 py-2.5 cursor-pointer border-b border-slate-100 transition-all hover:bg-slate-50`
+- Add a **coloured avatar circle** (letter initial) matching the Review page: `h-7 w-7 rounded-full bg-primary/10` with the sender's first letter
+- **Active state**: `bg-white shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] ring-1 ring-slate-900/5` (matching Review page exactly)
+- **Layout**: Two-line format -- Row 1: avatar + sender name + time; Row 2: subject + status badge (indented under avatar with `pl-9`)
+- Remove the separate Row 3 (AI summary) and Row 4 (category pill) to match the Review page's compact two-line format. The category label and status badge move inline with the subject line.
 
----
+### 2. Update Date Section Headers
+
+- Match the Review page's section header style: `px-3 py-1.5 bg-purple-50/80 border-b border-slate-100` with `text-[10px] font-bold uppercase tracking-wider text-purple-700`
+
+### 3. Files Modified
+
+- `src/components/conversations/JaceStyleInbox.tsx` -- the only file that needs changes (ConversationRow component and DateSection component)
+
+No data fetching, filtering, or business logic will be touched.
 
 ## Technical Details
 
-**File: `src/components/conversations/MessageTimeline.tsx`**
-- Around line 104-108, add logic to derive `displayBody` from `raw_payload` when `message.body` is empty
-- Add a simple `stripHtmlTags()` helper to extract text from HTML body
-- Update `actorName` derivation (line 100-102) to check `raw_payload.from`
+The `ConversationRow` component (around line 278) will be restructured from a 4-row vertical stack to a 2-row layout matching this pattern from the Review page:
 
-**File: `src/components/conversations/ConversationThread.tsx`**
-- Line 306: Change grid from `grid-cols-2` to `grid-cols-5`
-- Line 308: Add `col-span-2` to contact card
-- Line 332: Add `col-span-3` to intelligence card
-- Lines 370-373: Remove the AI summary paragraph (duplicate of briefing)
-- Lines 329, 425: Make "View details" more prominent with button-style styling
+```text
+[Avatar] Sender Name                    10:30 AM
+         Subject line here...    [Category] [Badge]
+```
+
+Active row styling changes from:
+```
+bg-purple-50/50 border border-purple-200 ring-1 ring-purple-100 shadow-sm
+```
+To:
+```
+bg-white shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] ring-1 ring-slate-900/5
+```
+
