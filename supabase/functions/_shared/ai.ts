@@ -19,7 +19,7 @@ export interface WorkspaceAiContext {
 }
 
 const DEFAULT_CLASSIFICATION: ClassificationResult = {
-  category: "inquiry",
+  category: "general",
   requires_reply: true,
   confidence: 0.55,
   entities: {},
@@ -40,99 +40,49 @@ function normalizeClassification(value: unknown): ClassificationResult {
     entities: typeof candidate.entities === "object" && candidate.entities
       ? candidate.entities as Record<string, unknown>
       : {},
-    reasoning: typeof candidate.reasoning === "string" ? candidate.reasoning : null,
-    sentiment: typeof candidate.sentiment === "string" ? candidate.sentiment : null,
-    why_this_needs_you: typeof candidate.why_this_needs_you === "string" ? candidate.why_this_needs_you : null,
-    summary_for_human: typeof candidate.summary_for_human === "string" ? candidate.summary_for_human : null,
   };
 }
 
-function classificationSystemPrompt(context: WorkspaceAiContext): string {
-  const biz = (context.business_context || {}) as Record<string, unknown>;
-  const flags = (biz.custom_flags || {}) as Record<string, unknown>;
-  const name = String(biz.name || biz.business_name || biz.company_name || "The Business");
-  const industry = String(biz.industry || biz.service_type || biz.business_type || "UK Local Service / Trades");
-  const rules = String(biz.rules || biz.core_rules || flags.core_rules || "Standard UK local service operations.");
-
-  const faqText = context.faq_entries.length > 0
-    ? JSON.stringify(context.faq_entries.slice(0, 30))
-    : "No FAQs provided.";
-
-  const correctionText = context.corrections.length > 0
-    ? JSON.stringify(context.corrections.slice(0, 30))
-    : "No historical corrections.";
-
-  return `You are the AI triage engine for a UK local service business inbox.
-Read each message, classify it with precision, determine urgency, and extract identity data.
-
-<BUSINESS_CONTEXT>
-Business Name: ${name}
-Industry/Service: ${industry}
-Specific Business Rules: ${rules}
-</BUSINESS_CONTEXT>
-
-<FAQ_KNOWLEDGE_BASE>
-Use these to determine if a question can be a "quick_win":
-${faqText}
-</FAQ_KNOWLEDGE_BASE>
-
-<HISTORICAL_CORRECTIONS>
-Learn from these past manual corrections by the business owner:
-${correctionText}
-</HISTORICAL_CORRECTIONS>
-
-<CATEGORIES>
-Assign exactly ONE:
-1. "quote" - Asking for pricing, estimates, or site visits to price a new job.
-2. "booking" - Wants to lock in a date/time, or confirms they want to proceed.
-3. "complaint" - Unhappy with service, damage, missed appointments, rework.
-4. "follow_up" - Logistical updates on active/upcoming jobs (e.g., "gate is open", "running late", "dogs inside").
-5. "inquiry" - General questions about the business, service area, capabilities.
-6. "notification" - Automated emails from software, suppliers, platforms (Stripe, Checkatrade, Toolstation).
-7. "newsletter" - Promotional emails, mailing lists from other companies.
-8. "spam" - Cold outreach, SEO services, phishing, unsolicited sales.
-9. "personal" - Emails from friends, family, or non-business contacts.
-</CATEGORIES>
-
-<DECISION_BUCKET>
-Route to exactly ONE:
-- "act_now": ONLY urgent complaints or urgent follow_ups (cancellations within 24hrs, locked access, active damage).
-- "quick_win": Quotes, bookings, or inquiries where the answer is standard or in the FAQ.
-- "needs_human": Complex jobs, bespoke quotes, nuanced complaints, owner judgment needed.
-- "auto_handled": Notifications, newsletters, spam, AND purely informational follow_ups needing no reply ("Thanks mate", "Payment sent", "Gate unlocked").
-</DECISION_BUCKET>
-
-<REQUIRES_REPLY>
-Does the sender expect a response?
-- true: Quotes, bookings, complaints, inquiries, direct questions.
-- false: Spam, newsletters, notifications, informational statements ("Thanks!", "Payment sent").
-</REQUIRES_REPLY>
-
-<IDENTITY_EXTRACTION>
-Extract alternate phone numbers or emails from the message body/signature belonging to the SENDER.
-Format phones to UK E.164 (+447...). Do NOT extract the business's own contact info.
-</IDENTITY_EXTRACTION>
-
-You will receive a batch of items as JSON. For EACH item, return:
-{
-  "item_id": "the item_id from input",
-  "reasoning": "1-sentence thought process (do this FIRST before deciding)",
-  "category": "one of the 9 categories above",
-  "requires_reply": boolean,
-  "confidence": 0.0-1.0,
-  "sentiment": "positive" | "neutral" | "negative" | "frustrated",
-  "why_this_needs_you": "1-2 sentences explaining why this landed in this bucket, written for the business owner, always filled even for auto_handled",
-  "summary_for_human": "2-3 sentence context summary giving the human full context to act immediately without reading the email",
-  "entities": {
-    "urgency": "high" | "medium" | "low",
-    "extracted_phones": [],
-    "extracted_emails": [],
-    "location_or_postcode": null,
-    "summary": "5-10 word summary of what they want"
+function formatCorrections(corrections: Array<Record<string, unknown>>): string {
+  if (!corrections || corrections.length === 0) {
+    return "";
   }
+
+  const lines = corrections.slice(0, 20).map((c) => {
+    const sender = c.sender_email || c.from_identifier || "unknown sender";
+    const subject = c.subject || c.email_subject || "unknown subject";
+    const original = c.original_category || c.ai_category || "unknown";
+    const corrected = c.corrected_category || c.human_category || "unknown";
+    if (original === corrected) {
+      return `- Email from "${sender}" about "${subject}" was correctly confirmed as "${corrected}"`;
+    }
+    return `- Email from "${sender}" about "${subject}" was incorrectly classified as "${original}" — correct category is "${corrected}"`;
+  });
+
+  return [
+    "",
+    "## Previous Corrections (learn from these)",
+    ...lines,
+  ].join("\n");
 }
 
-Return strictly JSON: {"results": [...]}`;
+function classificationSystemPrompt(context: WorkspaceAiContext): string {
+  const parts = [
+    "You are a customer service triage engine for UK SMB support inboxes.",
+    "Return strictly JSON with shape: {\"results\":[{\"item_id\":string,\"category\":string,\"requires_reply\":boolean,\"confidence\":number,\"entities\":object}]}",
+    "Confidence must be in [0,1].",
+    "Categories should be concise labels such as billing, complaint, booking, refund, order_update, spam, newsletter, notification, sales, general.",
+    "Use the provided business context, FAQ snippets, and historical correction examples to improve consistency.",
+    `Business context: ${JSON.stringify(context.business_context || {})}`,
+    `FAQ snippets: ${JSON.stringify(context.faq_entries.slice(0, 30))}`,
+  ];
+
+  const correctionsSection = formatCorrections(context.corrections);
+  if (correctionsSection) {
+    parts.push(correctionsSection);
+  }
+
+  return parts.join("\n");
 }
 
 export async function classifyBatchWithLovable(params: {
@@ -143,9 +93,9 @@ export async function classifyBatchWithLovable(params: {
     return new Map();
   }
 
-  const endpoint = getOptionalEnv("AI_GATEWAY_URL", "https://ai.gateway.lovable.dev/v1/chat/completions");
-  const model = getOptionalEnv("LOVABLE_CLASSIFY_MODEL", "google/gemini-2.5-flash");
-  const apiKey = Deno.env.get("LOVABLE_API_KEY") || getOptionalEnv("AI_GATEWAY_KEY", "");
+  const endpoint = getRequiredEnv("LOVABLE_AI_GATEWAY_URL");
+  const model = getOptionalEnv("LOVABLE_CLASSIFY_MODEL", "gemini-2.5-flash");
+  const apiKey = getOptionalEnv("LOVABLE_AI_GATEWAY_KEY");
 
   const payload = {
     model,
@@ -214,17 +164,15 @@ export async function generateDraftWithAnthropic(params: {
   businessContext: Record<string, unknown> | null;
   faqEntries: Array<Record<string, unknown>>;
 }): Promise<string> {
-  // Use Lovable AI Gateway (same as classify)
-  const endpoint = getOptionalEnv("AI_GATEWAY_URL", "https://ai.gateway.lovable.dev/v1/chat/completions");
-  const model = getOptionalEnv("LOVABLE_DRAFT_MODEL", "google/gemini-2.5-flash");
-  const apiKey = Deno.env.get("LOVABLE_API_KEY") || getOptionalEnv("AI_GATEWAY_KEY", "");
+  const apiKey = getRequiredEnv("ANTHROPIC_API_KEY");
+  const model = getOptionalEnv("ANTHROPIC_MODEL", "claude-3-5-sonnet-latest");
+  const endpoint = getOptionalEnv("ANTHROPIC_API_URL", "https://api.anthropic.com/v1/messages");
 
   const systemPrompt = [
     "You write concise, professional customer support replies for UK SMBs.",
     "Follow UK English spelling and tone.",
     "Do not invent policy details. If uncertain, ask a clear clarifying question.",
     "Use context and FAQ when relevant.",
-    "Return ONLY the reply text, no JSON wrapping.",
   ].join("\n");
 
   const userPrompt = JSON.stringify({
@@ -241,42 +189,36 @@ export async function generateDraftWithAnthropic(params: {
     },
   });
 
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-  if (apiKey) {
-    headers.Authorization = `Bearer ${apiKey}`;
-  }
-
   const response = await fetchWithTimeout(endpoint, {
     method: "POST",
-    headers,
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+    },
     body: JSON.stringify({
       model,
       max_tokens: 700,
       temperature: 0.2,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
+      system: systemPrompt,
+      messages: [{ role: "user", content: userPrompt }],
     }),
   }, 25_000);
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(`Lovable draft request failed (${response.status}): ${text}`);
+    throw new Error(`Anthropic draft request failed (${response.status}): ${text}`);
   }
 
   const data = await response.json();
-  const content = data?.choices?.[0]?.message?.content || data?.output_text || data?.content || "";
-  const text = typeof content === "string"
-    ? content.trim()
-    : Array.isArray(content)
-      ? content.map((part: { text?: string }) => part?.text || "").join("\n").trim()
-      : String(content).trim();
+  const content = Array.isArray(data?.content) ? data.content : [];
+  const text = content
+    .map((part: { type?: string; text?: string }) => part?.type === "text" ? part.text || "" : "")
+    .join("\n")
+    .trim();
 
   if (!text) {
-    throw new Error("Lovable draft response was empty");
+    throw new Error("Anthropic draft response was empty");
   }
 
   return text;

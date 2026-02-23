@@ -119,7 +119,7 @@ export const MessageCard = ({ message, onRespond }: MessageCardProps) => {
         {message.metadata && (message.metadata as any).ai_draft_response && (
           <div className="space-y-2">
             <p className="text-sm font-medium text-foreground">AI Draft Response</p>
-            <div className="rounded-lg bg-primary/5 border-l-4 border-primary p-3">
+            <div className="rounded-lg bg-purple-50/50 border border-purple-100 p-3">
               <p className="text-sm text-foreground/90 whitespace-pre-wrap">
                 {(message.metadata as any).ai_draft_response}
               </p>

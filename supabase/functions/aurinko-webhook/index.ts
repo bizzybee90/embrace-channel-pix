@@ -26,13 +26,12 @@ function timingSafeEqual(a: string, b: string): boolean {
 async function verifyAurinkoSignature(rawBody: string, req: Request): Promise<void> {
   const secret = Deno.env.get("AURINKO_WEBHOOK_SECRET")?.trim();
   if (!secret) {
-    return; // No secret configured, skip verification
+    return;
   }
 
   const provided = req.headers.get("x-aurinko-signature")?.trim();
   if (!provided) {
-    console.warn("⚠️ Missing Aurinko signature header — proceeding (non-blocking)");
-    return;
+    throw new HttpError(401, "Missing Aurinko signature header");
   }
 
   const key = await crypto.subtle.importKey(
@@ -48,8 +47,7 @@ async function verifyAurinkoSignature(rawBody: string, req: Request): Promise<vo
 
   const normalizedProvided = provided.toLowerCase().replace(/^sha256=/, "");
   if (!timingSafeEqual(normalizedProvided, hex)) {
-    console.warn("⚠️ Aurinko signature mismatch — proceeding (non-blocking)");
-    return;
+    throw new HttpError(401, "Invalid Aurinko signature");
   }
 }
 
@@ -57,7 +55,6 @@ function extractMessageId(payload: Record<string, unknown>): string | null {
   const candidates: unknown[] = [
     payload.message_id,
     payload.messageId,
-    payload.id,
     (payload.data as Record<string, unknown> | undefined)?.id,
     (payload.message as Record<string, unknown> | undefined)?.id,
   ];
@@ -87,63 +84,44 @@ function extractInlineMessage(payload: Record<string, unknown>): AurinkoMessage 
 
 Deno.serve(async (req) => {
   try {
-    // Aurinko sends GET to verify the webhook URL when creating/refreshing subscriptions
-    if (req.method === "GET") {
-      const url = new URL(req.url);
-      const validationToken = url.searchParams.get("validationToken");
-      if (validationToken) {
-        return new Response(validationToken, { status: 200, headers: { "Content-Type": "text/plain" } });
-      }
-      return new Response("OK", { status: 200 });
-    }
-
     if (req.method !== "POST") {
       throw new HttpError(405, "Method not allowed");
-    }
-
-    // Check for validation token in URL (Aurinko subscription verification via POST)
-    const url = new URL(req.url);
-    const validationToken = url.searchParams.get("validationToken");
-    if (validationToken) {
-      console.log("Aurinko subscription validation POST, echoing token");
-      return new Response(validationToken, { status: 200, headers: { "Content-Type": "text/plain" } });
     }
 
     const rawBody = await req.text();
     await verifyAurinkoSignature(rawBody, req);
 
     const payload = JSON.parse(rawBody) as Record<string, unknown>;
-    console.log("📨 Aurinko webhook payload keys:", Object.keys(payload), "subscriptionId:", payload.subscriptionId || payload.subscription_id, "accountId:", payload.accountId || payload.account_id);
+    const workspaceId = String(payload.workspace_id || payload.workspaceId || "").trim() || null;
+    const explicitConfigId = String(payload.config_id || payload.configId || "").trim() || null;
 
     const supabase = createServiceClient();
 
-    // Aurinko sends subscriptionId and/or accountId — match on those
+    let configQuery = supabase
+      .from("email_provider_configs")
+      .select("id, workspace_id, email_address, aliases, access_token, subscription_id, account_id")
+      .limit(1);
+
+    if (explicitConfigId) {
+      configQuery = configQuery.eq("id", explicitConfigId);
+    }
+
+    if (workspaceId) {
+      configQuery = configQuery.eq("workspace_id", workspaceId);
+    }
+
     const subscriptionId = String(payload.subscription_id || payload.subscriptionId || "").trim();
     const accountId = String(payload.account_id || payload.accountId || "").trim();
 
-    let config: Record<string, unknown> | null = null;
-    let configError: { message: string } | null = null;
+    if (!explicitConfigId && subscriptionId) {
+      configQuery = configQuery.eq("subscription_id", subscriptionId);
+    }
 
-    // Try subscription_id first, then account_id, then fallback to single config
-    if (subscriptionId) {
-      const res = await supabase.from("email_provider_configs")
-        .select("id, workspace_id, email_address, aliases, access_token, subscription_id, account_id")
-        .eq("subscription_id", subscriptionId).maybeSingle();
-      config = res.data; configError = res.error;
+    if (!explicitConfigId && !subscriptionId && accountId) {
+      configQuery = configQuery.eq("account_id", accountId);
     }
-    if (!config && accountId) {
-      const res = await supabase.from("email_provider_configs")
-        .select("id, workspace_id, email_address, aliases, access_token, subscription_id, account_id")
-        .eq("account_id", accountId).maybeSingle();
-      config = res.data; configError = res.error;
-    }
-    if (!config) {
-      // Fallback: if there's only one config, use it
-      const res = await supabase.from("email_provider_configs")
-        .select("id, workspace_id, email_address, aliases, access_token, subscription_id, account_id")
-        .limit(1).maybeSingle();
-      config = res.data; configError = res.error;
-    }
+
+    const { data: config, error: configError } = await configQuery.maybeSingle();
 
     if (configError || !config) {
       throw new Error(`email_provider_configs lookup failed: ${configError?.message || "not found"}`);
@@ -154,98 +132,120 @@ Deno.serve(async (req) => {
       throw new Error("Missing Aurinko access token for webhook config");
     }
 
+    // Detect event type from payload
+    const eventType = String(payload.event || payload.type || payload.eventType || "message.created").toLowerCase();
+
+    const messageId = extractMessageId(payload);
+    let aurinkoMessage = extractInlineMessage(payload);
+
+    if (!aurinkoMessage) {
+      if (!messageId) {
+        throw new HttpError(400, "Webhook payload does not include a message id or inline message object");
+      }
+
+      aurinkoMessage = await fetchAurinkoMessageById({
+        accessToken,
+        messageId,
+      });
+    }
+
     const ownerEmail = String(config.email_address || "").trim().toLowerCase();
     const aliases = Array.isArray(config.aliases)
-      ? config.aliases.map((entry: unknown) => String(entry).trim().toLowerCase()).filter(Boolean)
+      ? config.aliases.map((entry) => String(entry).trim().toLowerCase()).filter(Boolean)
       : [];
 
-    // Aurinko v2 webhook format: { subscription, resource, accountId, payloads: [{...}, ...] }
-    const payloads = Array.isArray(payload.payloads) ? payload.payloads as Record<string, unknown>[] : [payload];
-    const resource = String(payload.resource || "").toLowerCase();
-    const subscriptionResource = String(payload.subscription?.resource || "").toLowerCase();
-    console.log(`📬 Processing ${payloads.length} payload(s) from Aurinko webhook, resource: ${resource || subscriptionResource}`);
+    // Handle message.updated events (e.g., read status changed on phone)
+    if (eventType.includes("updated") || eventType.includes("modified")) {
+      const externalId = String(aurinkoMessage.id);
+      const sysLabels = Array.isArray(aurinkoMessage.sysLabels)
+        ? aurinkoMessage.sysLabels.map((x) => String(x).toLowerCase())
+        : [];
+      const isNowRead = !sysLabels.includes("unread");
 
-    const results: unknown[] = [];
+      // Update the message_events table
+      const { data: updatedEvents, error: updateEventsError } = await supabase
+        .from("message_events")
+        .update({ is_read: isNowRead, updated_at: new Date().toISOString() })
+        .eq("external_id", externalId)
+        .eq("workspace_id", config.workspace_id)
+        .select("id, materialized_message_id, materialized_conversation_id");
 
-    for (const item of payloads) {
-      const messageId = extractMessageId(item);
-      let aurinkoMessage = extractInlineMessage(item);
-
-      if (!aurinkoMessage && !messageId) {
-        console.warn("⚠️ Skipping payload without message id or inline message:", Object.keys(item));
-        continue;
+      if (updateEventsError) {
+        console.warn("message_events read status update failed:", updateEventsError.message);
       }
 
-      if (!aurinkoMessage) {
-        aurinkoMessage = await fetchAurinkoMessageById({
-          accessToken,
-          messageId: messageId!,
-        });
-      }
+      // Update the messages table
+      if (updatedEvents && updatedEvents.length > 0) {
+        for (const event of updatedEvents) {
+          if (event.materialized_message_id) {
+            await supabase
+              .from("messages")
+              .update({ is_read: isNowRead })
+              .eq("id", event.materialized_message_id);
+          }
 
-      // Handle message.updated events: sync read status from Gmail → BizzyBee
-      const eventType = String(item.type || item.event || payload.type || "").toLowerCase();
-      if (eventType === "message.updated" || eventType === "updated") {
-        const sysLabels = Array.isArray(aurinkoMessage.sysLabels) ? aurinkoMessage.sysLabels : [];
-        const isUnread = sysLabels.includes("unread") || sysLabels.includes("UNREAD");
-        const externalId = String(aurinkoMessage.id || messageId || "");
-
-        if (externalId) {
-          // Update message read status
-          const { data: msgRow } = await supabase
-            .from("messages")
-            .select("id, conversation_id")
-            .eq("external_id", externalId)
-            .maybeSingle();
-
-          if (msgRow) {
-            // If email was read in Gmail, update conversation status accordingly
-            if (!isUnread) {
-              await supabase
-                .from("conversations")
-                .update({ status: "open", updated_at: new Date().toISOString() })
-                .eq("id", msgRow.conversation_id)
-                .eq("status", "new"); // Only transition from 'new' to 'open'
-              console.log(`📖 Gmail read sync: conversation ${msgRow.conversation_id} marked as read`);
-            }
-            results.push({ external_id: externalId, type: "read_sync", is_unread: isUnread });
-            continue;
+          // If now read and conversation is 'new', move to 'open'
+          if (isNowRead && event.materialized_conversation_id) {
+            await supabase
+              .from("conversations")
+              .update({ status: "open", updated_at: new Date().toISOString() })
+              .eq("id", event.materialized_conversation_id)
+              .eq("status", "new");
           }
         }
       }
 
-      const direction = inferDirectionFromOwner(aurinkoMessage, ownerEmail, aliases);
-
-      const unified = aurinkoToUnifiedMessage({
-        message: aurinkoMessage,
-        channel: "email",
-        direction,
-        defaultToIdentifier: ownerEmail,
+      return jsonResponse({
+        ok: true,
+        event_type: "message.updated",
+        config_id: config.id,
+        workspace_id: config.workspace_id,
+        external_id: externalId,
+        is_read: isNowRead,
+        updated_count: updatedEvents?.length || 0,
       });
+    }
 
-      const { data: ingestData, error: ingestError } = await supabase.rpc("bb_ingest_unified_messages", {
-        p_workspace_id: config.workspace_id,
-        p_config_id: config.id,
-        p_run_id: null,
-        p_channel: "email",
-        p_messages: [unified],
+    // Default: message.created — ingest new message
+    const direction = inferDirectionFromOwner(aurinkoMessage, ownerEmail, aliases);
+
+    const unified = aurinkoToUnifiedMessage({
+      message: aurinkoMessage,
+      channel: "email",
+      direction,
+      defaultToIdentifier: ownerEmail,
+    });
+
+    const { data: ingestData, error: ingestError } = await supabase.rpc("bb_ingest_unified_messages", {
+      p_workspace_id: config.workspace_id,
+      p_config_id: config.id,
+      p_run_id: null,
+      p_channel: "email",
+      p_messages: [unified],
+    });
+
+    if (ingestError) {
+      throw new Error(`bb_ingest_unified_messages failed: ${ingestError.message}`);
+    }
+
+    // Instant pg_net wake-up: trigger the ingest worker immediately
+    // instead of waiting for the next cron tick (~10s → ~2s latency)
+    try {
+      await supabase.rpc("bb_trigger_worker", {
+        p_url_secret_name: "bb_worker_ingest_url",
+        p_body: {},
       });
-
-      if (ingestError) {
-        console.error(`❌ Ingest failed for message ${messageId}:`, ingestError.message);
-        continue;
-      }
-
-      console.log(`✅ Ingested message ${unified.external_id} (${direction})`);
-      results.push({ external_id: unified.external_id, direction, ingest: ingestData });
+    } catch (e) {
+      console.warn("pg_net wake-up failed (non-fatal):", e);
     }
 
     return jsonResponse({
       ok: true,
       config_id: config.id,
       workspace_id: config.workspace_id,
-      processed: results.length,
-      results,
+      external_id: unified.external_id,
+      direction: unified.direction,
+      ingest: ingestData,
     });
   } catch (error) {
     console.error("aurinko-webhook error", error);

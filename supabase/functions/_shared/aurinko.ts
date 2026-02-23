@@ -4,8 +4,10 @@ import type { Direction, UnifiedMessage } from "./types.ts";
 export interface AurinkoMessage {
   id: string;
   threadId?: string;
-  from?: { email?: string; name?: string } | string;
-  to?: Array<{ email?: string; name?: string }> | string[] | string;
+  from?: { email?: string; address?: string; name?: string }
+    | Array<{ email?: string; address?: string; name?: string }>
+    | string;
+  to?: Array<{ email?: string; address?: string; name?: string }> | string[] | string;
   subject?: string;
   textBody?: string;
   htmlBody?: string;
@@ -36,6 +38,17 @@ function asEmail(value: unknown): string | null {
     return trimmed || null;
   }
 
+  // Handle arrays: from can be [{ address, name }] or [{ email, name }]
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      const email = asEmail(entry);
+      if (email) {
+        return email;
+      }
+    }
+    return null;
+  }
+
   if (typeof value === "object") {
     const obj = value as { email?: string; address?: string };
     const maybeEmail = normalizeEmail(obj.email || obj.address);
@@ -64,6 +77,7 @@ function firstRecipient(value: unknown): string {
     return "";
   }
 
+  // Single object with email or address
   return asEmail(value) || "";
 }
 
@@ -110,10 +124,12 @@ export function aurinkoToUnifiedMessage(
     channel: "email",
     direction: params.direction,
     from_identifier: fromEmail,
-    from_name: typeof message.from === "object" && message.from ? ((message.from as { name?: string }).name || null) : null,
+    from_name: Array.isArray(message.from)
+      ? (message.from[0]?.name || null)
+      : (typeof message.from === "object" && message.from ? (message.from as { name?: string }).name || null : null),
     to_identifier: toEmail,
-    body: String(message.textBody || message.bodySnippet || ""),
-    body_html: message.htmlBody ? String(message.htmlBody) : (message.body ? String(message.body) : null),
+    body: String(message.textBody || ""),
+    body_html: message.htmlBody ? String(message.htmlBody) : null,
     subject: message.subject ? String(message.subject) : null,
     timestamp,
     is_read: !sysLabels.includes("unread"),

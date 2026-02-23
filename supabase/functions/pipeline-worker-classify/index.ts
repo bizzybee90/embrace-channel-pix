@@ -146,30 +146,19 @@ function decisionForClassification(
     };
   }
 
-  const noiseCategories = new Set(["notification", "newsletter", "spam", "personal"]);
+  const noiseCategories = new Set(["notification", "newsletter", "spam"]);
   const category = (result.category || "").toLowerCase();
 
-  // Noise → auto-handle and resolve
   if (noiseCategories.has(category)) {
     return { decisionBucket: "auto_handled", status: "resolved" };
   }
 
-  // Follow-ups that don't need reply → auto-handle
-  if (category === "follow_up" && !result.requires_reply) {
-    return { decisionBucket: "auto_handled", status: "resolved" };
-  }
-
-  // Low confidence → escalate to human
   if (result.confidence < 0.7) {
     return { decisionBucket: "needs_human", status: "escalated" };
   }
 
-  // Needs reply → act_now for complaints, quick_win for standard
   if (result.requires_reply) {
-    if (category === "complaint") {
-      return { decisionBucket: "act_now", status: "ai_handling" };
-    }
-    return { decisionBucket: "quick_win", status: "open" };
+    return { decisionBucket: "act_now", status: "ai_handling" };
   }
 
   return { decisionBucket: "quick_win", status: "open" };
@@ -244,7 +233,7 @@ async function applyClassification(params: {
   const { data: conversation, error: conversationError } = await supabase
     .from("conversations")
     .select(
-      "id, channel, status, metadata, customer_id, last_inbound_message_id, last_classified_message_id, last_draft_enqueued_message_id",
+      "id, channel, status, metadata, last_inbound_message_id, last_classified_message_id, last_draft_enqueued_message_id",
     )
     .eq("id", params.job.conversation_id)
     .single();
@@ -280,11 +269,8 @@ async function applyClassification(params: {
     status: decision.status,
     metadata: mergedMetadata,
     last_classified_message_id: params.job.target_message_id,
+    training_reviewed: false,
     updated_at: new Date().toISOString(),
-    ai_reasoning: params.result.reasoning || null,
-    ai_sentiment: params.result.sentiment || null,
-    ai_why_flagged: params.result.why_this_needs_you || null,
-    summary_for_human: params.result.summary_for_human || null,
   };
 
   if (conversation.channel === "email") {
@@ -301,46 +287,6 @@ async function applyClassification(params: {
     throw new Error(`Conversation update failed: ${updateConversationError.message}`);
   }
 
-  // Identity harvesting: extract phones/emails from AI entities into customer_identities
-  try {
-    const entities = (params.result.entities || {}) as Record<string, unknown>;
-    const extractedPhones = Array.isArray(entities.extracted_phones) ? entities.extracted_phones : [];
-    const extractedEmails = Array.isArray(entities.extracted_emails) ? entities.extracted_emails : [];
-    const customerId = conversation.customer_id;
-
-    if (customerId) {
-      for (const phone of extractedPhones) {
-        if (phone && typeof phone === "string" && phone.startsWith("+")) {
-          await supabase.from("customer_identities").upsert({
-            workspace_id: params.job.workspace_id,
-            customer_id: customerId,
-            identifier_type: "phone",
-            identifier_value: phone,
-            identifier_value_norm: phone,
-            verified: false,
-            source_channel: "email",
-          }, { onConflict: "workspace_id,identifier_type,identifier_value_norm" });
-        }
-      }
-
-      for (const email of extractedEmails) {
-        if (email && typeof email === "string" && email.includes("@")) {
-          await supabase.from("customer_identities").upsert({
-            workspace_id: params.job.workspace_id,
-            customer_id: customerId,
-            identifier_type: "email",
-            identifier_value: email,
-            identifier_value_norm: email.toLowerCase(),
-            verified: false,
-            source_channel: "email",
-          }, { onConflict: "workspace_id,identifier_type,identifier_value_norm" });
-        }
-      }
-    }
-  } catch (identityErr) {
-    console.warn("Identity harvesting error (non-fatal):", identityErr);
-  }
-
   const { error: eventError } = await supabase
     .from("message_events")
     .update({ status: "decided", last_error: null, updated_at: new Date().toISOString() })
@@ -351,44 +297,57 @@ async function applyClassification(params: {
     throw new Error(`message_events decision update failed: ${eventError.message}`);
   }
 
-  // AUTO-CLEAN: If noise email was unread, mark it as read in the actual mailbox
-  if (
-    decision.decisionBucket === "auto_handled" &&
-    conversation.channel === "email"
-  ) {
-    try {
-      const { data: targetMsg } = await supabase
-        .from("messages")
-        .select("id, external_id, config_id")
-        .eq("id", params.job.target_message_id)
-        .maybeSingle();
+  // Fire-and-forget: trigger customer intelligence enrichment
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+    if (supabaseUrl && serviceRoleKey) {
+      const { data: conv } = await supabase
+        .from("conversations")
+        .select("customer_id")
+        .eq("id", params.job.conversation_id)
+        .single();
 
-      if (targetMsg?.external_id && targetMsg?.config_id) {
-        const { data: emailConfig } = await supabase
-          .from("email_provider_configs")
-          .select("id, aurinko_access_token")
-          .eq("id", targetMsg.config_id)
-          .maybeSingle();
-
-        if (emailConfig?.aurinko_access_token) {
-          const aurinkoBaseUrl = Deno.env.get("AURINKO_API_BASE_URL") || "https://api.aurinko.io";
-          fetch(
-            `${aurinkoBaseUrl}/v1/email/messages/${targetMsg.external_id}`,
-            {
-              method: "PATCH",
-              headers: {
-                "Authorization": `Bearer ${emailConfig.aurinko_access_token}`,
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({ unread: false }),
-            },
-          ).catch((err) => {
-            console.warn("Auto-mark-read failed (non-fatal):", err.message);
-          });
-        }
+      if (conv?.customer_id) {
+        fetch(`${supabaseUrl}/functions/v1/ai-enrich-conversation`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${serviceRoleKey}`,
+          },
+          body: JSON.stringify({
+            conversation_id: params.job.conversation_id,
+            customer_id: conv.customer_id,
+            workspace_id: params.job.workspace_id,
+          }),
+        }).catch((e) => console.warn("ai-enrich fire-and-forget failed:", e));
       }
-    } catch (err) {
-      console.warn("Auto-clean mark-as-read error (non-fatal):", err);
+    }
+  } catch (e) {
+    console.warn("ai-enrich trigger error (non-fatal):", e);
+  }
+
+  // Fire-and-forget: mark email as read in Gmail for auto_handled conversations
+  // (Task 4a + Task 7b: auto-clean the user's real inbox)
+  if (decision.decisionBucket === "auto_handled") {
+    try {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+      const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+      if (supabaseUrl && serviceRoleKey) {
+        fetch(`${supabaseUrl}/functions/v1/mark-email-read`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${serviceRoleKey}`,
+          },
+          body: JSON.stringify({
+            conversationId: params.job.conversation_id,
+            markAsRead: true,
+          }),
+        }).catch((e) => console.warn("mark-email-read fire-and-forget failed:", e));
+      }
+    } catch (e) {
+      console.warn("mark-email-read trigger error (non-fatal):", e);
     }
   }
 
@@ -472,7 +431,7 @@ Deno.serve(async (req) => {
             workspaceId: job?.workspace_id,
             runId: job?.run_id,
             queueName: QUEUE_NAME,
-            jobPayload: (job || {}) as unknown as Record<string, unknown>,
+            jobPayload: (job || {}) as Record<string, unknown>,
             outcome: "discarded",
             error: "Invalid CLASSIFY job",
             attempts: record.read_ct,
@@ -628,7 +587,7 @@ Deno.serve(async (req) => {
             attempts: record.read_ct,
             workspaceId: job.workspace_id,
             runId: job.run_id,
-            jobPayload: (job || {}) as unknown as Record<string, unknown>,
+            jobPayload: (job || {}) as Record<string, unknown>,
             error: message,
             scope: "pipeline-worker-classify",
           });
@@ -637,7 +596,7 @@ Deno.serve(async (req) => {
             workspaceId: job?.workspace_id,
             runId: job?.run_id,
             queueName: QUEUE_NAME,
-            jobPayload: (job || {}) as unknown as Record<string, unknown>,
+            jobPayload: (job || {}) as Record<string, unknown>,
             outcome: "failed",
             error: message,
             attempts: record.read_ct,
@@ -679,7 +638,7 @@ Deno.serve(async (req) => {
           const job = row.record.message;
           try {
             const result = classifications.get(job.event_id) || {
-              category: "inquiry",
+              category: "general",
               requires_reply: true,
               confidence: 0.55,
               entities: {},
@@ -704,29 +663,6 @@ Deno.serve(async (req) => {
                 classify_source: "ai",
               },
             });
-
-            // Auto-trigger customer intelligence enrichment (fire-and-forget)
-            try {
-              const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
-              const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-              if (supabaseUrl && serviceRoleKey) {
-                fetch(`${supabaseUrl}/functions/v1/ai-enrich-conversation`, {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${serviceRoleKey}`,
-                  },
-                  body: JSON.stringify({
-                    conversation_id: job.conversation_id,
-                    workspace_id: job.workspace_id,
-                  }),
-                }).catch((err) => {
-                  console.warn("Auto-enrich trigger failed (non-fatal):", err.message);
-                });
-              }
-            } catch (enrichErr) {
-              console.warn("Auto-enrich error (non-fatal):", enrichErr);
-            }
 
             processed += 1;
           } catch (error) {

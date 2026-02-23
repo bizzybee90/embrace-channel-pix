@@ -78,7 +78,7 @@ export const TabletLayout = ({ filter = "all-open" }: TabletLayoutProps) => {
   };
 
   return (
-    <div className="flex h-screen w-full bg-background overflow-hidden">
+    <div className="flex h-screen w-full bg-slate-50/50 overflow-hidden">
       {/* Column 1: Collapsed sidebar (icons only) */}
       <div data-sidebar className="flex-shrink-0 border-r border-border/20 bg-card z-10">
         <Sidebar forceCollapsed onNavigate={() => setSelectedConversation(null)} />

@@ -11,7 +11,6 @@ interface ReviewQueueItemProps {
     decision_bucket: string;
     customer: { name: string; email: string } | null;
     channel?: string;
-    messages?: { actor_name?: string | null }[];
   };
   isActive: boolean;
   isReviewed: boolean;
@@ -22,16 +21,15 @@ interface ReviewQueueItemProps {
 }
 
 const getStateBadge = (bucket: string) => {
-  const base = "bg-slate-100 text-slate-500 px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider flex-shrink-0 whitespace-nowrap";
   switch (bucket) {
     case 'act_now':
-      return <Badge className={base}>Urgent</Badge>;
+      return <Badge className="bg-red-50 text-red-700 border border-red-200 text-[9px] px-1 py-0 h-4 flex-shrink-0 whitespace-nowrap">Urgent</Badge>;
     case 'quick_win':
-      return <Badge className={base}>Reply</Badge>;
+      return <Badge className="bg-amber-50 text-amber-700 border border-amber-200 text-[9px] px-1 py-0 h-4 flex-shrink-0 whitespace-nowrap">Reply</Badge>;
     case 'wait':
-      return <Badge className={base}>FYI</Badge>;
+      return <Badge className="bg-slate-50 text-slate-700 border border-slate-200 text-[9px] px-1 py-0 h-4 flex-shrink-0 whitespace-nowrap">FYI</Badge>;
     case 'auto_handled':
-      return <Badge className={base}>Done</Badge>;
+      return <Badge className="bg-green-50 text-green-700 border border-green-200 text-[9px] px-1 py-0 h-4 flex-shrink-0 whitespace-nowrap">Done</Badge>;
     default:
       return null;
   }
@@ -46,17 +44,17 @@ export const ReviewQueueItem = ({
   onClick,
   onToggleSelect 
 }: ReviewQueueItemProps) => {
-  const senderName = conversation.messages?.[0]?.actor_name || conversation.customer?.name || conversation.customer?.email?.split('@')[0] || 'Unknown Sender';
+  const senderName = conversation.customer?.name || conversation.customer?.email?.split('@')[0] || 'Unknown';
 
   return (
     <div
       onClick={onClick}
       className={cn(
-        "rounded-xl mx-2 my-1 p-3 cursor-pointer transition-all",
-        isActive && !isMultiSelectMode && "bg-white shadow-sm border border-purple-200 ring-1 ring-purple-50",
-        !isActive && !isSelected && "border border-transparent hover:bg-slate-50/80",
-        isSelected && "bg-white shadow-sm border border-purple-200 ring-1 ring-purple-50",
-        isReviewed && "opacity-50"
+        "px-3 py-2 cursor-pointer border-b border-border/30 transition-all",
+        "hover:bg-muted/50",
+        isActive && !isMultiSelectMode && "bg-purple-50/60 text-purple-900",
+        isSelected && "bg-purple-50/80 text-purple-900",
+        isReviewed && "opacity-60"
       )}
     >
       <div className="flex items-center gap-2">

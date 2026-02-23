@@ -216,7 +216,7 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate }
             "relative cursor-pointer transition-all duration-300 rounded-[22px] overflow-hidden",
             "bg-card border border-border/30 hover:border-primary/30",
             "apple-shadow hover:apple-shadow-lg spring-press",
-            selected && "border-primary/50 apple-shadow-lg bg-gradient-to-br from-primary/8 via-primary/4 to-card"
+            selected && "border-purple-200 apple-shadow-lg bg-purple-50/60"
           )}
           style={{
             transform: isSwiping ? `translateX(${swipeDistance}px)` : 'translateX(0)',
@@ -228,7 +228,7 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate }
           className={cn(
             "absolute top-0 left-0 right-0 h-1",
             conversation.status === 'resolved' 
-              ? "bg-green-500" 
+              ? "bg-purple-500" 
               : conversation.priority 
                 ? getPriorityBarColor(conversation.priority)
                 : "bg-muted"
@@ -237,7 +237,7 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate }
         
         {/* Overdue Badge */}
         {isOverdue && (
-          <Badge variant="priority-urgent" className="absolute top-4 right-4 text-[11px] font-bold uppercase tracking-wide px-3 py-1.5 rounded-full shadow-sm">
+          <Badge variant="priority-urgent" className="absolute top-4 right-4 text-[11px] font-bold uppercase tracking-wide px-3 py-1.5 rounded-md shadow-sm">
             Overdue
           </Badge>
         )}
@@ -263,19 +263,19 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate }
             {conversation.priority && (
               <Badge 
                 variant={getPriorityVariant(conversation.priority)}
-                className="rounded-full text-xs font-bold uppercase tracking-wide px-3 py-1.5 shadow-sm"
+                className="rounded-md text-xs font-bold uppercase tracking-wide px-3 py-1.5 shadow-sm"
               >
                 {conversation.priority}
               </Badge>
             )}
             
-            <Badge variant="outline" className="rounded-full text-xs font-semibold px-3 py-1.5 border-border/50 flex items-center gap-1.5">
+            <Badge variant="outline" className="rounded-md text-xs font-semibold px-3 py-1.5 border-border/50 flex items-center gap-1.5">
               <ChannelIcon channel={conversation.channel} className="h-3.5 w-3.5" />
               {conversation.channel}
             </Badge>
 
             {hasDraft && (
-              <Badge variant="secondary" className="rounded-full text-xs font-semibold px-3 py-1.5 bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 flex items-center gap-1.5">
+              <Badge variant="secondary" className="rounded-md text-xs font-semibold px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-1.5">
                 <FileEdit className="h-3 w-3" />
                 Draft
               </Badge>
@@ -307,7 +307,7 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate }
         "relative cursor-pointer transition-all duration-300 ease-out rounded-[22px] mb-3 overflow-hidden",
         "bg-card border border-border/30 hover:border-primary/30",
         "apple-shadow hover:apple-shadow-lg spring-press",
-        selected && "border-primary/50 apple-shadow-lg bg-gradient-to-br from-primary/8 via-primary/4 to-card"
+        selected && "border-purple-200 apple-shadow-lg bg-purple-50/60"
       )}
     >
       {/* Priority/Status Accent Bar */}
@@ -315,7 +315,7 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate }
         className={cn(
           "absolute top-0 left-0 right-0 h-1",
           conversation.status === 'resolved' 
-            ? "bg-green-500" 
+            ? "bg-purple-500" 
             : conversation.priority 
               ? getPriorityBarColor(conversation.priority)
               : "bg-muted"
@@ -324,7 +324,7 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate }
       
       {/* Overdue Badge */}
       {isOverdue && (
-        <Badge variant="priority-urgent" className="absolute top-4 right-4 text-[11px] font-bold uppercase tracking-wide px-3 py-1.5 rounded-full shadow-sm">
+        <Badge variant="priority-urgent" className="absolute top-4 right-4 text-[11px] font-bold uppercase tracking-wide px-3 py-1.5 rounded-md shadow-sm">
           Overdue
         </Badge>
       )}
@@ -350,19 +350,19 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate }
           {conversation.priority && (
             <Badge 
               variant={getPriorityVariant(conversation.priority)}
-              className="rounded-full text-xs font-bold uppercase tracking-wide px-3 py-1.5 shadow-sm"
+              className="rounded-md text-xs font-bold uppercase tracking-wide px-3 py-1.5 shadow-sm"
             >
               {conversation.priority}
             </Badge>
           )}
           
-          <Badge variant="outline" className="rounded-full text-xs font-semibold px-3 py-1.5 border-border/50 flex items-center gap-1.5">
+          <Badge variant="outline" className="rounded-md text-xs font-semibold px-3 py-1.5 border-border/50 flex items-center gap-1.5">
             <ChannelIcon channel={conversation.channel} className="h-3.5 w-3.5" />
             {conversation.channel}
           </Badge>
 
           {hasDraft && (
-            <Badge variant="secondary" className="rounded-full text-xs font-semibold px-3 py-1.5 bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 flex items-center gap-1.5">
+            <Badge variant="secondary" className="rounded-md text-xs font-semibold px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-1.5">
               <FileEdit className="h-3 w-3" />
               Draft
             </Badge>

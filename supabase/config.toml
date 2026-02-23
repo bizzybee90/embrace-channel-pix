@@ -19,6 +19,15 @@ verify_jwt = false
 [functions.email-send]
 verify_jwt = false
 
+[functions.send-reply]
+verify_jwt = false
+
+[functions.submit-training-review]
+verify_jwt = false
+
+[functions.nightly-queue-cleanup]
+verify_jwt = false
+
 [functions.export-customer-data]
 verify_jwt = false
 

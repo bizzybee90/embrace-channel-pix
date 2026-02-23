@@ -220,6 +220,17 @@ export const ReadingPane = ({ selectedEmailId, onBack }: ReadingPaneProps) => {
         )}
       </div>
 
+      {/* Reply Pill - sticky at bottom */}
+      <div className="border-t border-border/50 bg-card px-4 py-2 flex-shrink-0">
+        <button
+          className="w-full flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-sm text-muted-foreground transition-colors"
+          onClick={() => { /* TODO: expand to reply editor */ }}
+        >
+          <Reply className="h-4 w-4" />
+          <span>Reply to {email.from_name || email.from_email}...</span>
+        </button>
+      </div>
+
       {/* Quick Actions */}
       {workspace?.id && (
         <QuickActionsBar emailId={email.id} workspaceId={workspace.id} />

@@ -16,7 +16,8 @@ export const ThreeColumnLayout = ({ sidebar, main }: ThreeColumnLayoutProps) => 
   if (isMobile) {
     return (
       <>
-        <div className="flex h-screen w-full bg-background overflow-hidden flex-col">
+        <div className="flex h-screen w-full bg-slate-50/50 overflow-hidden flex-col">
+          {/* Mobile Header */}
           <header className="flex-shrink-0 h-14 border-b border-border bg-card px-4 flex items-center justify-between">
             <Button
               variant="ghost"
@@ -27,12 +28,16 @@ export const ThreeColumnLayout = ({ sidebar, main }: ThreeColumnLayoutProps) => 
               <Menu className="h-5 w-5" />
             </Button>
             <h1 className="text-lg font-semibold truncate">BizzyBee</h1>
-            <div className="w-9" />
+            <div className="w-9" /> {/* Spacer for center alignment */}
           </header>
+
+          {/* Main Content - Full Width on Mobile */}
           <main className="flex-1 overflow-y-auto">
             {main}
           </main>
         </div>
+
+        {/* Mobile Sidebar Overlay */}
         <MobileSidebarSheet
           open={sidebarOpen}
           onOpenChange={setSidebarOpen}
@@ -44,16 +49,14 @@ export const ThreeColumnLayout = ({ sidebar, main }: ThreeColumnLayoutProps) => 
 
   return (
     <div className="flex h-screen w-full bg-slate-50/50 overflow-hidden">
-      {/* Desktop Sidebar - icon rail */}
-      <aside className="bg-white flex-shrink-0 overflow-y-auto relative z-50 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] ring-1 ring-slate-900/5">
+      {/* Desktop Sidebar */}
+      <aside className="border-r border-border bg-card flex-shrink-0 overflow-y-auto relative z-50">
         {sidebar}
       </aside>
 
-      {/* Desktop Main Content - floating card */}
-      <main className="flex-1 flex flex-col overflow-y-auto min-w-0 p-4">
-        <div className="flex-1 bg-white rounded-xl shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] ring-1 ring-slate-900/5 overflow-y-auto">
-          {main}
-        </div>
+      {/* Desktop Main Content */}
+      <main className="flex-1 flex flex-col overflow-y-auto min-w-0">
+        {main}
       </main>
     </div>
   );
