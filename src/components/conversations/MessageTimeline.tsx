@@ -1,7 +1,7 @@
 import { Message } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
-import { Bot, StickyNote, Paperclip, ChevronDown, ChevronUp, Eye, EyeOff } from 'lucide-react';
+import { Bot, StickyNote, Paperclip, ChevronDown, ChevronUp, ChevronRight, Eye, EyeOff, FileText } from 'lucide-react';
 import { ChannelIcon } from '@/components/shared/ChannelIcon';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
@@ -223,46 +223,51 @@ export const MessageTimeline = ({
       return html;
     })() : '';
 
-    // Customer / inbound messages — naked email canvas style
+    // Customer / inbound messages — clean text + View Formatted (matching Review page)
     return (
       <div key={message.id} className="animate-fade-in">
-        {/* Naked email content — render HTML faithfully */}
-        {hasHtmlBody && !showOriginal ? (
-          <div
-            className="prose prose-sm md:prose-base max-w-none text-foreground leading-relaxed [&_a]:text-blue-600 hover:[&_a]:text-blue-800 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-border [&_td]:p-2 [&_img]:max-w-full [&_img]:h-auto break-words"
-            dangerouslySetInnerHTML={{ __html: sanitizedEmailHtml }}
-          />
-        ) : (
-          <div className="prose prose-sm max-w-none text-foreground leading-relaxed">
-            {isEmail && !showOriginal ? (
+        {/* Clean plain text rendering in soft container */}
+        <div className="text-slate-700 whitespace-pre-wrap leading-relaxed bg-slate-50/50 rounded-xl p-6 border border-slate-100 text-[15px]">
+          <p className="text-[15px] whitespace-pre-wrap leading-relaxed text-foreground/80 m-0">
+            {isEmail ? (
               <EmailThread body={displayBody || ''} />
             ) : (
-              <p className="text-sm whitespace-pre-wrap leading-relaxed m-0">{displayBody}</p>
+              displayBody
             )}
-          </div>
-        )}
+          </p>
+        </div>
         
-        {/* Show original toggle */}
-        {canShowOriginal && (
-          <div className="mt-2 flex items-center gap-3">
+        {/* Button row — Show previous messages + View formatted (matching Review page) */}
+        <div className="mt-3 pt-2 flex items-center gap-3">
+          {canShowOriginal && (
             <button
               onClick={() => toggleShowOriginal(message.id)}
-              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
             >
               {showOriginal ? (
                 <>
-                  <EyeOff className="h-3 w-3" />
-                  Show threaded
+                  <ChevronDown className="h-3 w-3" />
+                  <span>Hide original</span>
                 </>
               ) : (
                 <>
-                  <Eye className="h-3 w-3" />
-                  Show original
+                  <ChevronRight className="h-3 w-3" />
+                  <span>Show original</span>
                 </>
               )}
             </button>
-          </div>
-        )}
+          )}
+          
+          {hasHtmlBody && (
+            <button
+              onClick={() => setHtmlViewerMessage(message)}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm"
+            >
+              <FileText className="h-3.5 w-3.5" />
+              <span>View formatted</span>
+            </button>
+          )}
+        </div>
         
         {message.attachments && Array.isArray(message.attachments) && message.attachments.length > 0 && (
           <div className="mt-3 space-y-2">

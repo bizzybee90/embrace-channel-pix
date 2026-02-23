@@ -448,9 +448,11 @@ export const JaceStyleInbox = ({ onSelect, selectedId, filter = 'needs-me' }: Ja
       <div className="flex-1 overflow-y-auto">
         {filteredConversations.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
-          <Sparkles className="h-12 w-12 mb-4 opacity-20" />
-            <p className="text-lg font-medium">You're all caught up!</p>
-            <p className="text-sm mt-1 opacity-75">No messages need your attention right now</p>
+            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-purple-100 to-blue-50 flex items-center justify-center mb-6 shadow-inner ring-8 ring-purple-50/50">
+              <Sparkles className="w-10 h-10 text-purple-500 animate-pulse" />
+            </div>
+            <p className="text-lg font-semibold text-foreground/80">You're all caught up!</p>
+            <p className="text-sm mt-1 text-muted-foreground/70">No messages need your attention right now</p>
             <p className="text-xs text-muted-foreground/60 mt-3">⌘K to search • J/K to navigate</p>
           </div>
         ) : (
