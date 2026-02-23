@@ -18,10 +18,10 @@ export const EmailListItem = ({ email, isSelected, onClick }: EmailListItemProps
     <button
       onClick={onClick}
       className={cn(
-        'w-full text-left px-3 py-2.5 border-b border-border/50 transition-colors flex flex-col gap-0.5 group',
+        'w-full text-left rounded-xl mx-2 my-1 p-3 transition-all flex flex-col gap-0.5 group',
         isSelected
-          ? 'bg-accent/70'
-          : 'hover:bg-accent/30',
+          ? 'bg-white shadow-sm border border-purple-200 ring-1 ring-purple-50'
+          : 'border border-transparent hover:bg-slate-50/80',
         outbound && 'opacity-70'
       )}
     >
@@ -46,7 +46,7 @@ export const EmailListItem = ({ email, isSelected, onClick }: EmailListItemProps
           {email.subject || '(no subject)'}
         </span>
         {email.category && (
-          <span className={cn('text-[10px] px-1.5 py-0.5 rounded-sm font-medium flex-shrink-0', catInfo.bg, catInfo.text)}>
+          <span className="bg-slate-100 text-slate-500 px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider flex-shrink-0">
             {catInfo.label}
           </span>
         )}
