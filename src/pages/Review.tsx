@@ -729,9 +729,9 @@ export default function Review() {
         </div>
 
         {/* 3-Column Layout */}
-        <div className="flex-1 flex overflow-hidden gap-3 p-3">
+        <div className="flex-1 flex overflow-hidden gap-4 p-4">
           {/* Column 1: Reconciliation Queue (350px) */}
-          <div className="w-[350px] min-w-[350px] flex-shrink-0 flex flex-col bg-white rounded-xl shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] ring-1 ring-slate-900/5 overflow-hidden">
+          <div className="w-[350px] min-w-[350px] flex-shrink-0 flex flex-col bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
             <div className="px-3 py-2 border-b border-slate-100">
               <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">
                 Reconciliation Queue
@@ -831,7 +831,7 @@ export default function Review() {
           </div>
 
           {/* Column 2: Email Preview + AI Reasoning (flex) */}
-          <div className="flex-1 flex flex-col overflow-hidden bg-white rounded-xl shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] ring-1 ring-slate-900/5">
+          <div className="flex-1 flex flex-col overflow-hidden bg-white rounded-2xl shadow-sm border border-slate-200">
             {currentConversation ? (
               <div className="flex-1 flex flex-col overflow-y-auto">
                 {/* Sender row */}
@@ -922,7 +922,7 @@ export default function Review() {
           </div>
 
           {/* Column 3: Reconciliation Panel (300px) */}
-          <div className="w-[300px] min-w-[300px] flex-shrink-0 flex flex-col bg-white rounded-xl shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] ring-1 ring-slate-900/5 overflow-hidden">
+          <div className="w-[300px] min-w-[300px] flex-shrink-0 flex flex-col bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
             {currentConversation ? (
               <div className="flex-1 flex flex-col overflow-y-auto">
                 {/* The Verdict */}
@@ -941,9 +941,9 @@ export default function Review() {
                         <span className="text-muted-foreground">Confidence</span>
                         <span className={cn("font-bold text-sm", confidenceColor)}>{confidencePercent}%</span>
                       </div>
-                      <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden">
+                      <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden mt-3">
                         <div
-                          className="h-full rounded-full transition-all duration-700 ease-out bg-purple-600"
+                          className="h-full bg-gradient-to-r from-purple-500 to-blue-500 rounded-full transition-all duration-700 ease-out"
                           style={{ width: `${confidencePercent}%` }}
                         />
                       </div>
@@ -972,26 +972,28 @@ export default function Review() {
                 <div className="p-4 border-b space-y-3">
                   {!showChangePicker ? (
                     <>
-                      {/* CONFIRM — the hero button */}
-                      <Button
-                        className="w-full h-11 bg-purple-600 hover:bg-purple-700 text-white font-medium shadow-sm rounded-xl"
-                        onClick={handleConfirm}
-                        disabled={confirmMutation.isPending}
-                      >
-                        <Check className="h-5 w-5 mr-2" />
-                        Confirm Correct
-                      </Button>
+                      <div className="grid grid-cols-2 gap-3 mt-4">
+                        {/* CONFIRM — the hero button */}
+                        <Button
+                          className="h-11 bg-purple-600 hover:bg-purple-700 text-white font-medium shadow-sm rounded-xl"
+                          onClick={handleConfirm}
+                          disabled={confirmMutation.isPending}
+                        >
+                          <Check className="h-5 w-5 mr-2" />
+                          Confirm
+                        </Button>
 
-                      {/* CHANGE */}
-                      <Button
-                        variant="outline"
-                        className="w-full h-11 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm rounded-xl font-medium"
-                        onClick={() => setShowChangePicker(true)}
-                        disabled={confirmMutation.isPending}
-                      >
-                        <Pencil className="h-4 w-4 mr-1.5" />
-                        Change Classification
-                      </Button>
+                        {/* CHANGE */}
+                        <Button
+                          variant="outline"
+                          className="h-11 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm rounded-xl font-medium"
+                          onClick={() => setShowChangePicker(true)}
+                          disabled={confirmMutation.isPending}
+                        >
+                          <Pencil className="h-4 w-4 mr-1.5" />
+                          Change
+                        </Button>
+                      </div>
 
                       {/* SKIP */}
                       {currentIndex < unreviewedQueue.length - 1 && (
@@ -1069,32 +1071,44 @@ export default function Review() {
                   </div>
                   <div className="px-4 pb-3 space-y-3">
                     <div className="space-y-2">
-                      <Label className="text-xs font-medium">Handle all from this sender:</Label>
-                      <RadioGroup value={automationLevel} onValueChange={(val) => setAutomationLevel(val as AutomationLevel)} className="space-y-1">
+                      <span className="text-xs font-medium text-slate-700">Handle all from this sender:</span>
+                      <div className="space-y-2">
                         {[
                           { value: 'auto', label: 'Auto-handle', icon: <Bot className="h-3.5 w-3.5 text-green-500" /> },
                           { value: 'draft_first', label: 'Draft first', icon: <FileEdit className="h-3.5 w-3.5 text-amber-500" /> },
                           { value: 'always_review', label: 'Always review', icon: <Eye className="h-3.5 w-3.5 text-blue-500" /> },
                         ].map(opt => (
-                          <div key={opt.value} className="flex items-center space-x-2 p-1.5 rounded hover:bg-muted/50">
-                            <RadioGroupItem value={opt.value} id={`auto-${opt.value}`} />
-                            <Label htmlFor={`auto-${opt.value}`} className="flex items-center gap-1.5 cursor-pointer text-xs font-normal">
-                              {opt.icon}{opt.label}
-                            </Label>
-                          </div>
+                          <label
+                            key={opt.value}
+                            className={cn(
+                              "flex items-center gap-3 p-3 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50 transition-all text-sm font-medium text-slate-700",
+                              automationLevel === opt.value && "border-purple-500 bg-purple-50 ring-1 ring-purple-200"
+                            )}
+                            onClick={() => setAutomationLevel(opt.value as AutomationLevel)}
+                          >
+                            <input type="radio" name="automation" value={opt.value} checked={automationLevel === opt.value} onChange={() => setAutomationLevel(opt.value as AutomationLevel)} className="sr-only" />
+                            {opt.icon}{opt.label}
+                          </label>
                         ))}
-                      </RadioGroup>
+                      </div>
                     </div>
                     <div className="space-y-2 pt-2 border-t border-border/50">
-                      <Label className="text-xs font-medium">Tone for replies:</Label>
-                      <RadioGroup value={tonePreference} onValueChange={(val) => setTonePreference(val as TonePreference)} className="flex flex-wrap gap-3">
+                      <span className="text-xs font-medium text-slate-700">Tone for replies:</span>
+                      <div className="flex flex-wrap gap-2">
                         {[{ value: 'keep_current', label: 'Keep' }, { value: 'more_formal', label: 'Formal' }, { value: 'more_brief', label: 'Brief' }, { value: 'more_friendly', label: 'Friendly' }].map(opt => (
-                          <div key={opt.value} className="flex items-center space-x-1.5">
-                            <RadioGroupItem value={opt.value} id={`tone-${opt.value}`} />
-                            <Label htmlFor={`tone-${opt.value}`} className="cursor-pointer text-xs font-normal">{opt.label}</Label>
-                          </div>
+                          <label
+                            key={opt.value}
+                            className={cn(
+                              "px-3 py-2 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50 transition-all text-xs font-medium text-slate-700",
+                              tonePreference === opt.value && "border-purple-500 bg-purple-50 ring-1 ring-purple-200"
+                            )}
+                            onClick={() => setTonePreference(opt.value as TonePreference)}
+                          >
+                            <input type="radio" name="tone" value={opt.value} checked={tonePreference === opt.value} onChange={() => setTonePreference(opt.value as TonePreference)} className="sr-only" />
+                            {opt.label}
+                          </label>
                         ))}
-                      </RadioGroup>
+                      </div>
                     </div>
                   </div>
                 </div>
