@@ -292,9 +292,9 @@ export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackBut
           );
         })()}
 
-        {/* 2. Elevated AI Bento Strip */}
+        {/* 2. Elevated AI Bento Strip — Frosted Glass (Home page aesthetic) */}
         {briefingText && (
-          <div className="flex-shrink-0 mx-4 mt-3 mb-4 p-4 bg-slate-50/50 dark:bg-slate-900/30 rounded-xl border border-slate-200 dark:border-slate-700/50 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] flex flex-col gap-3">
+          <div className="flex-shrink-0 mx-6 mt-6 mb-2 p-5 bg-gradient-to-r from-amber-50/60 via-purple-50/40 to-blue-50/40 rounded-2xl border border-white/60 shadow-sm flex flex-col gap-3 ring-1 ring-slate-900/5">
             {/* Top row: AI Summary */}
             <div className="flex items-start gap-2">
               <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0 mt-0.5" />
@@ -387,12 +387,16 @@ export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackBut
 
       {/* Permanent right intelligence panel on wide screens */}
       {isWide && intelligencePanel && (
-        <div className="flex-shrink-0 w-[300px] overflow-y-auto bg-white p-4 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] ring-1 ring-slate-900/5 rounded-xl m-3 ml-0">
-          <div className="flex items-center gap-2 mb-4">
-            <Brain className="h-4 w-4 text-purple-600" />
-            <h3 className="text-sm font-semibold text-foreground">Intelligence</h3>
+        <div className="flex-shrink-0 w-[300px] overflow-y-auto bg-gradient-to-b from-indigo-50/30 to-white shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] ring-1 ring-slate-900/5 rounded-xl m-3 ml-0">
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 m-3 shadow-sm border border-slate-100/50">
+            <div className="flex items-center gap-2 mb-3">
+              <Brain className="h-4 w-4 text-purple-600" />
+              <h3 className="text-sm font-semibold text-foreground">Intelligence</h3>
+            </div>
           </div>
-          {intelligencePanel}
+          <div className="px-3 pb-3">
+            {intelligencePanel}
+          </div>
         </div>
       )}
 
