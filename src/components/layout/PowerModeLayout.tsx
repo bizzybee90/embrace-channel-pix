@@ -73,7 +73,7 @@ export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerMod
   };
 
   return (
-    <div className="flex flex-col h-screen w-full bg-slate-50/50 overflow-hidden">
+    <div className="bg-slate-50/50 min-h-screen flex h-screen overflow-hidden">
       {/* Mobile Header */}
       {isMobile && (
         <>
@@ -82,47 +82,50 @@ export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerMod
         </>
       )}
       
-      <div className="flex flex-1 min-h-0 overflow-hidden">
-        {/* Icon Rail Sidebar */}
-        <aside className="hidden md:flex border-r border-border/50 bg-card flex-shrink-0">
-          <Sidebar />
-        </aside>
+      {/* Left Nav (Icon Sidebar) */}
+      <aside className="hidden md:flex bg-white border-r border-slate-200 z-20 flex-col h-full flex-shrink-0">
+        <Sidebar />
+      </aside>
 
-        {/* Content area with padding for floating cards */}
-        <div className="flex-1 flex gap-4 p-4 min-h-0 overflow-hidden">
-          {/* Main Content */}
-          {!selectedConversation ? (
-            /* When nothing is selected, show just the inbox as a floating card */
-            <main className="flex-1 min-h-0 h-full overflow-hidden bg-card rounded-2xl shadow-sm">
-              <JaceStyleInbox
-                filter={filter}
-                onSelect={handleSelectConversation}
-              />
-            </main>
-          ) : (
-            <>
-              {/* Conversation List - floating card */}
-              <div className="w-[380px] min-w-[380px] flex-shrink-0 min-h-0 bg-card rounded-2xl shadow-sm overflow-hidden hidden md:flex flex-col">
-                <JaceStyleInbox
-                  filter={filter}
-                  onSelect={handleSelectConversation}
-                />
-              </div>
-
-              {/* Conversation Thread - floating card */}
-              <div className="flex-1 min-h-0 bg-card rounded-2xl shadow-sm overflow-hidden flex flex-col">
-                <ConversationThread
-                  key={refreshKey}
-                  conversation={selectedConversation}
-                  onUpdate={handleUpdate}
-                  onBack={handleBack}
-                  hideBackButton={false}
-                />
-              </div>
-            </>
-          )}
+      {/* Content area */}
+      {!selectedConversation ? (
+        <div className="flex-1 flex min-h-0 overflow-hidden">
+          <main className="w-[380px] flex-shrink-0 bg-white m-4 rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden flex flex-col z-10">
+            <JaceStyleInbox
+              filter={filter}
+              onSelect={handleSelectConversation}
+            />
+          </main>
+          {/* Empty state right pane */}
+          <div className="flex-1 bg-white my-4 mr-4 rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden flex flex-col relative z-10 items-center justify-center">
+            <div className="text-center text-muted-foreground">
+              <p className="text-sm font-medium text-foreground/60">Select a conversation</p>
+              <p className="text-xs text-muted-foreground/50 mt-1">Choose from the list to get started</p>
+            </div>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="flex-1 flex min-h-0 overflow-hidden">
+          {/* Middle Pane (Message List Column) - floating card */}
+          <div className="w-[380px] flex-shrink-0 bg-white m-4 rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden hidden md:flex flex-col z-10">
+            <JaceStyleInbox
+              filter={filter}
+              onSelect={handleSelectConversation}
+            />
+          </div>
+
+          {/* Right Pane (Reading/Preview Column) - floating card */}
+          <div className="flex-1 bg-white my-4 mr-4 rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden flex flex-col relative z-10">
+            <ConversationThread
+              key={refreshKey}
+              conversation={selectedConversation}
+              onUpdate={handleUpdate}
+              onBack={handleBack}
+              hideBackButton={false}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Customer Info Overlay Drawer */}
       {customerPanelOpen && selectedConversation && (
