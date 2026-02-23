@@ -88,6 +88,7 @@ export const TabletLayout = ({ filter = "all-open" }: TabletLayoutProps) => {
       <div className="w-[320px] flex-shrink-0 border-r border-border/20 flex flex-col min-h-0 overflow-hidden">
         <JaceStyleInbox
           onSelect={handleSelectConversation}
+          selectedId={selectedConversation?.id}
           filter={filter}
         />
       </div>
