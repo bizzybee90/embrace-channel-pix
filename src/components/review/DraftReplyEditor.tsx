@@ -147,7 +147,7 @@ export function DraftReplyEditor({
           <Button
             onClick={() => sendMutation.mutate()}
             disabled={sendMutation.isPending || !draft.trim()}
-            className="bg-purple-600 hover:bg-purple-700 text-white"
+            className="bg-green-600 hover:bg-green-700"
           >
             {sendMutation.isPending ? (
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />

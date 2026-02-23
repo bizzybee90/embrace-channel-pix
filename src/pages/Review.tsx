@@ -10,13 +10,11 @@ import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ReviewQueueItem } from '@/components/review/ReviewQueueItem';
+import { Checkbox } from '@/components/ui/checkbox';
 import { ChannelIcon } from '@/components/shared/ChannelIcon';
-import { CategoryLabel } from '@/components/shared/CategoryLabel';
+import { CategoryLabel, getCategoryConfig } from '@/components/shared/CategoryLabel';
 import { BackButton } from '@/components/shared/BackButton';
 import { DraftReplyEditor } from '@/components/review/DraftReplyEditor';
-import { ReviewExplainer } from '@/components/review/ReviewExplainer';
-import { SmartBatchActions } from '@/components/review/SmartBatchActions';
 import { EmailPreview } from '@/components/review/EmailPreview';
 import { TriageCorrectionFlow } from '@/components/conversations/TriageCorrectionFlow';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -25,34 +23,35 @@ import {
   ChevronDown, 
   ChevronRight, 
   Check, 
-  RefreshCw, 
   SkipForward, 
   Sparkles,
   Bot,
   FileEdit,
   Eye,
-  Keyboard,
+  Send,
+  Pencil,
+  Trophy,
+  TrendingUp,
+  Zap,
+  PartyPopper,
   CheckCheck,
   X,
-  Send,
-  Home
 } from 'lucide-react';
+import { cleanEmailContent } from '@/utils/emailParser';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useReviewFeedback } from '@/hooks/useReviewFeedback';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import DOMPurify from 'dompurify';
 
-// Helper to strip HTML tags and get plain text safely using DOMPurify
+// Helper to strip HTML tags safely
 const stripHtml = (html: string): string => {
   if (!html) return '';
-  // DOMPurify removes all HTML tags safely, preventing XSS
-  return DOMPurify.sanitize(html, { 
-    ALLOWED_TAGS: [], // Strip all tags
-    KEEP_CONTENT: true // Keep text content
-  });
+  return DOMPurify.sanitize(html, { ALLOWED_TAGS: [], KEEP_CONTENT: true });
 };
 
 interface ReviewConversation {
@@ -66,6 +65,10 @@ interface ReviewConversation {
   channel?: string;
   email_classification?: string;
   ai_draft_response?: string;
+  ai_reasoning?: string;
+  requires_reply?: boolean;
+  training_reviewed?: boolean;
+  training_reviewed_at?: string;
   customer: {
     name: string;
     email: string;
@@ -73,39 +76,35 @@ interface ReviewConversation {
   messages: {
     body: string;
     created_at: string;
+    actor_name?: string | null;
     raw_payload?: { body?: string } | null;
   }[];
 }
 
-// New state-based labels
-const bucketLabels: Record<string, string> = {
-  act_now: 'Needs attention',
-  quick_win: 'Needs reply',
-  wait: 'FYI',
-  auto_handled: 'Done',
+const getSenderName = (conv: ReviewConversation): string => {
+  const msg = conv.messages?.[0];
+  return msg?.actor_name || conv.customer?.name || conv.customer?.email?.split('@')[0] || 'Unknown Sender';
 };
 
-const bucketColors: Record<string, string> = {
-  act_now: 'bg-red-50 text-red-700 border border-red-200',
-  quick_win: 'bg-amber-50 text-amber-700 border border-amber-200',
-  wait: 'bg-slate-50 text-slate-700 border border-slate-200',
-  auto_handled: 'bg-green-50 text-green-700 border border-green-200',
+const getSenderEmail = (conv: ReviewConversation): string => {
+  return conv.customer?.email || 'No email';
 };
+
+// 9-category taxonomy for the change picker
+const CATEGORIES = [
+  { key: 'quote', label: 'Quote', dot: 'bg-amber-500' },
+  { key: 'booking', label: 'Booking', dot: 'bg-blue-500' },
+  { key: 'complaint', label: 'Complaint', dot: 'bg-red-500' },
+  { key: 'follow_up', label: 'Follow-up', dot: 'bg-orange-500' },
+  { key: 'inquiry', label: 'Enquiry', dot: 'bg-blue-400' },
+  { key: 'notification', label: 'Notification', dot: 'bg-slate-500' },
+  { key: 'newsletter', label: 'Newsletter', dot: 'bg-pink-500' },
+  { key: 'spam', label: 'Spam', dot: 'bg-red-600' },
+  { key: 'personal', label: 'Personal', dot: 'bg-purple-500' },
+];
 
 type AutomationLevel = 'auto' | 'draft_first' | 'always_review';
-type TonePreference = 'keep_current' | 'more_formal' | 'more_brief';
-type ReviewTab = 'triage' | 'low_confidence';
-
-interface LowConfidenceEmail {
-  id: string;
-  from_email: string;
-  subject: string;
-  body: string;
-  category: string;
-  confidence: number;
-  direction: string;
-  received_at: string;
-}
+type TonePreference = 'keep_current' | 'more_formal' | 'more_brief' | 'more_friendly';
 
 export default function Review() {
   const navigate = useNavigate();
@@ -113,25 +112,24 @@ export default function Review() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showChangePicker, setShowChangePicker] = useState(false);
+  const [changeReason, setChangeReason] = useState('');
+  const [selectedChangeCategory, setSelectedChangeCategory] = useState('');
   const [showTeachMore, setShowTeachMore] = useState(false);
   const [showDraftEditor, setShowDraftEditor] = useState(false);
   const [showCorrectionFlow, setShowCorrectionFlow] = useState(false);
   const [automationLevel, setAutomationLevel] = useState<AutomationLevel>('auto');
   const [tonePreference, setTonePreference] = useState<TonePreference>('keep_current');
-  const [reviewedIds, setReviewedIds] = useState<Set<string>>(new Set());
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [lastClickedIndex, setLastClickedIndex] = useState<number | null>(null);
-  const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
+  const [confirmedToday, setConfirmedToday] = useState<Set<string>>(new Set());
+  const [showConfirmedSection, setShowConfirmedSection] = useState(false);
   const [mobileShowDetail, setMobileShowDetail] = useState(false);
-  const [activeTab, setActiveTab] = useState<ReviewTab>('triage');
-  const [lcIndex, setLcIndex] = useState(0);
+  const [confirmFlashId, setConfirmFlashId] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { celebrateConfirmation, celebratePatternLearned, celebrateQueueComplete } = useReviewFeedback();
 
-  // Fetch conversations needing review
-  const { data: reviewQueue = [], isLoading } = useQuery({
-    queryKey: ['review-queue'],
+  // Fetch ALL conversations that need reconciliation (training_reviewed = false)
+  const { data: unreviewedQueue = [], isLoading } = useQuery({
+    queryKey: ['reconciliation-queue'],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return [];
@@ -147,24 +145,17 @@ export default function Review() {
       const { data, error } = await supabase
         .from('conversations')
         .select(`
-          id,
-          title,
-          summary_for_human,
-          decision_bucket,
-          why_this_needs_you,
-          triage_confidence,
-          created_at,
-          channel,
-          email_classification,
-          ai_draft_response,
+          id, title, summary_for_human, decision_bucket, why_this_needs_you,
+          triage_confidence, created_at, channel, email_classification,
+          ai_draft_response, ai_reasoning, requires_reply, training_reviewed,
           customer:customers(name, email),
-          messages(body, created_at, raw_payload)
+          messages(body, created_at, raw_payload, actor_name)
         `)
         .eq('workspace_id', userData.workspace_id)
-        .eq('needs_review', true)
-        .is('reviewed_at', null)
+        .eq('training_reviewed', false)
+        .not('email_classification', 'is', null)
         .order('created_at', { ascending: false })
-        .limit(50);
+        .limit(100);
 
       if (error) throw error;
 
@@ -174,12 +165,12 @@ export default function Review() {
         messages: c.messages || [],
       })) as ReviewConversation[];
     },
-    staleTime: 30000,
+    staleTime: 15000,
   });
 
-  // Fetch low-confidence bulk-classified emails
-  const { data: lowConfidenceEmails = [], isLoading: lcLoading } = useQuery({
-    queryKey: ['low-confidence-emails'],
+  // Fetch recently confirmed today
+  const { data: recentlyConfirmed = [] } = useQuery({
+    queryKey: ['reconciliation-confirmed-today'],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return [];
@@ -192,27 +183,105 @@ export default function Review() {
 
       if (!userData?.workspace_id) return [];
 
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+
       const { data, error } = await supabase
-        .from('email_import_queue')
-        .select('id, from_email, subject, body, category, confidence, direction, received_at')
+        .from('conversations')
+        .select(`
+          id, title, summary_for_human, decision_bucket, triage_confidence,
+          created_at, channel, email_classification, training_reviewed,
+          training_reviewed_at,
+          customer:customers(name, email),
+          messages(body, created_at, raw_payload, actor_name)
+        `)
         .eq('workspace_id', userData.workspace_id)
-        .eq('needs_review', true)
-        .not('category', 'is', null)
-        .order('confidence', { ascending: true })
-        .limit(50);
+        .eq('training_reviewed', true)
+        .gte('training_reviewed_at', todayStart.toISOString())
+        .order('training_reviewed_at', { ascending: false })
+        .limit(20);
 
       if (error) throw error;
-      return (data || []) as LowConfidenceEmail[];
+
+      return (data || []).map(c => ({
+        ...c,
+        customer: c.customer?.[0] || null,
+        messages: c.messages || [],
+      })) as ReviewConversation[];
     },
-    staleTime: 30000,
+    staleTime: 15000,
   });
 
-  // Low-confidence correction mutation
-  const lcCorrectionMutation = useMutation({
-    mutationFn: async ({ emailId, correctedCategory, correctedRequiresReply }: {
-      emailId: string;
-      correctedCategory: string;
-      correctedRequiresReply: boolean;
+  // Weekly stats
+  const { data: weeklyStats } = useQuery({
+    queryKey: ['reconciliation-weekly-stats'],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+
+      const { data: userData } = await supabase
+        .from('users')
+        .select('workspace_id')
+        .eq('id', user.id)
+        .single();
+
+      if (!userData?.workspace_id) return null;
+
+      const weekAgo = new Date();
+      weekAgo.setDate(weekAgo.getDate() - 7);
+
+      // Total processed this week
+      const { count: totalProcessed } = await supabase
+        .from('conversations')
+        .select('id', { count: 'exact', head: true })
+        .eq('workspace_id', userData.workspace_id)
+        .not('email_classification', 'is', null)
+        .gte('created_at', weekAgo.toISOString());
+
+      // Auto-handled this week
+      const { count: autoHandled } = await supabase
+        .from('conversations')
+        .select('id', { count: 'exact', head: true })
+        .eq('workspace_id', userData.workspace_id)
+        .eq('decision_bucket', 'auto_handled')
+        .gte('created_at', weekAgo.toISOString());
+
+      // Corrections this week
+      const { count: corrections } = await supabase
+        .from('triage_corrections')
+        .select('id', { count: 'exact', head: true })
+        .eq('workspace_id', userData.workspace_id)
+        .gte('created_at', weekAgo.toISOString());
+
+      const total = totalProcessed || 0;
+      const auto = autoHandled || 0;
+      const corr = corrections || 0;
+      const accuracy = total > 0 ? Math.round(((total - corr) / total) * 100) : 100;
+
+      return {
+        totalProcessed: total,
+        autoHandled: auto,
+        autoHandledPercent: total > 0 ? Math.round((auto / total) * 100) : 0,
+        corrections: corr,
+        accuracy,
+      };
+    },
+    staleTime: 60000,
+  });
+
+  const totalToReview = unreviewedQueue.length;
+  const confirmedTodayCount = confirmedToday.size + recentlyConfirmed.length;
+  const totalItems = totalToReview + confirmedTodayCount;
+  const progressPercent = totalItems > 0 ? Math.round((confirmedTodayCount / totalItems) * 100) : 100;
+
+  const currentConversation = unreviewedQueue[currentIndex] || null;
+
+  // Confirm mutation
+  const confirmMutation = useMutation({
+    mutationFn: async ({ conversationId, newCategory, reason }: {
+      conversationId: string;
+      newCategory?: string;
+      reason?: string;
     }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
@@ -223,67 +292,153 @@ export default function Review() {
         .eq('id', user.id)
         .single();
 
-      if (!userData?.workspace_id) throw new Error('No workspace');
+      const conv = unreviewedQueue.find(c => c.id === conversationId);
+      const senderEmail = conv?.customer?.email;
+      const senderDomain = senderEmail?.split('@')[1];
 
-      const email = lowConfidenceEmails.find(e => e.id === emailId);
-      
-      // Classification corrections migrated to n8n — direct table update
-      const { error: updateError } = await supabase
-        .from('email_import_queue')
-        .update({
-          category: correctedCategory,
-          requires_reply: correctedRequiresReply,
-          needs_review: false,
-          confidence: 0.9,
-        })
-        .eq('id', emailId);
+      // Mark as reviewed
+      const updates: Record<string, any> = {
+        training_reviewed: true,
+        training_reviewed_at: new Date().toISOString(),
+        reviewed_at: new Date().toISOString(),
+        reviewed_by: user.id,
+        needs_review: false,
+      };
 
-      if (updateError) throw updateError;
+      if (newCategory) {
+        updates.email_classification = newCategory;
+        updates.review_outcome = 'changed';
+      } else {
+        updates.review_outcome = 'confirmed';
+      }
 
-      // Log correction for learning
-      await supabase.from('triage_corrections').insert({
-        workspace_id: userData.workspace_id,
-        original_classification: email?.category,
-        new_classification: correctedCategory,
-        corrected_by: user.id,
-        sender_email: email?.from_email,
-        sender_domain: email?.from_email?.split('@')[1],
-      });
+      const { error } = await supabase
+        .from('conversations')
+        .update(updates)
+        .eq('id', conversationId);
 
-      return { siblings_updated: 0, rule_created: false };
+      if (error) throw error;
+
+      // If changed, log correction
+      if (newCategory && userData?.workspace_id) {
+        await supabase.from('triage_corrections').insert({
+          workspace_id: userData.workspace_id,
+          conversation_id: conversationId,
+          original_classification: conv?.email_classification,
+          new_classification: newCategory,
+          corrected_by: user.id,
+          sender_email: senderEmail,
+          sender_domain: senderDomain,
+        });
+
+        // Check for auto-rule creation (3+ corrections from same domain)
+        if (senderDomain) {
+          const { count } = await supabase
+            .from('triage_corrections')
+            .select('id', { count: 'exact', head: true })
+            .eq('sender_domain', senderDomain)
+            .eq('workspace_id', userData.workspace_id);
+
+          if (count && count >= 2) {
+            const { data: existingRule } = await supabase
+              .from('sender_rules')
+              .select('id')
+              .eq('sender_pattern', `@${senderDomain}`)
+              .eq('workspace_id', userData.workspace_id)
+              .single();
+
+            if (!existingRule) {
+              await supabase.from('sender_rules').insert({
+                workspace_id: userData.workspace_id,
+                sender_pattern: `@${senderDomain}`,
+                default_classification: newCategory,
+                skip_llm: true,
+              });
+              return { ruleCreated: true, domain: senderDomain, changed: true, newCategory };
+            }
+          }
+        }
+      }
+
+      // Save teaching data if provided
+      if (senderDomain && userData?.workspace_id && showTeachMore) {
+        const { data: existingRule } = await supabase
+          .from('sender_rules')
+          .select('id')
+          .eq('sender_pattern', `@${senderDomain}`)
+          .eq('workspace_id', userData.workspace_id)
+          .single();
+
+        if (existingRule) {
+          await supabase.from('sender_rules').update({
+            automation_level: automationLevel,
+            tone_preference: tonePreference,
+          }).eq('id', existingRule.id);
+        } else {
+          await supabase.from('sender_rules').insert({
+            workspace_id: userData.workspace_id,
+            sender_pattern: `@${senderDomain}`,
+            automation_level: automationLevel,
+            tone_preference: tonePreference,
+            default_classification: newCategory || conv?.email_classification,
+          });
+        }
+      }
+
+      return { ruleCreated: false, changed: !!newCategory, newCategory };
     },
-    onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ['low-confidence-emails'] });
-      const msg = result?.siblings_updated > 0
-        ? `Corrected! Also fixed ${result.siblings_updated} similar emails.${result.rule_created ? ` Auto-rule created for sender domain.` : ''}`
-        : `Correction saved.${result?.rule_created ? ` Auto-rule created for sender domain.` : ''}`;
-      toast({ title: '✅ Learned', description: msg });
-      setLcIndex(prev => Math.min(prev, lowConfidenceEmails.length - 2));
+    onSuccess: (result, variables) => {
+      // Flash green
+      setConfirmFlashId(variables.conversationId);
+      setTimeout(() => setConfirmFlashId(null), 600);
+
+      // Track locally
+      setConfirmedToday(prev => new Set([...prev, variables.conversationId]));
+
+      queryClient.invalidateQueries({ queryKey: ['reconciliation-queue'] });
+      queryClient.invalidateQueries({ queryKey: ['reconciliation-confirmed-today'] });
+      queryClient.invalidateQueries({ queryKey: ['reconciliation-weekly-stats'] });
+
+      if (result.changed && result.newCategory) {
+        const conv = unreviewedQueue.find(c => c.id === variables.conversationId);
+        const senderName = conv ? getSenderName(conv) : 'this sender';
+        toast({
+          title: '🐝 Learned',
+          description: `Future emails from ${senderName} will be classified as ${result.newCategory.replace(/_/g, ' ')}`,
+          duration: 3000,
+        });
+      } else {
+        celebrateConfirmation();
+      }
+
+      if (result.ruleCreated && result.domain) {
+        celebratePatternLearned(result.domain);
+      }
+
+      // Reset state
+      setShowChangePicker(false);
+      setChangeReason('');
+      setSelectedChangeCategory('');
+      setShowTeachMore(false);
+      setAutomationLevel('auto');
+      setTonePreference('keep_current');
+
+      // Auto-advance
+      const remaining = unreviewedQueue.filter(c => c.id !== variables.conversationId && !confirmedToday.has(c.id));
+      if (remaining.length === 0) {
+        celebrateQueueComplete(confirmedTodayCount + 1);
+      } else {
+        setCurrentIndex(prev => Math.min(prev, remaining.length - 1));
+      }
     },
     onError: () => {
-      toast({ title: 'Error', description: 'Failed to save correction.', variant: 'destructive' });
-    },
-  });
-
-  const lcConfirmMutation = useMutation({
-    mutationFn: async (emailId: string) => {
-      const { error } = await supabase
-        .from('email_import_queue')
-        .update({ needs_review: false, confidence: 0.85 })
-        .eq('id', emailId);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['low-confidence-emails'] });
-      toast({ title: '✅ Confirmed', description: 'Classification confirmed.' });
-      setLcIndex(prev => Math.min(prev, lowConfidenceEmails.length - 2));
+      toast({ title: 'Error', description: 'Failed to save. Please try again.', variant: 'destructive' });
     },
   });
 
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't capture if in input field
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       
       switch (e.key) {
@@ -296,10 +451,9 @@ export default function Review() {
         case 'ArrowDown':
         case 'j':
           e.preventDefault();
-          setCurrentIndex(prev => Math.min(reviewQueue.length - 1, prev + 1));
+          setCurrentIndex(prev => Math.min(unreviewedQueue.length - 1, prev + 1));
           setShowChangePicker(false);
           break;
-        case 'Enter':
         case 'l':
           if (!showChangePicker && currentConversation) {
             e.preventDefault();
@@ -322,688 +476,163 @@ export default function Review() {
             setShowChangePicker(false);
           }
           break;
-        case '1':
-          if (showChangePicker) {
-            e.preventDefault();
-            handleChange('act_now');
-          }
-          break;
-        case '2':
-          if (showChangePicker) {
-            e.preventDefault();
-            handleChange('quick_win');
-          }
-          break;
-        case '3':
-          if (showChangePicker) {
-            e.preventDefault();
-            handleChange('wait');
-          }
-          break;
-        case '4':
-          if (showChangePicker) {
-            e.preventDefault();
-            handleChange('auto_handled');
-          }
-          break;
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [reviewQueue.length, showChangePicker, currentIndex]);
-
-  // Mutation for confirming/changing review with teaching data
-  const reviewMutation = useMutation({
-    mutationFn: async ({ 
-      conversationId, 
-      outcome, 
-      newBucket,
-      teachingData
-    }: { 
-      conversationId: string; 
-      outcome: 'confirmed' | 'changed';
-      newBucket?: string;
-      teachingData?: {
-        automationLevel: AutomationLevel;
-        tonePreference: TonePreference;
-      };
-    }) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
-
-      const updates: Record<string, any> = {
-        reviewed_at: new Date().toISOString(),
-        reviewed_by: user.id,
-        review_outcome: outcome,
-        needs_review: false,
-      };
-
-      if (newBucket) {
-        updates.decision_bucket = newBucket;
-      }
-
-      const { error } = await supabase
-        .from('conversations')
-        .update(updates)
-        .eq('id', conversationId);
-
-      if (error) throw error;
-
-      const currentConv = reviewQueue[currentIndex];
-      const senderEmail = currentConv?.customer?.email;
-      const senderDomain = senderEmail?.split('@')[1];
-
-      // Get workspace ID
-      const { data: userData } = await supabase
-        .from('users')
-        .select('workspace_id')
-        .eq('id', user.id)
-        .single();
-
-      // Log to triage_corrections if changed
-      if (outcome === 'changed' && newBucket) {
-        await supabase.from('triage_corrections').insert({
-          conversation_id: conversationId,
-          original_classification: currentConv?.decision_bucket,
-          new_classification: newBucket,
-          corrected_by: user.id,
-          sender_email: senderEmail,
-          sender_domain: senderDomain,
-          workspace_id: userData?.workspace_id,
-        });
-      }
-
-      // Update or create sender rule with teaching data
-      if (senderDomain && userData?.workspace_id && teachingData) {
-        const { data: existingRule } = await supabase
-          .from('sender_rules')
-          .select('id')
-          .eq('sender_pattern', `@${senderDomain}`)
-          .eq('workspace_id', userData.workspace_id)
-          .single();
-
-        if (existingRule) {
-          await supabase
-            .from('sender_rules')
-            .update({
-              automation_level: teachingData.automationLevel,
-              tone_preference: teachingData.tonePreference,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', existingRule.id);
-        } else {
-          await supabase.from('sender_rules').insert({
-            workspace_id: userData.workspace_id,
-            sender_pattern: `@${senderDomain}`,
-            default_classification: newBucket === 'auto_handled' ? 'automated_notification' : 'customer_inquiry',
-            default_requires_reply: newBucket !== 'auto_handled' && newBucket !== 'wait',
-            automation_level: teachingData.automationLevel,
-            tone_preference: teachingData.tonePreference,
-          });
-        }
-
-        return { ruleCreated: true, domain: senderDomain };
-      }
-
-      // Check if we should create a rule (3+ corrections from same domain)
-      if (outcome === 'changed' && senderDomain && userData?.workspace_id) {
-        const { count } = await supabase
-          .from('triage_corrections')
-          .select('id', { count: 'exact', head: true })
-          .eq('sender_domain', senderDomain)
-          .eq('workspace_id', userData.workspace_id);
-
-        if (count && count >= 3) {
-          const { data: existingRule } = await supabase
-            .from('sender_rules')
-            .select('id')
-            .eq('sender_pattern', `@${senderDomain}`)
-            .eq('workspace_id', userData.workspace_id)
-            .single();
-
-          if (!existingRule) {
-            await supabase.from('sender_rules').insert({
-              workspace_id: userData.workspace_id,
-              sender_pattern: `@${senderDomain}`,
-              default_classification: newBucket === 'auto_handled' ? 'automated_notification' : 'customer_inquiry',
-              default_requires_reply: newBucket !== 'auto_handled' && newBucket !== 'wait',
-            });
-
-            return { ruleCreated: true, domain: senderDomain };
-          }
-        }
-      }
-
-      return { ruleCreated: false };
-    },
-    onSuccess: (result, variables) => {
-      // Mark this conversation as reviewed locally
-      setReviewedIds(prev => new Set([...prev, variables.conversationId]));
-      
-      queryClient.invalidateQueries({ queryKey: ['review-queue'] });
-      queryClient.invalidateQueries({ queryKey: ['sidebar-view-counts'] });
-
-      if (variables.outcome === 'confirmed') {
-        celebrateConfirmation();
-      }
-
-      if (result.ruleCreated && result.domain) {
-        celebratePatternLearned(result.domain);
-      }
-
-      // Reset teaching options
-      setShowTeachMore(false);
-      setAutomationLevel('auto');
-      setTonePreference('keep_current');
-      setShowChangePicker(false);
-
-      // Move to next unreviewed item
-      const nextUnreviewedIndex = reviewQueue.findIndex((conv, idx) => 
-        idx > currentIndex && !reviewedIds.has(conv.id) && conv.id !== variables.conversationId
-      );
-      
-      if (nextUnreviewedIndex !== -1) {
-        setCurrentIndex(nextUnreviewedIndex);
-      } else if (reviewedIds.size + 1 >= reviewQueue.length) {
-        celebrateQueueComplete(reviewQueue.length);
-      }
-    },
-    onError: () => {
-      toast({
-        title: 'Error',
-        description: 'Failed to save review. Please try again.',
-        variant: 'destructive',
-      });
-    },
-  });
-
-  // Batch review mutation
-  const batchReviewMutation = useMutation({
-    mutationFn: async ({ 
-      conversationIds, 
-      outcome, 
-      newBucket 
-    }: { 
-      conversationIds: string[]; 
-      outcome: 'confirmed' | 'changed';
-      newBucket?: string;
-    }) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
-
-      const updates: Record<string, any> = {
-        reviewed_at: new Date().toISOString(),
-        reviewed_by: user.id,
-        review_outcome: outcome,
-        needs_review: false,
-      };
-
-      if (newBucket) {
-        updates.decision_bucket = newBucket;
-      }
-
-      const { error } = await supabase
-        .from('conversations')
-        .update(updates)
-        .in('id', conversationIds);
-
-      if (error) throw error;
-
-      return { count: conversationIds.length };
-    },
-    onSuccess: (result, variables) => {
-      // Mark all as reviewed locally
-      setReviewedIds(prev => {
-        const newSet = new Set(prev);
-        variables.conversationIds.forEach(id => newSet.add(id));
-        return newSet;
-      });
-      
-      // Clear selection
-      setSelectedIds(new Set());
-      setIsMultiSelectMode(false);
-      
-      queryClient.invalidateQueries({ queryKey: ['review-queue'] });
-      queryClient.invalidateQueries({ queryKey: ['sidebar-view-counts'] });
-
-      toast({
-        title: 'Batch review complete',
-        description: `${result.count} items reviewed`,
-      });
-    },
-    onError: () => {
-      toast({
-        title: 'Error',
-        description: 'Failed to batch review. Please try again.',
-        variant: 'destructive',
-      });
-    },
-  });
-
-  const currentConversation = reviewQueue[currentIndex];
-  const reviewedCount = reviewedIds.size;
-  const totalCount = reviewQueue.length;
-  const progress = totalCount > 0 ? (reviewedCount / totalCount) * 100 : 0;
-
-  // Get current domain for batch actions
-  const senderDomain = currentConversation?.customer?.email?.split('@')[1];
-
-  // Get all conversations from the same domain
-  const sameDomainConversations = useMemo(() => {
-    if (!senderDomain) return [];
-    return reviewQueue.filter(conv => 
-      conv.customer?.email?.endsWith(`@${senderDomain}`) && 
-      !reviewedIds.has(conv.id)
-    );
-  }, [reviewQueue, senderDomain, reviewedIds]);
-
-  // Handle multi-select click with shift support
-  const handleItemClick = useCallback((index: number, event: React.MouseEvent) => {
-    if (isMultiSelectMode) {
-      const convId = reviewQueue[index].id;
-      
-      if (event.shiftKey && lastClickedIndex !== null) {
-        // Shift-click: select range
-        const start = Math.min(lastClickedIndex, index);
-        const end = Math.max(lastClickedIndex, index);
-        setSelectedIds(prev => {
-          const newSet = new Set(prev);
-          for (let i = start; i <= end; i++) {
-            newSet.add(reviewQueue[i].id);
-          }
-          return newSet;
-        });
-      } else {
-        // Regular click: toggle selection
-        setSelectedIds(prev => {
-          const newSet = new Set(prev);
-          if (newSet.has(convId)) {
-            newSet.delete(convId);
-          } else {
-            newSet.add(convId);
-          }
-          return newSet;
-        });
-      }
-      setLastClickedIndex(index);
-    } else {
-      setCurrentIndex(index);
-      setShowChangePicker(false);
-    }
-  }, [isMultiSelectMode, lastClickedIndex, reviewQueue]);
-
-  // Toggle item selection
-  const toggleSelection = useCallback((convId: string) => {
-    setSelectedIds(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(convId)) {
-        newSet.delete(convId);
-      } else {
-        newSet.add(convId);
-      }
-      return newSet;
-    });
-  }, []);
-
-  // Select all unreviewed
-  const selectAll = useCallback(() => {
-    const unreviewedIds = reviewQueue
-      .filter(conv => !reviewedIds.has(conv.id))
-      .map(conv => conv.id);
-    setSelectedIds(new Set(unreviewedIds));
-  }, [reviewQueue, reviewedIds]);
-
-  // Clear selection
-  const clearSelection = useCallback(() => {
-    setSelectedIds(new Set());
-    setIsMultiSelectMode(false);
-  }, []);
-
-  // Batch approve all from same domain
-  const handleBatchApproveDomain = useCallback(() => {
-    if (sameDomainConversations.length === 0) return;
-    
-    batchReviewMutation.mutate({
-      conversationIds: sameDomainConversations.map(c => c.id),
-      outcome: 'confirmed',
-    });
-  }, [sameDomainConversations, batchReviewMutation]);
-
-  // Batch mark selected as specific bucket
-  const handleBatchAction = useCallback((bucket: string) => {
-    if (selectedIds.size === 0) return;
-    
-    batchReviewMutation.mutate({
-      conversationIds: Array.from(selectedIds),
-      outcome: 'changed',
-      newBucket: bucket,
-    });
-  }, [selectedIds, batchReviewMutation]);
-
-  // Batch confirm selected
-  const handleBatchConfirm = useCallback(() => {
-    if (selectedIds.size === 0) return;
-    
-    batchReviewMutation.mutate({
-      conversationIds: Array.from(selectedIds),
-      outcome: 'confirmed',
-    });
-  }, [selectedIds, batchReviewMutation]);
+  }, [unreviewedQueue.length, showChangePicker, currentIndex, currentConversation]);
 
   const handleConfirm = useCallback(() => {
     if (!currentConversation) return;
-    
-    const hasTeachingData = showTeachMore && (automationLevel !== 'auto' || tonePreference !== 'keep_current');
-    
-    reviewMutation.mutate({
-      conversationId: currentConversation.id,
-      outcome: 'confirmed',
-      teachingData: hasTeachingData ? { automationLevel, tonePreference } : undefined,
-    });
-  }, [currentConversation, showTeachMore, automationLevel, tonePreference, reviewMutation]);
+    confirmMutation.mutate({ conversationId: currentConversation.id });
+  }, [currentConversation, confirmMutation]);
 
-  const handleChange = useCallback((newBucket: string) => {
-    if (!currentConversation) return;
-    
-    const hasTeachingData = showTeachMore && (automationLevel !== 'auto' || tonePreference !== 'keep_current');
-    
-    reviewMutation.mutate({
+  const handleChange = useCallback(() => {
+    if (!currentConversation || !selectedChangeCategory) return;
+    confirmMutation.mutate({
       conversationId: currentConversation.id,
-      outcome: 'changed',
-      newBucket,
-      teachingData: hasTeachingData ? { automationLevel, tonePreference } : undefined,
+      newCategory: selectedChangeCategory,
+      reason: changeReason,
     });
-  }, [currentConversation, showTeachMore, automationLevel, tonePreference, reviewMutation]);
+  }, [currentConversation, selectedChangeCategory, changeReason, confirmMutation]);
 
   const handleSkip = useCallback(() => {
-    if (currentIndex < reviewQueue.length - 1) {
+    if (currentIndex < unreviewedQueue.length - 1) {
       setCurrentIndex(prev => prev + 1);
       setShowChangePicker(false);
-      setShowTeachMore(false);
     }
-  }, [currentIndex, reviewQueue.length]);
+  }, [currentIndex, unreviewedQueue.length]);
 
-  // Empty state - Celebration when training is complete
-  if (!isLoading && reviewQueue.length === 0) {
-    if (isMobile) {
+  // Sender patterns for selected conversation
+  const selectedSenderDomain = currentConversation?.customer?.email?.split('@')[1];
+  const senderEmailCount = selectedSenderDomain
+    ? unreviewedQueue.filter(c => c.customer?.email?.endsWith(`@${selectedSenderDomain}`)).length
+    : 0;
+  const senderClassifications = selectedSenderDomain
+    ? unreviewedQueue
+        .filter(c => c.customer?.email?.endsWith(`@${selectedSenderDomain}`))
+        .map(c => c.email_classification)
+        .filter(Boolean)
+    : [];
+  const dominantClassification = senderClassifications.length > 0
+    ? senderClassifications.sort((a, b) =>
+        senderClassifications.filter(v => v === b).length - senderClassifications.filter(v => v === a).length
+      )[0]
+    : null;
+
+  // Confidence helpers
+  const confidencePercent = currentConversation?.triage_confidence != null
+    ? Math.round(currentConversation.triage_confidence * 100)
+    : null;
+  const confidenceColor = confidencePercent != null
+    ? confidencePercent >= 90 ? 'text-green-600' : confidencePercent >= 70 ? 'text-amber-500' : 'text-red-500'
+    : 'text-muted-foreground';
+  const confidenceBarColor = confidencePercent != null
+    ? confidencePercent >= 90 ? 'bg-green-500' : confidencePercent >= 70 ? 'bg-amber-500' : 'bg-red-500'
+    : 'bg-muted';
+
+  // All caught up state
+  const allCaughtUp = !isLoading && unreviewedQueue.length === 0;
+
+  // ============ MOBILE ============
+  if (isMobile) {
+    if (allCaughtUp) {
       return (
         <div className="flex flex-col h-screen bg-background overflow-hidden">
-          <MobileHeader 
-            onMenuClick={() => setSidebarOpen(true)}
-          />
-          <MobileSidebarSheet
-            open={sidebarOpen}
-            onOpenChange={setSidebarOpen}
-            onNavigate={() => setSidebarOpen(false)}
-          />
+          <MobileHeader onMenuClick={() => setSidebarOpen(true)} />
+          <MobileSidebarSheet open={sidebarOpen} onOpenChange={setSidebarOpen} onNavigate={() => setSidebarOpen(false)} />
           <div className="flex-1 flex items-center justify-center p-6">
             <div className="text-center max-w-xs">
-              <div className="w-16 h-16 bg-gradient-to-br from-green-100 to-emerald-100 dark:from-green-900/30 dark:to-emerald-900/30 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg shadow-green-500/10">
-                <Sparkles className="h-8 w-8 text-green-600" />
+              <div className="w-16 h-16 bg-gradient-to-br from-green-100 to-emerald-100 dark:from-green-900/30 dark:to-emerald-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                <PartyPopper className="h-8 w-8 text-green-600" />
               </div>
-              <h2 className="text-lg font-semibold mb-2">BizzyBee is confident!</h2>
-              <p className="text-sm text-muted-foreground break-words">
-                No messages need training right now. BizzyBee is handling emails automatically.
-              </p>
+              <h2 className="text-lg font-semibold mb-2">All caught up! 🎉</h2>
+              <p className="text-sm text-muted-foreground">BizzyBee classified {weeklyStats?.totalProcessed || 0} emails with {weeklyStats?.accuracy || 100}% accuracy this week.</p>
             </div>
           </div>
         </div>
       );
     }
 
-    return (
-      <div className="flex h-screen bg-background">
-        <Sidebar />
-        <div className="flex-1 flex flex-col">
-          <div className="p-4 border-b">
-            <BackButton to="/" label="Home" />
-          </div>
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center max-w-md px-6">
-              <div className="w-20 h-20 bg-gradient-to-br from-green-100 to-emerald-100 dark:from-green-900/30 dark:to-emerald-900/30 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-green-500/10">
-                <Sparkles className="h-10 w-10 text-green-600" />
-              </div>
-              <h2 className="text-2xl font-semibold mb-3">🎉 BizzyBee is confident!</h2>
-              <p className="text-muted-foreground mb-2">
-                There are no messages that need training right now.
-              </p>
-              <p className="text-sm text-muted-foreground">
-                BizzyBee is automatically handling routine emails based on what it has learned from you.
-                You'll only see messages here when BizzyBee wants to double-check something new.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Mobile layout
-  if (isMobile) {
     const conv = currentConversation;
     const rawEmailBody = conv?.messages?.[0]?.raw_payload?.body || conv?.messages?.[0]?.body || '';
-    const emailBody = stripHtml(rawEmailBody);
-    
-    // Mobile Detail View
+    const emailBody = cleanEmailContent(stripHtml(rawEmailBody));
+
     if (mobileShowDetail && conv) {
       return (
         <div className="flex flex-col h-screen bg-background overflow-hidden">
-          <MobileHeader 
-            onMenuClick={() => setSidebarOpen(true)}
-            showBackButton
-            onBackClick={() => setMobileShowDetail(false)}
-            backToText="Back"
-          />
-          <MobileSidebarSheet
-            open={sidebarOpen}
-            onOpenChange={setSidebarOpen}
-            onNavigate={() => setSidebarOpen(false)}
-          />
-          
-          {/* Detail content */}
+          <MobileHeader onMenuClick={() => setSidebarOpen(true)} showBackButton onBackClick={() => setMobileShowDetail(false)} backToText="Back" />
+          <MobileSidebarSheet open={sidebarOpen} onOpenChange={setSidebarOpen} onNavigate={() => setSidebarOpen(false)} />
           <div className="flex-1 overflow-y-auto">
             <div className="p-4 space-y-4">
-              {/* Header */}
               <div>
-                <h2 className="font-semibold text-base break-words">
-                  {conv.customer?.name || conv.customer?.email || 'Unknown Sender'}
-                </h2>
-                <p className="text-xs text-muted-foreground">{conv.customer?.email || 'No email'}</p>
+                <h2 className="font-semibold text-base">{getSenderName(conv)}</h2>
+                <p className="text-xs text-muted-foreground">{getSenderEmail(conv)}</p>
               </div>
-              
-              {/* Title */}
               <div>
-                <h3 className="font-medium text-sm break-words">{conv.title}</h3>
+                <h3 className="font-medium text-sm">{conv.title}</h3>
               </div>
-              
-              {/* Email content preview */}
               <Card className="p-3">
-                <p className="text-sm text-muted-foreground whitespace-pre-wrap break-words line-clamp-6">
-                  {emailBody}
-                </p>
-                {emailBody.length > 300 && (
-                  <Button variant="link" size="sm" className="p-0 h-auto mt-2 text-xs">
-                    View full message
-                  </Button>
-                )}
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap line-clamp-6">{emailBody}</p>
               </Card>
-              
-              {/* AI Draft section */}
-              {conv.ai_draft_response && (
-                <Card className="p-3 bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Sparkles className="h-4 w-4 text-green-600" />
-                    <span className="text-sm font-medium text-green-700 dark:text-green-400">AI draft ready</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground break-words line-clamp-3">
-                    {conv.ai_draft_response}
-                  </p>
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
-                    className="mt-2 w-full"
-                    onClick={() => setShowDraftEditor(true)}
-                  >
-                    <FileEdit className="h-3.5 w-3.5 mr-1.5" />
-                    Edit & Send Reply
-                  </Button>
-                </Card>
-              )}
-              
-              {/* BizzyBee thinks */}
-              <Card className="p-3 bg-purple-50 dark:bg-purple-950/30 border-purple-200 dark:border-purple-800">
-                <div className="flex items-center gap-2 mb-2">
-                  <Sparkles className="h-4 w-4 text-purple-600" />
-                  <span className="text-sm font-medium text-purple-700 dark:text-purple-400">BizzyBee thinks:</span>
-                </div>
-                <div className="flex flex-wrap gap-1.5 mb-2">
-                  <Badge className={cn("text-xs", bucketColors[conv.decision_bucket || 'wait'])}>
-                    {bucketLabels[conv.decision_bucket || 'wait']}
-                  </Badge>
-                  {conv.email_classification && (
-                    <Badge variant="outline" className="text-xs">
-                      {conv.email_classification.replace(/_/g, ' ')}
-                    </Badge>
+              {conv.email_classification && (
+                <div className="flex items-center gap-2">
+                  <CategoryLabel classification={conv.email_classification} size="md" />
+                  {confidencePercent != null && (
+                    <span className={cn("text-sm font-semibold", confidenceColor)}>{confidencePercent}%</span>
                   )}
                 </div>
-                {conv.why_this_needs_you && (
-                  <p className="text-xs text-muted-foreground break-words">
-                    {conv.why_this_needs_you}
-                  </p>
-                )}
-              </Card>
+              )}
             </div>
           </div>
-          
-          {/* Fixed bottom action bar */}
           <div className="flex-shrink-0 border-t bg-background p-4 space-y-2">
-            <div className="flex gap-2">
-              <Button 
-                className="flex-1 h-11"
-                onClick={handleConfirm}
-                disabled={reviewMutation.isPending}
-              >
-                <Check className="h-4 w-4 mr-1.5" />
-                Confirm
-              </Button>
-              <Button 
-                variant="outline"
-                className="flex-1 h-11"
-                onClick={() => setShowChangePicker(true)}
-              >
-                Change
-              </Button>
-            </div>
-            <Button 
-              variant="ghost" 
-              size="sm"
-              className="w-full"
-              onClick={handleSkip}
-            >
-              <SkipForward className="h-4 w-4 mr-1.5" />
-              Skip for now
+            <Button className="w-full h-12 bg-purple-600 hover:bg-purple-700 text-white text-base font-semibold shadow-sm rounded-lg" onClick={handleConfirm} disabled={confirmMutation.isPending}>
+              <Check className="h-5 w-5 mr-2" />Confirm Correct
             </Button>
-          </div>
-          
-          {/* Change picker bottom sheet */}
-          {showChangePicker && (
-            <div className="fixed inset-0 bg-black/50 z-50 flex items-end" onClick={() => setShowChangePicker(false)}>
-              <div 
-                className="bg-background w-full rounded-t-2xl p-4 space-y-3 max-h-[60vh] overflow-y-auto"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-semibold">Change classification</h3>
-                  <Button variant="ghost" size="sm" onClick={() => setShowChangePicker(false)}>
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-                {Object.entries(bucketLabels).map(([bucket, label]) => (
-                  <Button
-                    key={bucket}
-                    variant="outline"
-                    className="w-full justify-start h-12"
-                    onClick={() => { handleChange(bucket); setMobileShowDetail(false); }}
-                    disabled={reviewMutation.isPending}
-                  >
-                    <Badge className={cn("mr-2", bucketColors[bucket])}>{label}</Badge>
-                  </Button>
-                ))}
-              </div>
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1 bg-white border border-amber-200 text-amber-700 hover:bg-amber-50 shadow-sm rounded-lg" onClick={() => setShowChangePicker(true)}>
+                <Pencil className="h-4 w-4 mr-1.5" />Change
+              </Button>
+              <Button variant="ghost" className="text-muted-foreground" onClick={handleSkip}>
+                <SkipForward className="h-4 w-4 mr-1.5" />Skip
+              </Button>
             </div>
-          )}
+          </div>
         </div>
       );
     }
-    
-    // Mobile List View
+
+    // Mobile List
     return (
       <div className="flex flex-col h-screen bg-background overflow-hidden">
-        <MobileHeader 
-          onMenuClick={() => setSidebarOpen(true)}
-        />
-        <MobileSidebarSheet
-          open={sidebarOpen}
-          onOpenChange={setSidebarOpen}
-          onNavigate={() => setSidebarOpen(false)}
-        />
-        
-        {/* Mobile Header with progress */}
+        <MobileHeader onMenuClick={() => setSidebarOpen(true)} />
+        <MobileSidebarSheet open={sidebarOpen} onOpenChange={setSidebarOpen} onNavigate={() => setSidebarOpen(false)} />
         <div className="px-4 py-3 border-b bg-card/50 flex-shrink-0">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="p-2 rounded-xl bg-purple-500/10 flex-shrink-0">
-              <Sparkles className="h-5 w-5 text-purple-500" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h1 className="text-base font-semibold truncate">Teach BizzyBee</h1>
-              <p className="text-xs text-muted-foreground">
-                {totalCount - reviewedCount} examples remaining
-              </p>
-            </div>
+          <div className="flex items-center justify-between mb-2">
+            <h1 className="text-base font-semibold">AI Reconciliation</h1>
+            <span className="text-xs text-muted-foreground">{confirmedTodayCount} of {totalItems} reconciled</span>
           </div>
-          <Progress value={progress} className="h-1.5" />
+          <Progress value={progressPercent} className="h-2 [&>div]:bg-purple-600" />
         </div>
-
-        {/* Mobile Queue List */}
         <div className="flex-1 overflow-y-auto">
           <div className="p-3 space-y-2">
-            {reviewQueue.map((conv, idx) => {
-              const isReviewed = reviewedIds.has(conv.id);
-              
+            {unreviewedQueue.map((conv, idx) => {
+              const conf = conv.triage_confidence != null ? Math.round(conv.triage_confidence * 100) : null;
+              const confColor = conf != null ? (conf >= 90 ? 'text-green-600' : conf >= 70 ? 'text-amber-500' : 'text-red-500') : '';
               return (
-                <Card 
-                  key={conv.id}
-                  className={cn(
-                    "p-3 cursor-pointer transition-all border active:scale-[0.98]",
-                    isReviewed && "opacity-50 bg-muted/30"
-                  )}
-                  onClick={() => {
-                    setCurrentIndex(idx);
-                    setMobileShowDetail(true);
-                  }}
-                >
+                <Card key={conv.id} className="p-3 cursor-pointer transition-all active:scale-[0.98]" onClick={() => { setCurrentIndex(idx); setMobileShowDetail(true); }}>
                   <div className="flex items-start gap-3">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm break-words">
-                        {conv.customer?.name || conv.customer?.email || 'Unknown'}
-                      </p>
-                      <p className="text-xs text-muted-foreground break-words line-clamp-2 mt-0.5">
-                        {conv.title || conv.summary_for_human}
-                      </p>
+                    <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <span className="text-xs font-semibold text-primary">{getSenderName(conv)[0]?.toUpperCase()}</span>
                     </div>
-                    <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                      <Badge 
-                        variant="outline" 
-                        className={cn("text-xs", bucketColors[conv.decision_bucket || 'wait'])}
-                      >
-                        {bucketLabels[conv.decision_bucket || 'wait']}
-                      </Badge>
-                      {conv.ai_draft_response && (
-                        <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
-                          Draft ready
-                        </Badge>
-                      )}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-sm">{getSenderName(conv)}</p>
+                      <p className="text-xs text-muted-foreground truncate">{conv.title}</p>
+                    </div>
+                    <div className="flex flex-col items-end gap-1">
+                      {conv.email_classification && <CategoryLabel classification={conv.email_classification} size="xs" showIcon={false} />}
+                      {conf != null && <span className={cn("text-xs font-bold", confColor)}>{conf}%</span>}
                     </div>
                   </div>
                 </Card>
@@ -1015,583 +644,496 @@ export default function Review() {
     );
   }
 
-  // Desktop layout
-  return (
-    <div className="flex h-screen bg-background">
-      <Sidebar />
-      <div className="flex-1 flex flex-col">
-        {/* Header */}
-        <div className="border-b px-6 py-4">
-          <div className="flex items-center justify-between mb-1">
-            <div className="flex items-center gap-3">
-              <BackButton to="/" label="Home" />
-              <Sparkles className="h-5 w-5 text-purple-500" />
-              <div>
-                <h1 className="text-xl font-semibold">Teach BizzyBee ✨</h1>
-                <p className="text-sm text-muted-foreground">Your feedback helps BizzyBee work more independently over time</p>
+  // ============ DESKTOP — ALL CAUGHT UP ============
+  if (allCaughtUp) {
+    return (
+      <div className="flex h-screen bg-slate-50/50">
+        <Sidebar />
+      <div className="flex-1 flex flex-col items-center justify-center">
+          <div className="text-center max-w-md px-6 animate-fade-in">
+            <div className="w-24 h-24 bg-gradient-to-br from-emerald-50 to-emerald-100/50 rounded-full flex items-center justify-center mx-auto mb-6 ring-8 ring-emerald-50/50">
+              <Sparkles className="w-10 h-10 text-emerald-500" />
+            </div>
+            <h2 className="text-2xl font-bold text-slate-900 tracking-tight">You're all caught up!</h2>
+            <p className="text-muted-foreground mb-6">
+              BizzyBee classified <strong>{weeklyStats?.totalProcessed || 0}</strong> emails with <strong className="text-purple-600">{weeklyStats?.accuracy || 100}%</strong> accuracy this week.
+            </p>
+
+            {weeklyStats && (
+              <div className="grid grid-cols-2 gap-3 text-left mb-6">
+                <Card className="p-4 bg-card">
+                  <p className="text-2xl font-bold">{weeklyStats.totalProcessed}</p>
+                  <p className="text-xs text-muted-foreground">Emails processed</p>
+                </Card>
+                <Card className="p-4 bg-card">
+                  <p className="text-2xl font-bold text-green-600">{weeklyStats.autoHandled}</p>
+                  <p className="text-xs text-muted-foreground">Auto-handled ({weeklyStats.autoHandledPercent}%)</p>
+                </Card>
+                <Card className="p-4 bg-card">
+                  <p className="text-2xl font-bold text-amber-600">{weeklyStats.corrections}</p>
+                  <p className="text-xs text-muted-foreground">Your corrections</p>
+                </Card>
+                <Card className="p-4 bg-card">
+                  <div className="flex items-center gap-2">
+                    <p className="text-2xl font-bold text-green-600">{weeklyStats.accuracy}%</p>
+                    <TrendingUp className="h-4 w-4 text-green-500" />
+                  </div>
+                  <p className="text-xs text-muted-foreground">Current accuracy</p>
+                </Card>
               </div>
-              <ReviewExplainer />
-            </div>
-            <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
-              <Keyboard className="h-3.5 w-3.5" />
-              <span>↑↓ navigate • L confirm • H change • S skip</span>
-            </div>
-          </div>
-          <div className="flex items-center gap-4 mt-3">
-            <Progress value={activeTab === 'triage' ? progress : 0} className="flex-1 h-2" />
-            <span className="text-sm text-muted-foreground whitespace-nowrap">
-              {activeTab === 'triage' 
-                ? `${totalCount - reviewedCount} training examples remaining`
-                : `${lowConfidenceEmails.length} low-confidence items`
-              }
-            </span>
-          </div>
-          {/* Tabs */}
-          <div className="flex gap-1 mt-3">
-            <Button
-              variant={activeTab === 'triage' ? 'default' : 'ghost'}
-              size="sm"
-              className="h-7 text-xs"
-              onClick={() => setActiveTab('triage')}
-            >
-              <Eye className="h-3 w-3 mr-1" />
-              Triage Review
-              {reviewQueue.length > 0 && (
-                <Badge variant="secondary" className="ml-1.5 h-4 px-1 text-[10px]">{reviewQueue.length}</Badge>
-              )}
-            </Button>
-            <Button
-              variant={activeTab === 'low_confidence' ? 'default' : 'ghost'}
-              size="sm"
-              className="h-7 text-xs"
-              onClick={() => setActiveTab('low_confidence')}
-            >
-              <Bot className="h-3 w-3 mr-1" />
-              Low Confidence
-              {lowConfidenceEmails.length > 0 && (
-                <Badge variant="secondary" className="ml-1.5 h-4 px-1 text-[10px]">{lowConfidenceEmails.length}</Badge>
-              )}
+            )}
+
+            <Button variant="outline" onClick={() => navigate('/')}>
+              Back to Inbox
             </Button>
           </div>
         </div>
+      </div>
+    );
+  }
 
-        {/* Low Confidence Tab */}
-        {activeTab === 'low_confidence' && (
-          <div className="flex-1 flex overflow-hidden">
-            {/* Left: Low-confidence list */}
-            <div className="w-72 border-r flex-shrink-0 flex flex-col bg-muted/20">
-              <div className="px-3 py-2 border-b bg-muted/30">
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Low Confidence Emails
-                </span>
+  // ============ DESKTOP — 3-COLUMN RECONCILIATION ============
+  const selectedEmailBody = currentConversation
+    ? cleanEmailContent(stripHtml(currentConversation.messages?.[0]?.raw_payload?.body || currentConversation.messages?.[0]?.body || ''))
+    : '';
+
+  return (
+    <div className="flex h-screen bg-slate-50/50">
+      <Sidebar />
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Top Bar */}
+        <div className="px-6 py-2.5 flex-shrink-0 flex items-center justify-between bg-white/80 backdrop-blur-sm border-b border-slate-100">
+          <div className="flex items-center gap-3">
+            <BackButton to="/" label="Home" />
+            <h1 className="text-base font-semibold">AI Reconciliation</h1>
+            <Sparkles className="h-4 w-4 text-purple-500" />
+          </div>
+          <div className="flex items-center gap-4">
+            {weeklyStats && (
+              <div className="flex items-center gap-1.5 text-sm">
+                <Trophy className="h-3.5 w-3.5 text-purple-500" />
+                <span className="text-muted-foreground">Accuracy:</span>
+                <span className="font-bold text-purple-600">{weeklyStats.accuracy}%</span>
+                <span className="text-muted-foreground text-xs">this week</span>
               </div>
-              <ScrollArea className="flex-1">
-                {lcLoading ? (
-                  <div className="p-4 text-center text-muted-foreground animate-pulse">Loading...</div>
-                ) : lowConfidenceEmails.length === 0 ? (
-                  <div className="p-4 text-center text-muted-foreground text-sm">
-                    No low-confidence emails to review
-                  </div>
-                ) : (
-                  lowConfidenceEmails.map((email, idx) => (
-                    <div
-                      key={email.id}
-                      className={cn(
-                        "px-3 py-2.5 border-b cursor-pointer transition-colors",
-                        idx === lcIndex ? "bg-accent" : "hover:bg-muted/50"
-                      )}
-                      onClick={() => setLcIndex(idx)}
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-medium truncate max-w-[160px]">
-                          {email.from_email || 'Unknown'}
-                        </span>
-                        <Badge variant="outline" className="text-[10px] px-1 h-4">
-                          {Math.round((email.confidence || 0) * 100)}%
-                        </Badge>
-                      </div>
-                      <p className="text-xs text-muted-foreground truncate">{email.subject || '(no subject)'}</p>
-                      <Badge variant="secondary" className="text-[10px] mt-1">{email.category}</Badge>
-                    </div>
-                  ))
-                )}
-              </ScrollArea>
-            </div>
-
-            {/* Right: Detail + actions */}
-            <div className="flex-1 flex flex-col overflow-hidden">
-              {lowConfidenceEmails[lcIndex] ? (() => {
-                const lcEmail = lowConfidenceEmails[lcIndex];
-                return (
-                  <>
-                    <div className="p-6 border-b">
-                      <div className="flex items-center justify-between mb-2">
-                        <div>
-                          <h2 className="font-semibold text-lg">{lcEmail.subject || '(no subject)'}</h2>
-                          <p className="text-sm text-muted-foreground">From: {lcEmail.from_email}</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline">
-                            AI classified: <span className="font-semibold ml-1">{lcEmail.category}</span>
-                          </Badge>
-                          <Badge variant="secondary">
-                            {Math.round((lcEmail.confidence || 0) * 100)}% confident
-                          </Badge>
-                        </div>
-                      </div>
-                    </div>
-                    <ScrollArea className="flex-1 p-6">
-                      <div className="max-w-2xl">
-                        <p className="text-sm whitespace-pre-wrap">{(lcEmail.body || '').substring(0, 1000)}</p>
-                      </div>
-                    </ScrollArea>
-                    <div className="border-t p-4 flex items-center gap-3">
-                      <Button
-                        onClick={() => lcConfirmMutation.mutate(lcEmail.id)}
-                        disabled={lcConfirmMutation.isPending}
-                        className="gap-1.5"
-                      >
-                        <Check className="h-4 w-4" />
-                        Looks right
-                      </Button>
-                      <div className="flex items-center gap-1.5 ml-2">
-                        <span className="text-sm text-muted-foreground">Change to:</span>
-                        {['inquiry', 'booking', 'quote', 'complaint', 'follow_up', 'spam', 'notification', 'personal'].filter(c => c !== lcEmail.category).map(cat => (
-                          <Button
-                            key={cat}
-                            variant="outline"
-                            size="sm"
-                            className="h-7 text-xs"
-                            onClick={() => lcCorrectionMutation.mutate({
-                              emailId: lcEmail.id,
-                              correctedCategory: cat,
-                              correctedRequiresReply: !['spam', 'notification'].includes(cat),
-                            })}
-                            disabled={lcCorrectionMutation.isPending}
-                          >
-                            {cat.replace('_', ' ')}
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
-                  </>
-                );
-              })() : (
-                <div className="flex-1 flex items-center justify-center text-muted-foreground">
-                  No low-confidence emails to review
-                </div>
-              )}
+            )}
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">
+                <strong className="text-purple-600">{confirmedTodayCount}</strong> of <strong>{totalItems}</strong> reconciled
+              </span>
+              <div className="w-24">
+                <Progress value={progressPercent} className="h-2 [&>div]:bg-purple-600" />
+              </div>
             </div>
           </div>
-        )}
+        </div>
 
-        {/* Triage Review - Split panel layout */}
-        {activeTab === 'triage' && <div className="flex-1 flex overflow-hidden">
-          {/* Left: Queue list */}
-          <div className="w-72 border-r flex-shrink-0 flex flex-col bg-muted/20">
-            {/* Queue header with batch actions */}
-            <div className="px-3 py-2 border-b bg-muted/30 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Training Queue
-                </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 px-2 text-xs"
-                  onClick={() => {
-                    setIsMultiSelectMode(!isMultiSelectMode);
-                    if (isMultiSelectMode) {
-                      setSelectedIds(new Set());
-                    }
-                  }}
-                >
-                  {isMultiSelectMode ? (
-                    <>
-                      <X className="h-3 w-3 mr-1" />
-                      Cancel
-                    </>
-                  ) : (
-                    <>
-                      <CheckCheck className="h-3 w-3 mr-1" />
-                      Select
-                    </>
-                  )}
-                </Button>
-              </div>
-
-              {/* Multi-select mode actions */}
-              {isMultiSelectMode && (
-                <div className="flex flex-wrap gap-1">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-6 px-2 text-xs"
-                    onClick={selectAll}
-                  >
-                    Select all
-                  </Button>
-                  {selectedIds.size > 0 && (
-                    <>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-6 px-2 text-xs bg-green-50 hover:bg-green-100 text-green-700 border-green-200"
-                        onClick={handleBatchConfirm}
-                        disabled={batchReviewMutation.isPending}
-                      >
-                        <Check className="h-3 w-3 mr-1" />
-                        Approve ({selectedIds.size})
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-6 px-2 text-xs"
-                        onClick={() => handleBatchAction('auto_handled')}
-                        disabled={batchReviewMutation.isPending}
-                      >
-                        Mark done ({selectedIds.size})
-                      </Button>
-                    </>
-                  )}
-                </div>
-              )}
-
-              {/* Domain batch action */}
-              {!isMultiSelectMode && senderDomain && sameDomainConversations.length > 1 && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full h-7 text-xs justify-start"
-                  onClick={handleBatchApproveDomain}
-                  disabled={batchReviewMutation.isPending}
-                >
-                  <CheckCheck className="h-3 w-3 mr-1.5" />
-                  Approve all from @{senderDomain} ({sameDomainConversations.length})
-                </Button>
-              )}
+        {/* 3-Column Layout */}
+        <div className="flex-1 flex overflow-hidden gap-4 p-4">
+          {/* Column 1: Reconciliation Queue (350px) */}
+          <div className="w-[350px] min-w-[350px] flex-shrink-0 flex flex-col bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="px-3 py-2 border-b border-slate-100">
+              <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">
+                Reconciliation Queue
+              </span>
             </div>
 
-            {/* Smart batch actions */}
-            {!isMultiSelectMode && (
-              <SmartBatchActions
-                reviewQueue={reviewQueue}
-                reviewedIds={reviewedIds}
-                onBatchApprove={(ids) => {
-                  batchReviewMutation.mutate({
-                    conversationIds: ids,
-                    outcome: 'confirmed',
-                  });
-                }}
-                isPending={batchReviewMutation.isPending}
-              />
-            )}
             <ScrollArea className="flex-1">
-              {isLoading ? (
-                <div className="p-4 text-center text-muted-foreground animate-pulse">
-                  Loading...
-                </div>
-              ) : (
-                reviewQueue.map((conv, idx) => (
-                  <ReviewQueueItem
-                    key={conv.id}
-                    conversation={conv}
-                    isActive={idx === currentIndex && !isMultiSelectMode}
-                    isReviewed={reviewedIds.has(conv.id)}
-                    isSelected={selectedIds.has(conv.id)}
-                    isMultiSelectMode={isMultiSelectMode}
-                    onClick={(e) => handleItemClick(idx, e)}
-                    onToggleSelect={() => toggleSelection(conv.id)}
-                  />
-                ))
+              {/* To Review section */}
+              {unreviewedQueue.length > 0 && (
+                <>
+                  <div className="px-3 py-1.5 bg-purple-50/80 border-b border-slate-100 sticky top-0 z-10">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700 dark:text-purple-400">
+                      To Review ({unreviewedQueue.length})
+                    </span>
+                  </div>
+                  {unreviewedQueue.map((conv, idx) => {
+                    const conf = conv.triage_confidence != null ? Math.round(conv.triage_confidence * 100) : null;
+                    const confColor = conf != null ? (conf >= 90 ? 'text-green-600' : conf >= 70 ? 'text-amber-500' : 'text-red-500') : '';
+                    const isFlashing = confirmFlashId === conv.id;
+
+                    return (
+                      <div
+                        key={conv.id}
+                        onClick={() => { setCurrentIndex(idx); setShowChangePicker(false); }}
+                        className={cn(
+                         "px-3 py-2.5 cursor-pointer border-b border-slate-100 transition-all",
+                          "hover:bg-slate-50",
+                          idx === currentIndex && "bg-white shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] ring-1 ring-slate-900/5",
+                          isFlashing && "bg-green-100 dark:bg-green-900/40 transition-colors duration-300"
+                        )}
+                      >
+                        <div className="flex items-center gap-2">
+                          <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                            <span className="text-xs font-bold text-primary">
+                              {getSenderName(conv)[0]?.toUpperCase() || '?'}
+                            </span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <span className={cn("text-sm truncate block font-semibold")}>
+                              {getSenderName(conv)}
+                            </span>
+                          </div>
+                          {conf != null && (
+                            <span className={cn("text-[11px] font-bold flex-shrink-0 tabular-nums", confColor)}>{conf}%</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5 mt-0.5 pl-9">
+                          <p className="text-xs text-muted-foreground truncate flex-1">
+                            {conv.title || 'No subject'}
+                          </p>
+                          {conv.email_classification && (
+                            <CategoryLabel classification={conv.email_classification} size="xs" showIcon={false} />
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </>
+              )}
+
+              {/* Confirmed Today section (collapsed) */}
+              {recentlyConfirmed.length > 0 && (
+                <Collapsible open={showConfirmedSection} onOpenChange={setShowConfirmedSection}>
+                  <CollapsibleTrigger asChild>
+                   <button className="w-full px-3 py-1.5 bg-slate-50 border-b border-t border-slate-100 flex items-center justify-between sticky top-0 z-10 hover:bg-slate-100 transition-colors">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600">
+                        Confirmed ({recentlyConfirmed.length})
+                      </span>
+                      {showConfirmedSection ? <ChevronDown className="h-3 w-3 text-slate-500" /> : <ChevronRight className="h-3 w-3 text-slate-500" />}
+                    </button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    {recentlyConfirmed.map((conv) => (
+                      <div key={conv.id} className="px-3 py-2 border-b border-border/30 opacity-60">
+                        <div className="flex items-center gap-2">
+                          <Check className="h-3.5 w-3.5 text-green-600 flex-shrink-0" />
+                          <div className="h-6 w-6 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                            <span className="text-[10px] font-semibold text-muted-foreground">
+                              {getSenderName(conv)[0]?.toUpperCase()}
+                            </span>
+                          </div>
+                          <span className="text-xs truncate flex-1 text-muted-foreground">{getSenderName(conv)}</span>
+                          {conv.email_classification && (
+                            <CategoryLabel classification={conv.email_classification} size="xs" showIcon={false} />
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </CollapsibleContent>
+                </Collapsible>
+              )}
+
+              {unreviewedQueue.length === 0 && recentlyConfirmed.length === 0 && !isLoading && (
+                <div className="p-4 text-center text-muted-foreground text-sm">No emails to reconcile</div>
               )}
             </ScrollArea>
           </div>
 
-          {/* Right: Detail + Decision */}
-          <div className="flex-1 flex flex-col overflow-hidden">
-            {isLoading ? (
-              <div className="flex-1 flex items-center justify-center">
-                <div className="animate-pulse text-muted-foreground">Loading...</div>
-              </div>
-            ) : currentConversation ? (
-              <div className="flex-1 flex flex-col overflow-y-auto p-6">
-                <Card className="flex-1 flex flex-col max-w-3xl mx-auto w-full p-6">
-                  {/* Sender info */}
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center gap-2">
-                      {currentConversation.channel && (
-                        <ChannelIcon channel={currentConversation.channel} className="h-4 w-4" />
-                      )}
-                      <div>
-                        <p className="font-medium">
-                          {currentConversation.customer?.name || 'Unknown Sender'}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {currentConversation.customer?.email || 'No email'}
-                        </p>
-                      </div>
+          {/* Column 2: Email Preview + AI Reasoning (flex) */}
+          <div className="flex-1 flex flex-col overflow-hidden bg-white rounded-2xl shadow-sm border border-slate-200">
+            {currentConversation ? (
+              <div className="flex-1 flex flex-col overflow-y-auto">
+                {/* Sender row */}
+                <div className="px-6 py-4 border-b flex items-start justify-between flex-shrink-0">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <span className="text-sm font-bold text-primary">{getSenderName(currentConversation)[0]?.toUpperCase()}</span>
                     </div>
-                    <span className="text-sm text-muted-foreground">
-                      {format(new Date(currentConversation.created_at), 'MMM d, h:mm a')}
-                    </span>
+                    <div>
+                      <p className="font-semibold">{getSenderName(currentConversation)}</p>
+                      <p className="text-xs text-muted-foreground">{getSenderEmail(currentConversation)}</p>
+                    </div>
                   </div>
+                  <span className="text-xs text-muted-foreground">{format(new Date(currentConversation.created_at), 'MMM d, h:mm a')}</span>
+                </div>
 
-                  {/* Subject */}
-                  <h3 className="font-semibold text-lg mb-4">
-                    {currentConversation.title || 'No subject'}
-                  </h3>
+                {/* AI context bento strip */}
+                <div className="px-6 py-3 border-b border-slate-100 bg-slate-50/50 flex items-center gap-3 flex-wrap flex-shrink-0">
+                  {currentConversation.summary_for_human && (
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Bot className="h-3.5 w-3.5 text-purple-500" />
+                      <span className="line-clamp-1">{currentConversation.summary_for_human}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-1.5 ml-auto">
+                    {currentConversation.email_classification && (
+                      <CategoryLabel classification={currentConversation.email_classification} size="sm" />
+                    )}
+                  </div>
+                </div>
 
-                  {/* Preview */}
+                {/* Subject */}
+                <div className="px-6 pt-4 pb-2 flex-shrink-0">
+                  <h2 className="text-lg font-semibold">{currentConversation.title || 'No subject'}</h2>
+                </div>
+
+                {/* Email body */}
+                <div className="flex-1 px-6 pb-4 overflow-y-auto">
                   <EmailPreview
                     body={currentConversation.messages[0]?.body || ''}
                     summary={currentConversation.summary_for_human}
-                    maxLength={600}
+                    maxLength={2000}
                     rawHtmlBody={(currentConversation.messages[0]?.raw_payload as { body?: string })?.body}
                   />
 
-                  {/* AI Draft Available */}
+                  {/* AI Draft */}
                   {currentConversation.ai_draft_response && (
-                    <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 border border-green-200 dark:border-green-800 mb-4">
+                    <div className="bg-purple-50/50 dark:bg-purple-900/20 rounded-lg p-4 ring-1 ring-purple-200/50 mb-4">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <Sparkles className="h-4 w-4 text-green-600" />
-                          <span className="text-sm font-medium text-green-700 dark:text-green-300">
-                            AI draft ready
-                          </span>
+                          <Sparkles className="h-4 w-4 text-purple-600" />
+                          <span className="text-sm font-medium text-purple-700 dark:text-purple-300">AI draft ready</span>
                         </div>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7 text-xs gap-1.5 border-green-300 text-green-700 hover:bg-green-100"
-                          onClick={() => setShowDraftEditor(true)}
-                        >
-                          <Send className="h-3 w-3" />
-                          Edit & Send Reply
+                        <Button size="sm" variant="outline" className="h-7 text-xs gap-1.5 bg-white border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm rounded-lg" onClick={() => setShowDraftEditor(true)}>
+                          <Send className="h-3 w-3" />Edit & Send
                         </Button>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-2 line-clamp-2">
-                        {currentConversation.ai_draft_response.substring(0, 150)}...
-                      </p>
+                      <p className="text-xs text-muted-foreground mt-2 line-clamp-2">{currentConversation.ai_draft_response.substring(0, 200)}...</p>
                     </div>
                   )}
 
-                  {/* BizzyBee's decision */}
-                  <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4 border border-purple-200 dark:border-purple-800 mb-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Sparkles className="h-4 w-4 text-purple-500" />
-                      <span className="text-sm font-medium text-purple-700 dark:text-purple-300">
-                        BizzyBee thinks:
-                      </span>
+                  {/* AI Reasoning card */}
+                  <div className="mt-4 bg-purple-50/50 border border-purple-100/50 rounded-2xl p-5">
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <Bot className="h-3.5 w-3.5 text-purple-500" />
+                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">AI Reasoning</span>
                     </div>
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <Badge className={bucketColors[currentConversation.decision_bucket] || 'bg-gray-500'}>
-                        {bucketLabels[currentConversation.decision_bucket] || currentConversation.decision_bucket}
-                      </Badge>
-                      {/* Editable classification type */}
-                      <CategoryLabel 
-                        classification={currentConversation.email_classification} 
-                        size="sm" 
-                        editable={true}
-                        onClick={() => setShowCorrectionFlow(true)}
-                      />
-                      <span className="text-sm text-muted-foreground">
-                        {currentConversation.why_this_needs_you || 'No explanation provided'}
-                      </span>
-                    </div>
-                    {currentConversation.triage_confidence && (
-                      <p className="text-xs text-muted-foreground mt-2">
-                        Confidence: {Math.round(currentConversation.triage_confidence * 100)}%
-                      </p>
-                    )}
+                    <p className="text-sm text-foreground/80 leading-relaxed">
+                      {currentConversation.why_this_needs_you || currentConversation.ai_reasoning || (
+                        <>
+                          Classified as <strong className="capitalize">{currentConversation.email_classification?.replace(/_/g, ' ')}</strong>
+                          {currentConversation.requires_reply ? ' — this email needs a reply.' : ' — no reply needed, auto-handled.'}
+                          {confidencePercent != null && <> Confidence: <span className={cn("font-semibold", confidenceColor)}>{confidencePercent}%</span>.</>}
+                        </>
+                      )}
+                    </p>
                   </div>
-
-                  {/* Teach BizzyBee More - Collapsible */}
-                  <Collapsible open={showTeachMore} onOpenChange={setShowTeachMore} className="mb-4">
-                    <CollapsibleTrigger asChild>
-                      <Button variant="ghost" className="w-full justify-between text-muted-foreground hover:text-foreground">
-                        <span className="flex items-center gap-2">
-                          <Sparkles className="h-4 w-4" />
-                          Teach BizzyBee more (optional)
-                        </span>
-                        {showTeachMore ? (
-                          <ChevronDown className="h-4 w-4" />
-                        ) : (
-                          <ChevronRight className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent className="space-y-4 pt-4">
-                      <div className="bg-muted/30 rounded-lg p-4 space-y-4">
-                        {senderDomain && (
-                          <p className="text-sm font-medium text-muted-foreground">
-                            For emails from @{senderDomain}:
-                          </p>
-                        )}
-                        
-                        {/* Automation Level */}
-                        <div className="space-y-3">
-                          <Label className="text-sm font-medium">How should BizzyBee handle these?</Label>
-                          <RadioGroup 
-                            value={automationLevel} 
-                            onValueChange={(val) => setAutomationLevel(val as AutomationLevel)}
-                            className="space-y-2"
-                          >
-                            <div className="flex items-center space-x-3 p-2 rounded-md hover:bg-muted/50">
-                              <RadioGroupItem value="auto" id="auto" />
-                              <Label htmlFor="auto" className="flex items-center gap-2 cursor-pointer font-normal">
-                                <Bot className="h-4 w-4 text-green-500" />
-                                Always auto-handle (don't bother me)
-                              </Label>
-                            </div>
-                            <div className="flex items-center space-x-3 p-2 rounded-md hover:bg-muted/50">
-                              <RadioGroupItem value="draft_first" id="draft_first" />
-                              <Label htmlFor="draft_first" className="flex items-center gap-2 cursor-pointer font-normal">
-                                <FileEdit className="h-4 w-4 text-amber-500" />
-                                Draft replies but ask me first
-                              </Label>
-                            </div>
-                            <div className="flex items-center space-x-3 p-2 rounded-md hover:bg-muted/50">
-                              <RadioGroupItem value="always_review" id="always_review" />
-                              <Label htmlFor="always_review" className="flex items-center gap-2 cursor-pointer font-normal">
-                                <Eye className="h-4 w-4 text-blue-500" />
-                                Always show in Review first
-                              </Label>
-                            </div>
-                          </RadioGroup>
-                        </div>
-
-                        {/* Tone Preference */}
-                        <div className="space-y-3 pt-2 border-t border-border/50">
-                          <Label className="text-sm font-medium">Tone preference:</Label>
-                          <RadioGroup 
-                            value={tonePreference} 
-                            onValueChange={(val) => setTonePreference(val as TonePreference)}
-                            className="flex flex-wrap gap-4"
-                          >
-                            <div className="flex items-center space-x-2">
-                              <RadioGroupItem value="keep_current" id="keep_current" />
-                              <Label htmlFor="keep_current" className="cursor-pointer font-normal">Keep current</Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <RadioGroupItem value="more_formal" id="more_formal" />
-                              <Label htmlFor="more_formal" className="cursor-pointer font-normal">More formal</Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <RadioGroupItem value="more_brief" id="more_brief" />
-                              <Label htmlFor="more_brief" className="cursor-pointer font-normal">More brief</Label>
-                            </div>
-                          </RadioGroup>
-                        </div>
-                      </div>
-                    </CollapsibleContent>
-                  </Collapsible>
-
-                  {/* Actions */}
-                  <div className="flex items-center gap-3 pt-2">
-                    {!showChangePicker ? (
-                      <>
-                        <Button 
-                          onClick={handleConfirm}
-                          className="flex-1 bg-purple-600 hover:bg-purple-700 text-white"
-                          disabled={reviewMutation.isPending}
-                        >
-                          <Check className="h-4 w-4 mr-2" />
-                          Looks right
-                          <span className="ml-2 text-xs opacity-70">(L)</span>
-                        </Button>
-                        <Button 
-                          variant="outline"
-                          onClick={() => setShowChangePicker(true)}
-                          className="flex-1"
-                          disabled={reviewMutation.isPending}
-                        >
-                          <RefreshCw className="h-4 w-4 mr-2" />
-                          Handle differently
-                          <span className="ml-2 text-xs opacity-70">(H)</span>
-                        </Button>
-                      </>
-                    ) : (
-                      <div className="flex-1 space-y-3">
-                        <p className="text-sm font-medium">Where should this go?</p>
-                        <div className="grid grid-cols-2 gap-2">
-                          <Button
-                            variant="outline"
-                            className="justify-start"
-                            onClick={() => handleChange('act_now')}
-                            disabled={reviewMutation.isPending}
-                          >
-                            <span className="w-2 h-2 rounded-full bg-red-500 mr-2" />
-                            Needs attention
-                            <span className="ml-auto text-xs opacity-50">(1)</span>
-                          </Button>
-                          <Button
-                            variant="outline"
-                            className="justify-start"
-                            onClick={() => handleChange('quick_win')}
-                            disabled={reviewMutation.isPending}
-                          >
-                            <span className="w-2 h-2 rounded-full bg-amber-500 mr-2" />
-                            Needs reply
-                            <span className="ml-auto text-xs opacity-50">(2)</span>
-                          </Button>
-                          <Button
-                            variant="outline"
-                            className="justify-start"
-                            onClick={() => handleChange('wait')}
-                            disabled={reviewMutation.isPending}
-                          >
-                            <span className="w-2 h-2 rounded-full bg-slate-500 mr-2" />
-                            FYI
-                            <span className="ml-auto text-xs opacity-50">(3)</span>
-                          </Button>
-                          <Button
-                            variant="outline"
-                            className="justify-start"
-                            onClick={() => handleChange('auto_handled')}
-                            disabled={reviewMutation.isPending}
-                          >
-                            <span className="w-2 h-2 rounded-full bg-green-500 mr-2" />
-                            Done
-                            <span className="ml-auto text-xs opacity-50">(4)</span>
-                          </Button>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setShowChangePicker(false)}
-                          className="w-full"
-                        >
-                          Cancel (Esc)
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Skip option */}
-                  {!showChangePicker && currentIndex < reviewQueue.length - 1 && (
-                    <div className="text-center mt-4">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleSkip}
-                        className="text-muted-foreground"
-                      >
-                        <SkipForward className="h-4 w-4 mr-2" />
-                        Skip for now
-                        <span className="ml-2 text-xs opacity-70">(S)</span>
-                      </Button>
-                    </div>
-                  )}
-                </Card>
+                </div>
               </div>
-            ) : null}
+            ) : (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center max-w-xs">
+                  <Sparkles className="h-8 w-8 text-muted-foreground/30 mx-auto mb-3" />
+                  <p className="text-sm text-muted-foreground">Select an email from the queue to preview</p>
+                </div>
+              </div>
+            )}
           </div>
-        </div>}
+
+          {/* Column 3: Reconciliation Panel (300px) */}
+          <div className="w-[300px] min-w-[300px] flex-shrink-0 flex flex-col bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            {currentConversation ? (
+              <div className="flex-1 flex flex-col overflow-y-auto">
+                {/* The Verdict */}
+                <div className="p-4 border-b space-y-3">
+                  {/* Large category badge */}
+                  <div className="flex justify-center">
+                    {currentConversation.email_classification && (
+                      <CategoryLabel classification={currentConversation.email_classification} size="md" />
+                    )}
+                  </div>
+
+                  {/* Confidence bar */}
+                  {confidencePercent != null && (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">Confidence</span>
+                        <span className={cn("font-bold text-sm", confidenceColor)}>{confidencePercent}%</span>
+                      </div>
+                      <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden mt-3">
+                        <div
+                          className="h-full bg-gradient-to-r from-purple-500 to-blue-500 rounded-full transition-all duration-700 ease-out"
+                          style={{ width: `${confidencePercent}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Decision badge */}
+                  <div className="flex justify-center">
+                    <Badge variant="outline" className={cn("text-xs",
+                      currentConversation.decision_bucket === 'auto_handled' || !currentConversation.requires_reply
+                        ? 'border-green-300 text-green-700 bg-green-50 dark:bg-green-900/20 dark:text-green-400'
+                        : currentConversation.decision_bucket === 'act_now'
+                          ? 'border-red-300 text-red-700 bg-red-50 dark:bg-red-900/20 dark:text-red-400'
+                          : 'border-amber-300 text-amber-700 bg-amber-50 dark:bg-amber-900/20 dark:text-amber-400'
+                    )}>
+                      {currentConversation.decision_bucket === 'auto_handled' || !currentConversation.requires_reply
+                        ? '✓ Auto-handled'
+                        : currentConversation.decision_bucket === 'act_now'
+                          ? '🔴 Escalated'
+                          : '⚡ Needs Reply'}
+                    </Badge>
+                  </div>
+                </div>
+
+                {/* Quick Actions — The reconciliation buttons */}
+                <div className="p-4 border-b space-y-3">
+                  {!showChangePicker ? (
+                    <>
+                      <div className="grid grid-cols-2 gap-3 mt-4">
+                        {/* CONFIRM — the hero button */}
+                        <Button
+                          className="h-11 bg-purple-600 hover:bg-purple-700 text-white font-medium shadow-sm rounded-xl"
+                          onClick={handleConfirm}
+                          disabled={confirmMutation.isPending}
+                        >
+                          <Check className="h-5 w-5 mr-2" />
+                          Confirm
+                        </Button>
+
+                        {/* CHANGE */}
+                        <Button
+                          variant="outline"
+                          className="h-11 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm rounded-xl font-medium"
+                          onClick={() => setShowChangePicker(true)}
+                          disabled={confirmMutation.isPending}
+                        >
+                          <Pencil className="h-4 w-4 mr-1.5" />
+                          Change
+                        </Button>
+                      </div>
+
+                      {/* SKIP */}
+                      {currentIndex < unreviewedQueue.length - 1 && (
+                        <button
+                          className="w-full text-center text-xs text-muted-foreground hover:text-foreground transition-colors py-1"
+                          onClick={handleSkip}
+                        >
+                          Skip · <kbd className="bg-muted rounded px-1 py-0.5 font-mono text-[10px]">S</kbd>
+                        </button>
+                      )}
+                    </>
+                  ) : (
+                    <div className="space-y-2">
+                      <p className="text-xs font-semibold text-amber-700 dark:text-amber-400">Select correct category:</p>
+                      <div className="grid grid-cols-1 gap-1">
+                        {CATEGORIES.map(cat => (
+                          <button
+                            key={cat.key}
+                            onClick={() => setSelectedChangeCategory(cat.key)}
+                            className={cn(
+                              "flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-left transition-all",
+                              selectedChangeCategory === cat.key
+                                ? "bg-amber-100 dark:bg-amber-900/30 border border-amber-300 dark:border-amber-700 font-semibold"
+                                : "hover:bg-muted/50 border border-transparent"
+                            )}
+                          >
+                            <span className={cn("w-2.5 h-2.5 rounded-full flex-shrink-0", cat.dot)} />
+                            {cat.label}
+                          </button>
+                        ))}
+                      </div>
+
+                      {selectedChangeCategory && (
+                        <div className="space-y-2 pt-2">
+                          <Textarea
+                            placeholder="Why? (optional)"
+                            value={changeReason}
+                            onChange={e => setChangeReason(e.target.value)}
+                            className="h-16 text-xs resize-none"
+                          />
+                      <Button
+                            className="w-full bg-purple-600 hover:bg-purple-700 text-white shadow-sm rounded-lg"
+                            onClick={handleChange}
+                            disabled={confirmMutation.isPending}
+                          >
+                            Save Correction
+                          </Button>
+                        </div>
+                      )}
+
+                      <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => { setShowChangePicker(false); setSelectedChangeCategory(''); setChangeReason(''); }}>
+                        Cancel
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Sender Patterns */}
+                {selectedSenderDomain && (
+                  <div className="p-4 border-b space-y-2">
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Sender Patterns</span>
+                    <p className="text-xs text-foreground/80">
+                      <strong>{senderEmailCount}</strong> email{senderEmailCount !== 1 ? 's' : ''} from <span className="font-medium text-primary">@{selectedSenderDomain}</span>
+                      {dominantClassification && (
+                        <> — all <CategoryLabel classification={dominantClassification} size="xs" showIcon={false} className="inline ml-1" /></>
+                      )}
+                    </p>
+                  </div>
+                )}
+
+                {/* Teach More (always visible) */}
+                <div className="border-b">
+                  <div className="px-4 py-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Zap className="h-3.5 w-3.5 text-amber-500" />Teach more (optional)
+                  </div>
+                  <div className="px-4 pb-3 space-y-3">
+                    <div className="space-y-2">
+                      <span className="text-xs font-medium text-slate-700">Handle all from this sender:</span>
+                      <div className="space-y-2">
+                        {[
+                          { value: 'auto', label: 'Auto-handle', icon: <Bot className="h-3.5 w-3.5 text-green-500" /> },
+                          { value: 'draft_first', label: 'Draft first', icon: <FileEdit className="h-3.5 w-3.5 text-amber-500" /> },
+                          { value: 'always_review', label: 'Always review', icon: <Eye className="h-3.5 w-3.5 text-blue-500" /> },
+                        ].map(opt => (
+                          <label
+                            key={opt.value}
+                            className={cn(
+                              "flex items-center gap-3 p-3 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50 transition-all text-sm font-medium text-slate-700",
+                              automationLevel === opt.value && "border-purple-500 bg-purple-50 ring-1 ring-purple-200"
+                            )}
+                            onClick={() => setAutomationLevel(opt.value as AutomationLevel)}
+                          >
+                            <input type="radio" name="automation" value={opt.value} checked={automationLevel === opt.value} onChange={() => setAutomationLevel(opt.value as AutomationLevel)} className="sr-only" />
+                            {opt.icon}{opt.label}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="space-y-2 pt-2 border-t border-border/50">
+                      <span className="text-xs font-medium text-slate-700">Tone for replies:</span>
+                      <div className="flex flex-wrap gap-2">
+                        {[{ value: 'keep_current', label: 'Keep' }, { value: 'more_formal', label: 'Formal' }, { value: 'more_brief', label: 'Brief' }, { value: 'more_friendly', label: 'Friendly' }].map(opt => (
+                          <label
+                            key={opt.value}
+                            className={cn(
+                              "px-3 py-2 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50 transition-all text-xs font-medium text-slate-700",
+                              tonePreference === opt.value && "border-purple-500 bg-purple-50 ring-1 ring-purple-200"
+                            )}
+                            onClick={() => setTonePreference(opt.value as TonePreference)}
+                          >
+                            <input type="radio" name="tone" value={opt.value} checked={tonePreference === opt.value} onChange={() => setTonePreference(opt.value as TonePreference)} className="sr-only" />
+                            {opt.label}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Keyboard shortcuts */}
+                <div className="mt-auto p-3 border-t bg-muted/20">
+                  <div className="flex items-center justify-center gap-3 text-[10px] text-muted-foreground">
+                    <span><kbd className="bg-card border border-border rounded px-1 py-0.5 font-mono shadow-sm">↑↓</kbd> nav</span>
+                    <span><kbd className="bg-card border border-border rounded px-1 py-0.5 font-mono shadow-sm">L</kbd> confirm</span>
+                    <span><kbd className="bg-card border border-border rounded px-1 py-0.5 font-mono shadow-sm">H</kbd> change</span>
+                    <span><kbd className="bg-card border border-border rounded px-1 py-0.5 font-mono shadow-sm">S</kbd> skip</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex-1 flex items-center justify-center p-6">
+                <p className="text-xs text-muted-foreground text-center">Select an email to reconcile</p>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Draft Reply Editor Sheet */}
-      {currentConversation && currentConversation.ai_draft_response && (
+      {currentConversation?.ai_draft_response && (
         <DraftReplyEditor
           open={showDraftEditor}
           onOpenChange={setShowDraftEditor}
@@ -1600,13 +1142,7 @@ export default function Review() {
           customerEmail={currentConversation.customer?.email || ''}
           aiDraft={currentConversation.ai_draft_response}
           onSent={() => {
-            // Move to next unreviewed item
-            const nextUnreviewedIndex = reviewQueue.findIndex((conv, idx) => 
-              idx > currentIndex && !reviewedIds.has(conv.id)
-            );
-            if (nextUnreviewedIndex !== -1) {
-              setCurrentIndex(nextUnreviewedIndex);
-            }
+            handleConfirm();
           }}
         />
       )}
@@ -1619,13 +1155,13 @@ export default function Review() {
             title: currentConversation.title,
             channel: currentConversation.channel || 'email',
             email_classification: currentConversation.email_classification,
-            requires_reply: currentConversation.decision_bucket !== 'auto_handled' && currentConversation.decision_bucket !== 'wait',
+            requires_reply: currentConversation.requires_reply,
             customer: currentConversation.customer,
           } as any}
           open={showCorrectionFlow}
           onOpenChange={setShowCorrectionFlow}
           onUpdate={() => {
-            queryClient.invalidateQueries({ queryKey: ['review-queue'] });
+            queryClient.invalidateQueries({ queryKey: ['reconciliation-queue'] });
           }}
         />
       )}

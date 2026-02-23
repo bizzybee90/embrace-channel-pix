@@ -55,7 +55,7 @@ export const IntegrationsPanel = () => {
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between py-3 border-b">
             <span className="text-sm font-medium">Status</span>
-            <Badge className="bg-green-50 text-green-700 border border-green-200">
+            <Badge variant="default" className="bg-green-500 hover:bg-green-600">
               <CheckCircle2 className="h-3 w-3 mr-1" />
               Connected
             </Badge>

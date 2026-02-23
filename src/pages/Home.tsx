@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ThreeColumnLayout } from '@/components/layout/ThreeColumnLayout';
 import { Sidebar } from '@/components/sidebar/Sidebar';
@@ -10,7 +9,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { useNavigate } from 'react-router-dom';
 import { 
   Mail, 
-  AlertTriangle, 
+  Flame, 
   CheckCircle2, 
   Clock, 
   Sparkles,
@@ -20,15 +19,14 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import bizzybeelogo from '@/assets/bizzybee-logo.png';
 import { formatDistanceToNow } from 'date-fns';
 import { ActivityFeed } from '@/components/dashboard/ActivityFeed';
 import { DraftMessages } from '@/components/dashboard/DraftMessages';
 import { HumanAIActivityLog } from '@/components/dashboard/HumanAIActivityLog';
-import { AIBriefingWidget } from '@/components/dashboard/AIBriefingWidget';
 import { LearningInsightsWidget } from '@/components/dashboard/LearningInsightsWidget';
 import { InsightsWidget } from '@/components/dashboard/InsightsWidget';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { cn } from '@/lib/utils';
 
 interface HomeStats {
   clearedToday: number;
@@ -69,14 +67,12 @@ export const Home = () => {
           draftResult,
           lastHandledResult
         ] = await Promise.all([
-          // Cleared today (auto_handled + resolved)
           supabase
             .from('conversations')
             .select('id', { count: 'exact', head: true })
             .eq('workspace_id', workspace.id)
             .or('decision_bucket.eq.auto_handled,status.eq.resolved')
             .gte('updated_at', today.toISOString()),
-          // To Reply count - conversations requiring reply (last 30 days, inbound only)
           supabase
             .from('conversations')
             .select('id', { count: 'exact', head: true })
@@ -84,21 +80,18 @@ export const Home = () => {
             .eq('requires_reply', true)
             .in('status', ['new', 'open', 'waiting_internal', 'ai_handling', 'escalated'])
             .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()),
-          // At Risk (SLA breached or warning)
           supabase
             .from('conversations')
             .select('id', { count: 'exact', head: true })
             .eq('workspace_id', workspace.id)
-            .in('sla_status', ['warning', 'breached'])
+            .eq('decision_bucket', 'act_now')
             .in('status', ['new', 'open', 'waiting_internal', 'ai_handling', 'escalated']),
-          // Review queue count
           supabase
             .from('conversations')
             .select('id', { count: 'exact', head: true })
             .eq('workspace_id', workspace.id)
-            .eq('needs_review', true)
-            .is('reviewed_at', null),
-          // Draft count
+            .eq('training_reviewed', false)
+            .not('email_classification', 'is', null),
           supabase
             .from('conversations')
             .select('id', { count: 'exact', head: true })
@@ -108,7 +101,6 @@ export const Home = () => {
             .in('status', ['new', 'open', 'ai_handling'])
             .in('decision_bucket', ['quick_win', 'act_now'])
             .eq('requires_reply', true),
-          // Last handled conversation
           supabase
             .from('conversations')
             .select('auto_handled_at')
@@ -137,7 +129,6 @@ export const Home = () => {
 
     fetchStats();
 
-    // Realtime subscription
     const channel = supabase
       .channel('home-realtime')
       .on(
@@ -148,18 +139,13 @@ export const Home = () => {
           table: 'conversations',
           filter: `workspace_id=eq.${workspace?.id}`
         },
-        () => {
-          fetchStats();
-        }
+        () => { fetchStats(); }
       )
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [workspace?.id]);
 
-  // Get time-appropriate greeting
   const getGreeting = () => {
     const hour = new Date().getHours();
     if (hour < 12) return 'Good morning';
@@ -167,232 +153,201 @@ export const Home = () => {
     return 'Good evening';
   };
 
-  const handleNavigate = (path: string) => {
-    navigate(path);
-  };
+  const handleNavigate = (path: string) => { navigate(path); };
+
+  // Metric card config
+  const metrics = [
+    {
+      label: 'Urgent',
+      count: stats.atRiskCount,
+      icon: Flame,
+      iconColor: 'text-red-600',
+      iconBoxBg: 'bg-red-100',
+      cardBg: 'bg-gradient-to-b from-red-50/80 to-white',
+      cardBorder: 'border border-red-100',
+      onClick: () => navigate('/to-reply?filter=at-risk'),
+    },
+    {
+      label: 'To Reply',
+      count: stats.toReplyCount,
+      icon: Mail,
+      iconColor: 'text-blue-600',
+      iconBoxBg: 'bg-blue-100',
+      cardBg: 'bg-gradient-to-b from-blue-50/80 to-white',
+      cardBorder: 'border border-blue-100',
+      onClick: () => navigate('/to-reply?filter=to-reply'),
+    },
+    {
+      label: 'Drafts',
+      count: stats.draftCount,
+      icon: FileEdit,
+      iconColor: 'text-amber-600',
+      iconBoxBg: 'bg-amber-100',
+      cardBg: 'bg-gradient-to-b from-amber-50/80 to-white',
+      cardBorder: 'border border-amber-100',
+      onClick: () => navigate('/to-reply?filter=drafts'),
+    },
+    {
+      label: 'Training',
+      count: stats.reviewCount,
+      icon: Sparkles,
+      iconColor: 'text-purple-600',
+      iconBoxBg: 'bg-purple-100',
+      cardBg: 'bg-gradient-to-b from-purple-50/80 to-white',
+      cardBorder: 'border border-purple-100',
+      onClick: () => navigate('/review'),
+    },
+  ];
 
   const mainContent = (
     <ScrollArea className="h-[calc(100vh-4rem)]">
-      <div className="p-4 md:p-6 space-y-6">
+      <div className="p-4 md:p-6 space-y-6 bg-slate-50/50 min-h-full">
         {loading ? (
           <div className="space-y-4">
-            <div className="flex items-center gap-4">
-              <Skeleton className="h-20 w-20 rounded-2xl" />
-              <div className="space-y-2">
-                <Skeleton className="h-6 w-40" />
-                <Skeleton className="h-4 w-64" />
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Skeleton className="h-24 rounded-2xl" />
-              <Skeleton className="h-24 rounded-2xl" />
-              <Skeleton className="h-24 rounded-2xl" />
-              <Skeleton className="h-24 rounded-2xl" />
+            <Skeleton className="h-28 rounded-2xl" />
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <Skeleton className="h-32 rounded-2xl" />
+              <Skeleton className="h-32 rounded-2xl" />
+              <Skeleton className="h-32 rounded-2xl" />
+              <Skeleton className="h-32 rounded-2xl" />
             </div>
           </div>
         ) : (
           <>
-            {/* Header with greeting */}
-            <div className="flex items-center gap-4">
-              <img src={bizzybeelogo} alt="BizzyBee" className="h-20 w-auto" />
+            {/* ── Hero Copilot Banner ── */}
+            <div className="w-full bg-gradient-to-r from-amber-100/50 via-purple-50/50 to-blue-100/30 rounded-3xl p-8 ring-1 ring-slate-900/5 shadow-sm relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-2">
               <div>
-                <h1 className="text-xl font-semibold text-foreground">
-                  {getGreeting()}
-                </h1>
-                <p className="text-sm text-muted-foreground">
-                  {stats.clearedToday > 0 ? (
-                    <>BizzyBee handled <span className="font-medium text-foreground">{stats.clearedToday}</span> messages today</>
-                  ) : (
-                    'BizzyBee is ready to help'
-                  )}
-                  {stats.lastHandled && (
-                    <> • Last: {formatDistanceToNow(stats.lastHandled, { addSuffix: true })}</>
-                  )}
-                </p>
-              </div>
-            </div>
-
-            {/* Summary Banner - Calm, structured framing */}
-            {(stats.atRiskCount > 0 || stats.reviewCount > 0 || stats.toReplyCount > 0 || stats.draftCount > 0) && (
-              <div className="text-sm text-muted-foreground">
-                <p className="font-medium text-foreground">Here's what BizzyBee has lined up for you</p>
-                <p>Sorted by urgency and effort</p>
-              </div>
-            )}
-
-            {/* AI Briefing Widget */}
-            <AIBriefingWidget />
-
-            {/* Action Cards - Priority order with visual hierarchy */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* At Risk - Most urgent, prominent styling */}
-              <Card 
-                className={`p-5 cursor-pointer transition-all hover:scale-[1.02] ${
-                  stats.atRiskCount > 0 
-                    ? 'bg-gradient-to-br from-destructive/10 via-destructive/5 to-background border-destructive/30 shadow-lg shadow-destructive/10' 
-                    : 'hover:bg-accent/50'
-                }`}
-                onClick={() => navigate('/to-reply?filter=at-risk')}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className={`p-3 rounded-xl ${stats.atRiskCount > 0 ? 'bg-destructive/20' : 'bg-destructive/10'}`}>
-                      <AlertTriangle className={`h-6 w-6 ${stats.atRiskCount > 0 ? 'text-destructive animate-pulse' : 'text-destructive/70'}`} />
-                    </div>
-                    <div>
-                      <p className="text-3xl font-bold text-foreground">{stats.atRiskCount}</p>
-                      <p className="text-sm font-medium text-muted-foreground">At Risk</p>
-                    </div>
-                  </div>
-                  <ChevronRight className="h-5 w-5 text-muted-foreground/40" />
-                </div>
-              </Card>
-
-              {/* Training - Help BizzyBee learn */}
-              <Card 
-                className={`p-5 cursor-pointer transition-all hover:scale-[1.02] ${
-                  stats.reviewCount > 0 
-                    ? 'bg-gradient-to-br from-purple-500/10 via-purple-500/5 to-background border-purple-500/30 shadow-lg shadow-purple-500/10' 
-                    : 'hover:bg-accent/50'
-                }`}
-                onClick={() => navigate('/review')}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className={`p-3 rounded-xl ${stats.reviewCount > 0 ? 'bg-purple-500/20' : 'bg-purple-500/10'}`}>
-                      <Sparkles className={`h-6 w-6 ${stats.reviewCount > 0 ? 'text-purple-500' : 'text-purple-500/70'}`} />
-                    </div>
-                    <div>
-                      <p className="text-3xl font-bold text-foreground">{stats.reviewCount}</p>
-                      <p className="text-sm font-medium text-muted-foreground">Training</p>
-                    </div>
-                  </div>
-                  <ChevronRight className="h-5 w-5 text-muted-foreground/40" />
-                </div>
-              </Card>
-
-              {/* To Reply - Primary work queue */}
-              <Card 
-                className={`p-5 cursor-pointer transition-all hover:scale-[1.02] ${
-                  stats.toReplyCount > 0 
-                    ? 'bg-gradient-to-br from-primary/10 via-primary/5 to-background border-primary/30' 
-                    : 'hover:bg-accent/50'
-                }`}
-                onClick={() => navigate('/to-reply?filter=to-reply')}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className={`p-3 rounded-xl ${stats.toReplyCount > 0 ? 'bg-primary/20' : 'bg-primary/10'}`}>
-                      <Mail className={`h-6 w-6 ${stats.toReplyCount > 0 ? 'text-primary' : 'text-primary/70'}`} />
-                    </div>
-                    <div>
-                      <p className="text-3xl font-bold text-foreground">{stats.toReplyCount}</p>
-                      <p className="text-sm font-medium text-muted-foreground">To Reply</p>
-                    </div>
-                  </div>
-                  <ChevronRight className="h-5 w-5 text-muted-foreground/40" />
-                </div>
-              </Card>
-
-              {/* Drafts Ready - Actionable, quick wins */}
-              <Card 
-                className={`p-5 cursor-pointer transition-all hover:scale-[1.02] ${
-                  stats.draftCount > 0 
-                    ? 'bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-background border-amber-500/30' 
-                    : 'hover:bg-accent/50'
-                }`}
-                onClick={() => navigate('/to-reply?filter=drafts')}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className={`p-3 rounded-xl ${stats.draftCount > 0 ? 'bg-amber-500/20' : 'bg-amber-500/10'}`}>
-                      <FileEdit className={`h-6 w-6 ${stats.draftCount > 0 ? 'text-amber-500' : 'text-amber-500/70'}`} />
-                    </div>
-                    <div>
-                      <p className="text-3xl font-bold text-foreground">{stats.draftCount}</p>
-                      <p className="text-sm font-medium text-muted-foreground">Drafts Ready</p>
-                    </div>
-                  </div>
-                  <ChevronRight className="h-5 w-5 text-muted-foreground/40" />
-                </div>
-              </Card>
-            </div>
-
-            {/* All caught up banner */}
-            {stats.toReplyCount === 0 && stats.reviewCount === 0 && stats.atRiskCount === 0 && (
-              <Card className="p-4 border border-green-200 bg-green-50/50 rounded-xl">
                 <div className="flex items-center gap-3">
-                  <CheckCircle2 className="h-5 w-5 text-success" />
-                  <div>
-                    <p className="font-medium text-foreground">You're all caught up!</p>
-                    <p className="text-sm text-muted-foreground">BizzyBee is handling your inbox</p>
-                  </div>
+                  <span className="text-3xl">🐝</span>
+                  <h1 className="text-3xl font-bold text-slate-900 tracking-tight">{getGreeting()}!</h1>
                 </div>
-              </Card>
+                <p className="text-lg text-slate-700 max-w-2xl mt-2 leading-relaxed">
+                  {stats.atRiskCount > 0
+                    ? `You have ${stats.atRiskCount} urgent item${stats.atRiskCount !== 1 ? 's' : ''} that need attention.`
+                    : stats.toReplyCount > 0
+                      ? `${stats.toReplyCount} conversation${stats.toReplyCount !== 1 ? 's' : ''} waiting for your reply.`
+                      : 'Here is what BizzyBee has lined up for you.'}
+                </p>
+                {/* Frosted-glass AI Briefing Panel */}
+                <div className="mt-6 p-5 bg-white/40 backdrop-blur-md rounded-2xl border border-white/60 text-slate-800 text-[15px] leading-relaxed shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
+                  {stats.clearedToday > 0 ? (
+                    <p>
+                      Since this morning, BizzyBee auto-handled <strong>{stats.clearedToday}</strong> message{stats.clearedToday !== 1 ? 's' : ''}
+                      {stats.draftCount > 0 && <>, prepared <strong>{stats.draftCount}</strong> draft{stats.draftCount !== 1 ? 's' : ''} for your review</>}
+                      {stats.reviewCount > 0 && <>, and flagged <strong>{stats.reviewCount}</strong> for training</>}.
+                      {stats.toReplyCount === 0 && stats.atRiskCount === 0
+                        ? ' Your inbox is clear — go grab a coffee ☕'
+                        : ' Here\'s what still needs your attention.'}
+                    </p>
+                  ) : (
+                    <p>
+                      {stats.toReplyCount > 0
+                        ? `You have ${stats.toReplyCount} conversation${stats.toReplyCount !== 1 ? 's' : ''} waiting. BizzyBee is learning your style — the more you review, the smarter it gets.`
+                        : 'BizzyBee is monitoring your inbox. Nothing needs your attention right now — enjoy your day!'}
+                    </p>
+                  )}
+                </div>
+              </div>
+              {stats.clearedToday > 0 && (
+                <div className="bg-white/80 backdrop-blur-md border border-emerald-200 text-emerald-800 px-5 py-2.5 rounded-2xl shadow-sm font-semibold flex items-center gap-2 text-sm whitespace-nowrap self-start md:self-center">
+                  <CheckCircle2 className="w-5 h-5" />
+                  {stats.clearedToday} messages auto-handled today
+                </div>
+              )}
+            </div>
+
+            {/* ── Tinted Glass Metric Cards ── */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              {metrics.map(m => {
+                const active = m.count > 0;
+                const Icon = m.icon;
+                return (
+                  <div
+                    key={m.label}
+                    onClick={m.onClick}
+                    className={cn(
+                      'rounded-3xl p-6 cursor-pointer transition-all duration-200',
+                      active
+                        ? `${m.cardBg} ${m.cardBorder} shadow-sm hover:shadow-md hover:-translate-y-1`
+                        : 'bg-slate-50/80 border border-slate-100 opacity-60 grayscale shadow-none'
+                    )}
+                  >
+                    <div className={cn(
+                      'w-12 h-12 rounded-2xl flex items-center justify-center',
+                      active ? m.iconBoxBg : 'bg-slate-100'
+                    )}>
+                      <Icon className={cn('h-5 w-5', active ? m.iconColor : 'text-slate-400')} />
+                    </div>
+                    <p className="text-5xl font-extrabold tracking-tight text-slate-900 mt-5 mb-1">{m.count}</p>
+                    <p className="text-sm font-medium text-slate-500 uppercase tracking-wide">{m.label}</p>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* ── All caught up ── */}
+            {stats.toReplyCount === 0 && stats.reviewCount === 0 && stats.atRiskCount === 0 && (
+              <div className="flex flex-col items-center justify-center h-[60vh] text-center">
+                <div className="w-24 h-24 bg-gradient-to-br from-emerald-50 to-emerald-100/50 rounded-full flex items-center justify-center mb-6 ring-8 ring-emerald-50/50 mx-auto">
+                  <Sparkles className="w-10 h-10 text-emerald-500" />
+                </div>
+                <h3 className="text-2xl font-bold text-slate-900 tracking-tight">You're all caught up!</h3>
+                <p className="text-slate-500 mt-2 max-w-sm mx-auto text-lg">BizzyBee is actively monitoring your inbox. Go grab a coffee.</p>
+              </div>
             )}
 
-            {/* Main Content Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {/* Drafts Section */}
-              <Card className="p-4">
+            {/* ── Widget Grid ── */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Pending Drafts */}
+              <div className="bg-white rounded-3xl border border-slate-100/80 shadow-sm p-5 flex flex-col">
                 <div className="flex items-center gap-2 mb-4">
-                  <FileEdit className="h-4 w-4 text-warning" />
-                  <h2 className="font-semibold text-foreground">Pending Drafts</h2>
+                  <FileEdit className="h-4 w-4 text-amber-500" />
+                  <h2 className="font-semibold text-slate-900">Pending Drafts</h2>
                 </div>
-                <DraftMessages onNavigate={handleNavigate} maxItems={4} />
+                <div className="flex-1">
+                  <DraftMessages onNavigate={handleNavigate} maxItems={4} />
+                </div>
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="w-full text-muted-foreground mt-2"
+                  className="w-full text-slate-500 mt-3 hover:bg-slate-50"
                   onClick={() => navigate('/to-reply?filter=drafts')}
                 >
                   View all drafts
-                  <ChevronRight className="h-4 w-4 ml-1" />
                 </Button>
-              </Card>
+              </div>
 
-              {/* Activity Feed */}
-              <Card className="p-4">
+              {/* Recent Activity */}
+              <div className="bg-white rounded-3xl border border-slate-100/80 shadow-sm p-5 flex flex-col">
                 <div className="flex items-center gap-2 mb-4">
-                  <Activity className="h-4 w-4 text-primary" />
-                  <h2 className="font-semibold text-foreground">Recent Activity</h2>
+                  <Activity className="h-4 w-4 text-blue-500" />
+                  <h2 className="font-semibold text-slate-900">Recent Activity</h2>
                 </div>
-                <ActivityFeed onNavigate={handleNavigate} maxItems={6} />
+                <div className="flex-1">
+                  <ActivityFeed onNavigate={handleNavigate} maxItems={6} />
+                </div>
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="w-full text-muted-foreground mt-2"
+                  className="w-full text-slate-500 mt-3 hover:bg-slate-50"
                   onClick={() => navigate('/activity')}
                 >
                   View all activity
-                  <ChevronRight className="h-4 w-4 ml-1" />
                 </Button>
-              </Card>
+              </div>
 
-              {/* Right Column: Insights + Learning + Activity Log */}
-              <div className="space-y-4">
-                {/* AI Insights - New Stage 3 Widget */}
+              {/* Right Column */}
+              <div className="space-y-6">
                 {workspace?.id && <InsightsWidget workspaceId={workspace.id} />}
-
-                {/* Enhanced Learning Insights */}
                 <LearningInsightsWidget />
-
-                {/* Human + AI Activity Log */}
-                <Card className="p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Users className="h-4 w-4 text-success" />
-                    <h2 className="font-semibold text-foreground">Human + AI Log</h2>
-                  </div>
-                  <HumanAIActivityLog onNavigate={handleNavigate} maxItems={6} />
-                </Card>
               </div>
             </div>
 
             {/* System Status Footer */}
-            <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground pt-4">
-              <CheckCircle2 className="h-3 w-3 text-success" />
+            <div className="flex items-center justify-center gap-2 text-xs text-slate-400 pt-4">
+              <CheckCircle2 className="h-3 w-3 text-emerald-400" />
               <span>System active</span>
-              <span className="text-muted-foreground/50">•</span>
+              <span>•</span>
               <Clock className="h-3 w-3" />
               <span>Checking every minute</span>
             </div>

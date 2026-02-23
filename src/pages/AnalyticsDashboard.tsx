@@ -104,11 +104,11 @@ export default function AnalyticsDashboard() {
       });
 
       const channelColors: Record<string, string> = {
-        sms: 'hsl(280, 70%, 50%)',
-        whatsapp: 'hsl(142, 70%, 45%)',
-        email: 'hsl(217, 91%, 60%)',
-        web_chat: 'hsl(262, 83%, 58%)',
-        web: 'hsl(262, 83%, 58%)',
+        sms: '#8b5cf6',
+        whatsapp: '#10b981',
+        email: '#3b82f6',
+        web_chat: '#a855f7',
+        web: '#a855f7',
       };
 
       const byChannel = Object.entries(channelCounts).map(([name, value]) => ({
@@ -169,9 +169,9 @@ export default function AnalyticsDashboard() {
   };
 
   const handledData = data ? [
-    { name: 'AI Handled', value: data.aiHandled, color: 'hsl(142, 70%, 45%)' },
-    { name: 'Human Handled', value: data.humanHandled - data.escalated, color: 'hsl(217, 91%, 60%)' },
-    { name: 'Escalated', value: data.escalated, color: 'hsl(25, 95%, 53%)' },
+    { name: 'AI Handled', value: data.aiHandled, color: '#10b981' },
+    { name: 'Human Handled', value: data.humanHandled - data.escalated, color: '#3b82f6' },
+    { name: 'Escalated', value: data.escalated, color: '#f97316' },
   ].filter(d => d.value > 0) : [];
 
   const containmentRate = data && data.totalConversations > 0
@@ -184,7 +184,7 @@ export default function AnalyticsDashboard() {
   if (isMobile) {
     return (
       <>
-        <div className="flex h-screen w-full bg-background overflow-hidden flex-col">
+        <div className="flex h-screen w-full bg-slate-50/50 overflow-hidden flex-col">
           <header className="flex-shrink-0 h-14 border-b border-border bg-card px-4 flex items-center justify-between">
             <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)} className="h-9 w-9">
               <Menu className="h-5 w-5" />
@@ -253,239 +253,193 @@ export default function AnalyticsDashboard() {
           <>
             {/* Key Metrics */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-              <Card className="rounded-3xl bg-gradient-to-br from-purple-50 to-white border-0 shadow-sm">
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-muted-foreground font-medium">Total Conversations</p>
-                      <p className="text-2xl font-bold">{data.totalConversations}</p>
-                    </div>
-                    <div className="h-10 w-10 rounded-xl bg-purple-100 flex items-center justify-center">
-                      <MessageSquare className="h-5 w-5 text-purple-600" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              <div className="bg-gradient-to-b from-blue-50/80 to-white border border-slate-100 rounded-3xl shadow-sm p-6">
+                <div className="bg-blue-100 text-blue-600 rounded-2xl w-12 h-12 flex items-center justify-center">
+                  <MessageSquare className="h-5 w-5" />
+                </div>
+                <p className="text-4xl font-extrabold tracking-tight text-slate-900 mt-2">{data.totalConversations}</p>
+                <p className="text-xs text-slate-500 font-medium mt-1">Total Conversations</p>
+              </div>
 
-              <Card className="rounded-3xl bg-gradient-to-br from-green-50 to-white border-0 shadow-sm">
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-muted-foreground font-medium">AI Containment</p>
-                      <p className="text-2xl font-bold">{containmentRate}%</p>
-                      <p className="text-xs text-muted-foreground">{data.aiHandled} of {data.totalConversations}</p>
-                    </div>
-                    <div className="h-10 w-10 rounded-xl bg-green-100 flex items-center justify-center">
-                      <Bot className="h-5 w-5 text-green-600" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              <div className="bg-gradient-to-b from-emerald-50/80 to-white border border-slate-100 rounded-3xl shadow-sm p-6">
+                <div className="bg-emerald-100 text-emerald-600 rounded-2xl w-12 h-12 flex items-center justify-center">
+                  <Bot className="h-5 w-5" />
+                </div>
+                <p className="text-4xl font-extrabold tracking-tight text-slate-900 mt-2">{containmentRate}%</p>
+                <p className="text-xs text-slate-500 font-medium mt-1">AI Containment</p>
+                <p className="text-xs text-slate-400">{data.aiHandled} of {data.totalConversations}</p>
+              </div>
 
-              <Card className="rounded-3xl bg-gradient-to-br from-blue-50 to-white border-0 shadow-sm">
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-muted-foreground font-medium">Avg Response Time</p>
-                      <p className="text-2xl font-bold">{formatResponseTime(data.avgResponseTimeSeconds)}</p>
-                    </div>
-                    <div className="h-10 w-10 rounded-xl bg-blue-100 flex items-center justify-center">
-                      <Clock className="h-5 w-5 text-blue-600" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              <div className="bg-gradient-to-b from-amber-50/80 to-white border border-slate-100 rounded-3xl shadow-sm p-6">
+                <div className="bg-amber-100 text-amber-600 rounded-2xl w-12 h-12 flex items-center justify-center">
+                  <Clock className="h-5 w-5" />
+                </div>
+                <p className="text-4xl font-extrabold tracking-tight text-slate-900 mt-2">{formatResponseTime(data.avgResponseTimeSeconds)}</p>
+                <p className="text-xs text-slate-500 font-medium mt-1">Avg Response Time</p>
+              </div>
 
-              <Card className="rounded-3xl bg-gradient-to-br from-emerald-50 to-white border-0 shadow-sm">
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-muted-foreground font-medium">Resolution Rate</p>
-                      <p className="text-2xl font-bold">{data.resolutionRate.toFixed(1)}%</p>
-                    </div>
-                    <div className="h-10 w-10 rounded-xl bg-emerald-100 flex items-center justify-center">
-                      <CheckCircle className="h-5 w-5 text-emerald-600" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              <div className="bg-gradient-to-b from-purple-50/80 to-white border border-slate-100 rounded-3xl shadow-sm p-6">
+                <div className="bg-purple-100 text-purple-600 rounded-2xl w-12 h-12 flex items-center justify-center">
+                  <CheckCircle className="h-5 w-5" />
+                </div>
+                <p className="text-4xl font-extrabold tracking-tight text-slate-900 mt-2">{data.resolutionRate.toFixed(1)}%</p>
+                <p className="text-xs text-slate-500 font-medium mt-1">Resolution Rate</p>
+              </div>
 
-              <Card className="rounded-3xl bg-gradient-to-br from-amber-50 to-white border-0 shadow-sm">
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-muted-foreground font-medium">Avg CSAT</p>
-                      <p className="text-2xl font-bold">
-                        {data.avgCSAT ? `${data.avgCSAT.toFixed(1)}/5` : 'N/A'}
-                      </p>
-                      <p className="text-xs text-muted-foreground">{data.csatCount} ratings</p>
-                    </div>
-                    <div className="h-10 w-10 rounded-xl bg-amber-100 flex items-center justify-center">
-                      <Star className="h-5 w-5 text-amber-600" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              <div className="bg-gradient-to-b from-blue-50/80 to-white border border-slate-100 rounded-3xl shadow-sm p-6">
+                <div className="bg-blue-100 text-blue-600 rounded-2xl w-12 h-12 flex items-center justify-center">
+                  <Star className="h-5 w-5" />
+                </div>
+                <p className="text-4xl font-extrabold tracking-tight text-slate-900 mt-2">
+                  {data.avgCSAT ? `${data.avgCSAT.toFixed(1)}` : 'N/A'}
+                </p>
+                <p className="text-xs text-slate-500 font-medium mt-1">Avg CSAT</p>
+                <p className="text-xs text-slate-400">{data.csatCount} ratings</p>
+              </div>
             </div>
 
             {/* Charts Row */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* AI vs Human Pie Chart */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Bot className="h-5 w-5" />
-                    AI vs Human Handled
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {handledData.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={250}>
-                      <PieChart>
-                        <Pie
-                          data={handledData}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={60}
-                          outerRadius={90}
-                          paddingAngle={2}
-                          dataKey="value"
-                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                        >
-                          {handledData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        <Tooltip />
-                        <Legend />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <div className="h-[250px] flex items-center justify-center text-muted-foreground">
-                      No data available
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+              <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
+                <h3 className="text-lg font-semibold text-slate-900 flex items-center gap-2 mb-4">
+                  <Bot className="h-5 w-5 text-slate-600" />
+                  AI vs Human Handled
+                </h3>
+                {handledData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={250}>
+                    <PieChart>
+                      <Pie
+                        data={handledData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={90}
+                        paddingAngle={2}
+                        dataKey="value"
+                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      >
+                        {handledData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-[250px] flex items-center justify-center text-slate-400">
+                    No data available
+                  </div>
+                )}
+              </div>
 
               {/* By Channel Pie Chart */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <MessageCircle className="h-5 w-5" />
-                    Conversations by Channel
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {data.byChannel.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={250}>
-                      <PieChart>
-                        <Pie
-                          data={data.byChannel}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={60}
-                          outerRadius={90}
-                          paddingAngle={2}
-                          dataKey="value"
-                          label={({ name, value }) => `${name}: ${value}`}
-                        >
-                          {data.byChannel.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        <Tooltip />
-                        <Legend />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <div className="h-[250px] flex items-center justify-center text-muted-foreground">
-                      No data available
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+              <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
+                <h3 className="text-lg font-semibold text-slate-900 flex items-center gap-2 mb-4">
+                  <MessageCircle className="h-5 w-5 text-slate-600" />
+                  Conversations by Channel
+                </h3>
+                {data.byChannel.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={250}>
+                    <PieChart>
+                      <Pie
+                        data={data.byChannel}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={90}
+                        paddingAngle={2}
+                        dataKey="value"
+                        label={({ name, value }) => `${name}: ${value}`}
+                      >
+                        {data.byChannel.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-[250px] flex items-center justify-center text-slate-400">
+                    No data available
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Volume Over Time Line Chart */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5" />
-                  Conversation Volume Over Time
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={data.volumeOverTime}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis dataKey="date" className="text-xs" />
-                    <YAxis className="text-xs" />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: 'hsl(var(--card))', 
-                        border: '1px solid hsl(var(--border))' 
-                      }} 
-                    />
-                    <Legend />
-                    <Line 
-                      type="monotone" 
-                      dataKey="total" 
-                      stroke="hsl(var(--primary))" 
-                      strokeWidth={2}
-                      name="Total"
-                      dot={false}
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="ai" 
-                      stroke="hsl(142, 70%, 45%)" 
-                      strokeWidth={2}
-                      name="AI Handled"
-                      dot={false}
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="escalated" 
-                      stroke="hsl(25, 95%, 53%)" 
-                      strokeWidth={2}
-                      name="Escalated"
-                      dot={false}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
+            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
+              <h3 className="text-lg font-semibold text-slate-900 flex items-center gap-2 mb-4">
+                <TrendingUp className="h-5 w-5 text-slate-600" />
+                Conversation Volume Over Time
+              </h3>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={data.volumeOverTime}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f8fafc" />
+                  <XAxis dataKey="date" className="text-xs" />
+                  <YAxis className="text-xs" />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#fff', 
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '12px',
+                      boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.05)'
+                    }} 
+                  />
+                  <Legend />
+                  <Line 
+                    type="monotone" 
+                    dataKey="total" 
+                    stroke="#8b5cf6" 
+                    strokeWidth={2}
+                    name="Total"
+                    dot={false}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="ai" 
+                    stroke="#10b981" 
+                    strokeWidth={2}
+                    name="AI Handled"
+                    dot={false}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="escalated" 
+                    stroke="#f97316" 
+                    strokeWidth={2}
+                    name="Escalated"
+                    dot={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
 
             {/* Escalation Stats */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Card className="rounded-3xl border-0 shadow-sm">
-                <CardContent className="pt-6">
-                  <div className="text-center">
-                    <p className="text-3xl font-bold text-purple-600">{data.aiHandled}</p>
-                    <p className="text-sm text-muted-foreground mt-1">AI Handled</p>
-                    <p className="text-xs text-muted-foreground">Fully automated responses</p>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="rounded-3xl border-0 shadow-sm">
-                <CardContent className="pt-6">
-                  <div className="text-center">
-                    <p className="text-3xl font-bold text-amber-600">{data.escalated}</p>
-                    <p className="text-sm text-muted-foreground mt-1">Escalated</p>
-                    <p className="text-xs text-muted-foreground">Required human review</p>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="rounded-3xl border-0 shadow-sm">
-                <CardContent className="pt-6">
-                  <div className="text-center">
-                    <p className="text-3xl font-bold text-blue-600">{data.humanHandled - data.escalated}</p>
-                    <p className="text-sm text-muted-foreground mt-1">Human Handled</p>
-                    <p className="text-xs text-muted-foreground">Agent responses</p>
-                  </div>
-                </CardContent>
-              </Card>
+              <div className="bg-gradient-to-b from-emerald-50/80 to-white border border-slate-100 rounded-3xl shadow-sm p-6">
+                <div className="text-center">
+                  <p className="text-4xl font-extrabold tracking-tight text-slate-900">{data.aiHandled}</p>
+                  <p className="text-sm text-slate-500 font-medium mt-1">AI Handled</p>
+                  <p className="text-xs text-slate-400">Fully automated responses</p>
+                </div>
+              </div>
+              <div className="bg-gradient-to-b from-amber-50/80 to-white border border-slate-100 rounded-3xl shadow-sm p-6">
+                <div className="text-center">
+                  <p className="text-4xl font-extrabold tracking-tight text-slate-900">{data.escalated}</p>
+                  <p className="text-sm text-slate-500 font-medium mt-1">Escalated</p>
+                  <p className="text-xs text-slate-400">Required human review</p>
+                </div>
+              </div>
+              <div className="bg-gradient-to-b from-blue-50/80 to-white border border-slate-100 rounded-3xl shadow-sm p-6">
+                <div className="text-center">
+                  <p className="text-4xl font-extrabold tracking-tight text-slate-900">{data.humanHandled - data.escalated}</p>
+                  <p className="text-sm text-slate-500 font-medium mt-1">Human Handled</p>
+                  <p className="text-xs text-slate-400">Agent responses</p>
+                </div>
+              </div>
             </div>
           </>
         ) : (

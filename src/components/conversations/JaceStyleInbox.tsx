@@ -122,6 +122,11 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
         .gt('snoozed_until', new Date().toISOString());
     } else if (filter === 'sent') {
       query = query.eq('status', 'resolved');
+    } else if (filter === 'all-open') {
+      // Inbox: all active conversations, exclude auto-handled/resolved
+      query = query
+        .neq('decision_bucket', 'auto_handled')
+        .in('status', ['new', 'open', 'waiting_internal', 'ai_handling', 'escalated']);
     }
 
     // When searching, fetch more items so search works beyond the first page
@@ -228,40 +233,45 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
 
   // Fixed width for all status badges to ensure consistent alignment
   const BADGE_CLASS = "text-[10px] px-2 py-0 h-5 min-w-[90px] text-center justify-center";
-
+  
   // State-based labels: what does the user need to DO, not how hard is it
   const getStateConfig = (bucket: string, hasAiDraft: boolean) => {
     if (bucket === 'act_now') {
-      return {
-        badge: <Badge className={`bg-red-50 text-red-700 border border-red-200 ${BADGE_CLASS} font-medium`}>Needs attention</Badge>,
-        rowClass: 'bg-red-50/50 dark:bg-red-950/20'
+      return { 
+        border: 'border-l-red-500', 
+        badge: <Badge variant="destructive" className={`${BADGE_CLASS} font-medium`}>Needs attention</Badge>,
+        rowClass: 'bg-red-50/50 dark:bg-red-950/20' // Subtle urgency tint
       };
     }
     if (bucket === 'quick_win' && hasAiDraft) {
-      return {
-        badge: <Badge className={`bg-purple-50 text-purple-700 border border-purple-200 ${BADGE_CLASS}`}>Draft ready</Badge>,
+      return { 
+        border: 'border-l-purple-500', 
+        badge: <Badge className={`bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 hover:bg-purple-200 ${BADGE_CLASS}`}>Draft ready</Badge>,
         rowClass: ''
       };
     }
     if (bucket === 'quick_win') {
-      return {
-        badge: <Badge className={`bg-amber-50 text-amber-700 border border-amber-200 ${BADGE_CLASS}`}>Needs reply</Badge>,
+      return { 
+        border: 'border-l-amber-500', 
+        badge: <Badge className={`bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 hover:bg-amber-200 ${BADGE_CLASS}`}>Needs reply</Badge>,
         rowClass: ''
       };
     }
     if (bucket === 'wait') {
-      return {
-        badge: <Badge className={`bg-slate-50 text-slate-700 border border-slate-200 ${BADGE_CLASS}`}>FYI</Badge>,
+      return { 
+        border: 'border-l-slate-400', 
+        badge: <Badge className={`bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 hover:bg-slate-200 ${BADGE_CLASS}`}>FYI</Badge>,
         rowClass: ''
       };
     }
     if (bucket === 'auto_handled') {
-      return {
-        badge: <Badge className={`bg-green-50 text-green-700 border border-green-200 ${BADGE_CLASS}`}>Done</Badge>,
+      return { 
+        border: 'border-l-green-500', 
+        badge: <Badge className={`bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 hover:bg-green-200 ${BADGE_CLASS}`}>Done</Badge>,
         rowClass: ''
       };
     }
-    return { badge: null, rowClass: '' };
+    return { border: 'border-l-transparent', badge: null, rowClass: '' };
   };
 
   const formatTime = (dateStr: string) => {
@@ -271,122 +281,52 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
 
   const ConversationRow = ({ conversation }: { conversation: Conversation }) => {
     const conv = conversation as any;
-    const customerName = conv.customer?.name || conv.customer?.email?.split('@')[0] || 'Unknown';
+    const rawName = conv.customer?.name || conv.customer?.email?.split('@')[0] || '';
+    const customerName = (!rawName || rawName.includes('unknown.invalid') || rawName.startsWith('unknown@')) ? 'Unknown Sender' : rawName;
     const hasAiDraft = !!conv.ai_draft_response;
     const stateConfig = getStateConfig(conv.decision_bucket, hasAiDraft);
-    const messageCount = conv.message_count || 0;
     const isUrgent = conv.decision_bucket === 'act_now';
+    const snippet = conv.summary_for_human || conv.why_this_needs_you || '';
 
-    // Mobile: Two-line layout
-    if (isMobile) {
-      return (
-        <div
-          onClick={() => onSelect(conversation)}
-          className={cn(
-            "px-3 py-3 cursor-pointer border-b border-border/30 transition-all",
-            "hover:bg-muted/50",
-            stateConfig.rowClass
-          )}
-        >
-          {/* Top row: Sender + Time */}
-          <div className="flex items-center justify-between gap-2 mb-1">
-            <div className="flex items-center gap-1.5 min-w-0 flex-1">
-              <ChannelIcon channel={conv.channel} className="h-3 w-3 flex-shrink-0 opacity-60" />
-              <span className={cn(
-                "text-sm text-foreground truncate",
-                isUrgent ? "font-semibold" : "font-medium"
-              )}>
-                {customerName}
-              </span>
-              {messageCount > 1 && (
-                <span className="text-[10px] font-medium text-muted-foreground bg-muted rounded-full h-4 min-w-4 px-1 flex items-center justify-center flex-shrink-0">
-                  {messageCount}
-                </span>
-              )}
-            </div>
-            <span className="text-xs text-muted-foreground whitespace-nowrap flex-shrink-0">
-              {formatTime(conv.updated_at || conv.created_at)}
-            </span>
-          </div>
-          
-          {/* Bottom row: Subject + Badge */}
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-sm text-muted-foreground truncate flex-1 min-w-0">
-              {conv.title || 'No subject'}
-            </p>
-            <div className="flex-shrink-0">
-              {stateConfig.badge}
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    // Desktop: Single-line layout with hover quick-actions
     return (
       <div
         onClick={() => onSelect(conversation)}
         className={cn(
-          "group flex items-center gap-2 px-3 py-2.5 cursor-pointer border-b border-border/30 transition-all",
-          "hover:bg-muted/50",
+          "px-4 py-3 cursor-pointer border-b border-border/30 transition-all",
+          "border-l-4 hover:bg-muted/50 flex flex-col items-start w-full gap-0.5",
+          stateConfig.border,
           stateConfig.rowClass
         )}
       >
-        {/* Channel icon + Sender - fixed width, truncate */}
-        <div className="w-28 flex-shrink-0 min-w-0 flex items-center gap-1.5">
-          <ChannelIcon channel={conv.channel} className="h-3 w-3 flex-shrink-0 opacity-60" />
-          <span className={cn(
-            "text-sm text-foreground truncate",
-            isUrgent ? "font-semibold" : "font-medium"
-          )}>
-            {customerName}
-          </span>
-        </div>
-
-        {/* Subject + Preview - fills remaining space, single line with truncation */}
-        <div className="flex-1 min-w-0 overflow-hidden">
-          <p className="text-sm text-foreground truncate">
-            <span className={cn(isUrgent ? "font-semibold" : "font-medium")}>
-              {conv.title || 'No subject'}
-            </span>
-            {conv.summary_for_human && (
-              <span className="text-muted-foreground ml-1">· {conv.summary_for_human}</span>
-            )}
-          </p>
-        </div>
-
-        {/* Category + Confidence + State badge */}
-        <div className="flex items-center gap-1.5 flex-shrink-0">
-          <CategoryLabel 
-            classification={conv.email_classification} 
-            size="xs" 
-            editable={true}
-            onClick={(e) => handleCategoryClick(conversation, e)}
-          />
-          {conv.ai_confidence != null && (
+        {/* Row 1: Sender + Time */}
+        <div className="flex items-center justify-between gap-2 w-full">
+          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+            <ChannelIcon channel={conv.channel} className="h-3 w-3 flex-shrink-0 opacity-60" />
             <span className={cn(
-              "text-[10px] font-medium px-1.5 py-0.5 rounded-md",
-              conv.ai_confidence >= 0.9 ? "text-green-700 bg-green-50 border border-green-200" :
-              conv.ai_confidence >= 0.7 ? "text-amber-700 bg-amber-50 border border-amber-200" :
-              "text-red-700 bg-red-50 border border-red-200"
+              "text-sm text-foreground truncate",
+              isUrgent ? "font-semibold" : "font-semibold"
             )}>
-              {Math.round(conv.ai_confidence * 100)}%
+              {customerName}
             </span>
-          )}
-          {stateConfig.badge}
-        </div>
-
-        {/* Hover Quick Actions + Thread Count + Time */}
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <InboxQuickActions conversation={conversation} />
-          {messageCount > 1 && (
-            <span className="text-[10px] font-medium text-muted-foreground bg-muted rounded-full h-4 min-w-4 px-1 flex items-center justify-center">
-              {messageCount}
-            </span>
-          )}
-          <span className="text-xs text-muted-foreground whitespace-nowrap">
+          </div>
+          <span className="text-xs text-muted-foreground whitespace-nowrap flex-shrink-0">
             {formatTime(conv.updated_at || conv.created_at)}
           </span>
+        </div>
+
+        {/* Row 2: Subject */}
+        <p className="text-sm font-medium text-foreground/80 truncate w-full">
+          {conv.title || 'No subject'}
+        </p>
+
+        {/* Row 3: AI Summary + Badge */}
+        <div className="flex items-center justify-between gap-2 w-full">
+          <p className="text-sm text-muted-foreground truncate flex-1 min-w-0 line-clamp-1">
+            {snippet || '\u00A0'}
+          </p>
+          <div className="flex-shrink-0">
+            {stateConfig.badge}
+          </div>
         </div>
       </div>
     );
@@ -422,11 +362,12 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
     if (subFilter === 'at-risk') return 'At Risk';
     if (subFilter === 'drafts') return 'Drafts Ready';
     if (subFilter === 'to-reply') return 'To Reply';
-    if (filter === 'cleared') return 'Done';
+    if (filter === 'cleared') return 'Cleared';
     if (filter === 'snoozed') return 'Snoozed';
     if (filter === 'sent') return 'Sent';
     if (filter === 'unread') return 'Unread';
     if (filter === 'drafts-ready') return 'Drafts';
+    if (filter === 'needs-me') return 'Needs Action';
     return 'Inbox';
   };
 
@@ -486,7 +427,7 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
             <SearchInput
               value={searchQuery}
               onChange={setSearchQuery}
-              placeholder="Search or ask BizzyBee a question..."
+              placeholder="Search or ask BizzyBee..."
             />
           </div>
           <div className="flex items-center justify-end gap-2 text-xs text-muted-foreground">
