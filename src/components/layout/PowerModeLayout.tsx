@@ -93,6 +93,7 @@ export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerMod
           <main className="w-[380px] flex-shrink-0 bg-white m-4 rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden flex flex-col z-10">
             <JaceStyleInbox
               filter={filter}
+              selectedId={selectedConversation?.id}
               onSelect={handleSelectConversation}
             />
           </main>
@@ -110,6 +111,7 @@ export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerMod
           <div className="w-[380px] flex-shrink-0 bg-white m-4 rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden hidden md:flex flex-col z-10">
             <JaceStyleInbox
               filter={filter}
+              selectedId={selectedConversation?.id}
               onSelect={handleSelectConversation}
             />
           </div>

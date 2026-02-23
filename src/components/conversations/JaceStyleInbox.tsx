@@ -18,6 +18,7 @@ import { useKeyboardNavigation } from '@/hooks/useKeyboardNavigation';
 
 interface JaceStyleInboxProps {
   onSelect: (conversation: Conversation) => void;
+  selectedId?: string | null;
   filter?: 'my-tickets' | 'unassigned' | 'sla-risk' | 'all-open' | 'awaiting-reply' | 'completed' | 'sent' | 'high-priority' | 'vip-customers' | 'escalations' | 'triaged' | 'needs-me' | 'snoozed' | 'cleared' | 'fyi' | 'unread' | 'drafts-ready';
 }
 
@@ -27,7 +28,7 @@ interface GroupedConversations {
   older: Conversation[];
 }
 
-export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInboxProps) => {
+export const JaceStyleInbox = ({ onSelect, selectedId, filter = 'needs-me' }: JaceStyleInboxProps) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const subFilter = searchParams.get('filter'); // 'at-risk', 'to-reply', 'drafts'
   
@@ -232,19 +233,19 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
   };
 
   // Fixed width for all status badges to ensure consistent alignment
-  const BADGE_CLASS = "text-[10px] px-2 py-0 h-5 min-w-[90px] text-center justify-center";
+  const BADGE_CLASS = "text-[10px] px-2 py-0.5 h-auto min-w-[90px] text-center justify-center font-semibold uppercase tracking-wider rounded-md";
   
   // State-based labels: what does the user need to DO, not how hard is it
   const getStateConfig = (bucket: string, hasAiDraft: boolean) => {
     if (bucket === 'act_now') {
       return { 
-        badge: <Badge className={`bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 ${BADGE_CLASS} font-medium`}>Needs attention</Badge>,
-        rowClass: 'bg-red-50/30 border-red-100 rounded-xl'
+        badge: <Badge className={`bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 ${BADGE_CLASS}`}>Needs attention</Badge>,
+        rowClass: 'bg-red-50/30 border-red-100'
       };
     }
     if (bucket === 'quick_win' && hasAiDraft) {
       return { 
-        badge: <Badge className={`bg-purple-50 text-purple-600 border border-purple-200 hover:bg-purple-100 ${BADGE_CLASS}`}>Draft ready</Badge>,
+        badge: <Badge className={`bg-purple-50 text-purple-700 border border-purple-100 hover:bg-purple-100 ${BADGE_CLASS}`}>Draft ready</Badge>,
         rowClass: ''
       };
     }
@@ -256,13 +257,13 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
     }
     if (bucket === 'wait') {
       return { 
-        badge: <Badge className={`bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 hover:bg-slate-200 ${BADGE_CLASS}`}>FYI</Badge>,
+        badge: <Badge className={`bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200 ${BADGE_CLASS}`}>FYI</Badge>,
         rowClass: ''
       };
     }
     if (bucket === 'auto_handled') {
       return { 
-        badge: <Badge className={`bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100 ${BADGE_CLASS}`}>Done</Badge>,
+        badge: <Badge className={`bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200 ${BADGE_CLASS}`}>Done</Badge>,
         rowClass: ''
       };
     }
@@ -282,15 +283,18 @@ export const JaceStyleInbox = ({ onSelect, filter = 'needs-me' }: JaceStyleInbox
     const stateConfig = getStateConfig(conv.decision_bucket, hasAiDraft);
     const isUrgent = conv.decision_bucket === 'act_now';
     const snippet = conv.summary_for_human || conv.why_this_needs_you || '';
+    const isSelected = selectedId === conv.id;
 
     return (
       <div
         onClick={() => onSelect(conversation)}
         className={cn(
-          "mx-2 my-1 px-4 py-3 cursor-pointer rounded-xl transition-all",
+          "mx-3 my-2 p-4 rounded-xl transition-all cursor-pointer group",
           "flex flex-col items-start w-full gap-0.5",
-          "hover:bg-slate-50/80 border border-transparent hover:border-slate-200",
-          stateConfig.rowClass
+          isSelected
+            ? "bg-purple-50/50 border border-purple-200 ring-1 ring-purple-100 shadow-sm"
+            : "bg-white border border-transparent hover:bg-slate-50 hover:border-slate-200 hover:shadow-sm",
+          !isSelected && stateConfig.rowClass
         )}
       >
         {/* Row 1: Sender + Time */}
