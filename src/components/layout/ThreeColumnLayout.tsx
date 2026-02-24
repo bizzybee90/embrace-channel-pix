@@ -45,7 +45,7 @@ export const ThreeColumnLayout = ({ sidebar, main }: ThreeColumnLayoutProps) => 
   return (
     <div className="flex h-screen w-full bg-slate-50/50 overflow-hidden">
       {/* Desktop Sidebar - icon rail */}
-      <aside className="bg-white flex-shrink-0 overflow-y-auto relative z-50 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] border-r border-slate-200/80">
+      <aside className="bg-slate-50/50 flex-shrink-0 overflow-y-auto relative z-50">
         {sidebar}
       </aside>
 

@@ -779,8 +779,8 @@ export default function Review() {
                             <span className={cn("text-[11px] font-bold flex-shrink-0 tabular-nums", confColor)}>{conf}%</span>
                           )}
                         </div>
-                        <div className="flex items-center gap-1.5 mt-0.5 pl-9">
-                          <p className="text-xs text-muted-foreground truncate flex-1">
+                        <div className="flex items-center gap-1.5 mt-0.5 pl-9 min-w-0">
+                          <p className="text-xs text-muted-foreground truncate min-w-0 flex-1">
                             {conv.title || 'No subject'}
                           </p>
                           {conv.email_classification && (
