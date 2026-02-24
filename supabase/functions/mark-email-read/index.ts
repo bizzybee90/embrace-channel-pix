@@ -178,7 +178,17 @@ serve(async (req) => {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Failed to update email:', response.status, errorText);
+      console.warn(`mark-email-read: Aurinko returned ${response.status} for message ${aurinkoMessageId}:`, errorText);
+      
+      // 404 means the message no longer exists in the provider (deleted, expired import ID, etc.)
+      // Treat as a soft success — nothing to update.
+      if (response.status === 404) {
+        return new Response(
+          JSON.stringify({ success: true, message: 'Email not found in provider, skipping', messageId: aurinkoMessageId }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
       return new Response(
         JSON.stringify({ error: 'Failed to update email', details: errorText }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
