@@ -849,14 +849,14 @@ export default function Review() {
                 </div>
 
                 {/* AI context bento strip */}
-                <div className="px-6 py-3 border-b border-slate-100 bg-slate-50/50 flex items-center gap-3 flex-wrap flex-shrink-0">
+                <div className="mx-6 mt-4 mb-2 p-4 bg-gradient-to-r from-amber-50/60 via-purple-50/40 to-blue-50/40 rounded-2xl border border-white/60 shadow-sm ring-1 ring-slate-900/5 flex items-center gap-3 flex-wrap flex-shrink-0">
                   {currentConversation.summary_for_human && (
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <Bot className="h-3.5 w-3.5 text-purple-500" />
-                      <span className="line-clamp-1">{currentConversation.summary_for_human}</span>
+                    <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                      <Sparkles className="h-4 w-4 text-amber-600 shrink-0" />
+                      <span className="text-sm font-medium text-slate-700 line-clamp-2">{currentConversation.summary_for_human}</span>
                     </div>
                   )}
-                  <div className="flex items-center gap-1.5 ml-auto">
+                  <div className="flex items-center gap-1.5 ml-auto flex-shrink-0">
                     {currentConversation.email_classification && (
                       <CategoryLabel classification={currentConversation.email_classification} size="sm" />
                     )}

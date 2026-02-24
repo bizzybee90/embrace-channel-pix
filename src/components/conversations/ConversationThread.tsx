@@ -5,7 +5,8 @@ import { ConversationHeader } from './ConversationHeader';
 import { MessageTimeline } from './MessageTimeline';
 import { ReplyArea } from './ReplyArea';
 import { CustomerIntelligence } from '@/components/customers/CustomerIntelligence';
-import { Loader2, Brain, Sparkles, ChevronRight, TrendingUp, Tag, Reply } from 'lucide-react';
+import { Loader2, Brain, Sparkles, ChevronRight, TrendingUp, Reply } from 'lucide-react';
+import { CategoryLabel } from '@/components/shared/CategoryLabel';
 import { useToast } from '@/hooks/use-toast';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
@@ -310,10 +311,7 @@ export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackBut
                 </span>
               )}
               {conversation.category && (
-                <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md border border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">
-                  <Tag className="w-3 h-3" />
-                  {conversation.category}
-                </span>
+                <CategoryLabel classification={conversation.category} size="sm" />
               )}
               {Array.isArray(topics) && topics.slice(0, 2).map((topic: string, i: number) => (
                 <span key={i} className="px-2 py-1 text-xs font-medium rounded-md border border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-700 dark:bg-blue-950/40 dark:text-blue-300">
