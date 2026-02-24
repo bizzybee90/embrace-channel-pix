@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { checkRateLimit, RATE_LIMITS } from "../_shared/rate-limit.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -36,6 +37,10 @@ Deno.serve(async (req) => {
     if (!conversationId) throw new Error('conversation_id is required');
     if (!workspaceId) throw new Error('workspace_id is required');
     if (!content || content.trim().length === 0) throw new Error('content is required and cannot be empty');
+
+    // --- Rate limiting ---
+    const rateLimited = await checkRateLimit(workspaceId, RATE_LIMITS['send-reply']);
+    if (rateLimited) return rateLimited;
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;

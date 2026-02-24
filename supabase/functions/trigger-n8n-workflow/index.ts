@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { validateAuth, AuthError, authErrorResponse } from '../_shared/auth.ts';
+import { checkRateLimit, RATE_LIMITS } from '../_shared/rate-limit.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -43,6 +44,10 @@ Deno.serve(async (req) => {
       if (error instanceof AuthError) return authErrorResponse(error);
       throw error;
     }
+
+    // Rate limiting — prevents runaway workflow triggers
+    const rateLimited = await checkRateLimit(workspace_id, RATE_LIMITS['trigger-n8n-workflow']);
+    if (rateLimited) return rateLimited;
 
     console.log(`[trigger-n8n] workspace=${workspace_id} type=${workflow_type}`);
 

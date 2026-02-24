@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { checkRateLimit, RATE_LIMITS } from "../_shared/rate-limit.ts";
 
 /**
  * CLASSIFY-EMAILS-DISPATCHER
@@ -43,8 +44,11 @@ serve(async (req) => {
       });
     }
 
+    // Rate limiting
+    const rateLimited = await checkRateLimit(workspace_id, RATE_LIMITS['classify-emails-dispatcher']);
+    if (rateLimited) return rateLimited;
+
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Count unclassified emails
