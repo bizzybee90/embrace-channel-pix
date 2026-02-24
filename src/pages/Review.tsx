@@ -564,23 +564,69 @@ export default function Review() {
           <MobileHeader onMenuClick={() => setSidebarOpen(true)} showBackButton onBackClick={() => setMobileShowDetail(false)} backToText="Back" />
           <MobileSidebarSheet open={sidebarOpen} onOpenChange={setSidebarOpen} onNavigate={() => setSidebarOpen(false)} />
           <div className="flex-1 overflow-y-auto">
-            <div className="p-4 space-y-4">
-              <div>
-                <h2 className="font-semibold text-base">{getSenderName(conv)}</h2>
-                <p className="text-xs text-muted-foreground">{getSenderEmail(conv)}</p>
+            <div className="p-4 space-y-3">
+              {/* Sender row */}
+              <div className="flex items-center gap-3">
+                <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <span className="text-sm font-bold text-primary">{getSenderName(conv)[0]?.toUpperCase()}</span>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h2 className="font-semibold text-sm truncate">{getSenderName(conv)}</h2>
+                  <p className="text-xs text-muted-foreground truncate">{getSenderEmail(conv)}</p>
+                </div>
               </div>
-              <div>
-                <h3 className="font-medium text-sm">{conv.title}</h3>
+
+              {/* AI summary bento strip */}
+              {conv.summary_for_human && (
+                <div className="p-3 bg-gradient-to-r from-amber-50/60 via-purple-50/40 to-blue-50/40 rounded-xl border border-white/60 shadow-sm ring-1 ring-slate-900/5 flex items-start gap-2">
+                  <Sparkles className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                  <span className="text-sm text-slate-700 leading-snug line-clamp-3">{conv.summary_for_human}</span>
+                </div>
+              )}
+
+              {/* Subject */}
+              <h3 className="font-semibold text-sm">{conv.title}</h3>
+
+              {/* Email body — read-only, no resize */}
+              <div className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed bg-slate-50 p-4 rounded-xl border border-slate-100 line-clamp-[8]">
+                {emailBody}
               </div>
-              <Card className="p-3">
-                <p className="text-sm text-muted-foreground whitespace-pre-wrap line-clamp-6">{emailBody}</p>
-              </Card>
+
+              {/* Classification + confidence */}
               {conv.email_classification && (
                 <div className="flex items-center gap-2">
                   <CategoryLabel classification={conv.email_classification} size="md" />
                   {confidencePercent != null && (
                     <span className={cn("text-sm font-semibold", confidenceColor)}>{confidencePercent}%</span>
                   )}
+                </div>
+              )}
+
+              {/* AI Reasoning */}
+              <div className="bg-purple-50/50 border border-purple-100/50 rounded-xl p-4">
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <Bot className="h-3.5 w-3.5 text-purple-500" />
+                  <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">AI Reasoning</span>
+                </div>
+                <p className="text-sm text-foreground/80 leading-relaxed">
+                  {conv.why_this_needs_you || conv.ai_reasoning || (
+                    <>
+                      Classified as <strong className="capitalize">{conv.email_classification?.replace(/_/g, ' ')}</strong>
+                      {conv.requires_reply ? ' — needs a reply.' : ' — no reply needed.'}
+                      {confidencePercent != null && <> Confidence: <span className={cn("font-semibold", confidenceColor)}>{confidencePercent}%</span>.</>}
+                    </>
+                  )}
+                </p>
+              </div>
+
+              {/* AI Draft preview */}
+              {conv.ai_draft_response && (
+                <div className="bg-purple-50/50 rounded-xl p-4 ring-1 ring-purple-200/50">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <Sparkles className="h-4 w-4 text-purple-600" />
+                    <span className="text-sm font-medium text-purple-700">AI draft ready</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground line-clamp-2">{conv.ai_draft_response.substring(0, 200)}</p>
                 </div>
               )}
             </div>

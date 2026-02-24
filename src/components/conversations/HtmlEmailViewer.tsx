@@ -51,6 +51,16 @@ export function HtmlEmailViewer({ htmlContent, open, onOpenChange }: HtmlEmailVi
         }
         table {
           max-width: 100%;
+          word-break: break-word;
+        }
+        td, th {
+          word-break: break-word;
+          overflow-wrap: break-word;
+        }
+        @media (max-width: 600px) {
+          table { width: 100% !important; }
+          td, th { display: block !important; width: 100% !important; }
+          img { max-width: 100% !important; height: auto !important; }
         }
       </style>
     </head>
@@ -70,7 +80,7 @@ export function HtmlEmailViewer({ htmlContent, open, onOpenChange }: HtmlEmailVi
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl h-[80vh] flex flex-col p-0">
+      <DialogContent className="max-w-4xl flex flex-col p-0 h-[100dvh] w-screen rounded-none sm:rounded-lg sm:h-[80vh] sm:w-auto">
         <DialogHeader className="px-4 py-3 border-b flex-shrink-0">
           <div className="flex items-center justify-between">
             <DialogTitle className="text-base">Formatted Email</DialogTitle>
