@@ -630,7 +630,7 @@ export default function Review() {
                       <p className="text-xs text-muted-foreground truncate">{conv.title}</p>
                     </div>
                     <div className="flex flex-col items-end gap-1">
-                      {conv.email_classification && <CategoryLabel classification={conv.email_classification} size="xs" showIcon={false} />}
+                      {conv.email_classification && <CategoryLabel classification={conv.email_classification} size="xs" />}
                       {conf != null && <span className={cn("text-xs font-bold", confColor)}>{conf}%</span>}
                     </div>
                   </div>
@@ -783,7 +783,7 @@ export default function Review() {
                             {conv.title || 'No subject'}
                           </p>
                           {conv.email_classification && (
-                            <CategoryLabel classification={conv.email_classification} size="xs" showIcon={false} />
+                            <CategoryLabel classification={conv.email_classification} size="xs" />
                           )}
                           {conv.decision_bucket && (
                             <Badge variant="outline" className={cn(
@@ -831,7 +831,7 @@ export default function Review() {
                           </div>
                           <span className="text-xs truncate flex-1 text-muted-foreground">{getSenderName(conv)}</span>
                           {conv.email_classification && (
-                            <CategoryLabel classification={conv.email_classification} size="xs" showIcon={false} />
+                            <CategoryLabel classification={conv.email_classification} size="xs" />
                           )}
                         </div>
                       </div>
