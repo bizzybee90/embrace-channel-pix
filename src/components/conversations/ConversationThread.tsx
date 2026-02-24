@@ -29,6 +29,7 @@ export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackBut
   const [customer, setCustomer] = useState<any>(null);
   const [intelligenceDrawerOpen, setIntelligenceDrawerOpen] = useState(false);
   const [isWide, setIsWide] = useState(false);
+  const [localReopened, setLocalReopened] = useState(false);
   const { toast } = useToast();
   const draftSaveTimeoutRef = useRef<NodeJS.Timeout>();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -44,6 +45,7 @@ export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackBut
   // Reset AI draft and scroll position when conversation changes
   useEffect(() => {
     setDraftText('');
+    setLocalReopened(false);
     scrollContainerRef.current?.scrollTo(0, 0);
   }, [conversation.id]);
 
@@ -199,15 +201,30 @@ export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackBut
     onUpdate();
   };
 
-  const handleReopen = async () => {
-    await supabase
+  const handleReopen = async (showReply = false) => {
+    const { error } = await supabase
       .from('conversations')
-      .update({ status: 'open', resolved_at: null })
+      .update({ status: 'open', resolved_at: null, decision_bucket: null })
       .eq('id', conversation.id);
+    
+    if (error) {
+      toast({ title: "Failed to reopen", description: error.message, variant: "destructive" });
+      return;
+    }
+
+    if (showReply) {
+      // Keep local state so reply area shows even before refetch
+      setLocalReopened(true);
+    } else {
+      toast({ title: "Conversation reopened", description: "Moved back to your inbox" });
+    }
     onUpdate();
   };
 
-  const isCompleted = conversation.status === 'resolved';
+  const isCompleted = !localReopened && (
+    conversation.status === 'resolved' || 
+    conversation.decision_bucket === 'auto_handled'
+  );
 
   // AI Briefing text
   const briefingText = conversation.summary_for_human
@@ -350,17 +367,14 @@ export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackBut
           {isCompleted ? (
             <div className="flex-shrink-0 px-4 pb-4 space-y-2">
               <button
-                onClick={() => {
-                  handleReopen();
-                  // Small delay to let state update, then the ReplyArea will show
-                }}
+                onClick={() => handleReopen(true)}
                 className="border border-slate-200 rounded-full py-3 px-4 text-muted-foreground cursor-pointer shadow-sm bg-white hover:border-purple-300 transition-all flex items-center gap-3 w-full text-left text-sm"
               >
                 <Reply className="w-4 h-4" />
                 Reply...
               </button>
               <button
-                onClick={handleReopen}
+                onClick={() => handleReopen(false)}
                 className="border border-slate-100 rounded-full py-2 px-4 text-muted-foreground/70 cursor-pointer bg-slate-50 hover:bg-slate-100 transition-all flex items-center justify-center gap-2 w-full text-xs"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
