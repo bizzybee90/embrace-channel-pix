@@ -99,7 +99,7 @@ export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerMod
   // Mobile layout — unchanged
   if (isMobile) {
     return (
-      <div className="flex h-screen bg-slate-50/50">
+      <div className="flex flex-col h-screen bg-slate-50/50">
         <MobileHeader onMenuClick={() => setSidebarOpen(true)} />
         <MobileSidebarSheet open={sidebarOpen} onOpenChange={setSidebarOpen} />
 

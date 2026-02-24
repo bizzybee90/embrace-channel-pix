@@ -58,8 +58,8 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
           .from('conversations')
           .select('id', { count: 'exact', head: true })
           .eq('workspace_id', userData.workspace_id)
-          .eq('needs_review', true)
-          .is('reviewed_at', null),
+          .eq('training_reviewed', false)
+          .not('email_classification', 'is', null),
         supabase
           .from('conversations')
           .select('id', { count: 'exact', head: true })

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { useWorkspace } from '@/hooks/useWorkspace';
 import { formatDistanceToNow } from 'date-fns';
 import {
   Sheet,
@@ -51,6 +52,7 @@ export function DraftPreviewSheet({
   onOpenChange,
   onSent,
 }: DraftPreviewSheetProps) {
+  const { workspace } = useWorkspace();
   const [conversation, setConversation] = useState<ConversationDetails | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [draftText, setDraftText] = useState('');
@@ -124,10 +126,11 @@ export function DraftPreviewSheet({
     setSending(true);
     try {
       // Send via edge function
-      const { error: sendError } = await supabase.functions.invoke('email-send', {
+      const { error: sendError } = await supabase.functions.invoke('send-reply', {
         body: {
-          conversationId: conversation.id,
-          response: draftText,
+          conversation_id: conversation.id,
+          workspace_id: workspace!.id,
+          content: draftText,
         },
       });
 
