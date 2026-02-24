@@ -51,6 +51,7 @@ export const ThreeColumnLayout = ({ sidebar, main }: ThreeColumnLayoutProps) => 
 
       {/* Desktop Main Content - floating card */}
       <main className="flex-1 flex flex-col overflow-y-auto min-w-0 p-4">
+        {/* Main content card */}
         <div className="flex-1 bg-white rounded-3xl shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] border border-slate-200/80 overflow-y-auto">
           {main}
         </div>
