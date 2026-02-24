@@ -84,6 +84,16 @@ function extractInlineMessage(payload: Record<string, unknown>): AurinkoMessage 
 
 Deno.serve(async (req) => {
   try {
+    // Handle Aurinko subscription validation handshake (GET with validationToken)
+    const url = new URL(req.url);
+    const validationToken = url.searchParams.get("validationToken");
+    if (validationToken) {
+      return new Response(validationToken, {
+        status: 200,
+        headers: { "Content-Type": "text/plain" },
+      });
+    }
+
     if (req.method !== "POST") {
       throw new HttpError(405, "Method not allowed");
     }
