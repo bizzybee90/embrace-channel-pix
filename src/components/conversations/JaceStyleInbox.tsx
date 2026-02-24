@@ -129,7 +129,7 @@ export const JaceStyleInbox = ({ onSelect, selectedId, filter = 'needs-me', hide
     }
 
     // When searching, fetch more items so search works beyond the first page
-    const limit = debouncedSearch && debouncedSearch.trim().length > 0 ? 250 : PAGE_SIZE;
+    const limit = PAGE_SIZE;
     query = query.limit(limit);
 
     const { data, error } = await query;
@@ -160,7 +160,7 @@ export const JaceStyleInbox = ({ onSelect, selectedId, filter = 'needs-me', hide
   });
 
   const { data: conversations = [], isLoading, isFetching } = useQuery({
-    queryKey: ['jace-inbox', filter, subFilter, debouncedSearch],
+    queryKey: ['jace-inbox', filter, subFilter],
     queryFn: async () => {
       const result = await fetchConversations();
       setLastUpdated(new Date());
