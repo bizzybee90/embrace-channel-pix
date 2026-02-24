@@ -785,6 +785,22 @@ export default function Review() {
                           {conv.email_classification && (
                             <CategoryLabel classification={conv.email_classification} size="xs" showIcon={false} />
                           )}
+                          {conv.decision_bucket && (
+                            <Badge variant="outline" className={cn(
+                              "text-[10px] px-1.5 py-0 h-4 font-semibold uppercase tracking-wider rounded-md border flex-shrink-0",
+                              conv.decision_bucket === 'act_now' && 'bg-red-50 text-red-600 border-red-200',
+                              conv.decision_bucket === 'quick_win' && conv.ai_draft_response ? 'bg-purple-50 text-purple-700 border-purple-100' : '',
+                              conv.decision_bucket === 'quick_win' && !conv.ai_draft_response && 'bg-amber-50 text-amber-600 border-amber-200',
+                              conv.decision_bucket === 'wait' && 'bg-slate-100 text-slate-600 border-slate-200',
+                              conv.decision_bucket === 'auto_handled' && 'bg-slate-100 text-slate-600 border-slate-200',
+                            )}>
+                              {conv.decision_bucket === 'act_now' && 'Urgent'}
+                              {conv.decision_bucket === 'quick_win' && conv.ai_draft_response && 'Draft'}
+                              {conv.decision_bucket === 'quick_win' && !conv.ai_draft_response && 'Reply'}
+                              {conv.decision_bucket === 'wait' && 'FYI'}
+                              {conv.decision_bucket === 'auto_handled' && 'Done'}
+                            </Badge>
+                          )}
                         </div>
                       </div>
                     );
