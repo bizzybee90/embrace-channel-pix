@@ -7,7 +7,7 @@ import { ConversationFilters } from './ConversationFilters';
 import { SearchInput } from './SearchInput';
 import { useIsTablet } from '@/hooks/use-tablet';
 import { Loader2, SlidersHorizontal, Sparkles } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, escapeSearchTerm } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -202,7 +202,7 @@ export const ConversationList = ({ selectedId, onSelect, filter = 'all-open', on
     // Add server-side search if search query provided
     if (debouncedSearch && debouncedSearch.trim().length > 0) {
       const searchTerm = debouncedSearch.trim();
-      query = query.or(`title.ilike.%${searchTerm}%,summary_for_human.ilike.%${searchTerm}%`);
+      query = query.or(`title.ilike.%${escapeSearchTerm(searchTerm)}%,summary_for_human.ilike.%${escapeSearchTerm(searchTerm)}%`);
     }
 
     // Add pagination
