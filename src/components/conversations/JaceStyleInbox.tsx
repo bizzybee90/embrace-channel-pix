@@ -41,6 +41,7 @@ export const JaceStyleInbox = ({ onSelect, selectedId, filter = 'needs-me', hide
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
   const [keyboardIndex, setKeyboardIndex] = useState(0);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'open' | 'done' | 'drafts' | 'needs-reply'>('all');
   const PAGE_SIZE = 50;
 
   // Debounce search to avoid spamming requests while typing
@@ -171,7 +172,7 @@ export const JaceStyleInbox = ({ onSelect, selectedId, filter = 'needs-me', hide
   });
 
   // Filter by search
-  const filteredConversations = conversations.filter((conv: any) => {
+  const searchFilteredConversations = conversations.filter((conv: any) => {
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
     return (
@@ -181,6 +182,25 @@ export const JaceStyleInbox = ({ onSelect, selectedId, filter = 'needs-me', hide
       conv.customer?.email?.toLowerCase().includes(q)
     );
   });
+
+  // Apply inline status filter (Inbox only)
+  const filteredConversations = filter === 'all-open' && statusFilter !== 'all'
+    ? searchFilteredConversations.filter((conv: any) => {
+        if (statusFilter === 'open') {
+          return conv.status !== 'resolved' && conv.decision_bucket !== 'auto_handled';
+        }
+        if (statusFilter === 'done') {
+          return conv.status === 'resolved' || conv.decision_bucket === 'auto_handled';
+        }
+        if (statusFilter === 'drafts') {
+          return !!conv.ai_draft_response && !conv.final_response && conv.requires_reply;
+        }
+        if (statusFilter === 'needs-reply') {
+          return conv.requires_reply && ['new', 'open', 'waiting_internal', 'ai_handling', 'escalated'].includes(conv.status);
+        }
+        return true;
+      })
+    : searchFilteredConversations;
 
   // Group by date
   const groupedConversations: GroupedConversations = {
@@ -437,6 +457,44 @@ export const JaceStyleInbox = ({ onSelect, selectedId, filter = 'needs-me', hide
         </div>
       </div>
       </>)}
+
+      {/* Inline filter chips — Inbox only */}
+      {filter === 'all-open' && !subFilter && (
+        <div className="flex items-center gap-1.5 px-3 py-2 border-b border-slate-100 overflow-x-auto flex-shrink-0 no-scrollbar">
+          {([
+            { key: 'all', label: 'All' },
+            { key: 'open', label: 'Open' },
+            { key: 'needs-reply', label: 'Needs Reply' },
+            { key: 'drafts', label: 'Drafts' },
+            { key: 'done', label: 'Done' },
+          ] as const).map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => setStatusFilter(key)}
+              className={cn(
+                "px-3 py-1 text-xs font-medium rounded-full whitespace-nowrap transition-all flex-shrink-0",
+                statusFilter === key
+                  ? "bg-purple-100 text-purple-700 ring-1 ring-purple-200"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              )}
+            >
+              {label}
+              {key !== 'all' && (() => {
+                const count = key === 'open'
+                  ? searchFilteredConversations.filter((c: any) => c.status !== 'resolved' && c.decision_bucket !== 'auto_handled').length
+                  : key === 'done'
+                  ? searchFilteredConversations.filter((c: any) => c.status === 'resolved' || c.decision_bucket === 'auto_handled').length
+                  : key === 'drafts'
+                  ? searchFilteredConversations.filter((c: any) => !!c.ai_draft_response && !c.final_response && c.requires_reply).length
+                  : key === 'needs-reply'
+                  ? searchFilteredConversations.filter((c: any) => c.requires_reply && ['new', 'open', 'waiting_internal', 'ai_handling', 'escalated'].includes(c.status)).length
+                  : 0;
+                return count > 0 ? <span className="ml-1 opacity-70">{count}</span> : null;
+              })()}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Conversation list */}
       <div className="flex-1 overflow-y-auto">
