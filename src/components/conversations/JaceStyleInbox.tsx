@@ -41,8 +41,24 @@ export const JaceStyleInbox = ({ onSelect, selectedId, filter = 'needs-me', hide
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
   const [keyboardIndex, setKeyboardIndex] = useState(0);
-  const [statusFilter, setStatusFilter] = useState<'all' | 'open' | 'done' | 'drafts' | 'needs-reply'>('all');
+  const [statusFilter, setStatusFilter] = useState<Set<string>>(new Set(['all']));
   const PAGE_SIZE = 50;
+
+  const toggleFilter = (key: string) => {
+    setStatusFilter(prev => {
+      const next = new Set(prev);
+      if (key === 'all') {
+        return new Set(['all']);
+      }
+      next.delete('all');
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next.size === 0 ? new Set(['all']) : next;
+    });
+  };
 
   // Debounce search to avoid spamming requests while typing
   useEffect(() => {
@@ -184,21 +200,19 @@ export const JaceStyleInbox = ({ onSelect, selectedId, filter = 'needs-me', hide
   });
 
   // Apply inline status filter (Inbox only)
-  const filteredConversations = filter === 'all-open' && statusFilter !== 'all'
+  const filteredConversations = filter === 'all-open' && !statusFilter.has('all')
     ? searchFilteredConversations.filter((conv: any) => {
-        if (statusFilter === 'open') {
-          return conv.status !== 'resolved' && conv.decision_bucket !== 'auto_handled';
-        }
-        if (statusFilter === 'done') {
-          return conv.status === 'resolved' || conv.decision_bucket === 'auto_handled';
-        }
-        if (statusFilter === 'drafts') {
-          return !!conv.ai_draft_response && !conv.final_response && conv.requires_reply;
-        }
-        if (statusFilter === 'needs-reply') {
-          return conv.requires_reply && ['new', 'open', 'waiting_internal', 'ai_handling', 'escalated'].includes(conv.status);
-        }
-        return true;
+        const isOpen = conv.status !== 'resolved' && conv.decision_bucket !== 'auto_handled';
+        const isDone = conv.status === 'resolved' || conv.decision_bucket === 'auto_handled';
+        const isDraft = !!conv.ai_draft_response && !conv.final_response && conv.requires_reply;
+        const isNeedsReply = conv.requires_reply && ['new', 'open', 'waiting_internal', 'ai_handling', 'escalated'].includes(conv.status);
+
+        return (
+          (statusFilter.has('open') && isOpen) ||
+          (statusFilter.has('done') && isDone) ||
+          (statusFilter.has('drafts') && isDraft) ||
+          (statusFilter.has('needs-reply') && isNeedsReply)
+        );
       })
     : searchFilteredConversations;
 
@@ -470,10 +484,10 @@ export const JaceStyleInbox = ({ onSelect, selectedId, filter = 'needs-me', hide
           ] as const).map(({ key, label }) => (
             <button
               key={key}
-              onClick={() => setStatusFilter(key)}
+              onClick={() => toggleFilter(key)}
               className={cn(
                 "px-3 py-1 text-xs font-medium rounded-full whitespace-nowrap transition-all flex-shrink-0",
-                statusFilter === key
+                statusFilter.has(key)
                   ? "bg-purple-100 text-purple-700 ring-1 ring-purple-200"
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200"
               )}
