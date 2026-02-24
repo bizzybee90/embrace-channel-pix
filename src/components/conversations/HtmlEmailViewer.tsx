@@ -100,7 +100,7 @@ export function HtmlEmailViewer({ htmlContent, open, onOpenChange }: HtmlEmailVi
         <div className="flex-1 overflow-hidden bg-white rounded-b-3xl">
           <iframe
             srcDoc={styledHtml}
-            sandbox="allow-same-origin"
+            sandbox=""
             className="w-full h-full border-0"
             title="Email content"
           />

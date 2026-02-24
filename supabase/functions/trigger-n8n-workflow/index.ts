@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { validateAuth, AuthError, authErrorResponse } from '../_shared/auth.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -15,33 +16,6 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const n8nWebhookBaseUrl = Deno.env.get('N8N_WEBHOOK_URL');
-
-    // SECURITY: Validate authentication — user JWT or service role
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized — missing token' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const token = authHeader.replace('Bearer ', '');
-    const isServiceRole = token === supabaseServiceKey;
-
-    if (!isServiceRole) {
-      // Validate user JWT
-      const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
-      const userSupabase = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
-        global: { headers: { Authorization: authHeader } }
-      });
-      const { data: { user }, error: authError } = await userSupabase.auth.getUser();
-      if (authError || !user) {
-        return new Response(
-          JSON.stringify({ error: 'Unauthorized — invalid token' }),
-          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-    }
     
     if (!n8nWebhookBaseUrl) {
       return new Response(
@@ -60,6 +34,14 @@ Deno.serve(async (req) => {
         JSON.stringify({ error: 'workspace_id and workflow_type are required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    // SECURITY: Validate JWT + workspace ownership
+    try {
+      await validateAuth(req, workspace_id);
+    } catch (error) {
+      if (error instanceof AuthError) return authErrorResponse(error);
+      throw error;
     }
 
     console.log(`[trigger-n8n] workspace=${workspace_id} type=${workflow_type}`);

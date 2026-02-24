@@ -69,30 +69,18 @@ Deno.serve(async (req) => {
       throw new HttpError(405, "Method not allowed");
     }
 
-    // SECURITY: Validate authentication — worker token, service role, or user JWT
+    // SECURITY: Internal-only — require worker token or service role key
     const workerToken = req.headers.get("x-bb-worker-token")?.trim();
     const expectedWorkerToken = Deno.env.get("BB_WORKER_TOKEN");
     const authHeader = req.headers.get("Authorization");
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
     const isWorker = workerToken && expectedWorkerToken && workerToken === expectedWorkerToken;
-    const isServiceRole = authHeader?.includes(serviceRoleKey);
+    const isServiceRole = authHeader?.replace("Bearer ", "") === serviceRoleKey;
 
     if (!isWorker && !isServiceRole) {
-      // Try user JWT as last resort
-      if (!authHeader?.startsWith("Bearer ")) {
-        throw new HttpError(401, "Unauthorized — missing authentication");
-      }
-      const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
-      const userSupabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
-        global: { headers: { Authorization: authHeader } }
-      });
-      const { error: authError } = await userSupabase.auth.getUser();
-      if (authError) {
-        throw new HttpError(401, "Unauthorized — invalid token");
-      }
+      throw new HttpError(401, "Unauthorized — worker token or service role required");
     }
-
     const body = await req.json() as {
       workspace_id?: string;
       config_id?: string;

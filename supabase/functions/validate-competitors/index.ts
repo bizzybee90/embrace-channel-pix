@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { calculateQualityScore } from "../_shared/quality-scorer.ts";
+import { validateAuth, AuthError, authErrorResponse } from "../_shared/auth.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -114,24 +115,18 @@ serve(async (req) => {
   const startTime = Date.now();
 
   try {
-    // SECURITY: Validate authentication
-    const authHeader = req.headers.get('Authorization');
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const isServiceRole = authHeader?.includes(supabaseServiceKey);
+    const { workspace_id, business_type } = await req.json();
 
-    if (!isServiceRole) {
-      if (!authHeader?.startsWith('Bearer ')) {
-        return new Response(JSON.stringify({ error: 'Unauthorized' }), 
-          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-      }
-      const userSupabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
-        global: { headers: { Authorization: authHeader } }
-      });
-      const { data: { user }, error: authError } = await userSupabase.auth.getUser();
-      if (authError || !user) {
-        return new Response(JSON.stringify({ error: 'Unauthorized' }),
-          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-      }
+    if (!workspace_id) {
+      throw new Error('workspace_id is required');
+    }
+
+    // SECURITY: Validate JWT + workspace ownership
+    try {
+      await validateAuth(req, workspace_id);
+    } catch (error) {
+      if (error instanceof AuthError) return authErrorResponse(error);
+      throw error;
     }
 
     const supabase = createClient(
@@ -139,12 +134,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    const { workspace_id, business_type } = await req.json();
     console.log(`[${FUNCTION_NAME}] Starting validation for workspace=${workspace_id}, type=${business_type}`);
-
-    if (!workspace_id) {
-      throw new Error('workspace_id is required');
-    }
 
     const { data: competitors, error: fetchError } = await supabase
       .from('competitor_sites')
