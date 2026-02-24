@@ -73,7 +73,7 @@ export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerMod
   };
 
   return (
-    <div className="bg-slate-50/50 min-h-screen flex h-screen overflow-hidden">
+    <div className="flex h-screen bg-slate-50/50">
       {/* Mobile Header */}
       {isMobile && (
         <>
@@ -88,46 +88,48 @@ export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerMod
       </div>
 
       {/* Content area */}
-      {!selectedConversation ? (
-        <div className="flex-1 flex min-h-0 overflow-hidden">
-          <main className="w-[380px] flex-shrink-0 bg-white m-4 rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden flex flex-col z-10">
-            <JaceStyleInbox
-              filter={filter}
-              selectedId={selectedConversation?.id}
-              onSelect={handleSelectConversation}
-            />
-          </main>
-          {/* Empty state right pane */}
-          <div className="flex-1 bg-white my-4 mr-4 rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden flex flex-col relative z-10 items-center justify-center">
-            <div className="text-center text-muted-foreground">
-              <p className="text-sm font-medium text-foreground/60">Select a conversation</p>
-              <p className="text-xs text-muted-foreground/50 mt-1">Choose from the list to get started</p>
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {!selectedConversation ? (
+          <div className="flex-1 flex overflow-hidden gap-4 p-4">
+            <main className="w-[380px] flex-shrink-0 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+              <JaceStyleInbox
+                filter={filter}
+                selectedId={selectedConversation?.id}
+                onSelect={handleSelectConversation}
+              />
+            </main>
+            {/* Empty state right pane */}
+            <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col relative items-center justify-center">
+              <div className="text-center text-muted-foreground">
+                <p className="text-sm font-medium text-foreground/60">Select a conversation</p>
+                <p className="text-xs text-muted-foreground/50 mt-1">Choose from the list to get started</p>
+              </div>
             </div>
           </div>
-        </div>
-      ) : (
-        <div className="flex-1 flex min-h-0 overflow-hidden">
-          {/* Middle Pane (Message List Column) - floating card */}
-          <div className="w-[380px] flex-shrink-0 bg-white m-4 rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden hidden md:flex flex-col z-10">
-            <JaceStyleInbox
-              filter={filter}
-              selectedId={selectedConversation?.id}
-              onSelect={handleSelectConversation}
-            />
-          </div>
+        ) : (
+          <div className="flex-1 flex overflow-hidden gap-4 p-4">
+            {/* Middle Pane (Message List Column) */}
+            <div className="w-[380px] flex-shrink-0 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hidden md:flex flex-col">
+              <JaceStyleInbox
+                filter={filter}
+                selectedId={selectedConversation?.id}
+                onSelect={handleSelectConversation}
+              />
+            </div>
 
-          {/* Right Pane (Reading/Preview Column) - floating card */}
-          <div className="flex-1 bg-white my-4 mr-4 rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden flex flex-col relative z-10">
-            <ConversationThread
-              key={refreshKey}
-              conversation={selectedConversation}
-              onUpdate={handleUpdate}
-              onBack={handleBack}
-              hideBackButton={false}
-            />
+            {/* Right Pane (Reading/Preview Column) */}
+            <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col relative">
+              <ConversationThread
+                key={refreshKey}
+                conversation={selectedConversation}
+                onUpdate={handleUpdate}
+                onBack={handleBack}
+                hideBackButton={false}
+              />
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Customer Info Overlay Drawer */}
       {customerPanelOpen && selectedConversation && (
