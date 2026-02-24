@@ -370,7 +370,7 @@ export const JaceStyleInbox = ({ onSelect, selectedId, filter = 'needs-me' }: Ja
   };
 
   return (
-    <div className="flex flex-col h-full bg-background">
+    <div className="flex flex-col h-full bg-white">
       {/* Header with title and metrics */}
       <div className={cn(
         "bg-gradient-to-r from-primary/5 to-transparent border-b border-border/50",
