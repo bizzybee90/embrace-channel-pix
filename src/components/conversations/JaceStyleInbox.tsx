@@ -329,7 +329,7 @@ export const JaceStyleInbox = ({ onSelect, selectedId, filter = 'needs-me' }: Ja
     if (conversations.length === 0) return null;
     return (
       <div>
-        <div className="px-3 py-1.5 bg-purple-50/80 border-b border-slate-100">
+        <div className="px-3 py-1.5 bg-purple-50/80 border-b border-slate-100 sticky top-0 z-10">
           <span className="text-[10px] font-bold text-purple-700 uppercase tracking-wider">
             {title}
           </span>
@@ -373,7 +373,7 @@ export const JaceStyleInbox = ({ onSelect, selectedId, filter = 'needs-me' }: Ja
     <div className="flex flex-col h-full bg-white">
       {/* Header with title and metrics */}
       <div className={cn(
-        "bg-gradient-to-r from-primary/5 to-transparent border-b border-border/50",
+        "bg-white/80 backdrop-blur-sm border-b border-slate-100",
         isMobile ? "px-4 py-3" : "px-6 py-4"
       )}>
         <div className="flex items-center justify-between">
@@ -388,7 +388,7 @@ export const JaceStyleInbox = ({ onSelect, selectedId, filter = 'needs-me' }: Ja
                 <ArrowLeft className="h-4 w-4" />
               </Button>
             )}
-            <h1 className="text-lg font-semibold text-foreground">{getFilterTitle()}</h1>
+            <h1 className="text-base font-semibold text-foreground">{getFilterTitle()}</h1>
             {subFilter && (
               <span className="text-sm text-muted-foreground">
                 ({filteredConversations.length})
