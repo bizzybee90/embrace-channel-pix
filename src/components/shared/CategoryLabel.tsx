@@ -25,53 +25,56 @@ interface CategoryConfig {
   className: string;
 }
 
+// Unified premium indigo style for all category pills
+const UNIFIED_PILL = 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 border-indigo-200 dark:border-indigo-700';
+
 const categoryConfigs: Record<string, CategoryConfig> = {
   // New 9-category taxonomy (primary keys)
-  quote: { icon: Receipt, label: 'Quote', className: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20' },
-  booking: { icon: MessageCircle, label: 'Booking', className: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20' },
-  complaint: { icon: AlertTriangle, label: 'Complaint', className: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20' },
-  follow_up: { icon: MessageCircle, label: 'Follow-up', className: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20' },
-  inquiry: { icon: Mail, label: 'Enquiry', className: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20' },
-  notification: { icon: Bot, label: 'Auto', className: 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20' },
-  newsletter: { icon: Megaphone, label: 'Marketing', className: 'bg-pink-500/10 text-pink-600 dark:text-pink-400 border-pink-500/20' },
-  spam: { icon: Ban, label: 'Spam', className: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20' },
-  personal: { icon: Users, label: 'Personal', className: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20' },
+  quote: { icon: Receipt, label: 'Quote', className: UNIFIED_PILL },
+  booking: { icon: MessageCircle, label: 'Booking', className: UNIFIED_PILL },
+  complaint: { icon: AlertTriangle, label: 'Complaint', className: UNIFIED_PILL },
+  follow_up: { icon: MessageCircle, label: 'Follow-up', className: UNIFIED_PILL },
+  inquiry: { icon: Mail, label: 'Enquiry', className: UNIFIED_PILL },
+  notification: { icon: Bot, label: 'Auto', className: UNIFIED_PILL },
+  newsletter: { icon: Megaphone, label: 'Marketing', className: UNIFIED_PILL },
+  spam: { icon: Ban, label: 'Spam', className: UNIFIED_PILL },
+  personal: { icon: Users, label: 'Personal', className: UNIFIED_PILL },
 
   // Legacy category keys (backwards compatibility)
-  customer_inquiry: { icon: Mail, label: 'Inquiry', className: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20' },
-  customer_complaint: { icon: AlertTriangle, label: 'Complaint', className: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20' },
-  customer_feedback: { icon: ThumbsUp, label: 'Feedback', className: 'bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20' },
-  complaint_dispute: { icon: AlertTriangle, label: 'Complaint', className: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20' },
+  customer_inquiry: { icon: Mail, label: 'Enquiry', className: UNIFIED_PILL },
+  customer_complaint: { icon: AlertTriangle, label: 'Complaint', className: UNIFIED_PILL },
+  customer_feedback: { icon: ThumbsUp, label: 'Feedback', className: UNIFIED_PILL },
+  complaint_dispute: { icon: AlertTriangle, label: 'Complaint', className: UNIFIED_PILL },
   
   // Specific request types
-  booking_request: { icon: MessageCircle, label: 'Booking', className: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20' },
-  quote_request: { icon: Receipt, label: 'Quote', className: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20' },
-  cancellation_request: { icon: AlertTriangle, label: 'Cancel', className: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20' },
-  reschedule_request: { icon: MessageCircle, label: 'Reschedule', className: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20' },
+  booking_request: { icon: MessageCircle, label: 'Booking', className: UNIFIED_PILL },
+  quote_request: { icon: Receipt, label: 'Quote', className: UNIFIED_PILL },
+  cancellation_request: { icon: AlertTriangle, label: 'Cancel', className: UNIFIED_PILL },
+  reschedule_request: { icon: MessageCircle, label: 'Reschedule', className: UNIFIED_PILL },
   
   // Lead categories
-  lead_new: { icon: UserPlus, label: 'New Lead', className: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20' },
-  lead_followup: { icon: MessageCircle, label: 'Follow-up', className: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20' },
+  lead_new: { icon: UserPlus, label: 'New Lead', className: UNIFIED_PILL },
+  lead_followup: { icon: MessageCircle, label: 'Follow-up', className: UNIFIED_PILL },
   
   // Financial categories
-  supplier_invoice: { icon: Receipt, label: 'Invoice', className: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' },
-  supplier_urgent: { icon: Zap, label: 'Supplier Urgent', className: 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/20' },
-  receipt_confirmation: { icon: Receipt, label: 'Receipt', className: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' },
-  payment_confirmation: { icon: Receipt, label: 'Payment', className: 'bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/20' },
+  supplier_invoice: { icon: Receipt, label: 'Invoice', className: UNIFIED_PILL },
+  supplier_urgent: { icon: Zap, label: 'Supplier Urgent', className: UNIFIED_PILL },
+  receipt_confirmation: { icon: Receipt, label: 'Receipt', className: UNIFIED_PILL },
+  payment_confirmation: { icon: Receipt, label: 'Payment', className: UNIFIED_PILL },
   
   // Partner/Business
-  partner_request: { icon: Users, label: 'Partner', className: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20' },
+  partner_request: { icon: Users, label: 'Partner', className: UNIFIED_PILL },
   
   // Automated/System
-  automated_notification: { icon: Bot, label: 'Auto', className: 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20' },
-  internal_system: { icon: Settings2, label: 'System', className: 'bg-gray-500/10 text-gray-600 dark:text-gray-400 border-gray-500/20' },
-  informational_only: { icon: Info, label: 'Info', className: 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20' },
+  automated_notification: { icon: Bot, label: 'Auto', className: UNIFIED_PILL },
+  internal_system: { icon: Settings2, label: 'System', className: UNIFIED_PILL },
+  informational_only: { icon: Info, label: 'Info', className: UNIFIED_PILL },
   
   // Noise categories
-  spam_phishing: { icon: Ban, label: 'Spam', className: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20' },
-  marketing_newsletter: { icon: Megaphone, label: 'Marketing', className: 'bg-pink-500/10 text-pink-600 dark:text-pink-400 border-pink-500/20' },
-  recruitment_hr: { icon: Briefcase, label: 'Recruitment', className: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20' },
-  misdirected: { icon: AlertTriangle, label: 'Misdirected', className: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20' },
+  spam_phishing: { icon: Ban, label: 'Spam', className: UNIFIED_PILL },
+  marketing_newsletter: { icon: Megaphone, label: 'Marketing', className: UNIFIED_PILL },
+  recruitment_hr: { icon: Briefcase, label: 'Recruitment', className: UNIFIED_PILL },
+  misdirected: { icon: AlertTriangle, label: 'Misdirected', className: UNIFIED_PILL },
 };
 
 // Keyword-based fallback matching for non-standard classifications
@@ -80,49 +83,49 @@ const getConfigByKeyword = (classification: string): CategoryConfig | null => {
   
   // Payment/Receipt related
   if (lower.includes('payment') && (lower.includes('confirm') || lower.includes('received'))) {
-    return { icon: Receipt, label: 'Payment', className: 'bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/20' };
+    return { icon: Receipt, label: 'Payment', className: UNIFIED_PILL };
   }
   if (lower.includes('receipt') || lower.includes('stripe') || lower.includes('paypal')) {
-    return { icon: Receipt, label: 'Receipt', className: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' };
+    return { icon: Receipt, label: 'Receipt', className: UNIFIED_PILL };
   }
   
   // Invoice related
   if (lower.includes('invoice') || lower.includes('billing') || lower.includes('bill')) {
-    return { icon: Receipt, label: 'Invoice', className: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' };
+    return { icon: Receipt, label: 'Invoice', className: UNIFIED_PILL };
   }
   
   // Marketing
   if (lower.includes('marketing') || lower.includes('newsletter') || lower.includes('promo')) {
-    return { icon: Megaphone, label: 'Marketing', className: 'bg-pink-500/10 text-pink-600 dark:text-pink-400 border-pink-500/20' };
+    return { icon: Megaphone, label: 'Marketing', className: UNIFIED_PILL };
   }
   
   // Customer requests - be specific
   if (lower.includes('booking') || lower.includes('appointment') || lower.includes('schedule')) {
-    return { icon: MessageCircle, label: 'Booking', className: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20' };
+    return { icon: MessageCircle, label: 'Booking', className: UNIFIED_PILL };
   }
   if (lower.includes('quote') || lower.includes('estimate') || lower.includes('pricing')) {
-    return { icon: Receipt, label: 'Quote', className: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20' };
+    return { icon: Receipt, label: 'Quote', className: UNIFIED_PILL };
   }
   if (lower.includes('cancel')) {
-    return { icon: AlertTriangle, label: 'Cancel', className: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20' };
+    return { icon: AlertTriangle, label: 'Cancel', className: UNIFIED_PILL };
   }
   if (lower.includes('reschedule') || lower.includes('rebook') || lower.includes('change date')) {
-    return { icon: MessageCircle, label: 'Reschedule', className: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20' };
+    return { icon: MessageCircle, label: 'Reschedule', className: UNIFIED_PILL };
   }
   
-  // General enquiry - only if nothing more specific matches
+  // General enquiry
   if (lower.includes('enquiry') || lower.includes('inquiry') || lower.includes('question')) {
-    return { icon: Mail, label: 'Enquiry', className: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20' };
+    return { icon: Mail, label: 'Enquiry', className: UNIFIED_PILL };
   }
   
   // Complaints/Issues
   if (lower.includes('complaint') || lower.includes('issue') || lower.includes('problem') || lower.includes('unhappy')) {
-    return { icon: AlertTriangle, label: 'Complaint', className: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20' };
+    return { icon: AlertTriangle, label: 'Complaint', className: UNIFIED_PILL };
   }
   
   // Feedback
   if (lower.includes('feedback') || lower.includes('review') || lower.includes('thank')) {
-    return { icon: ThumbsUp, label: 'Feedback', className: 'bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20' };
+    return { icon: ThumbsUp, label: 'Feedback', className: UNIFIED_PILL };
   }
   
   return null;

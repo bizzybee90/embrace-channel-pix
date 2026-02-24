@@ -290,7 +290,7 @@ export const JaceStyleInbox = ({ onSelect, selectedId, filter = 'needs-me' }: Ja
         className={cn(
           "px-3 py-2.5 cursor-pointer transition-all",
           isSelected
-            ? "bg-white shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] ring-1 ring-slate-900/5 z-10"
+            ? "bg-purple-50/60 border border-purple-200 ring-1 ring-purple-100 shadow-sm z-10 rounded-xl"
             : "border-b border-slate-100 hover:bg-slate-50"
         )}
       >
