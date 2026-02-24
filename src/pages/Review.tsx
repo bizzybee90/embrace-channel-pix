@@ -9,7 +9,6 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ChannelIcon } from '@/components/shared/ChannelIcon';
 import { CategoryLabel, getCategoryConfig } from '@/components/shared/CategoryLabel';
@@ -739,7 +738,7 @@ export default function Review() {
               </span>
             </div>
 
-            <ScrollArea className="flex-1">
+            <div className="flex-1 overflow-y-auto">
               {/* To Review section */}
               {unreviewedQueue.length > 0 && (
                 <>
@@ -844,7 +843,7 @@ export default function Review() {
               {unreviewedQueue.length === 0 && recentlyConfirmed.length === 0 && !isLoading && (
                 <div className="p-4 text-center text-muted-foreground text-sm">No emails to reconcile</div>
               )}
-            </ScrollArea>
+            </div>
           </div>
 
           {/* Column 2: Email Preview + AI Reasoning (flex) */}
