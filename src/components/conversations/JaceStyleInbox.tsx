@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useState } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Conversation } from '@/lib/types';
 import { SearchInput } from './SearchInput';
@@ -30,11 +30,12 @@ interface GroupedConversations {
 }
 
 export const JaceStyleInbox = ({ onSelect, selectedId, filter = 'needs-me', hideHeader = false }: JaceStyleInboxProps) => {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const subFilter = searchParams.get('filter'); // 'at-risk', 'to-reply', 'drafts'
   
   const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [correctionOpen, setCorrectionOpen] = useState(false);
   const [selectedForCorrection, setSelectedForCorrection] = useState<Conversation | null>(null);
@@ -60,11 +61,6 @@ export const JaceStyleInbox = ({ onSelect, selectedId, filter = 'needs-me', hide
     });
   };
 
-  // Debounce search to avoid spamming requests while typing
-  useEffect(() => {
-    const t = window.setTimeout(() => setDebouncedSearch(searchQuery), 250);
-    return () => window.clearTimeout(t);
-  }, [searchQuery]);
 
   const fetchConversations = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -397,8 +393,7 @@ export const JaceStyleInbox = ({ onSelect, selectedId, filter = 'needs-me', hide
   };
 
   const clearSubFilter = () => {
-    // Navigate back to home page
-    window.location.href = '/';
+    navigate('/');
   };
 
   return (

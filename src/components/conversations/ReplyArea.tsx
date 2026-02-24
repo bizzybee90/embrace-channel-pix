@@ -47,7 +47,7 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend, ex
   // Load saved draft when conversation changes
   useEffect(() => {
     const savedDraft = localStorage.getItem(`draft-${conversationId}`);
-    console.log('📖 Loading draft for conversation:', { conversationId, savedDraft });
+    
     setReplyBody(savedDraft || '');
     setDraftUsed(false);
     setIsCollapsed(true);
@@ -55,7 +55,7 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend, ex
 
   // Handle AI-generated draft from "Use Draft" button
   useEffect(() => {
-    console.log('📝 ReplyArea external draft updated:', { externalDraftText, currentReplyBody: replyBody });
+    
     if (externalDraftText && externalDraftText !== replyBody && !draftUsed) {
       setReplyBody(externalDraftText);
       setDraftUsed(true);
