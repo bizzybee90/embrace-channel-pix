@@ -83,9 +83,9 @@ export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerMod
       )}
       
       {/* Left Nav (Icon Sidebar) */}
-      <aside className="hidden md:flex bg-white border-r border-slate-200 z-20 flex-col h-full flex-shrink-0">
+      <div className="hidden md:flex flex-shrink-0">
         <Sidebar />
-      </aside>
+      </div>
 
       {/* Content area */}
       {!selectedConversation ? (
