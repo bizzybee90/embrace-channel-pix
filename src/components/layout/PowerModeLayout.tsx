@@ -106,7 +106,7 @@ export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerMod
         <div className="flex-1 flex flex-col overflow-hidden">
           {!selectedConversation ? (
             <div className="flex-1 flex overflow-hidden gap-4 p-4">
-              <main className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+              <main className="flex-1 bg-white rounded-3xl shadow-sm border border-slate-200/80 overflow-hidden flex flex-col">
                 <JaceStyleInbox
                   filter={filter}
                   selectedId={selectedConversation?.id}
@@ -191,7 +191,7 @@ export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerMod
         {/* Content area */}
         {!selectedConversation ? (
           <div className="flex-1 flex overflow-hidden gap-4 p-4">
-            <main className="w-[350px] min-w-[350px] flex-shrink-0 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+            <main className="w-[350px] min-w-[350px] flex-shrink-0 bg-white rounded-3xl shadow-sm border border-slate-200/80 overflow-hidden flex flex-col">
               <JaceStyleInbox
                 filter={filter}
                 selectedId={selectedConversation?.id}
@@ -200,7 +200,7 @@ export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerMod
               />
             </main>
             {/* Empty state right pane */}
-            <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col relative items-center justify-center">
+            <div className="flex-1 bg-white rounded-3xl shadow-sm border border-slate-200/80 overflow-hidden flex flex-col relative items-center justify-center">
               <div className="text-center text-muted-foreground">
                 <p className="text-sm font-medium text-foreground/60">Select a conversation</p>
                 <p className="text-xs text-muted-foreground/50 mt-1">Choose from the list to get started</p>
@@ -210,7 +210,7 @@ export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerMod
         ) : (
           <div className="flex-1 flex overflow-hidden gap-4 p-4">
             {/* Middle Pane (Message List Column) */}
-            <div className="w-[350px] min-w-[350px] flex-shrink-0 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+            <div className="w-[350px] min-w-[350px] flex-shrink-0 bg-white rounded-3xl shadow-sm border border-slate-200/80 overflow-hidden flex flex-col">
               <JaceStyleInbox
                 filter={filter}
                 selectedId={selectedConversation?.id}
@@ -220,7 +220,7 @@ export const PowerModeLayout = ({ filter = 'all-open', channelFilter }: PowerMod
             </div>
 
             {/* Right Pane (Reading/Preview Column) */}
-            <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col relative">
+            <div className="flex-1 bg-white rounded-3xl shadow-sm border border-slate-200/80 overflow-hidden flex flex-col relative">
               <ConversationThread
                 key={refreshKey}
                 conversation={selectedConversation}
