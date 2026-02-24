@@ -157,18 +157,11 @@ export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackBut
           }
 
           if (recipient) {
-            const { error: sendError } = await supabase.functions.invoke('email-send', {
+            const { error: sendError } = await supabase.functions.invoke('send-reply', {
               body: {
-                conversationId: conversation.id,
-                channel: conversation.channel,
-                to: recipient,
-                message: body,
-                skipMessageLog: true,
-                metadata: {
-                  actorType: 'human_agent',
-                  actorName: userData?.name || 'Agent',
-                  actorId: user.id
-                }
+                conversation_id: conversation.id,
+                workspace_id: conversation.workspace_id,
+                content: body
               }
             });
 

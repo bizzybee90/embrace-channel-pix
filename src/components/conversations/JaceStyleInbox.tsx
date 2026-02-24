@@ -125,10 +125,7 @@ export const JaceStyleInbox = ({ onSelect, selectedId, filter = 'needs-me', hide
     } else if (filter === 'sent') {
       query = query.eq('status', 'resolved');
     } else if (filter === 'all-open') {
-      // Inbox: all active conversations, exclude auto-handled/resolved
-      query = query
-        .neq('decision_bucket', 'auto_handled')
-        .in('status', ['new', 'open', 'waiting_internal', 'ai_handling', 'escalated']);
+      // Inbox: show ALL conversations — no filters
     }
 
     // When searching, fetch more items so search works beyond the first page
