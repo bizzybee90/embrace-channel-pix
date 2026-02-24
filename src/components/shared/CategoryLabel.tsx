@@ -192,7 +192,7 @@ export const CategoryLabel = ({
     <Badge 
       variant="outline" 
       className={cn(
-        "rounded-full border flex items-center gap-1 font-medium",
+        "rounded-full border flex items-center gap-1 font-medium flex-shrink-0 whitespace-nowrap",
         sizeClasses[size],
         config.className,
         editable && "cursor-pointer hover:ring-2 hover:ring-primary/20 transition-all group",
