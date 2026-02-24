@@ -731,7 +731,7 @@ export default function Review() {
         {/* 3-Column Layout */}
         <div className="flex-1 flex overflow-hidden gap-4 p-4">
           {/* Column 1: Reconciliation Queue (350px) */}
-          <div className="w-[350px] min-w-[350px] flex-shrink-0 flex flex-col bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="w-[350px] min-w-[350px] flex-shrink-0 flex flex-col bg-white rounded-3xl shadow-sm border border-slate-200/80 overflow-hidden">
             <div className="px-3 py-2 border-b border-slate-100">
               <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">
                 Reconciliation Queue
@@ -847,7 +847,7 @@ export default function Review() {
           </div>
 
           {/* Column 2: Email Preview + AI Reasoning (flex) */}
-          <div className="flex-1 flex flex-col overflow-hidden bg-white rounded-2xl shadow-sm border border-slate-200">
+          <div className="flex-1 flex flex-col overflow-hidden bg-white rounded-3xl shadow-sm border border-slate-200/80">
             {currentConversation ? (
               <div className="flex-1 flex flex-col overflow-y-auto">
                 {/* Sender row */}
@@ -938,7 +938,7 @@ export default function Review() {
           </div>
 
           {/* Column 3: Reconciliation Panel (300px) */}
-          <div className="w-[300px] min-w-[300px] flex-shrink-0 flex flex-col bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="w-[300px] min-w-[300px] flex-shrink-0 flex flex-col bg-white rounded-3xl shadow-sm border border-slate-200/80 overflow-hidden">
             {currentConversation ? (
               <div className="flex-1 flex flex-col overflow-y-auto">
                 {/* The Verdict */}
