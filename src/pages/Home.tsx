@@ -165,7 +165,7 @@ export const Home = () => {
       iconBoxBg: 'bg-red-100',
       cardBg: 'bg-gradient-to-b from-red-50/80 to-white',
       cardBorder: 'border border-red-100',
-      onClick: () => navigate('/to-reply?filter=at-risk'),
+      onClick: () => navigate('/needs-action?filter=at-risk'),
     },
     {
       label: 'To Reply',
@@ -175,7 +175,7 @@ export const Home = () => {
       iconBoxBg: 'bg-blue-100',
       cardBg: 'bg-gradient-to-b from-blue-50/80 to-white',
       cardBorder: 'border border-blue-100',
-      onClick: () => navigate('/to-reply?filter=to-reply'),
+      onClick: () => navigate('/needs-action?filter=needs-action'),
     },
     {
       label: 'Drafts',
@@ -185,7 +185,7 @@ export const Home = () => {
       iconBoxBg: 'bg-amber-100',
       cardBg: 'bg-gradient-to-b from-amber-50/80 to-white',
       cardBorder: 'border border-amber-100',
-      onClick: () => navigate('/to-reply?filter=drafts'),
+      onClick: () => navigate('/needs-action?filter=drafts'),
     },
     {
       label: 'Training',
@@ -311,7 +311,7 @@ export const Home = () => {
                   variant="ghost"
                   size="sm"
                   className="w-full text-slate-500 mt-3 hover:bg-slate-50"
-                  onClick={() => navigate('/to-reply?filter=drafts')}
+                  onClick={() => navigate('/needs-action?filter=drafts')}
                 >
                   View all drafts
                 </Button>

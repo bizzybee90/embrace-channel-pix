@@ -279,11 +279,11 @@ export function ActivityFeed({ onNavigate, maxItems = 10 }: ActivityFeedProps) {
           onClick={() => {
             if (activity.conversationId && onNavigate) {
               if (activity.type === 'draft_ready') {
-                onNavigate(`/to-reply?id=${activity.conversationId}`);
+                onNavigate(`/needs-action?id=${activity.conversationId}`);
               } else if (activity.type === 'inbox') {
-                onNavigate(`/to-reply`);
+                onNavigate(`/needs-action`);
               } else {
-                onNavigate(`/to-reply?id=${activity.conversationId}`);
+                onNavigate(`/needs-action?id=${activity.conversationId}`);
               }
             }
           }}

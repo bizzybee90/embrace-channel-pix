@@ -11,9 +11,9 @@ interface MobileBottomNavProps {
 
 const navItems = [
   { 
-    id: 'to-reply' as const, 
+    id: 'needs-action' as const, 
     icon: Mail, 
-    label: 'To Reply',
+    label: 'Needs Action',
     badgeBg: 'bg-destructive/10',
     iconColor: 'text-destructive'
   },

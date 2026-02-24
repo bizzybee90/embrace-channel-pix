@@ -270,7 +270,7 @@ export function DraftMessages({ onNavigate, maxItems = 5 }: DraftMessagesProps) 
               />
               <div 
                 className="flex-1 min-w-0"
-                onClick={() => navigate(`/to-reply?filter=drafts&conversation=${draft.id}`)}
+                onClick={() => navigate(`/needs-action?filter=drafts&conversation=${draft.id}`)}
               >
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-sm font-medium text-foreground truncate">
