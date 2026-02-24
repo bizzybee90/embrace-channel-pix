@@ -241,6 +241,79 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend, ex
 
           <TabsContent value="reply" className="mt-0">
             <div className="space-y-2">
+              {/* Mobile: textarea full-width, buttons below */}
+              {useMobileStyle ? (
+                <>
+                  <Textarea
+                    ref={replyTextareaRef}
+                    placeholder="Type your reply..."
+                    value={replyBody}
+                    onChange={(e) => {
+                      const newValue = e.target.value;
+                      setReplyBody(newValue);
+                      if (newValue.trim()) {
+                        localStorage.setItem(`draft-${conversationId}`, newValue);
+                      } else {
+                        localStorage.removeItem(`draft-${conversationId}`);
+                      }
+                      onDraftChange?.(newValue);
+                    }}
+                    className="w-full min-h-[44px] max-h-[200px] text-sm resize-none rounded-xl border-0 bg-purple-50/30 dark:bg-purple-500/5 focus-visible:ring-1 focus-visible:ring-purple-300/50 leading-relaxed placeholder:text-muted-foreground/50 transition-all duration-200 overflow-y-auto"
+                  />
+
+                  {attachments.length > 0 && (
+                    <div className="space-y-1">
+                      {attachments.map((file, idx) => (
+                        <div key={idx} className="flex items-center gap-2 text-sm bg-muted/50 rounded-lg px-3 py-1.5">
+                          <Paperclip className="h-3 w-3 text-muted-foreground" />
+                          <span className="flex-1 truncate text-xs">{file.name}</span>
+                          <Button type="button" variant="ghost" size="sm" onClick={() => removeAttachment(idx)} className="h-5 w-5 p-0">
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Mobile action bar */}
+                  <div className="flex items-center gap-2">
+                    <input ref={fileInputRef} type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv" onChange={handleFileSelect} className="hidden" />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploading || attachments.length >= 10}
+                      className="h-8 px-2 text-xs text-muted-foreground rounded-lg"
+                    >
+                      <Paperclip className="h-3.5 w-3.5 mr-1" />
+                      Attach
+                    </Button>
+                    <div className="flex-1" />
+                    {replyBody && draftUsed && (
+                      <Button
+                        onClick={() => { setReplyBody(''); setDraftUsed(false); onDraftTextCleared?.(); }}
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0 rounded-lg text-muted-foreground hover:text-destructive"
+                        title="Discard draft"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                    <Button
+                      onClick={handleSendReply}
+                      disabled={sending || uploading || (!replyBody.trim() && attachments.length === 0)}
+                      className="rounded-xl bg-purple-600 hover:bg-purple-700 text-white px-4 h-9 text-sm font-medium shadow-sm gap-1.5"
+                    >
+                      <Sparkles className="h-3.5 w-3.5" />
+                      {draftUsed ? 'Approve & Send' : 'Send'}
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                /* Desktop: side-by-side layout unchanged */
+                <>
               <div className="flex items-end gap-2 rounded-xl transition-all duration-200">
                 <Textarea
                   ref={replyTextareaRef}
@@ -256,10 +329,7 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend, ex
                     }
                     onDraftChange?.(newValue);
                   }}
-                  className={cn(
-                    useMobileStyle ? "min-h-[80px] text-sm" : "min-h-[56px] text-base",
-                    "w-full resize-none rounded-xl border-0 bg-purple-50/30 dark:bg-purple-500/5 focus-visible:ring-1 focus-visible:ring-purple-300/50 leading-relaxed placeholder:text-muted-foreground/50 transition-all duration-200 flex-1 overflow-y-auto"
-                  )}
+                  className="min-h-[56px] text-base w-full resize-none rounded-xl border-0 bg-purple-50/30 dark:bg-purple-500/5 focus-visible:ring-1 focus-visible:ring-purple-300/50 leading-relaxed placeholder:text-muted-foreground/50 transition-all duration-200 flex-1 overflow-y-auto"
                 />
                 <div className="flex flex-col gap-1 mb-1">
                   {replyBody && draftUsed && (
@@ -322,20 +392,42 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend, ex
                   ⌘+Enter to send
                 </span>
               </div>
+                </>
+              )}
             </div>
           </TabsContent>
 
           <TabsContent value="note" className="mt-0">
+            {useMobileStyle ? (
+              <div className="space-y-2">
+                <Textarea
+                  ref={noteTextareaRef}
+                  placeholder="Add an internal note..."
+                  value={noteBody}
+                  onChange={(e) => setNoteBody(e.target.value)}
+                  className="w-full min-h-[44px] max-h-[200px] text-sm resize-none rounded-xl border-0 bg-warning/5 focus-visible:ring-1 focus-visible:ring-warning/30 leading-relaxed placeholder:text-muted-foreground/50 transition-all duration-200 overflow-y-auto"
+                />
+                <div className="flex justify-end">
+                  <Button
+                    onClick={handleSendNote}
+                    disabled={sending || !noteBody.trim()}
+                    variant="outline"
+                    size="sm"
+                    className="h-9 rounded-xl border-warning/20 bg-warning/10 text-warning hover:bg-warning/20 gap-1.5 px-4"
+                  >
+                    <Send className="h-3.5 w-3.5" />
+                    Add Note
+                  </Button>
+                </div>
+              </div>
+            ) : (
             <div className="flex items-end gap-2">
               <Textarea
                 ref={noteTextareaRef}
                 placeholder="Add an internal note..."
                 value={noteBody}
                 onChange={(e) => setNoteBody(e.target.value)}
-                className={cn(
-                  useMobileStyle ? "min-h-[80px] text-sm" : "min-h-[56px] text-base",
-                  "w-full resize-none rounded-xl border-0 bg-warning/5 focus-visible:ring-1 focus-visible:ring-warning/30 leading-relaxed placeholder:text-muted-foreground/50 shadow-[inset_0_1px_2px_rgba(0,0,0,0.02)] transition-all duration-200 flex-1 overflow-y-auto"
-                )}
+                className="min-h-[56px] text-base w-full resize-none rounded-xl border-0 bg-warning/5 focus-visible:ring-1 focus-visible:ring-warning/30 leading-relaxed placeholder:text-muted-foreground/50 shadow-[inset_0_1px_2px_rgba(0,0,0,0.02)] transition-all duration-200 flex-1 overflow-y-auto"
               />
               <Button
                 onClick={handleSendNote}
@@ -347,6 +439,7 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend, ex
                 <Send className="h-4 w-4" />
               </Button>
             </div>
+            )}
           </TabsContent>
         </div>
       </Tabs>

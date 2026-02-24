@@ -5,7 +5,7 @@ import { ConversationHeader } from './ConversationHeader';
 import { MessageTimeline } from './MessageTimeline';
 import { ReplyArea } from './ReplyArea';
 import { CustomerIntelligence } from '@/components/customers/CustomerIntelligence';
-import { Loader2, Brain, Sparkles, ChevronRight, TrendingUp, Reply } from 'lucide-react';
+import { Loader2, Brain, Sparkles, ChevronRight, TrendingUp, Reply, RotateCcw } from 'lucide-react';
 import { CategoryLabel } from '@/components/shared/CategoryLabel';
 import { useToast } from '@/hooks/use-toast';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
@@ -348,13 +348,23 @@ export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackBut
         {/* Reply area at bottom — always render */}
         <div className="flex-shrink-0">
           {isCompleted ? (
-            <div className="flex-shrink-0 px-4 pb-4">
+            <div className="flex-shrink-0 px-4 pb-4 space-y-2">
               <button
-                onClick={handleReopen}
+                onClick={() => {
+                  handleReopen();
+                  // Small delay to let state update, then the ReplyArea will show
+                }}
                 className="border border-slate-200 rounded-full py-3 px-4 text-muted-foreground cursor-pointer shadow-sm bg-white hover:border-purple-300 transition-all flex items-center gap-3 w-full text-left text-sm"
               >
                 <Reply className="w-4 h-4" />
-                Reopen &amp; reply...
+                Reply...
+              </button>
+              <button
+                onClick={handleReopen}
+                className="border border-slate-100 rounded-full py-2 px-4 text-muted-foreground/70 cursor-pointer bg-slate-50 hover:bg-slate-100 transition-all flex items-center justify-center gap-2 w-full text-xs"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                Reopen without replying
               </button>
             </div>
           ) : (

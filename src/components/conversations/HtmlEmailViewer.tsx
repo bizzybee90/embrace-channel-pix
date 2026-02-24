@@ -80,8 +80,8 @@ export function HtmlEmailViewer({ htmlContent, open, onOpenChange }: HtmlEmailVi
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl flex flex-col p-0 h-[100dvh] w-screen rounded-none sm:rounded-lg sm:h-[80vh] sm:w-auto">
-        <DialogHeader className="px-4 py-3 border-b flex-shrink-0">
+      <DialogContent className="max-w-4xl flex flex-col p-0 mx-4 h-[80dvh] w-[calc(100vw-2rem)] rounded-3xl sm:rounded-3xl sm:h-[80vh] sm:w-auto sm:mx-auto">
+        <DialogHeader className="px-4 py-3 border-b flex-shrink-0 rounded-t-3xl">
           <div className="flex items-center justify-between">
             <DialogTitle className="text-base">Formatted Email</DialogTitle>
             <div className="flex items-center gap-2">
@@ -89,7 +89,7 @@ export function HtmlEmailViewer({ htmlContent, open, onOpenChange }: HtmlEmailVi
                 variant="outline"
                 size="sm"
                 onClick={handleOpenInNewTab}
-                className="gap-1.5"
+                className="gap-1.5 rounded-xl"
               >
                 <ExternalLink className="h-3.5 w-3.5" />
                 Open in new tab
@@ -97,7 +97,7 @@ export function HtmlEmailViewer({ htmlContent, open, onOpenChange }: HtmlEmailVi
             </div>
           </div>
         </DialogHeader>
-        <div className="flex-1 overflow-hidden bg-white rounded-b-lg">
+        <div className="flex-1 overflow-hidden bg-white rounded-b-3xl">
           <iframe
             srcDoc={styledHtml}
             sandbox="allow-same-origin"
