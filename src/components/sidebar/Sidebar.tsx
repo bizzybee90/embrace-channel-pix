@@ -103,8 +103,8 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
           <nav className="space-y-1 flex-1">
             {[
               { to: '/', icon: Home, label: 'Home', end: true },
-              { to: '/all-open', icon: Inbox, label: 'Inbox' },
-              { to: '/to-reply', icon: Zap, label: 'Needs Action', count: viewCounts?.toReply, color: 'text-destructive' },
+              { to: '/inbox', icon: Inbox, label: 'Inbox' },
+              { to: '/needs-action', icon: Zap, label: 'Needs Action', count: viewCounts?.toReply, color: 'text-destructive' },
               { to: '/unread', icon: Mail, label: 'Unread', count: viewCounts?.unread, color: 'text-blue-500' },
               { to: '/drafts', icon: FileEdit, label: 'Drafts', count: viewCounts?.drafts, color: 'text-amber-500' },
               { to: '/review', icon: ClipboardCheck, label: 'Training', count: viewCounts?.review, color: 'text-purple-500' },
@@ -178,8 +178,8 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
         {/* Primary nav - top anchored */}
         <nav className="flex flex-col items-center gap-1">
           <IconRailItem to="/" icon={Home} label="Home" end />
-          <IconRailItem to="/all-open" icon={Inbox} label="Inbox" />
-          <IconRailItem to="/to-reply" icon={Zap} label="Needs Action" count={viewCounts?.toReply} color="text-destructive" />
+          <IconRailItem to="/inbox" icon={Inbox} label="Inbox" />
+          <IconRailItem to="/needs-action" icon={Zap} label="Needs Action" count={viewCounts?.toReply} color="text-destructive" />
           <IconRailItem to="/unread" icon={Mail} label="Unread" count={viewCounts?.unread} color="text-blue-500" />
           <IconRailItem to="/drafts" icon={FileEdit} label="Drafts" count={viewCounts?.drafts} color="text-amber-500" />
           <IconRailItem to="/review" icon={ClipboardCheck} label="Training" count={viewCounts?.review} color="text-purple-500" />

@@ -51,12 +51,22 @@ const RouterContent = () => {
         } 
       />
 
-      {/* Redirect old /inbox to /all-open (Inbox) */}
-      <Route path="/inbox" element={<Navigate to="/all-open" replace />} />
-      
-      {/* To Reply - Primary view */}
+      {/* Inbox - All open conversations */}
       <Route 
-        path="/to-reply" 
+        path="/inbox" 
+        element={
+          <AuthGuard>
+            <EscalationHub filter="all-open" />
+          </AuthGuard>
+        } 
+      />
+      
+      {/* Redirect old /all-open to /inbox */}
+      <Route path="/all-open" element={<Navigate to="/inbox" replace />} />
+      
+      {/* Needs Action - Primary view */}
+      <Route 
+        path="/needs-action" 
         element={
           <AuthGuard>
             <EscalationHub filter="needs-me" />
@@ -64,8 +74,9 @@ const RouterContent = () => {
         } 
       />
       
-      {/* Redirect old needs-me route */}
-      <Route path="/needs-me" element={<Navigate to="/to-reply" replace />} />
+      {/* Redirect old routes */}
+      <Route path="/to-reply" element={<Navigate to="/needs-action" replace />} />
+      <Route path="/needs-me" element={<Navigate to="/needs-action" replace />} />
       
       {/* Done - Auto-handled + resolved */}
       <Route 
@@ -130,15 +141,7 @@ const RouterContent = () => {
         } 
       />
       
-      {/* All Open (Inbox All) */}
-      <Route 
-        path="/all-open" 
-        element={
-          <AuthGuard>
-            <EscalationHub filter="all-open" />
-          </AuthGuard>
-        } 
-      />
+      {/* Legacy /all-open handled by redirect above */}
       
       {/* Legacy routes */}
       <Route 

@@ -156,7 +156,7 @@ export const RecentActivityWidget = () => {
     if (activity.conversation_id) {
       // Navigate to the appropriate page with the conversation selected
       if (activity.type === 'escalation') {
-        navigate(`/to-reply?id=${activity.conversation_id}`);
+        navigate(`/needs-action?id=${activity.conversation_id}`);
       } else {
         navigate(`/done?id=${activity.conversation_id}`);
       }

@@ -203,7 +203,7 @@ export const ActivityPage = () => {
   const handleActivityClick = (activity: ActivityItem) => {
     if (activity.conversationId) {
       if (activity.type === 'draft_ready') {
-        navigate(`/to-reply?id=${activity.conversationId}`);
+        navigate(`/needs-action?id=${activity.conversationId}`);
       } else {
         navigate(`/done?id=${activity.conversationId}`);
       }
