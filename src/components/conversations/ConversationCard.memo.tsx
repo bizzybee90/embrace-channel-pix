@@ -215,8 +215,8 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate }
           className={cn(
             "relative cursor-pointer transition-all duration-300 rounded-[22px] overflow-hidden",
             "bg-card border border-border/30 hover:border-primary/30",
-            "apple-shadow hover:apple-shadow-lg spring-press",
-            selected && "border-primary/50 apple-shadow-lg bg-gradient-to-br from-primary/8 via-primary/4 to-card"
+            "apple-shadow hover:honey-glow-shadow spring-press",
+            selected && "border-primary/50 ring-1 ring-primary/20 honey-glow-shadow bg-gradient-to-br from-primary/8 via-primary/4 to-card"
           )}
           style={{
             transform: isSwiping ? `translateX(${swipeDistance}px)` : 'translateX(0)',
@@ -306,8 +306,8 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate }
       className={cn(
         "relative cursor-pointer transition-all duration-300 ease-out rounded-[22px] mb-3 overflow-hidden",
         "bg-card border border-border/30 hover:border-primary/30",
-        "apple-shadow hover:apple-shadow-lg spring-press",
-        selected && "border-primary/50 apple-shadow-lg bg-gradient-to-br from-primary/8 via-primary/4 to-card"
+        "apple-shadow hover:honey-glow-shadow spring-press",
+        selected && "border-primary/50 ring-1 ring-primary/20 honey-glow-shadow bg-gradient-to-br from-primary/8 via-primary/4 to-card"
       )}
     >
       {/* Priority/Status Accent Bar */}
