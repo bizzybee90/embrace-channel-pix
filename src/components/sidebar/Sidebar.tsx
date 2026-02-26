@@ -107,7 +107,7 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
               { to: '/needs-action', icon: Zap, label: 'Needs Action', count: viewCounts?.toReply, color: 'text-destructive' },
               { to: '/unread', icon: Mail, label: 'Unread', count: viewCounts?.unread, color: 'text-blue-500' },
               { to: '/drafts', icon: FileEdit, label: 'Drafts', count: viewCounts?.drafts, color: 'text-amber-500' },
-              { to: '/review', icon: ClipboardCheck, label: 'Training', count: viewCounts?.review, color: 'text-purple-500' },
+              { to: '/review', icon: ClipboardCheck, label: 'Training', count: viewCounts?.review, color: 'text-amber-500' },
               { to: '/snoozed', icon: Clock, label: 'Snoozed', count: viewCounts?.snoozed, color: 'text-amber-500' },
               { to: '/done', icon: Archive, label: 'Cleared', count: viewCounts?.done, color: 'text-green-500' },
               { to: '/sent', icon: Send, label: 'Sent' },
@@ -182,7 +182,7 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
           <IconRailItem to="/needs-action" icon={Zap} label="Needs Action" count={viewCounts?.toReply} color="text-destructive" />
           <IconRailItem to="/unread" icon={Mail} label="Unread" count={viewCounts?.unread} color="text-blue-500" />
           <IconRailItem to="/drafts" icon={FileEdit} label="Drafts" count={viewCounts?.drafts} color="text-amber-500" />
-          <IconRailItem to="/review" icon={ClipboardCheck} label="Training" count={viewCounts?.review} color="text-purple-500" />
+          <IconRailItem to="/review" icon={ClipboardCheck} label="Training" count={viewCounts?.review} color="text-amber-500" />
           <IconRailItem to="/snoozed" icon={Clock} label="Snoozed" count={viewCounts?.snoozed} color="text-amber-500" />
           <IconRailItem to="/done" icon={Archive} label="Cleared" count={viewCounts?.done} color="text-green-500" />
           <IconRailItem to="/sent" icon={Send} label="Sent" color="text-blue-500" />

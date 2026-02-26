@@ -20,7 +20,7 @@ export const EmailListItem = ({ email, isSelected, onClick }: EmailListItemProps
       className={cn(
         'w-full text-left rounded-xl mx-2 my-1 p-3 transition-all flex flex-col gap-0.5 group',
         isSelected
-          ? 'bg-white shadow-sm border border-purple-200 ring-1 ring-purple-50'
+          ? 'bg-white shadow-sm border border-amber-200 ring-1 ring-amber-50'
           : 'border border-transparent hover:bg-slate-50/80',
         outbound && 'opacity-70'
       )}

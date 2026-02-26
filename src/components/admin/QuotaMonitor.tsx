@@ -60,7 +60,7 @@ export function QuotaMonitor() {
           limit: 500,
           period: 'per hour',
           icon: <Zap className="h-5 w-5" />,
-          color: 'text-purple-500',
+          color: 'text-amber-500',
         },
         {
           provider: 'Aurinko',

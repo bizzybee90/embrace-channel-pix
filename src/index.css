@@ -18,33 +18,33 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    --background: 220 17% 97%;
-    --foreground: 220 15% 12%;
+    --background: 50 20% 98%;
+    --foreground: 0 0% 10%;
 
     --card: 0 0% 100%;
-    --card-foreground: 220 15% 12%;
+    --card-foreground: 0 0% 10%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 220 15% 12%;
+    --popover-foreground: 0 0% 10%;
 
-    --primary: 217 91% 60%;
+    --primary: 36 64% 55%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 14% 96%;
-    --secondary-foreground: 220 15% 12%;
+    --secondary: 46 96% 89%;
+    --secondary-foreground: 30 33% 15%;
 
     --muted: 220 14% 96%;
-    --muted-foreground: 220 9% 46%;
+    --muted-foreground: 220 9% 42%;
 
-    --accent: 220 14% 96%;
-    --accent-foreground: 220 15% 12%;
+    --accent: 46 96% 89%;
+    --accent-foreground: 30 33% 15%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: 217 91% 60%;
+    --border: 220 14% 90%;
+    --input: 220 14% 90%;
+    --ring: 36 64% 55%;
 
     --radius: 0.75rem;
     
@@ -80,7 +80,7 @@ All colors MUST be HSL.
     
     --channel-sms: 267 84% 64%;
     --channel-whatsapp: 142 71% 45%;
-    --channel-email: 217 91% 60%;
+    --channel-email: 36 64% 55%;
     --channel-phone: 25 95% 53%;
     --channel-webchat: 280 71% 60%;
 
@@ -88,7 +88,7 @@ All colors MUST be HSL.
 
     --sidebar-foreground: 240 5.3% 26.1%;
 
-    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary: 30 33% 15%;
 
     --sidebar-primary-foreground: 0 0% 98%;
 
@@ -96,9 +96,9 @@ All colors MUST be HSL.
 
     --sidebar-accent-foreground: 240 5.9% 10%;
 
-    --sidebar-border: 220 13% 91%;
+    --sidebar-border: 220 14% 90%;
 
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-ring: 36 64% 55%;
   }
 
   .dark {
@@ -111,16 +111,16 @@ All colors MUST be HSL.
     --popover: 220 15% 11%;
     --popover-foreground: 220 10% 95%;
 
-    --primary: 217 91% 60%;
+    --primary: 36 64% 55%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 15% 16%;
+    --secondary: 30 20% 18%;
     --secondary-foreground: 220 10% 95%;
 
     --muted: 220 15% 16%;
     --muted-foreground: 220 10% 65%;
 
-    --accent: 220 15% 16%;
+    --accent: 30 20% 18%;
     --accent-foreground: 220 10% 95%;
 
     --destructive: 0 62% 50%;
@@ -128,7 +128,7 @@ All colors MUST be HSL.
 
     --border: 220 15% 18%;
     --input: 220 15% 18%;
-    --ring: 217 91% 60%;
+    --ring: 36 64% 55%;
     
     /* Priority colors - uniform across all views */
     --priority-urgent: 0 84% 60%;
@@ -154,17 +154,17 @@ All colors MUST be HSL.
     
     --channel-sms: 267 84% 64%;
     --channel-whatsapp: 142 71% 45%;
-    --channel-email: 217 91% 60%;
+    --channel-email: 36 64% 55%;
     --channel-phone: 25 95% 53%;
     --channel-webchat: 280 71% 60%;
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary: 36 64% 55%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 240 3.7% 15.9%;
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-ring: 36 64% 55%;
   }
 }
 

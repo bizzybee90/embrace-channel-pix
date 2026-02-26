@@ -55,7 +55,7 @@ export const InsightsWidget = ({ workspaceId }: InsightsWidgetProps) => {
     if (severity === 'warning') return <AlertTriangle className="h-4 w-4 text-amber-500" />;
     if (type === 'trend' || type === 'category_trend') return <TrendingUp className="h-4 w-4 text-blue-500" />;
     if (type === 'opportunity' || type === 'automation_opportunity') return <Lightbulb className="h-4 w-4 text-yellow-500" />;
-    if (type === 'summary') return <Sparkles className="h-4 w-4 text-indigo-500" />;
+    if (type === 'summary') return <Sparkles className="h-4 w-4 text-amber-500" />;
     return <Info className="h-4 w-4 text-slate-400" />;
   };
 
@@ -77,13 +77,13 @@ export const InsightsWidget = ({ workspaceId }: InsightsWidgetProps) => {
   return (
     <div className="bg-white rounded-3xl border border-slate-100/80 shadow-sm p-5">
       <div className="flex items-center gap-2 mb-4">
-        <Lightbulb className="h-4 w-4 text-indigo-500" />
+        <Lightbulb className="h-4 w-4 text-amber-500" />
         <h2 className="font-semibold text-slate-900">Insights</h2>
       </div>
 
       {insights.length === 0 ? (
-        <div className="flex flex-col items-center justify-center h-48 rounded-2xl bg-gradient-to-br from-slate-50 to-purple-50/30 border border-purple-100/50 border-dashed m-4">
-          <Sparkles className="w-5 h-5 text-purple-500 animate-pulse mb-3" />
+        <div className="flex flex-col items-center justify-center h-48 rounded-2xl bg-gradient-to-br from-slate-50 to-amber-50/30 border border-amber-100/50 border-dashed m-4">
+          <Sparkles className="w-5 h-5 text-amber-500 animate-pulse mb-3" />
           <p className="text-sm font-medium text-slate-600">Gathering Intelligence...</p>
           <p className="text-xs text-slate-400 mt-1 max-w-[200px]">
             Insights will appear here as BizzyBee analyzes patterns.
