@@ -1,132 +1,128 @@
 
 
-# Honey Theme Migration -- Colour-Only, No Layout Changes
+# Premium Honey Visual Upgrade — App-Wide Polish Pass
 
-## Summary
-Swap the app's blue/purple primary colour system to the BizzyBee "Honey Amber" palette so it matches the marketing site. Only CSS variables, semantic tokens, and hardcoded colour classes change -- zero layout, spacing, typography, or component structure modifications.
+## The Problem
+The honey theme migration swapped colours correctly, but the app still *feels* flat and dull because the marketing site uses a much richer visual language: gradient text, honey-tinted shadows, glowing accent backgrounds, warm elevated cards, and subtle amber washes. The app just changed hex values without adopting any of that warmth.
 
----
-
-## Phase 1: Global Theme Tokens (`src/index.css`)
-
-Update the CSS custom properties in both `:root` (light) and `.dark` blocks:
-
-| Token | Current (HSL) | New (HSL from hex) |
-|-------|---------------|-------------------|
-| `--primary` | `217 91% 60%` (blue) | `36 64% 55%` (#d59543) |
-| `--primary-foreground` | `0 0% 100%` | `0 0% 100%` (unchanged) |
-| `--ring` | `217 91% 60%` | `36 64% 55%` |
-| `--secondary` | `220 14% 96%` | `46 96% 89%` (#fef3c7 tint) |
-| `--secondary-foreground` | `220 15% 12%` | `30 33% 15%` (#3d2516-ish) |
-| `--accent` | `220 14% 96%` | `46 96% 89%` |
-| `--accent-foreground` | `220 15% 12%` | `30 33% 15%` |
-| `--background` | `220 17% 97%` | `50 20% 98%` (#fafaf8 warm white) |
-| `--foreground` | `220 15% 12%` | `0 0% 10%` (#1a1a1a) |
-| `--muted-foreground` | `220 9% 46%` | `220 9% 42%` (#6b7280) |
-| `--border` | `220 13% 91%` | `220 14% 90%` (#e5e7eb) |
-| `--input` | same as border | same as border |
-| `--sidebar-ring` | `217.2 91.2% 59.8%` | `36 64% 55%` |
-| `--sidebar-primary` | `240 5.9% 10%` | `30 33% 15%` |
-| `--channel-email` | `217 91% 60%` | `36 64% 55%` (honey) |
-
-Dark mode `--primary` and `--ring` get the same honey amber value. Secondary/accent become darker warm tones (`30 20% 18%`).
+## What Changes (and What Doesn't)
+- **NO layout, spacing, typography, component structure, or routing changes**
+- **YES**: Shadows, gradients, glows, card treatments, hover states, and subtle ambient warmth
 
 ---
 
-## Phase 2: Tailwind Config (`tailwind.config.ts`)
+## Phase 1: New Design Tokens in `src/index.css`
 
-No structural changes needed -- all colours already reference CSS variables. No action required here.
+Add these CSS variables (matching the marketing site's system):
 
----
+| New Token | Value | Purpose |
+|-----------|-------|---------|
+| `--accent-glow` | `48 96% 89%` | Soft amber wash for highlights, badges, active states |
+| `--deep-brown` | `20 45% 16%` | Premium dark text accent (hero headings, sidebar logo text) |
+| `--brand-brown` | `25 42% 28%` | Mid-tone brown for secondary text accents |
 
-## Phase 3: Hardcoded Purple References (~39 files, ~446 matches)
-
-Search-and-replace patterns for all `purple-*` Tailwind classes:
-
-| Pattern | Replacement |
-|---------|-------------|
-| `purple-600` | `amber-600` |
-| `purple-500` | `amber-500` |
-| `purple-400` | `amber-400` |
-| `purple-700` | `amber-700` |
-| `purple-100` | `amber-100` |
-| `purple-50` | `amber-50` |
-| `purple-950` | `amber-950` |
-| `purple-200` | `amber-200` |
-| `purple-800` | `amber-800` |
-| `purple-900` | `amber-900` |
-
-Key files affected:
-- `LiveActivityDashboard.tsx` (unread cards)
-- `JaceStyleInbox.tsx` (empty state gradient)
-- `ConversationCard.tsx` / `.memo.tsx` (swipe actions -- these are blue, see Phase 4)
-- `ActivityFeed.tsx` (reviewed icon)
-- `InsightRevealCard.tsx` (purple variant)
-- `ChannelManagementPanel.tsx` (review mode icon)
-- `LearningSystemPanel.tsx` (behavior stats icon)
-- `InboxLearningInsightsPanel.tsx` (patterns icon)
-- Various onboarding / settings panels
+Add new utility classes:
+- `.gradient-text` -- `bg-clip-text text-transparent bg-gradient-to-r from-primary to-accent` (honey-to-gold text shimmer)
+- `.honey-glow-shadow` -- Multi-layer shadow with amber tint: `0 4px 24px -4px hsl(33 62% 55% / 0.15), 0 1px 3px hsl(0 0% 0% / 0.04)`
+- `.honey-glow-shadow-lg` -- Stronger version for hero/feature cards
+- `.card-warm` -- White card with warm honey hover shadow (matching marketing's `.card-elevated`)
+- `.hex-pattern` -- Subtle hexagonal SVG background pattern at 4% opacity (brand texture)
 
 ---
 
-## Phase 4: Hardcoded Blue References (~45 files, ~368 matches)
+## Phase 2: Hero Copilot Banner Enhancement (`Home.tsx`)
 
-Blue is used in two contexts:
-1. **As the old primary colour** (buttons, spinners, active states) -- these become honey via the CSS variable change automatically (they use `text-primary`, `bg-primary`, etc.).
-2. **As a semantic/category colour** (e.g., `text-blue-500` for "scheduling", channel icons, info badges) -- these stay blue because they represent category meaning, not brand.
+Currently: flat `bg-gradient-to-r from-amber-100/50` with basic shadows.
 
-Only blue references that serve as "brand primary" substitutes get changed to amber:
-- `ConversationCard.memo.tsx` swipe resolve background: `blue-500/20` to `amber-500/20`, `blue-600` to `amber-600`
-- `ConversationCard.tsx` same swipe colours
-- Draft badges: `blue-500/10 text-blue-600 border-blue-500/20` to `amber-500/10 text-amber-600 border-amber-500/20`
-- `Home.tsx` "To Reply" icon colour if it acts as primary
-
-Category/semantic blues (scheduling, info, channel-email, admin status) stay as-is.
+Upgrade to:
+- Richer gradient: `from-[hsl(var(--accent-glow))] via-white to-[hsl(var(--accent-glow))]/30`
+- Add the hex-pattern background overlay
+- Apply `.honey-glow-shadow` to the banner card
+- Make the greeting text use `.gradient-text` on the dynamic part
+- Frosted briefing panel: add a subtle `ring-1 ring-primary/10` warm border glow
+- Auto-handled badge: add honey glow shadow instead of plain `shadow-sm`
 
 ---
 
-## Phase 5: Indigo Category Pills (`CategoryLabel.tsx`)
+## Phase 3: Metric Cards Warm Treatment (`Home.tsx`)
 
-The unified pill class:
-```
-bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 border-indigo-200 dark:border-indigo-700
-```
-Changes to:
-```
-bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border-amber-200 dark:border-amber-700
-```
+Currently: flat gradients with plain borders.
 
-Other indigo references in `ConversationThread.tsx` (Deep Dive button, intelligence panel gradient), `CustomerIntelligence.tsx`, and `InsightsWidget.tsx` change from indigo to amber/honey equivalents.
+Upgrade:
+- Active cards get `honey-glow-shadow` on hover (warm amber shadow lift)
+- Icon boxes get a subtle inner glow: `shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]`
+- The "Training" and "Drafts" amber cards get a slightly richer gradient from `amber-50` to `white` with a warm ring
 
 ---
 
-## Phase 6: Button Hover State (`button.tsx`)
+## Phase 4: Sidebar Visual Warmth (`Sidebar.tsx`)
 
-The default variant already uses `hover:bg-primary/90` which will automatically use the new honey token. No changes needed to button component.
+Currently: plain icon rail with flat hover states.
 
----
-
-## Phase 7: Contrast Verification Pass
-
-After token changes, visually verify these key screens:
-- **Dashboard**: KPI cards, activity feed, AI widgets
-- **Inbox / Conversation List**: active item highlight, badges
-- **AI Reconciliation (Review)**: confirm/change buttons, confidence bars
-- **Cleared / Done**: resolved state styling
-- **Settings**: section headers, toggle accents
-
-White text on `#d59543` has a contrast ratio of ~3.6:1 which passes WCAG AA for large text. For small text we ensure `--primary-foreground` stays white and button text is bold/semibold (matching current pattern).
+Upgrade:
+- Active nav item: add `ring-1 ring-primary/20` warm border glow alongside existing `bg-primary/10`
+- Logo: add subtle `drop-shadow-[0_2px_8px_hsl(33_62%_55%/0.3)]` honey glow
+- Notification badges: swap from flat `bg-destructive` to include a tiny warm shadow
 
 ---
 
-## Files Modified (estimated ~50 files)
+## Phase 5: Widget Cards Elevation (`Home.tsx` widget grid)
 
-1. `src/index.css` -- theme tokens (the core change)
-2. `src/components/shared/CategoryLabel.tsx` -- indigo to amber pills
-3. ~35 component files -- purple/blue hardcoded classes to amber
-4. `src/components/conversations/ConversationThread.tsx` -- indigo accents
-5. `src/components/customers/CustomerIntelligence.tsx` -- indigo gradient
-6. `src/components/dashboard/InsightsWidget.tsx` -- indigo icons
+Currently: `bg-white rounded-3xl border border-slate-100/80 shadow-sm`
+
+Upgrade to match marketing's `.card-elevated` pattern:
+- `shadow-[0_2px_20px_-4px_hsl(0_0%_0%/0.06)]`
+- `hover:shadow-[0_8px_40px_-8px_hsl(33_62%_55%/0.12)]` (honey-tinted hover glow)
+- `transition-all duration-500`
+
+---
+
+## Phase 6: Button Primary Glow (`button.tsx`)
+
+Currently: flat `hover:shadow-md`.
+
+Upgrade the `default` variant:
+- Add honey drop shadow: `shadow-[0_2px_12px_-2px_hsl(33_62%_55%/0.3)]`
+- Hover: `hover:shadow-[0_4px_20px_-2px_hsl(33_62%_55%/0.4)]`
+- This makes primary buttons feel warm and premium, matching marketing CTAs
+
+---
+
+## Phase 7: Conversation List Polish (`JaceStyleInbox.tsx`, `ConversationCard.memo.tsx`)
+
+- Selected conversation: add `ring-1 ring-primary/20` warm highlight
+- Card hover: apply warm shadow lift `hover:shadow-[0_4px_16px_-4px_hsl(33_62%_55%/0.1)]`
+- Empty state gradient: enrich from flat amber to include accent-glow wash
+
+---
+
+## Phase 8: AI/Training Sparkle Accents
+
+Where amber sparkle icons appear (Review page, training badges, AI widgets):
+- Add `drop-shadow-[0_0_6px_hsl(33_62%_55%/0.4)]` to sparkle icons for a warm luminous effect
+- Confidence bars: add `shadow-[inset_0_1px_0_rgba(255,255,255,0.3)]` for depth
+
+---
+
+## Phase 9: Global "Warm Canvas" Polish (`index.css`)
+
+- Add a very subtle hex-pattern background to the main `body` or `.bg-background` at 2-3% opacity, giving the warm textured feel of the marketing site
+- Update `.panel-elevated` to use warm shadow instead of cold slate ring
+- Update `.apple-shadow` variants to include a hint of amber warmth in the shadow colour
+
+---
+
+## Files Modified (estimated ~10 files)
+
+1. `src/index.css` -- New tokens + utility classes + warm shadow updates
+2. `src/pages/Home.tsx` -- Hero banner, metric cards, widget cards
+3. `src/components/ui/button.tsx` -- Primary variant honey glow
+4. `src/components/sidebar/Sidebar.tsx` -- Active state glow, logo shadow
+5. `src/components/conversations/JaceStyleInbox.tsx` -- Selection glow, empty state
+6. `src/components/conversations/ConversationCard.memo.tsx` -- Warm hover shadow
+7. `src/pages/Review.tsx` -- AI sparkle glow
+8. `src/components/dashboard/InsightsWidget.tsx` -- Card elevation
+9. `src/components/dashboard/LearningInsightsWidget.tsx` -- Card elevation
 
 No layout, spacing, typography, component structure, routing, or copy changes.
 
