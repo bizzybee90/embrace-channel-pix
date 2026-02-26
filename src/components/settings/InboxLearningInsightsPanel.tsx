@@ -164,7 +164,7 @@ export function InboxLearningInsightsPanel() {
           <p className="text-xs text-muted-foreground">Responses Studied</p>
         </Card>
         <Card className="p-3 text-center">
-          <Sparkles className="h-4 w-4 text-purple-600 mx-auto mb-1" />
+          <Sparkles className="h-4 w-4 text-amber-600 mx-auto mb-1" />
           <div className="text-xl font-bold">{insights.patterns_learned}</div>
           <p className="text-xs text-muted-foreground">Patterns Learned</p>
         </Card>

@@ -21,8 +21,8 @@ const navItems = [
     id: 'review' as const, 
     icon: ClipboardCheck, 
     label: 'Review',
-    badgeBg: 'bg-purple-500/10',
-    iconColor: 'text-purple-500'
+    badgeBg: 'bg-amber-500/10',
+    iconColor: 'text-amber-500'
   },
   { 
     id: 'snoozed' as const, 

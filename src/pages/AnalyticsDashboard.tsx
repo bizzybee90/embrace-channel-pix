@@ -278,8 +278,8 @@ export default function AnalyticsDashboard() {
                 <p className="text-xs text-slate-500 font-medium mt-1">Avg Response Time</p>
               </div>
 
-              <div className="bg-gradient-to-b from-purple-50/80 to-white border border-slate-100 rounded-3xl shadow-sm p-6">
-                <div className="bg-purple-100 text-purple-600 rounded-2xl w-12 h-12 flex items-center justify-center">
+              <div className="bg-gradient-to-b from-amber-50/80 to-white border border-slate-100 rounded-3xl shadow-sm p-6">
+                <div className="bg-amber-100 text-amber-600 rounded-2xl w-12 h-12 flex items-center justify-center">
                   <CheckCircle className="h-5 w-5" />
                 </div>
                 <p className="text-4xl font-extrabold tracking-tight text-slate-900 mt-2">{data.resolutionRate.toFixed(1)}%</p>

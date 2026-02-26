@@ -260,7 +260,7 @@ export const ChannelManagementPanel = () => {
   const automationModes = [
     { value: 'automatic', label: 'Automatic', icon: Zap, description: 'AI drafts and sends automatically', color: 'text-success' },
     { value: 'draft_only', label: 'Draft Only', icon: FileEdit, description: 'AI drafts, you send', color: 'text-amber-500' },
-    { value: 'review_required', label: 'Review Mode', icon: Eye, description: 'Everything goes to review', color: 'text-purple-500' },
+    { value: 'review_required', label: 'Review Mode', icon: Eye, description: 'Everything goes to review', color: 'text-amber-500' },
     { value: 'disabled', label: 'Manual', icon: Pause, description: 'No AI assistance', color: 'text-muted-foreground' },
   ];
 

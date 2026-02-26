@@ -53,7 +53,7 @@ const getConfidenceState = (stats: LearningStats): ConfidenceState => {
 
 const confidenceStateConfig: Record<ConfidenceState, { label: string; level: number; color: string; icon: typeof Brain }> = {
   learning: { label: 'Learning', level: 1, color: 'bg-amber-500/10 text-amber-600 border-amber-500/20', icon: Brain },
-  stabilising: { label: 'Stabilising', level: 2, color: 'bg-purple-500/10 text-purple-600 border-purple-500/20', icon: Sparkles },
+  stabilising: { label: 'Stabilising', level: 2, color: 'bg-amber-500/10 text-amber-600 border-amber-500/20', icon: Sparkles },
   confident: { label: 'Confident', level: 3, color: 'bg-green-500/10 text-green-600 border-green-500/20', icon: CheckCircle2 },
 };
 
@@ -266,7 +266,7 @@ export const LearningInsightsWidget = () => {
     >
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <Brain className="h-4 w-4 text-purple-500" />
+          <Brain className="h-4 w-4 text-amber-500" />
           <h2 className="font-semibold text-foreground">Learning</h2>
         </div>
         <div className="flex items-center gap-2">
@@ -284,7 +284,7 @@ export const LearningInsightsWidget = () => {
       <div className="grid grid-cols-3 gap-3 mb-3">
         <div className="text-center">
           <div className="flex items-center justify-center gap-1 text-lg font-bold text-foreground">
-            <BookOpen className="h-3.5 w-3.5 text-purple-500" />
+            <BookOpen className="h-3.5 w-3.5 text-amber-500" />
             {stats.rulesCount}
           </div>
           <p className="text-[10px] text-muted-foreground">Rules</p>
