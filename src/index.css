@@ -165,11 +165,47 @@ All colors MUST be HSL.
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 36 64% 55%;
+
+    /* Premium honey tokens */
+    --accent-glow: 48 96% 89%;
+    --deep-brown: 20 45% 16%;
+    --brand-brown: 25 42% 28%;
   }
 }
 
 
 @layer utilities {
+  /* Premium honey utilities */
+  .gradient-text {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-accent;
+  }
+
+  .honey-glow-shadow {
+    box-shadow:
+      0 4px 24px -4px hsl(33 62% 55% / 0.15),
+      0 1px 3px hsl(0 0% 0% / 0.04);
+  }
+
+  .honey-glow-shadow-lg {
+    box-shadow:
+      0 8px 40px -8px hsl(33 62% 55% / 0.2),
+      0 2px 6px hsl(0 0% 0% / 0.04);
+  }
+
+  .card-warm {
+    @apply bg-white dark:bg-card rounded-3xl border border-border/30;
+    box-shadow:
+      0 2px 20px -4px hsl(0 0% 0% / 0.06);
+    transition: box-shadow 0.5s ease;
+  }
+  .card-warm:hover {
+    box-shadow:
+      0 8px 40px -8px hsl(33 62% 55% / 0.12);
+  }
+
+  .honey-sparkle {
+    filter: drop-shadow(0 0 6px hsl(33 62% 55% / 0.4));
+  }
   .smooth-transition {
     @apply transition-all duration-300 ease-in-out;
   }
@@ -226,26 +262,28 @@ All colors MUST be HSL.
   /* PREMIUM MULTI-LAYER APPLE SHADOWS — apply globally, not inside media query */
   .apple-shadow-sm {
     box-shadow:
-      0px 1px 2px rgba(0, 0, 0, 0.04),
-      0px 0px 0px 1px rgba(0, 0, 0, 0.02);
+      0px 1px 2px hsl(33 62% 55% / 0.06),
+      0px 0px 0px 1px hsl(33 62% 55% / 0.03);
   }
 
   .apple-shadow {
     box-shadow:
-      0px 4px 12px rgba(0, 0, 0, 0.06),
-      0px 1px 2px rgba(0, 0, 0, 0.04),
-      0px 0px 0px 1px rgba(0, 0, 0, 0.02);
+      0px 4px 12px hsl(33 62% 55% / 0.08),
+      0px 1px 2px hsl(0 0% 0% / 0.04),
+      0px 0px 0px 1px hsl(33 62% 55% / 0.04);
   }
 
   .apple-shadow-lg {
     box-shadow:
-      0px 24px 48px -12px rgba(0, 0, 0, 0.12),
-      0px 0px 0px 1px rgba(0, 0, 0, 0.02);
+      0px 24px 48px -12px hsl(33 62% 55% / 0.15),
+      0px 0px 0px 1px hsl(33 62% 55% / 0.04);
   }
 
   /* God Prompt: Premium panel elevation */
   .panel-elevated {
-    @apply bg-white dark:bg-card shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] ring-1 ring-slate-900/5 rounded-xl;
+    @apply bg-white dark:bg-card rounded-xl;
+    box-shadow: 0 2px 8px -2px hsl(33 62% 55% / 0.08);
+    ring: 1px hsl(33 62% 55% / 0.08);
   }
 
   /* SPRING PHYSICS — corrected bezier curve */

@@ -146,11 +146,11 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
           end={end}
           onClick={onNavigate}
           className="flex items-center justify-center w-10 h-10 rounded-xl text-foreground hover:bg-accent/50 transition-all relative"
-          activeClassName="bg-primary/10 text-primary"
+          activeClassName="bg-primary/10 text-primary ring-1 ring-primary/20"
         >
           <Icon className={`h-5 w-5 ${color || 'text-muted-foreground'}`} />
           {count ? (
-            <span className="absolute -top-0.5 -right-0.5 bg-destructive text-destructive-foreground text-[9px] font-bold rounded-full min-w-[14px] h-[14px] flex items-center justify-center px-0.5 leading-none">
+            <span className="absolute -top-0.5 -right-0.5 bg-destructive text-destructive-foreground text-[9px] font-bold rounded-full min-w-[14px] h-[14px] flex items-center justify-center px-0.5 leading-none shadow-[0_1px_4px_hsl(0_0%_0%/0.15)]">
               {count > 99 ? '99+' : count}
             </span>
           ) : null}
@@ -169,7 +169,7 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
         <Tooltip>
           <TooltipTrigger asChild>
             <div className="mb-3 cursor-pointer hover:scale-110 transition-transform">
-              <img src={bizzybeelogo} alt="BizzyBee" className="h-10 w-10 object-contain" />
+              <img src={bizzybeelogo} alt="BizzyBee" className="h-10 w-10 object-contain drop-shadow-[0_2px_8px_hsl(33_62%_55%/0.3)]" />
             </div>
           </TooltipTrigger>
           <TooltipContent side="right"><p className="font-semibold">BizzyBee</p></TooltipContent>
