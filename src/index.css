@@ -12,13 +12,16 @@ h1, h2, h3, h4, h5, h6, p, span, div {
   max-width: 100%;
 }
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+/* ═══════════════════════════════════════════════════════
+   DESIGN SYSTEM — Aligned with Growth Hub (f5fbf29a)
+   All colors MUST be HSL.
+   ═══════════════════════════════════════════════════════ */
 
 @layer base {
   :root {
-    --background: 50 20% 98%;
+    /* ─── Core palette (from Growth Hub) ─── */
+    --background: 0 0% 100%;
+    --background-alt: 48 14% 98%;
     --foreground: 0 0% 10%;
 
     --card: 0 0% 100%;
@@ -27,28 +30,35 @@ All colors MUST be HSL.
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 10%;
 
-    --primary: 36 64% 55%;
+    --primary: 35 55% 55%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 46 96% 89%;
-    --secondary-foreground: 30 33% 15%;
+    --primary-light: 40 78% 67%;
+    --primary-glow: 44 93% 90%;
+
+    --secondary: 48 14% 96%;
+    --secondary-foreground: 0 0% 10%;
 
     --muted: 220 14% 96%;
-    --muted-foreground: 220 9% 42%;
+    --muted-foreground: 220 9% 46%;
 
-    --accent: 46 96% 89%;
-    --accent-foreground: 30 33% 15%;
+    --accent: 35 55% 55%;
+    --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 14% 90%;
-    --input: 220 14% 90%;
-    --ring: 36 64% 55%;
+    --border: 220 13% 91%;
+    --border-hover: 35 55% 55%;
+    --input: 220 13% 91%;
+    --ring: 35 55% 55%;
 
     --radius: 0.75rem;
-    
-    /* Tablet-specific design tokens (768px-1199px) */
+
+    --deep-brown: 20 44% 16%;
+    --brand-brown: 25 42% 28%;
+
+    /* ─── Tablet-specific design tokens (768px-1199px) ─── */
     --tablet-spacing-xl: 1.75rem;
     --tablet-spacing-lg: 1.5rem;
     --tablet-spacing-md: 1.25rem;
@@ -56,156 +66,173 @@ All colors MUST be HSL.
     --tablet-header-height: 3.5rem;
     --tablet-column-gap: 1px;
     
-    /* Priority colors - uniform across all views */
+    /* ─── Priority colors (Escalation Hub specific) ─── */
     --priority-urgent: 0 84% 60%;
     --priority-urgent-foreground: 0 0% 100%;
-    
     --priority-high: 38 92% 50%;
     --priority-high-foreground: 0 0% 100%;
-    
     --priority-medium: 45 93% 47%;
     --priority-medium-foreground: 0 0% 100%;
-    
     --priority-low: 220 9% 46%;
     --priority-low-foreground: 0 0% 100%;
     
     --urgent: 25 95% 53%;
     --urgent-foreground: 0 0% 100%;
-    
     --success: 142 71% 45%;
     --success-foreground: 0 0% 100%;
-    
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 100%;
     
+    /* ─── Channel colors (Escalation Hub specific) ─── */
     --channel-sms: 267 84% 64%;
     --channel-whatsapp: 142 71% 45%;
-    --channel-email: 36 64% 55%;
+    --channel-email: 35 55% 55%;
     --channel-phone: 25 95% 53%;
     --channel-webchat: 280 71% 60%;
 
+    /* ─── Sidebar (from Growth Hub) ─── */
     --sidebar-background: 0 0% 98%;
-
     --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 30 33% 15%;
-
+    --sidebar-primary: 240 5.9% 10%;
     --sidebar-primary-foreground: 0 0% 98%;
-
     --sidebar-accent: 240 4.8% 95.9%;
-
     --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 14% 90%;
-
-    --sidebar-ring: 36 64% 55%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 35 55% 55%;
   }
 
   .dark {
-    --background: 220 15% 8%;
-    --foreground: 220 10% 95%;
+    --background: 20 44% 6%;
+    --background-alt: 20 44% 8%;
+    --foreground: 40 20% 96%;
 
-    --card: 220 15% 11%;
-    --card-foreground: 220 10% 95%;
+    --card: 20 44% 8%;
+    --card-foreground: 40 20% 96%;
 
-    --popover: 220 15% 11%;
-    --popover-foreground: 220 10% 95%;
+    --popover: 20 44% 8%;
+    --popover-foreground: 40 20% 96%;
 
-    --primary: 36 64% 55%;
+    --primary: 35 55% 55%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 30 20% 18%;
-    --secondary-foreground: 220 10% 95%;
+    --primary-light: 40 78% 67%;
+    --primary-glow: 44 93% 90%;
+
+    --secondary: 20 30% 15%;
+    --secondary-foreground: 40 20% 96%;
 
     --muted: 220 15% 16%;
-    --muted-foreground: 220 10% 65%;
+    --muted-foreground: 220 9% 60%;
 
-    --accent: 30 20% 18%;
-    --accent-foreground: 220 10% 95%;
+    --accent: 35 55% 55%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 62% 50%;
+    --destructive: 0 62% 30%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 15% 18%;
-    --input: 220 15% 18%;
-    --ring: 36 64% 55%;
+    --border: 20 30% 20%;
+    --border-hover: 35 55% 55%;
+    --input: 20 30% 20%;
+    --ring: 35 55% 55%;
     
-    /* Priority colors - uniform across all views */
+    --deep-brown: 20 44% 16%;
+    --brand-brown: 25 42% 28%;
+    --accent-glow: 48 96% 89%;
+
     --priority-urgent: 0 84% 60%;
     --priority-urgent-foreground: 0 0% 100%;
-    
     --priority-high: 38 92% 50%;
     --priority-high-foreground: 0 0% 100%;
-    
     --priority-medium: 45 93% 47%;
     --priority-medium-foreground: 0 0% 100%;
-    
     --priority-low: 220 10% 65%;
     --priority-low-foreground: 220 15% 8%;
     
     --urgent: 25 95% 53%;
     --urgent-foreground: 0 0% 100%;
-    
     --success: 142 71% 45%;
     --success-foreground: 0 0% 100%;
-    
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 100%;
     
     --channel-sms: 267 84% 64%;
     --channel-whatsapp: 142 71% 45%;
-    --channel-email: 36 64% 55%;
+    --channel-email: 35 55% 55%;
     --channel-phone: 25 95% 53%;
     --channel-webchat: 280 71% 60%;
+
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 36 64% 55%;
+    --sidebar-primary: 224.3 76.3% 48%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 240 3.7% 15.9%;
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 36 64% 55%;
-
-    /* Premium honey tokens */
-    --accent-glow: 48 96% 89%;
-    --deep-brown: 20 45% 16%;
-    --brand-brown: 25 42% 28%;
+    --sidebar-ring: 35 55% 55%;
   }
 }
 
-
 @layer utilities {
-  /* Premium honey utilities */
+  /* ─── Growth Hub utilities ─── */
+  .gradient-honey {
+    background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-light)));
+  }
+
+  .gradient-warm-dark {
+    background: linear-gradient(180deg, hsl(48 14% 98%), hsl(var(--deep-brown)), hsl(35 40% 20%));
+  }
+
+  .gradient-sunrise {
+    background: linear-gradient(180deg, hsl(var(--deep-brown)), hsl(25 50% 30%), hsl(35 60% 50%), hsl(44 96% 90%));
+  }
+
+  .text-gradient-honey {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-light)));
+  }
+
+  .border-hover-accent:hover {
+    border-color: hsl(var(--border-hover));
+  }
+
+  .font-mono-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  /* ─── Premium honey utilities ─── */
   .gradient-text {
     @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-accent;
   }
 
   .honey-glow-shadow {
     box-shadow:
-      0 4px 24px -4px hsl(33 62% 55% / 0.15),
+      0 4px 24px -4px hsl(35 55% 55% / 0.15),
       0 1px 3px hsl(0 0% 0% / 0.04);
   }
 
   .honey-glow-shadow-lg {
     box-shadow:
-      0 8px 40px -8px hsl(33 62% 55% / 0.2),
+      0 8px 40px -8px hsl(35 55% 55% / 0.2),
       0 2px 6px hsl(0 0% 0% / 0.04);
   }
 
   .card-warm {
     @apply bg-white dark:bg-card rounded-3xl border border-border/30;
-    box-shadow:
-      0 2px 20px -4px hsl(0 0% 0% / 0.06);
+    box-shadow: 0 2px 20px -4px hsl(0 0% 0% / 0.06);
     transition: box-shadow 0.5s ease;
   }
   .card-warm:hover {
-    box-shadow:
-      0 8px 40px -8px hsl(33 62% 55% / 0.12);
+    box-shadow: 0 8px 40px -8px hsl(35 55% 55% / 0.12);
   }
 
   .honey-sparkle {
-    filter: drop-shadow(0 0 6px hsl(33 62% 55% / 0.4));
+    filter: drop-shadow(0 0 6px hsl(35 55% 55% / 0.4));
   }
+
   .smooth-transition {
     @apply transition-all duration-300 ease-in-out;
   }
@@ -217,8 +244,22 @@ All colors MUST be HSL.
   .focus-mode-overlay {
     @apply fixed inset-0 bg-background/50 backdrop-blur-sm z-40 animate-in fade-in-0 duration-200;
   }
+
+  /* Noise texture overlay for dark sections */
+  .noise-overlay::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    opacity: 0.035;
+    pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+    background-size: 128px 128px;
+    mix-blend-mode: overlay;
+    z-index: 1;
+  }
   
-  /* Apple-quality mobile utilities */
+  /* ─── Apple-quality mobile utilities ─── */
   @media (max-width: 900px) {
     .mobile-native-card {
       @apply rounded-2xl bg-card border border-border/30 shadow-sm p-4;
@@ -247,7 +288,6 @@ All colors MUST be HSL.
     .mobile-slide-up {
       @apply animate-in slide-in-from-bottom-4 duration-150;
     }
-    /* Tablet-specific utility classes */
     .tablet-card-shadow {
       @apply shadow-sm hover:shadow-md transition-shadow;
     }
@@ -259,34 +299,33 @@ All colors MUST be HSL.
     }
   }
 
-  /* PREMIUM MULTI-LAYER APPLE SHADOWS — apply globally, not inside media query */
+  /* ─── Premium multi-layer Apple shadows ─── */
   .apple-shadow-sm {
     box-shadow:
-      0px 1px 2px hsl(33 62% 55% / 0.06),
-      0px 0px 0px 1px hsl(33 62% 55% / 0.03);
+      0px 1px 2px hsl(35 55% 55% / 0.06),
+      0px 0px 0px 1px hsl(35 55% 55% / 0.03);
   }
 
   .apple-shadow {
     box-shadow:
-      0px 4px 12px hsl(33 62% 55% / 0.08),
+      0px 4px 12px hsl(35 55% 55% / 0.08),
       0px 1px 2px hsl(0 0% 0% / 0.04),
-      0px 0px 0px 1px hsl(33 62% 55% / 0.04);
+      0px 0px 0px 1px hsl(35 55% 55% / 0.04);
   }
 
   .apple-shadow-lg {
     box-shadow:
-      0px 24px 48px -12px hsl(33 62% 55% / 0.15),
-      0px 0px 0px 1px hsl(33 62% 55% / 0.04);
+      0px 24px 48px -12px hsl(35 55% 55% / 0.15),
+      0px 0px 0px 1px hsl(35 55% 55% / 0.04);
   }
 
-  /* God Prompt: Premium panel elevation */
   .panel-elevated {
     @apply bg-white dark:bg-card rounded-xl;
-    box-shadow: 0 2px 8px -2px hsl(33 62% 55% / 0.08);
-    ring: 1px hsl(33 62% 55% / 0.08);
+    box-shadow: 0 2px 8px -2px hsl(35 55% 55% / 0.08);
+    ring: 1px hsl(35 55% 55% / 0.08);
   }
 
-  /* SPRING PHYSICS — corrected bezier curve */
+  /* ─── Spring physics ─── */
   .spring-bounce {
     transition-timing-function: cubic-bezier(0.175, 0.885, 0.32, 1.275);
   }
@@ -302,7 +341,11 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+
+  html {
+    scroll-behavior: smooth;
   }
 }
 
@@ -326,5 +369,15 @@ All colors MUST be HSL.
   }
   100% {
     transform: translateX(-100%);
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
