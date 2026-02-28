@@ -19,44 +19,45 @@ h1, h2, h3, h4, h5, h6, p, span, div {
 
 @layer base {
   :root {
-    /* ─── Core palette (from Growth Hub) ─── */
-    --background: 0 0% 100%;
-    --background-alt: 48 14% 98%;
-    --foreground: 0 0% 10%;
+    /* ─── Pristine SaaS Foundation (Cool Slate) ─── */
+    --background: 210 40% 98%;
+    --background-alt: 210 40% 97%;
+    --foreground: 222.2 84% 4.9%;
 
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 10%;
+    --card-foreground: 222.2 84% 4.9%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 10%;
+    --popover-foreground: 222.2 84% 4.9%;
 
-    --primary: 35 55% 55%;
-    --primary-foreground: 0 0% 100%;
+    /* ─── Futuristic SaaS Purple ─── */
+    --primary: 271 81% 56%;
+    --primary-foreground: 210 40% 98%;
 
-    --primary-light: 40 78% 67%;
-    --primary-glow: 44 93% 90%;
+    --primary-light: 271 81% 65%;
+    --primary-glow: 271 81% 92%;
 
-    --secondary: 48 14% 96%;
-    --secondary-foreground: 0 0% 10%;
+    --secondary: 214.3 31.8% 91.4%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
 
-    --muted: 220 14% 96%;
-    --muted-foreground: 220 9% 46%;
+    --muted: 214.3 31.8% 91.4%;
+    --muted-foreground: 215.4 16.3% 46.9%;
 
-    --accent: 35 55% 55%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 214.3 31.8% 91.4%;
+    --accent-foreground: 222.2 47.4% 11.2%;
 
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
 
-    --border: 220 13% 91%;
-    --border-hover: 35 55% 55%;
-    --input: 220 13% 91%;
-    --ring: 35 55% 55%;
+    --border: 214.3 31.8% 91.4%;
+    --border-hover: 271 81% 56%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 271 81% 56%;
 
     --radius: 0.75rem;
 
-    --deep-brown: 20 44% 16%;
-    --brand-brown: 25 42% 28%;
+    --deep-brown: 222.2 84% 4.9%;
+    --brand-brown: 222.2 47.4% 11.2%;
 
     /* ─── Tablet-specific design tokens (768px-1199px) ─── */
     --tablet-spacing-xl: 1.75rem;
@@ -66,14 +67,14 @@ h1, h2, h3, h4, h5, h6, p, span, div {
     --tablet-header-height: 3.5rem;
     --tablet-column-gap: 1px;
     
-    /* ─── Priority colors (Escalation Hub specific) ─── */
+    /* ─── Priority colors ─── */
     --priority-urgent: 0 84% 60%;
     --priority-urgent-foreground: 0 0% 100%;
     --priority-high: 38 92% 50%;
     --priority-high-foreground: 0 0% 100%;
     --priority-medium: 45 93% 47%;
     --priority-medium-foreground: 0 0% 100%;
-    --priority-low: 220 9% 46%;
+    --priority-low: 215.4 16.3% 46.9%;
     --priority-low-foreground: 0 0% 100%;
     
     --urgent: 25 95% 53%;
@@ -83,61 +84,62 @@ h1, h2, h3, h4, h5, h6, p, span, div {
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 100%;
     
-    /* ─── Channel colors (Escalation Hub specific) ─── */
+    /* ─── Channel colors ─── */
     --channel-sms: 267 84% 64%;
     --channel-whatsapp: 142 71% 45%;
-    --channel-email: 35 55% 55%;
+    --channel-email: 271 81% 56%;
     --channel-phone: 25 95% 53%;
     --channel-webchat: 280 71% 60%;
 
-    /* ─── Sidebar (from Growth Hub) ─── */
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 35 55% 55%;
+    /* ─── Sidebar ─── */
+    --sidebar-background: 210 40% 98%;
+    --sidebar-foreground: 222.2 84% 4.9%;
+    --sidebar-primary: 271 81% 56%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 214.3 31.8% 91.4%;
+    --sidebar-accent-foreground: 222.2 47.4% 11.2%;
+    --sidebar-border: 214.3 31.8% 91.4%;
+    --sidebar-ring: 271 81% 56%;
   }
 
   .dark {
-    --background: 20 44% 6%;
-    --background-alt: 20 44% 8%;
-    --foreground: 40 20% 96%;
+    /* ─── Premium Dark Mode (Deep Slate) ─── */
+    --background: 222.2 84% 4.9%;
+    --background-alt: 222.2 84% 6%;
+    --foreground: 210 40% 98%;
 
-    --card: 20 44% 8%;
-    --card-foreground: 40 20% 96%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
 
-    --popover: 20 44% 8%;
-    --popover-foreground: 40 20% 96%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
 
-    --primary: 35 55% 55%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 271 81% 56%;
+    --primary-foreground: 210 40% 98%;
 
-    --primary-light: 40 78% 67%;
-    --primary-glow: 44 93% 90%;
+    --primary-light: 271 81% 65%;
+    --primary-glow: 271 81% 92%;
 
-    --secondary: 20 30% 15%;
-    --secondary-foreground: 40 20% 96%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
 
-    --muted: 220 15% 16%;
-    --muted-foreground: 220 9% 60%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
 
-    --accent: 35 55% 55%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
 
-    --destructive: 0 62% 30%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
 
-    --border: 20 30% 20%;
-    --border-hover: 35 55% 55%;
-    --input: 20 30% 20%;
-    --ring: 35 55% 55%;
+    --border: 217.2 32.6% 17.5%;
+    --border-hover: 271 81% 56%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 271 81% 56%;
     
-    --deep-brown: 20 44% 16%;
-    --brand-brown: 25 42% 28%;
-    --accent-glow: 48 96% 89%;
+    --deep-brown: 222.2 84% 4.9%;
+    --brand-brown: 217.2 32.6% 17.5%;
+    --accent-glow: 271 81% 92%;
 
     --priority-urgent: 0 84% 60%;
     --priority-urgent-foreground: 0 0% 100%;
@@ -145,8 +147,8 @@ h1, h2, h3, h4, h5, h6, p, span, div {
     --priority-high-foreground: 0 0% 100%;
     --priority-medium: 45 93% 47%;
     --priority-medium-foreground: 0 0% 100%;
-    --priority-low: 220 10% 65%;
-    --priority-low-foreground: 220 15% 8%;
+    --priority-low: 215 20.2% 65.1%;
+    --priority-low-foreground: 217.2 32.6% 17.5%;
     
     --urgent: 25 95% 53%;
     --urgent-foreground: 0 0% 100%;
@@ -157,33 +159,33 @@ h1, h2, h3, h4, h5, h6, p, span, div {
     
     --channel-sms: 267 84% 64%;
     --channel-whatsapp: 142 71% 45%;
-    --channel-email: 35 55% 55%;
+    --channel-email: 271 81% 56%;
     --channel-phone: 25 95% 53%;
     --channel-webchat: 280 71% 60%;
 
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-background: 222.2 84% 4.9%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 271 81% 56%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 35 55% 55%;
+    --sidebar-accent: 217.2 32.6% 17.5%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 217.2 32.6% 17.5%;
+    --sidebar-ring: 271 81% 56%;
   }
 }
 
 @layer utilities {
-  /* ─── Growth Hub utilities ─── */
+  /* ─── SaaS gradient utilities ─── */
   .gradient-honey {
     background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-light)));
   }
 
   .gradient-warm-dark {
-    background: linear-gradient(180deg, hsl(48 14% 98%), hsl(var(--deep-brown)), hsl(35 40% 20%));
+    background: linear-gradient(180deg, hsl(210 40% 98%), hsl(222.2 84% 4.9%), hsl(217 33% 17%));
   }
 
   .gradient-sunrise {
-    background: linear-gradient(180deg, hsl(var(--deep-brown)), hsl(25 50% 30%), hsl(35 60% 50%), hsl(44 96% 90%));
+    background: linear-gradient(180deg, hsl(222.2 84% 4.9%), hsl(271 81% 30%), hsl(271 81% 56%), hsl(271 81% 92%));
   }
 
   .text-gradient-honey {
@@ -203,20 +205,20 @@ h1, h2, h3, h4, h5, h6, p, span, div {
     text-transform: uppercase;
   }
 
-  /* ─── Premium honey utilities ─── */
+  /* ─── Premium SaaS utilities ─── */
   .gradient-text {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-accent;
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary-light;
   }
 
   .honey-glow-shadow {
     box-shadow:
-      0 4px 24px -4px hsl(35 55% 55% / 0.15),
+      0 4px 24px -4px hsl(271 81% 56% / 0.12),
       0 1px 3px hsl(0 0% 0% / 0.04);
   }
 
   .honey-glow-shadow-lg {
     box-shadow:
-      0 8px 40px -8px hsl(35 55% 55% / 0.2),
+      0 8px 40px -8px hsl(271 81% 56% / 0.18),
       0 2px 6px hsl(0 0% 0% / 0.04);
   }
 
@@ -226,11 +228,11 @@ h1, h2, h3, h4, h5, h6, p, span, div {
     transition: box-shadow 0.5s ease;
   }
   .card-warm:hover {
-    box-shadow: 0 8px 40px -8px hsl(35 55% 55% / 0.12);
+    box-shadow: 0 8px 40px -8px hsl(271 81% 56% / 0.10);
   }
 
   .honey-sparkle {
-    filter: drop-shadow(0 0 6px hsl(35 55% 55% / 0.4));
+    filter: drop-shadow(0 0 6px hsl(271 81% 56% / 0.4));
   }
 
   .smooth-transition {
@@ -302,27 +304,27 @@ h1, h2, h3, h4, h5, h6, p, span, div {
   /* ─── Premium multi-layer Apple shadows ─── */
   .apple-shadow-sm {
     box-shadow:
-      0px 1px 2px hsl(35 55% 55% / 0.06),
-      0px 0px 0px 1px hsl(35 55% 55% / 0.03);
+      0px 1px 2px hsl(222 84% 5% / 0.06),
+      0px 0px 0px 1px hsl(214 32% 91% / 0.5);
   }
 
   .apple-shadow {
     box-shadow:
-      0px 4px 12px hsl(35 55% 55% / 0.08),
+      0px 4px 12px hsl(222 84% 5% / 0.07),
       0px 1px 2px hsl(0 0% 0% / 0.04),
-      0px 0px 0px 1px hsl(35 55% 55% / 0.04);
+      0px 0px 0px 1px hsl(214 32% 91% / 0.5);
   }
 
   .apple-shadow-lg {
     box-shadow:
-      0px 24px 48px -12px hsl(35 55% 55% / 0.15),
-      0px 0px 0px 1px hsl(35 55% 55% / 0.04);
+      0px 24px 48px -12px hsl(271 81% 56% / 0.12),
+      0px 0px 0px 1px hsl(214 32% 91% / 0.5);
   }
 
   .panel-elevated {
     @apply bg-white dark:bg-card rounded-xl;
-    box-shadow: 0 2px 8px -2px hsl(35 55% 55% / 0.08);
-    ring: 1px hsl(35 55% 55% / 0.08);
+    box-shadow: 0 2px 8px -2px hsl(222 84% 5% / 0.08);
+    ring: 1px hsl(214 32% 91% / 0.5);
   }
 
   /* ─── Spring physics ─── */
