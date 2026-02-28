@@ -4,18 +4,22 @@ import { supabase } from "@/integrations/supabase/client";
 import { User, Session } from "@supabase/supabase-js";
 import { isOnboardingComplete } from "@/lib/onboardingStatus";
 
+// DEV BYPASS: Skip auth during development
+const DEV_BYPASS_AUTH = true;
+
 export const AuthGuard = ({ children }: { children: React.ReactNode }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!DEV_BYPASS_AUTH);
   const checkingOnboardingRef = useRef(false);
   const hasCheckedOnboarding = useRef(false);
   const lastCheckedUserIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    // Set up auth state listener first
+    if (DEV_BYPASS_AUTH) return;
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setSession(session);
@@ -24,7 +28,6 @@ export const AuthGuard = ({ children }: { children: React.ReactNode }) => {
       }
     );
 
-    // Then check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
@@ -38,24 +41,21 @@ export const AuthGuard = ({ children }: { children: React.ReactNode }) => {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
-  // Check onboarding status ONCE after user is loaded
   useEffect(() => {
+    if (DEV_BYPASS_AUTH) return;
+
     const checkOnboarding = async () => {
       if (!user || checkingOnboardingRef.current || hasCheckedOnboarding.current) return;
-
-       // If user changes (sign out/in), allow a new check.
-       if (lastCheckedUserIdRef.current && lastCheckedUserIdRef.current !== user.id) {
-         hasCheckedOnboarding.current = false;
-       }
-      
-      // Skip onboarding check if already on onboarding page
+      if (lastCheckedUserIdRef.current && lastCheckedUserIdRef.current !== user.id) {
+        hasCheckedOnboarding.current = false;
+      }
       if (location.pathname === '/onboarding') return;
 
       checkingOnboardingRef.current = true;
       try {
         const { data: userData, error } = await supabase
           .from('users')
-            .select('onboarding_completed, onboarding_step')
+          .select('onboarding_completed, onboarding_step')
           .eq('id', user.id)
           .single();
 
@@ -67,7 +67,6 @@ export const AuthGuard = ({ children }: { children: React.ReactNode }) => {
         hasCheckedOnboarding.current = true;
         lastCheckedUserIdRef.current = user.id;
 
-        // Redirect to onboarding if not completed
         if (!isOnboardingComplete(userData)) {
           navigate('/onboarding');
         }
@@ -81,6 +80,10 @@ export const AuthGuard = ({ children }: { children: React.ReactNode }) => {
     checkOnboarding();
   }, [user, navigate, location.pathname]);
 
+  if (DEV_BYPASS_AUTH) {
+    return <>{children}</>;
+  }
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -93,7 +96,6 @@ export const AuthGuard = ({ children }: { children: React.ReactNode }) => {
   }
 
   if (!user || !session) {
-    // Show loading state instead of null to prevent flash
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-center">
