@@ -58,7 +58,7 @@ const Inbox = () => {
   }
 
   return (
-    <div className="flex h-screen w-full bg-slate-50/50 overflow-hidden">
+    <div className="flex h-screen w-full bg-background-alt overflow-hidden">
       {/* Stats Bar */}
       <div className="absolute top-0 left-0 right-0 h-8 bg-card border-b border-border flex items-center px-4 gap-4 text-xs text-muted-foreground z-10">
         <Button variant="ghost" size="sm" className="h-6 px-2 gap-1 text-xs" onClick={() => navigate('/')}>

@@ -80,7 +80,7 @@ export function HtmlEmailViewer({ htmlContent, open, onOpenChange }: HtmlEmailVi
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl flex flex-col p-0 mx-4 h-[80dvh] w-[calc(100vw-2rem)] rounded-3xl sm:rounded-3xl sm:h-[80vh] sm:w-auto sm:mx-auto">
+      <DialogContent className="max-w-4xl flex flex-col p-0 mx-4 h-[80dvh] w-[calc(100vw-2rem)] rounded-2xl sm:rounded-2xl sm:h-[80vh] sm:w-auto sm:mx-auto">
         <DialogHeader className="px-4 py-3 border-b flex-shrink-0 rounded-t-3xl">
           <div className="flex items-center justify-between">
             <DialogTitle className="text-base">Formatted Email</DialogTitle>

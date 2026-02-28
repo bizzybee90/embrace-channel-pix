@@ -146,7 +146,7 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
           end={end}
           onClick={onNavigate}
           className="flex items-center justify-center w-10 h-10 rounded-xl text-foreground hover:bg-accent/50 transition-all relative"
-          activeClassName="bg-primary/10 text-primary ring-1 ring-primary/20"
+          activeClassName="bg-primary/10 text-primary border border-primary/20"
         >
           <Icon className={`h-5 w-5 ${color || 'text-muted-foreground'}`} />
           {count ? (

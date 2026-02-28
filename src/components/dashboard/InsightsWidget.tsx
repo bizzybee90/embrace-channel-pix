@@ -56,15 +56,15 @@ export const InsightsWidget = ({ workspaceId }: InsightsWidgetProps) => {
     if (type === 'trend' || type === 'category_trend') return <TrendingUp className="h-4 w-4 text-blue-500" />;
     if (type === 'opportunity' || type === 'automation_opportunity') return <Lightbulb className="h-4 w-4 text-yellow-500" />;
     if (type === 'summary') return <Sparkles className="h-4 w-4 text-amber-500" />;
-    return <Info className="h-4 w-4 text-slate-400" />;
+    return <Info className="h-4 w-4 text-muted-foreground/70" />;
   };
 
   if (loading) {
     return (
       <div className="card-warm p-5">
         <div className="flex items-center gap-2 mb-4">
-          <Lightbulb className="h-4 w-4 text-slate-400" />
-          <h2 className="font-semibold text-slate-900">Insights</h2>
+          <Lightbulb className="h-4 w-4 text-muted-foreground/70" />
+          <h2 className="font-semibold text-foreground">Insights</h2>
         </div>
         <div className="space-y-3">
           <Skeleton className="h-14 w-full rounded-lg" />
@@ -78,32 +78,32 @@ export const InsightsWidget = ({ workspaceId }: InsightsWidgetProps) => {
     <div className="card-warm p-5">
       <div className="flex items-center gap-2 mb-4">
         <Lightbulb className="h-4 w-4 text-amber-500" />
-        <h2 className="font-semibold text-slate-900">Insights</h2>
+        <h2 className="font-semibold text-foreground">Insights</h2>
       </div>
 
       {insights.length === 0 ? (
-        <div className="flex flex-col items-center justify-center h-48 rounded-2xl bg-gradient-to-br from-slate-50 to-amber-50/30 border border-amber-100/50 border-dashed m-4">
+        <div className="flex flex-col items-center justify-center h-48 rounded-2xl bg-gradient-to-br from-background-alt to-amber-50/30 border border-amber-100/50 border-dashed m-4">
           <Sparkles className="w-5 h-5 text-amber-500 animate-pulse honey-sparkle mb-3" />
-          <p className="text-sm font-medium text-slate-600">Gathering Intelligence...</p>
-          <p className="text-xs text-slate-400 mt-1 max-w-[200px]">
+          <p className="text-sm font-medium text-muted-foreground">Gathering Intelligence...</p>
+          <p className="text-xs text-muted-foreground/70 mt-1 max-w-[200px]">
             Insights will appear here as BizzyBee analyzes patterns.
           </p>
         </div>
       ) : (
-        <div className="divide-y divide-slate-100">
+        <div className="divide-y divide-border">
           {insights.map(insight => (
             <div
               key={insight.id}
-              className="p-3 hover:bg-slate-50/80 transition-colors cursor-pointer flex items-start gap-2.5 first:pt-0 last:pb-0 relative group"
+              className="p-3 hover:bg-background-alt transition-colors cursor-pointer flex items-start gap-2.5 first:pt-0 last:pb-0 relative group"
             >
               <div className="mt-0.5 flex-shrink-0">
                 {getIcon(insight.insight_type, insight.severity)}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-medium text-sm text-slate-900 leading-tight">
+                <p className="font-medium text-sm text-foreground leading-tight">
                   {insight.title}
                 </p>
-                <p className="text-xs text-slate-500 mt-1 line-clamp-2">
+                <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
                   {insight.description}
                 </p>
                 {insight.is_actionable && (
@@ -114,10 +114,10 @@ export const InsightsWidget = ({ workspaceId }: InsightsWidgetProps) => {
               </div>
               <button
                 onClick={(e) => { e.stopPropagation(); markAsRead(insight.id); }}
-                className="p-1 rounded-full hover:bg-slate-100 transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0"
+                className="p-1 rounded-full hover:bg-muted transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0"
                 aria-label="Dismiss"
               >
-                <X className="h-3 w-3 text-slate-400" />
+                <X className="h-3 w-3 text-muted-foreground/70" />
               </button>
             </div>
           ))}

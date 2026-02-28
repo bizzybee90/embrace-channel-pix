@@ -117,30 +117,30 @@ export const RecentLearning = ({ onHighlightRule }: RecentLearningProps) => {
 
   if (loading) {
     return (
-      <div className="bg-white rounded-3xl ring-1 ring-slate-900/5 shadow-sm p-6">
+      <div className="bg-white rounded-2xl border border-border shadow-sm p-6">
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground/70" />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-3xl ring-1 ring-slate-900/5 shadow-sm p-6 flex flex-col">
+    <div className="bg-white rounded-2xl border border-border shadow-sm p-6 flex flex-col">
       <div className="flex items-center gap-2 mb-4">
-        <Sparkles className="h-4 w-4 text-slate-500" />
-        <h2 className="font-semibold text-slate-900">Recent learning</h2>
+        <Sparkles className="h-4 w-4 text-muted-foreground" />
+        <h2 className="font-semibold text-foreground">Recent learning</h2>
       </div>
 
       {events.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 text-center flex-1">
-          <p className="text-sm text-slate-500 max-w-[260px] leading-relaxed">
+          <p className="text-sm text-muted-foreground max-w-[260px] leading-relaxed">
             Start reviewing emails in the Teach queue to help BizzyBee learn. Your confirmations and corrections appear here.
           </p>
           <Button
             variant="outline"
             size="sm"
-            className="mt-4 text-slate-700"
+            className="mt-4 text-foreground/80"
             onClick={() => navigate('/review')}
           >
             Go to Teach queue <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
@@ -154,7 +154,7 @@ export const RecentLearning = ({ onHighlightRule }: RecentLearningProps) => {
               <div
                 key={event.id}
                 onClick={() => handleClick(event)}
-                className="flex items-start gap-2.5 rounded-lg px-3 py-2.5 hover:bg-slate-50 transition-all cursor-pointer group"
+                className="flex items-start gap-2.5 rounded-lg px-3 py-2.5 hover:bg-background-alt transition-all cursor-pointer group"
               >
                 <span className={cn(
                   'text-xs w-6 h-6 rounded-md flex items-center justify-center shrink-0 mt-0.5',
@@ -163,8 +163,8 @@ export const RecentLearning = ({ onHighlightRule }: RecentLearningProps) => {
                   {config.emoji}
                 </span>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-slate-700 leading-snug">{event.description}</p>
-                  <p className="text-xs text-slate-400 mt-0.5">
+                  <p className="text-sm text-foreground/80 leading-snug">{event.description}</p>
+                  <p className="text-xs text-muted-foreground/70 mt-0.5">
                     {event.timestamp ? formatDistanceToNow(new Date(event.timestamp), { addSuffix: true }) : ''}
                   </p>
                 </div>

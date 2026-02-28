@@ -34,7 +34,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   booking_request: 'bg-blue-500',
   general_inquiry: 'bg-violet-500',
   complaint: 'bg-amber-500',
-  notification: 'bg-slate-400',
+  notification: 'bg-muted-foreground',
   newsletter: 'bg-pink-400',
   spam: 'bg-red-400',
   payment_billing: 'bg-teal-500',

@@ -96,7 +96,7 @@ const CATEGORIES = [
   { key: 'complaint', label: 'Complaint', dot: 'bg-red-500' },
   { key: 'follow_up', label: 'Follow-up', dot: 'bg-orange-500' },
   { key: 'inquiry', label: 'Enquiry', dot: 'bg-blue-400' },
-  { key: 'notification', label: 'Notification', dot: 'bg-slate-500' },
+  { key: 'notification', label: 'Notification', dot: 'bg-background-alt0' },
   { key: 'newsletter', label: 'Newsletter', dot: 'bg-pink-500' },
   { key: 'spam', label: 'Spam', dot: 'bg-red-600' },
   { key: 'personal', label: 'Personal', dot: 'bg-amber-500' },
@@ -578,9 +578,9 @@ export default function Review() {
 
               {/* AI summary bento strip */}
               {conv.summary_for_human && (
-                <div className="p-3 bg-gradient-to-r from-amber-50/60 via-amber-50/40 to-amber-50/40 rounded-xl border border-white/60 shadow-sm ring-1 ring-slate-900/5 flex items-start gap-2">
+                <div className="p-3 bg-gradient-to-r from-amber-50/60 via-amber-50/40 to-amber-50/40 rounded-xl border border-white/60 shadow-sm border border-border flex items-start gap-2">
                   <Sparkles className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
-                  <span className="text-sm text-slate-700 leading-snug line-clamp-3">{conv.summary_for_human}</span>
+                  <span className="text-sm text-foreground/80 leading-snug line-clamp-3">{conv.summary_for_human}</span>
                 </div>
               )}
 
@@ -588,7 +588,7 @@ export default function Review() {
               <h3 className="font-semibold text-sm">{conv.title}</h3>
 
               {/* Email body — read-only, no resize */}
-              <div className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed bg-slate-50 p-4 rounded-xl border border-slate-100 line-clamp-[8]">
+              <div className="text-sm text-foreground/80 whitespace-pre-wrap leading-relaxed bg-background-alt p-4 rounded-xl border border-border/50 line-clamp-[8]">
                 {emailBody}
               </div>
 
@@ -692,14 +692,14 @@ export default function Review() {
   // ============ DESKTOP — ALL CAUGHT UP ============
   if (allCaughtUp) {
     return (
-      <div className="flex h-screen bg-slate-50/50">
+      <div className="flex h-screen bg-background-alt">
         <Sidebar />
       <div className="flex-1 flex flex-col items-center justify-center">
           <div className="text-center max-w-md px-6 animate-fade-in">
-            <div className="w-24 h-24 bg-gradient-to-br from-emerald-50 to-emerald-100/50 rounded-full flex items-center justify-center mx-auto mb-6 ring-8 ring-emerald-50/50">
+            <div className="w-24 h-24 bg-gradient-to-br from-emerald-50 to-emerald-100/50 rounded-full flex items-center justify-center mx-auto mb-6 ">
               <Sparkles className="w-10 h-10 text-emerald-500" />
             </div>
-            <h2 className="text-2xl font-bold text-slate-900 tracking-tight">You're all caught up!</h2>
+            <h2 className="text-2xl font-bold text-foreground tracking-tight">You're all caught up!</h2>
             <p className="text-muted-foreground mb-6">
               BizzyBee classified <strong>{weeklyStats?.totalProcessed || 0}</strong> emails with <strong className="text-amber-600">{weeklyStats?.accuracy || 100}%</strong> accuracy this week.
             </p>
@@ -743,12 +743,12 @@ export default function Review() {
     : '';
 
   return (
-    <div className="flex h-screen bg-slate-50/50">
+    <div className="flex h-screen bg-background-alt">
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden p-4">
-        <div className="flex-1 bg-white rounded-3xl shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] border border-slate-200/80 overflow-hidden flex flex-col">
+        <div className="flex-1 bg-white rounded-2xl shadow-sm border border-border overflow-hidden flex flex-col">
         {/* Top Bar — inside the pill */}
-        <div className="px-6 py-2.5 flex-shrink-0 flex items-center justify-between border-b border-slate-100">
+        <div className="px-6 py-2.5 flex-shrink-0 flex items-center justify-between border-b border-border/50">
           <div className="flex items-center gap-3">
             <BackButton to="/" label="Home" />
             <h1 className="text-base font-semibold">AI Reconciliation</h1>
@@ -777,9 +777,9 @@ export default function Review() {
         {/* 3-Column Layout */}
         <div className="flex-1 flex overflow-hidden gap-4 p-4">
           {/* Column 1: Reconciliation Queue (350px) */}
-          <div className="w-[350px] min-w-[350px] flex-shrink-0 flex flex-col bg-slate-50/30 rounded-2xl border border-slate-100 overflow-hidden">
-            <div className="px-3 py-2 border-b border-slate-100">
-              <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">
+          <div className="w-[350px] min-w-[350px] flex-shrink-0 flex flex-col bg-background-alt/30 rounded-2xl border border-border/50 overflow-hidden">
+            <div className="px-3 py-2 border-b border-border/50">
+              <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
                 Reconciliation Queue
               </span>
             </div>
@@ -788,7 +788,7 @@ export default function Review() {
               {/* To Review section */}
               {unreviewedQueue.length > 0 && (
                 <>
-                  <div className="px-3 py-1.5 bg-amber-50/80 border-b border-slate-100 sticky top-0 z-10">
+                  <div className="px-3 py-1.5 bg-amber-50/80 border-b border-border/50 sticky top-0 z-10">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">
                       To Review ({unreviewedQueue.length})
                     </span>
@@ -803,9 +803,9 @@ export default function Review() {
                         key={conv.id}
                         onClick={() => { setCurrentIndex(idx); setShowChangePicker(false); }}
                         className={cn(
-                         "px-3 py-2.5 cursor-pointer border-b border-slate-100 transition-all",
-                          "hover:bg-slate-50",
-                          idx === currentIndex && "bg-white shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] ring-1 ring-slate-900/5",
+                         "px-3 py-2.5 cursor-pointer border-b border-border/50 transition-all",
+                          "hover:bg-background-alt",
+                          idx === currentIndex && "bg-white shadow-sm border border-border",
                           isFlashing && "bg-green-100 dark:bg-green-900/40 transition-colors duration-300"
                         )}
                       >
@@ -837,8 +837,8 @@ export default function Review() {
                               conv.decision_bucket === 'act_now' && 'bg-red-50 text-red-600 border-red-200',
                               conv.decision_bucket === 'quick_win' && conv.ai_draft_response && 'bg-amber-50 text-amber-700 border-amber-100',
                               conv.decision_bucket === 'quick_win' && !conv.ai_draft_response && 'bg-amber-50 text-amber-600 border-amber-200',
-                              conv.decision_bucket === 'wait' && 'bg-slate-100 text-slate-600 border-slate-200',
-                              conv.decision_bucket === 'auto_handled' && 'bg-slate-100 text-slate-600 border-slate-200',
+                              conv.decision_bucket === 'wait' && 'bg-muted text-muted-foreground border-border',
+                              conv.decision_bucket === 'auto_handled' && 'bg-muted text-muted-foreground border-border',
                             )}>
                               {conv.decision_bucket === 'act_now' && 'Urgent'}
                               {conv.decision_bucket === 'quick_win' && conv.ai_draft_response && 'Draft ready'}
@@ -858,11 +858,11 @@ export default function Review() {
               {recentlyConfirmed.length > 0 && (
                 <Collapsible open={showConfirmedSection} onOpenChange={setShowConfirmedSection}>
                   <CollapsibleTrigger asChild>
-                   <button className="w-full px-3 py-1.5 bg-slate-50 border-b border-t border-slate-100 flex items-center justify-between sticky top-0 z-10 hover:bg-slate-100 transition-colors">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600">
+                   <button className="w-full px-3 py-1.5 bg-background-alt border-b border-t border-border/50 flex items-center justify-between sticky top-0 z-10 hover:bg-muted transition-colors">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                         Confirmed ({recentlyConfirmed.length})
                       </span>
-                      {showConfirmedSection ? <ChevronDown className="h-3 w-3 text-slate-500" /> : <ChevronRight className="h-3 w-3 text-slate-500" />}
+                      {showConfirmedSection ? <ChevronDown className="h-3 w-3 text-muted-foreground" /> : <ChevronRight className="h-3 w-3 text-muted-foreground" />}
                     </button>
                   </CollapsibleTrigger>
                   <CollapsibleContent>
@@ -893,7 +893,7 @@ export default function Review() {
           </div>
 
           {/* Column 2: Email Preview + AI Reasoning (flex) */}
-          <div className="flex-1 flex flex-col overflow-hidden bg-slate-50/30 rounded-2xl border border-slate-100">
+          <div className="flex-1 flex flex-col overflow-hidden bg-background-alt/30 rounded-2xl border border-border/50">
             {currentConversation ? (
               <div className="flex-1 flex flex-col overflow-y-auto">
                 {/* Sender row */}
@@ -911,11 +911,11 @@ export default function Review() {
                 </div>
 
                 {/* AI context bento strip */}
-                <div className="mx-6 mt-4 mb-2 p-4 bg-gradient-to-r from-amber-50/60 via-amber-50/40 to-amber-50/40 rounded-2xl border border-white/60 shadow-sm ring-1 ring-slate-900/5 flex items-center gap-3 flex-wrap flex-shrink-0">
+                <div className="mx-6 mt-4 mb-2 p-4 bg-gradient-to-r from-amber-50/60 via-amber-50/40 to-amber-50/40 rounded-2xl border border-white/60 shadow-sm border border-border flex items-center gap-3 flex-wrap flex-shrink-0">
                   {currentConversation.summary_for_human && (
                     <div className="flex items-center gap-1.5 flex-1 min-w-0">
                       <Sparkles className="h-4 w-4 text-amber-600 shrink-0" />
-                      <span className="text-sm font-medium text-slate-700 line-clamp-2">{currentConversation.summary_for_human}</span>
+                      <span className="text-sm font-medium text-foreground/80 line-clamp-2">{currentConversation.summary_for_human}</span>
                     </div>
                   )}
                   <div className="flex items-center gap-1.5 ml-auto flex-shrink-0">
@@ -947,7 +947,7 @@ export default function Review() {
                           <Sparkles className="h-4 w-4 text-amber-600" />
                           <span className="text-sm font-medium text-amber-700 dark:text-amber-300">AI draft ready</span>
                         </div>
-                        <Button size="sm" variant="outline" className="h-7 text-xs gap-1.5 bg-white border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm rounded-lg" onClick={() => setShowDraftEditor(true)}>
+                        <Button size="sm" variant="outline" className="h-7 text-xs gap-1.5 bg-white border-border text-foreground/80 hover:bg-background-alt shadow-sm rounded-lg" onClick={() => setShowDraftEditor(true)}>
                           <Send className="h-3 w-3" />Edit & Send
                         </Button>
                       </div>
@@ -984,7 +984,7 @@ export default function Review() {
           </div>
 
           {/* Column 3: Reconciliation Panel (300px) */}
-          <div className="w-[300px] min-w-[300px] flex-shrink-0 flex flex-col bg-slate-50/30 rounded-2xl border border-slate-100 overflow-hidden">
+          <div className="w-[300px] min-w-[300px] flex-shrink-0 flex flex-col bg-background-alt/30 rounded-2xl border border-border/50 overflow-hidden">
             {currentConversation ? (
               <div className="flex-1 flex flex-col overflow-y-auto">
                 {/* The Verdict */}
@@ -1003,7 +1003,7 @@ export default function Review() {
                         <span className="text-muted-foreground">Confidence</span>
                         <span className={cn("font-bold text-sm", confidenceColor)}>{confidencePercent}%</span>
                       </div>
-                      <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden mt-3">
+                      <div className="h-2 w-full bg-muted rounded-full overflow-hidden mt-3">
                         <div
                           className="h-full bg-gradient-to-r from-amber-500 to-amber-600 rounded-full transition-all duration-700 ease-out"
                           style={{ width: `${confidencePercent}%` }}
@@ -1048,7 +1048,7 @@ export default function Review() {
                         {/* CHANGE */}
                         <Button
                           variant="outline"
-                          className="h-11 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm rounded-xl font-medium"
+                          className="h-11 bg-white border border-border text-foreground/80 hover:bg-background-alt shadow-sm rounded-xl font-medium"
                           onClick={() => setShowChangePicker(true)}
                           disabled={confirmMutation.isPending}
                         >
@@ -1133,7 +1133,7 @@ export default function Review() {
                   </div>
                   <div className="px-4 pb-3 space-y-3">
                     <div className="space-y-2">
-                      <span className="text-xs font-medium text-slate-700">Handle all from this sender:</span>
+                      <span className="text-xs font-medium text-foreground/80">Handle all from this sender:</span>
                       <div className="space-y-2">
                         {[
                           { value: 'auto', label: 'Auto-handle', icon: <Bot className="h-3.5 w-3.5 text-green-500" /> },
@@ -1143,7 +1143,7 @@ export default function Review() {
                           <label
                             key={opt.value}
                             className={cn(
-                              "flex items-center gap-3 p-3 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50 transition-all text-sm font-medium text-slate-700",
+                              "flex items-center gap-3 p-3 border border-border rounded-xl cursor-pointer hover:bg-background-alt transition-all text-sm font-medium text-foreground/80",
                               automationLevel === opt.value && "border-amber-500 bg-amber-50 ring-1 ring-amber-200"
                             )}
                             onClick={() => setAutomationLevel(opt.value as AutomationLevel)}
@@ -1155,13 +1155,13 @@ export default function Review() {
                       </div>
                     </div>
                     <div className="space-y-2 pt-2 border-t border-border/50">
-                      <span className="text-xs font-medium text-slate-700">Tone for replies:</span>
+                      <span className="text-xs font-medium text-foreground/80">Tone for replies:</span>
                       <div className="flex flex-wrap gap-2">
                         {[{ value: 'keep_current', label: 'Keep' }, { value: 'more_formal', label: 'Formal' }, { value: 'more_brief', label: 'Brief' }, { value: 'more_friendly', label: 'Friendly' }].map(opt => (
                           <label
                             key={opt.value}
                             className={cn(
-                              "px-3 py-2 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50 transition-all text-xs font-medium text-slate-700",
+                              "px-3 py-2 border border-border rounded-xl cursor-pointer hover:bg-background-alt transition-all text-xs font-medium text-foreground/80",
                               tonePreference === opt.value && "border-amber-500 bg-amber-50 ring-1 ring-amber-200"
                             )}
                             onClick={() => setTonePreference(opt.value as TonePreference)}

@@ -209,24 +209,21 @@ h1, h2, h3, h4, h5, h6, p, span, div {
   }
 
   .honey-glow-shadow {
-    box-shadow:
-      0 4px 24px -4px hsl(35 55% 55% / 0.15),
-      0 1px 3px hsl(0 0% 0% / 0.04);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
   }
 
   .honey-glow-shadow-lg {
-    box-shadow:
-      0 8px 40px -8px hsl(35 55% 55% / 0.2),
-      0 2px 6px hsl(0 0% 0% / 0.04);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
   }
 
   .card-warm {
-    @apply bg-white dark:bg-card rounded-3xl border border-border/30;
-    box-shadow: 0 2px 20px -4px hsl(0 0% 0% / 0.06);
-    transition: box-shadow 0.5s ease;
+    @apply bg-white dark:bg-card rounded-2xl border border-border;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+    transition: box-shadow 0.3s ease, border-color 0.3s ease;
   }
   .card-warm:hover {
-    box-shadow: 0 8px 40px -8px hsl(35 55% 55% / 0.12);
+    border-color: hsl(35 55% 55% / 0.4);
+    box-shadow: 0 2px 8px rgba(213,149,67,0.08);
   }
 
   .honey-sparkle {
@@ -301,28 +298,20 @@ h1, h2, h3, h4, h5, h6, p, span, div {
 
   /* ─── Premium multi-layer Apple shadows ─── */
   .apple-shadow-sm {
-    box-shadow:
-      0px 1px 2px hsl(35 55% 55% / 0.06),
-      0px 0px 0px 1px hsl(35 55% 55% / 0.03);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
   }
 
   .apple-shadow {
-    box-shadow:
-      0px 4px 12px hsl(35 55% 55% / 0.08),
-      0px 1px 2px hsl(0 0% 0% / 0.04),
-      0px 0px 0px 1px hsl(35 55% 55% / 0.04);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
   }
 
   .apple-shadow-lg {
-    box-shadow:
-      0px 24px 48px -12px hsl(35 55% 55% / 0.15),
-      0px 0px 0px 1px hsl(35 55% 55% / 0.04);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
   }
 
   .panel-elevated {
-    @apply bg-white dark:bg-card rounded-xl;
-    box-shadow: 0 2px 8px -2px hsl(35 55% 55% / 0.08);
-    ring: 1px hsl(35 55% 55% / 0.08);
+    @apply bg-white dark:bg-card rounded-xl border border-border;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.03);
   }
 
   /* ─── Spring physics ─── */

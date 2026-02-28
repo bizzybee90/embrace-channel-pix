@@ -22,7 +22,7 @@ interface ReviewQueueItemProps {
 }
 
 const getStateBadge = (bucket: string) => {
-  const base = "bg-slate-100 text-slate-500 px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider flex-shrink-0 whitespace-nowrap";
+  const base = "bg-muted text-muted-foreground px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider flex-shrink-0 whitespace-nowrap";
   switch (bucket) {
     case 'act_now':
       return <Badge className={base}>Urgent</Badge>;
@@ -54,7 +54,7 @@ export const ReviewQueueItem = ({
       className={cn(
         "rounded-xl mx-2 my-1 p-3 cursor-pointer transition-all",
         isActive && !isMultiSelectMode && "bg-white shadow-sm border border-amber-200 ring-1 ring-amber-50",
-        !isActive && !isSelected && "border border-transparent hover:bg-slate-50/80",
+        !isActive && !isSelected && "border border-transparent hover:bg-background-alt",
         isSelected && "bg-white shadow-sm border border-amber-200 ring-1 ring-amber-50",
         isReviewed && "opacity-50"
       )}

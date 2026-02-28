@@ -194,7 +194,7 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend, ex
       <div className="flex-shrink-0 px-4 pb-4">
         <button
           onClick={() => setIsCollapsed(false)}
-          className="mt-auto border border-slate-200 rounded-full py-3 px-4 text-muted-foreground cursor-text shadow-sm bg-white hover:border-amber-300 transition-all flex items-center gap-3 w-full text-left text-sm"
+          className="mt-auto border border-border rounded-full py-3 px-4 text-muted-foreground cursor-text shadow-sm bg-white hover:border-amber-300 transition-all flex items-center gap-3 w-full text-left text-sm"
         >
           <Reply className="w-4 h-4" />
           Reply to {senderName || 'sender'}...
@@ -218,7 +218,7 @@ export const ReplyArea = ({ conversationId, channel, aiDraftResponse, onSend, ex
         {/* Collapse toggle */}
         <button
           onClick={() => setIsCollapsed(true)}
-          className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 bg-white rounded-md p-1 z-10"
+          className="absolute top-4 right-4 text-muted-foreground/70 hover:text-muted-foreground bg-white rounded-md p-1 z-10"
           title="Collapse"
         >
           <Minimize2 className="w-4 h-4" />
