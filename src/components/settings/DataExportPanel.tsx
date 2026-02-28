@@ -6,7 +6,6 @@ import { Label } from '@/components/ui/label';
 import { Download, Search } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { escapeSearchTerm } from '@/lib/utils';
 
 export const DataExportPanel = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -24,7 +23,7 @@ export const DataExportPanel = () => {
       const { data, error } = await supabase
         .from('customers')
         .select('*')
-        .or(`name.ilike.%${escapeSearchTerm(searchTerm)}%,email.ilike.%${escapeSearchTerm(searchTerm)}%`)
+        .or(`name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`)
         .limit(10);
 
       if (error) throw error;

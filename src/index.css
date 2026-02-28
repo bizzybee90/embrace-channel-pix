@@ -12,54 +12,43 @@ h1, h2, h3, h4, h5, h6, p, span, div {
   max-width: 100%;
 }
 
-/* ═══════════════════════════════════════════════════════
-   DESIGN SYSTEM — Aligned with Growth Hub (f5fbf29a)
-   All colors MUST be HSL.
-   ═══════════════════════════════════════════════════════ */
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
 
 @layer base {
   :root {
-    /* ─── Pristine SaaS Foundation (Cool Slate) ─── */
-    --background: 210 40% 98%;
-    --background-alt: 210 40% 97%;
-    --foreground: 222.2 84% 4.9%;
+    --background: 220 17% 97%;
+    --foreground: 220 15% 12%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 220 15% 12%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 220 15% 12%;
 
-    /* ─── Futuristic SaaS Purple ─── */
-    --primary: 271 81% 56%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
 
-    --primary-light: 271 81% 65%;
-    --primary-glow: 271 81% 92%;
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 220 15% 12%;
 
-    --secondary: 214.3 31.8% 91.4%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 9% 46%;
 
-    --muted: 214.3 31.8% 91.4%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 220 14% 96%;
+    --accent-foreground: 220 15% 12%;
 
-    --accent: 214.3 31.8% 91.4%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 214.3 31.8% 91.4%;
-    --border-hover: 271 81% 56%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 271 81% 56%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 217 91% 60%;
 
     --radius: 0.75rem;
-
-    --deep-brown: 222.2 84% 4.9%;
-    --brand-brown: 222.2 47.4% 11.2%;
-
-    /* ─── Tablet-specific design tokens (768px-1199px) ─── */
+    
+    /* Tablet-specific design tokens (768px-1199px) */
     --tablet-spacing-xl: 1.75rem;
     --tablet-spacing-lg: 1.5rem;
     --tablet-spacing-md: 1.25rem;
@@ -67,174 +56,120 @@ h1, h2, h3, h4, h5, h6, p, span, div {
     --tablet-header-height: 3.5rem;
     --tablet-column-gap: 1px;
     
-    /* ─── Priority colors ─── */
+    /* Priority colors - uniform across all views */
     --priority-urgent: 0 84% 60%;
     --priority-urgent-foreground: 0 0% 100%;
+    
     --priority-high: 38 92% 50%;
     --priority-high-foreground: 0 0% 100%;
+    
     --priority-medium: 45 93% 47%;
     --priority-medium-foreground: 0 0% 100%;
-    --priority-low: 215.4 16.3% 46.9%;
+    
+    --priority-low: 220 9% 46%;
     --priority-low-foreground: 0 0% 100%;
     
     --urgent: 25 95% 53%;
     --urgent-foreground: 0 0% 100%;
+    
     --success: 142 71% 45%;
     --success-foreground: 0 0% 100%;
+    
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 100%;
     
-    /* ─── Channel colors ─── */
     --channel-sms: 267 84% 64%;
     --channel-whatsapp: 142 71% 45%;
-    --channel-email: 271 81% 56%;
+    --channel-email: 217 91% 60%;
     --channel-phone: 25 95% 53%;
     --channel-webchat: 280 71% 60%;
 
-    /* ─── Sidebar ─── */
-    --sidebar-background: 210 40% 98%;
-    --sidebar-foreground: 222.2 84% 4.9%;
-    --sidebar-primary: 271 81% 56%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 214.3 31.8% 91.4%;
-    --sidebar-accent-foreground: 222.2 47.4% 11.2%;
-    --sidebar-border: 214.3 31.8% 91.4%;
-    --sidebar-ring: 271 81% 56%;
+    --sidebar-background: 0 0% 98%;
+
+    --sidebar-foreground: 240 5.3% 26.1%;
+
+    --sidebar-primary: 240 5.9% 10%;
+
+    --sidebar-primary-foreground: 0 0% 98%;
+
+    --sidebar-accent: 240 4.8% 95.9%;
+
+    --sidebar-accent-foreground: 240 5.9% 10%;
+
+    --sidebar-border: 220 13% 91%;
+
+    --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
   .dark {
-    /* ─── Premium Dark Mode (Deep Slate) ─── */
-    --background: 222.2 84% 4.9%;
-    --background-alt: 222.2 84% 6%;
-    --foreground: 210 40% 98%;
+    --background: 220 15% 8%;
+    --foreground: 220 10% 95%;
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    --card: 220 15% 11%;
+    --card-foreground: 220 10% 95%;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 220 15% 11%;
+    --popover-foreground: 220 10% 95%;
 
-    --primary: 271 81% 56%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
 
-    --primary-light: 271 81% 65%;
-    --primary-glow: 271 81% 92%;
+    --secondary: 220 15% 16%;
+    --secondary-foreground: 220 10% 95%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --muted: 220 15% 16%;
+    --muted-foreground: 220 10% 65%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 220 15% 16%;
+    --accent-foreground: 220 10% 95%;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 100%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --border-hover: 271 81% 56%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 271 81% 56%;
+    --border: 220 15% 18%;
+    --input: 220 15% 18%;
+    --ring: 217 91% 60%;
     
-    --deep-brown: 222.2 84% 4.9%;
-    --brand-brown: 217.2 32.6% 17.5%;
-    --accent-glow: 271 81% 92%;
-
+    /* Priority colors - uniform across all views */
     --priority-urgent: 0 84% 60%;
     --priority-urgent-foreground: 0 0% 100%;
+    
     --priority-high: 38 92% 50%;
     --priority-high-foreground: 0 0% 100%;
+    
     --priority-medium: 45 93% 47%;
     --priority-medium-foreground: 0 0% 100%;
-    --priority-low: 215 20.2% 65.1%;
-    --priority-low-foreground: 217.2 32.6% 17.5%;
+    
+    --priority-low: 220 10% 65%;
+    --priority-low-foreground: 220 15% 8%;
     
     --urgent: 25 95% 53%;
     --urgent-foreground: 0 0% 100%;
+    
     --success: 142 71% 45%;
     --success-foreground: 0 0% 100%;
+    
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 100%;
     
     --channel-sms: 267 84% 64%;
     --channel-whatsapp: 142 71% 45%;
-    --channel-email: 271 81% 56%;
+    --channel-email: 217 91% 60%;
     --channel-phone: 25 95% 53%;
     --channel-webchat: 280 71% 60%;
-
-    --sidebar-background: 222.2 84% 4.9%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 271 81% 56%;
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 217.2 32.6% 17.5%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 217.2 32.6% 17.5%;
-    --sidebar-ring: 271 81% 56%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
   }
 }
 
+
 @layer utilities {
-  /* ─── SaaS gradient utilities ─── */
-  .gradient-honey {
-    background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-light)));
-  }
-
-  .gradient-warm-dark {
-    background: linear-gradient(180deg, hsl(210 40% 98%), hsl(222.2 84% 4.9%), hsl(217 33% 17%));
-  }
-
-  .gradient-sunrise {
-    background: linear-gradient(180deg, hsl(222.2 84% 4.9%), hsl(271 81% 30%), hsl(271 81% 56%), hsl(271 81% 92%));
-  }
-
-  .text-gradient-honey {
-    @apply bg-clip-text text-transparent;
-    background-image: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-light)));
-  }
-
-  .border-hover-accent:hover {
-    border-color: hsl(var(--border-hover));
-  }
-
-  .font-mono-label {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.7rem;
-    font-weight: 500;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-
-  /* ─── Premium SaaS utilities ─── */
-  .gradient-text {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary-light;
-  }
-
-  .honey-glow-shadow {
-    box-shadow:
-      0 4px 24px -4px hsl(271 81% 56% / 0.12),
-      0 1px 3px hsl(0 0% 0% / 0.04);
-  }
-
-  .honey-glow-shadow-lg {
-    box-shadow:
-      0 8px 40px -8px hsl(271 81% 56% / 0.18),
-      0 2px 6px hsl(0 0% 0% / 0.04);
-  }
-
-  .card-warm {
-    @apply bg-white dark:bg-card rounded-3xl border border-border/30;
-    box-shadow: 0 2px 20px -4px hsl(0 0% 0% / 0.06);
-    transition: box-shadow 0.5s ease;
-  }
-  .card-warm:hover {
-    box-shadow: 0 8px 40px -8px hsl(271 81% 56% / 0.10);
-  }
-
-  .honey-sparkle {
-    filter: drop-shadow(0 0 6px hsl(271 81% 56% / 0.4));
-  }
-
   .smooth-transition {
     @apply transition-all duration-300 ease-in-out;
   }
@@ -246,22 +181,8 @@ h1, h2, h3, h4, h5, h6, p, span, div {
   .focus-mode-overlay {
     @apply fixed inset-0 bg-background/50 backdrop-blur-sm z-40 animate-in fade-in-0 duration-200;
   }
-
-  /* Noise texture overlay for dark sections */
-  .noise-overlay::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    opacity: 0.035;
-    pointer-events: none;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-    background-repeat: repeat;
-    background-size: 128px 128px;
-    mix-blend-mode: overlay;
-    z-index: 1;
-  }
   
-  /* ─── Apple-quality mobile utilities ─── */
+  /* Apple-quality mobile utilities */
   @media (max-width: 900px) {
     .mobile-native-card {
       @apply rounded-2xl bg-card border border-border/30 shadow-sm p-4;
@@ -290,6 +211,7 @@ h1, h2, h3, h4, h5, h6, p, span, div {
     .mobile-slide-up {
       @apply animate-in slide-in-from-bottom-4 duration-150;
     }
+    /* Tablet-specific utility classes */
     .tablet-card-shadow {
       @apply shadow-sm hover:shadow-md transition-shadow;
     }
@@ -301,33 +223,32 @@ h1, h2, h3, h4, h5, h6, p, span, div {
     }
   }
 
-  /* ─── Premium multi-layer Apple shadows ─── */
+  /* PREMIUM MULTI-LAYER APPLE SHADOWS — apply globally, not inside media query */
   .apple-shadow-sm {
     box-shadow:
-      0px 1px 2px hsl(222 84% 5% / 0.06),
-      0px 0px 0px 1px hsl(214 32% 91% / 0.5);
+      0px 1px 2px rgba(0, 0, 0, 0.04),
+      0px 0px 0px 1px rgba(0, 0, 0, 0.02);
   }
 
   .apple-shadow {
     box-shadow:
-      0px 4px 12px hsl(222 84% 5% / 0.07),
-      0px 1px 2px hsl(0 0% 0% / 0.04),
-      0px 0px 0px 1px hsl(214 32% 91% / 0.5);
+      0px 4px 12px rgba(0, 0, 0, 0.06),
+      0px 1px 2px rgba(0, 0, 0, 0.04),
+      0px 0px 0px 1px rgba(0, 0, 0, 0.02);
   }
 
   .apple-shadow-lg {
     box-shadow:
-      0px 24px 48px -12px hsl(271 81% 56% / 0.12),
-      0px 0px 0px 1px hsl(214 32% 91% / 0.5);
+      0px 24px 48px -12px rgba(0, 0, 0, 0.12),
+      0px 0px 0px 1px rgba(0, 0, 0, 0.02);
   }
 
+  /* God Prompt: Premium panel elevation */
   .panel-elevated {
-    @apply bg-white dark:bg-card rounded-xl;
-    box-shadow: 0 2px 8px -2px hsl(222 84% 5% / 0.08);
-    ring: 1px hsl(214 32% 91% / 0.5);
+    @apply bg-white dark:bg-card shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] ring-1 ring-slate-900/5 rounded-xl;
   }
 
-  /* ─── Spring physics ─── */
+  /* SPRING PHYSICS — corrected bezier curve */
   .spring-bounce {
     transition-timing-function: cubic-bezier(0.175, 0.885, 0.32, 1.275);
   }
@@ -343,11 +264,7 @@ h1, h2, h3, h4, h5, h6, p, span, div {
   }
 
   body {
-    @apply bg-background text-foreground font-sans antialiased;
-  }
-
-  html {
-    scroll-behavior: smooth;
+    @apply bg-background text-foreground;
   }
 }
 
@@ -371,15 +288,5 @@ h1, h2, h3, h4, h5, h6, p, span, div {
   }
   100% {
     transform: translateX(-100%);
-  }
-}
-
-/* Reduced motion */
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
   }
 }

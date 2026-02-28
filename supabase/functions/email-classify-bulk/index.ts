@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { checkRateLimit, RATE_LIMITS } from "../_shared/rate-limit.ts";
 import {
   fetchBusinessContext,
   fetchSenderRules,
@@ -38,15 +37,6 @@ serve(async (req) => {
   }
 
   try {
-    // SECURITY: Internal-only function — require service role key
-    const authHeader = req.headers.get('Authorization');
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const token = authHeader?.replace('Bearer ', '');
-    if (token !== supabaseServiceKey) {
-      return new Response(JSON.stringify({ error: 'Unauthorized — service role required' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
-
     const { 
       workspace_id, 
       partition_id, 
@@ -62,14 +52,11 @@ serve(async (req) => {
       });
     }
 
-    // Rate limiting
-    const rateLimited = await checkRateLimit(workspace_id, RATE_LIMITS['email-classify-bulk']);
-    if (rateLimited) return rateLimited;
-
     const isPartitioned = partition_id !== undefined && total_partitions !== undefined;
     const workerTag = isPartitioned ? `[Worker ${partition_id}/${total_partitions}]` : '[legacy]';
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
 
     if (!lovableApiKey) {

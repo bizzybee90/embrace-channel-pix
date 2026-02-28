@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useWorkspace } from '@/hooks/useWorkspace';
 import {
   Sheet,
   SheetContent,
@@ -41,8 +40,6 @@ export function DraftReplyEditor({
   const [verificationStatus, setVerificationStatus] = useState<'pending' | 'passed' | 'failed' | 'needs_review' | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { workspace } = useWorkspace();
-  const resolvedWorkspaceId = workspaceId || workspace?.id;
 
   // Reset draft when opened
   const handleOpenChange = (isOpen: boolean) => {
@@ -56,11 +53,11 @@ export function DraftReplyEditor({
   const sendMutation = useMutation({
     mutationFn: async () => {
       // Call edge function to send response
-      const { error: sendError } = await supabase.functions.invoke('send-reply', {
+      const { error: sendError } = await supabase.functions.invoke('email-send', {
         body: {
-          conversation_id: conversationId,
-          workspace_id: resolvedWorkspaceId,
-          content: draft,
+          conversationId,
+          response: draft,
+          channel: 'email',
         },
       });
 
@@ -104,7 +101,7 @@ export function DraftReplyEditor({
       <SheetContent className="sm:max-w-2xl w-full flex flex-col">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-amber-500" />
+            <Sparkles className="h-5 w-5 text-purple-500" />
             Edit & Send Reply
             {workspaceId && (
               <DraftVerificationBadge

@@ -1,7 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { calculateQualityScore } from "../_shared/quality-scorer.ts";
-import { validateAuth, AuthError, authErrorResponse } from "../_shared/auth.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -115,26 +114,17 @@ serve(async (req) => {
   const startTime = Date.now();
 
   try {
-    const { workspace_id, business_type } = await req.json();
-
-    if (!workspace_id) {
-      throw new Error('workspace_id is required');
-    }
-
-    // SECURITY: Validate JWT + workspace ownership
-    try {
-      await validateAuth(req, workspace_id);
-    } catch (error) {
-      if (error instanceof AuthError) return authErrorResponse(error);
-      throw error;
-    }
-
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
+    const { workspace_id, business_type } = await req.json();
     console.log(`[${FUNCTION_NAME}] Starting validation for workspace=${workspace_id}, type=${business_type}`);
+
+    if (!workspace_id) {
+      throw new Error('workspace_id is required');
+    }
 
     const { data: competitors, error: fetchError } = await supabase
       .from('competitor_sites')

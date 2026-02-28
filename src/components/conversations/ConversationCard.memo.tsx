@@ -181,13 +181,13 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate }
       >
         {/* Swipe Action Background - Left (Resolve) */}
         <div 
-          className="absolute inset-0 bg-amber-500/20 flex items-center justify-end pr-8 pointer-events-none transition-opacity duration-200"
+          className="absolute inset-0 bg-blue-500/20 flex items-center justify-end pr-8 pointer-events-none transition-opacity duration-200"
           style={{ 
             opacity: !isRightSwipe && isSwiping ? swipeProgress : 0 
           }}
         >
           <CheckCircle2 
-            className="h-6 w-6 text-amber-600 dark:text-amber-400 transition-transform duration-200" 
+            className="h-6 w-6 text-blue-600 dark:text-blue-400 transition-transform duration-200" 
             style={{ 
               transform: `scale(${swipeProgress})` 
             }}
@@ -215,8 +215,8 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate }
           className={cn(
             "relative cursor-pointer transition-all duration-300 rounded-[22px] overflow-hidden",
             "bg-card border border-border/30 hover:border-primary/30",
-            "apple-shadow hover:honey-glow-shadow spring-press",
-            selected && "border-primary/50 ring-1 ring-primary/20 honey-glow-shadow bg-gradient-to-br from-primary/8 via-primary/4 to-card"
+            "apple-shadow hover:apple-shadow-lg spring-press",
+            selected && "border-primary/50 apple-shadow-lg bg-gradient-to-br from-primary/8 via-primary/4 to-card"
           )}
           style={{
             transform: isSwiping ? `translateX(${swipeDistance}px)` : 'translateX(0)',
@@ -275,7 +275,7 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate }
             </Badge>
 
             {hasDraft && (
-              <Badge variant="secondary" className="rounded-full text-xs font-semibold px-3 py-1.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 flex items-center gap-1.5">
+              <Badge variant="secondary" className="rounded-full text-xs font-semibold px-3 py-1.5 bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 flex items-center gap-1.5">
                 <FileEdit className="h-3 w-3" />
                 Draft
               </Badge>
@@ -306,8 +306,8 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate }
       className={cn(
         "relative cursor-pointer transition-all duration-300 ease-out rounded-[22px] mb-3 overflow-hidden",
         "bg-card border border-border/30 hover:border-primary/30",
-        "apple-shadow hover:honey-glow-shadow spring-press",
-        selected && "border-primary/50 ring-1 ring-primary/20 honey-glow-shadow bg-gradient-to-br from-primary/8 via-primary/4 to-card"
+        "apple-shadow hover:apple-shadow-lg spring-press",
+        selected && "border-primary/50 apple-shadow-lg bg-gradient-to-br from-primary/8 via-primary/4 to-card"
       )}
     >
       {/* Priority/Status Accent Bar */}
@@ -362,7 +362,7 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate }
           </Badge>
 
           {hasDraft && (
-            <Badge variant="secondary" className="rounded-full text-xs font-semibold px-3 py-1.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 flex items-center gap-1.5">
+            <Badge variant="secondary" className="rounded-full text-xs font-semibold px-3 py-1.5 bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 flex items-center gap-1.5">
               <FileEdit className="h-3 w-3" />
               Draft
             </Badge>

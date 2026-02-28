@@ -2,7 +2,6 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useWorkspace } from './useWorkspace';
 import { isOutbound, isInbound, type InboxFolder, CATEGORY_GROUPS } from '@/lib/emailDirection';
-import { escapeSearchTerm } from '@/lib/utils';
 
 const PAGE_SIZE = 50;
 
@@ -119,7 +118,7 @@ export const useInboxEmails = ({ folder, categoryFilter, search, page }: UseInbo
 
       // Apply search (search customer name/email via title or joined customer)
       if (search.trim()) {
-        query = query.or(`title.ilike.%${escapeSearchTerm(search)}%,summary_for_human.ilike.%${escapeSearchTerm(search)}%`);
+        query = query.or(`title.ilike.%${search}%,summary_for_human.ilike.%${search}%`);
       }
 
       // Pagination

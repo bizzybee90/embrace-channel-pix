@@ -191,10 +191,10 @@ export const Home = () => {
       label: 'Training',
       count: stats.reviewCount,
       icon: Sparkles,
-      iconColor: 'text-amber-600',
-      iconBoxBg: 'bg-amber-100',
-      cardBg: 'bg-gradient-to-b from-amber-50/80 to-white',
-      cardBorder: 'border border-amber-100',
+      iconColor: 'text-purple-600',
+      iconBoxBg: 'bg-purple-100',
+      cardBg: 'bg-gradient-to-b from-purple-50/80 to-white',
+      cardBorder: 'border border-purple-100',
       onClick: () => navigate('/review'),
     },
   ];
@@ -215,7 +215,7 @@ export const Home = () => {
         ) : (
           <>
             {/* ── Hero Copilot Banner ── */}
-            <div className="w-full bg-gradient-to-r from-[hsl(var(--accent-glow))] via-white to-[hsl(var(--accent-glow))]/30 rounded-3xl p-8 ring-1 ring-primary/10 honey-glow-shadow relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-2">
+            <div className="w-full bg-gradient-to-r from-amber-100/50 via-purple-50/50 to-blue-100/30 rounded-3xl p-8 ring-1 ring-slate-900/5 shadow-sm relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-2">
               <div>
                 <div className="flex items-center gap-3">
                   <span className="text-3xl">🐝</span>
@@ -229,7 +229,7 @@ export const Home = () => {
                       : 'Here is what BizzyBee has lined up for you.'}
                 </p>
                 {/* Frosted-glass AI Briefing Panel */}
-                <div className="mt-6 p-5 bg-white/40 backdrop-blur-md rounded-2xl border border-white/60 ring-1 ring-primary/10 text-slate-800 text-[15px] leading-relaxed shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
+                <div className="mt-6 p-5 bg-white/40 backdrop-blur-md rounded-2xl border border-white/60 text-slate-800 text-[15px] leading-relaxed shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
                   {stats.clearedToday > 0 ? (
                     <p>
                       Since this morning, BizzyBee auto-handled <strong>{stats.clearedToday}</strong> message{stats.clearedToday !== 1 ? 's' : ''}
@@ -249,7 +249,7 @@ export const Home = () => {
                 </div>
               </div>
               {stats.clearedToday > 0 && (
-                <div className="bg-white/80 backdrop-blur-md border border-emerald-200 text-emerald-800 px-5 py-2.5 rounded-2xl honey-glow-shadow font-semibold flex items-center gap-2 text-sm whitespace-nowrap self-start md:self-center">
+                <div className="bg-white/80 backdrop-blur-md border border-emerald-200 text-emerald-800 px-5 py-2.5 rounded-2xl shadow-sm font-semibold flex items-center gap-2 text-sm whitespace-nowrap self-start md:self-center">
                   <CheckCircle2 className="w-5 h-5" />
                   {stats.clearedToday} messages auto-handled today
                 </div>
@@ -268,12 +268,12 @@ export const Home = () => {
                     className={cn(
                       'rounded-3xl p-6 cursor-pointer transition-all duration-200',
                       active
-                        ? `${m.cardBg} ${m.cardBorder} shadow-sm hover:honey-glow-shadow hover:-translate-y-1`
+                        ? `${m.cardBg} ${m.cardBorder} shadow-sm hover:shadow-md hover:-translate-y-1`
                         : 'bg-slate-50/80 border border-slate-100 opacity-60 grayscale shadow-none'
                     )}
                   >
                     <div className={cn(
-                      'w-12 h-12 rounded-2xl flex items-center justify-center shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]',
+                      'w-12 h-12 rounded-2xl flex items-center justify-center',
                       active ? m.iconBoxBg : 'bg-slate-100'
                     )}>
                       <Icon className={cn('h-5 w-5', active ? m.iconColor : 'text-slate-400')} />
@@ -299,7 +299,7 @@ export const Home = () => {
             {/* ── Widget Grid ── */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Pending Drafts */}
-              <div className="card-warm p-5 flex flex-col">
+              <div className="bg-white rounded-3xl border border-slate-100/80 shadow-sm p-5 flex flex-col">
                 <div className="flex items-center gap-2 mb-4">
                   <FileEdit className="h-4 w-4 text-amber-500" />
                   <h2 className="font-semibold text-slate-900">Pending Drafts</h2>
@@ -318,7 +318,7 @@ export const Home = () => {
               </div>
 
               {/* Recent Activity */}
-              <div className="card-warm p-5 flex flex-col">
+              <div className="bg-white rounded-3xl border border-slate-100/80 shadow-sm p-5 flex flex-col">
                 <div className="flex items-center gap-2 mb-4">
                   <Activity className="h-4 w-4 text-blue-500" />
                   <h2 className="font-semibold text-slate-900">Recent Activity</h2>

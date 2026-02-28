@@ -156,7 +156,7 @@ export function WorkspaceInspector() {
               </Card>
               <Card className="bg-muted/30">
                 <CardContent className="p-4 text-center">
-                  <MessageSquare className="h-5 w-5 mx-auto mb-1 text-amber-500" />
+                  <MessageSquare className="h-5 w-5 mx-auto mb-1 text-purple-500" />
                   <p className="text-2xl font-bold">{data.stats.conversations}</p>
                   <p className="text-xs text-muted-foreground">Conversations</p>
                 </CardContent>

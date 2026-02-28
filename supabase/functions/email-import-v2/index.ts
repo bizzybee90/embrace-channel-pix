@@ -1,8 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { chainNextBatch } from '../_shared/batch-processor.ts';
-import { validateAuth, AuthError, authErrorResponse } from '../_shared/auth.ts';
-import { checkRateLimit, RATE_LIMITS } from '../_shared/rate-limit.ts';
 
 // =============================================================================
 // ROBUST EMAIL IMPORT WITH RELAY RACE SELF-INVOCATION + WORKER LOCKS
@@ -187,18 +185,6 @@ serve(async (req) => {
     if (!workspace_id) {
       throw new Error('workspace_id is required');
     }
-
-    // SECURITY: Validate JWT + workspace ownership
-    try {
-      await validateAuth(req, workspace_id);
-    } catch (error) {
-      if (error instanceof AuthError) return authErrorResponse(error);
-      throw error;
-    }
-
-    // Rate limiting
-    const rateLimited = await checkRateLimit(workspace_id, RATE_LIMITS['email-import-v2']);
-    if (rateLimited) return rateLimited;
 
     // -------------------------------------------------------------------------
     // Acquire Worker Lock - Only ONE import worker per workspace

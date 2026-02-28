@@ -15,7 +15,7 @@ export function DataStats() {
   const [stats, setStats] = useState<StatItem[]>([
     { name: 'Workspaces', value: null, icon: <Building2 className="h-4 w-4" />, color: 'text-blue-500' },
     { name: 'Customers', value: null, icon: <Users className="h-4 w-4" />, color: 'text-green-500' },
-    { name: 'Conversations', value: null, icon: <MessageSquare className="h-4 w-4" />, color: 'text-amber-500' },
+    { name: 'Conversations', value: null, icon: <MessageSquare className="h-4 w-4" />, color: 'text-purple-500' },
     { name: 'Messages', value: null, icon: <Mail className="h-4 w-4" />, color: 'text-orange-500' },
     { name: 'FAQs', value: null, icon: <HelpCircle className="h-4 w-4" />, color: 'text-cyan-500' },
     { name: 'Raw Emails', value: null, icon: <FileText className="h-4 w-4" />, color: 'text-pink-500' },
@@ -52,7 +52,7 @@ export function DataStats() {
       setStats([
         { name: 'Workspaces', value: workspacesRes.count ?? 0, icon: <Building2 className="h-4 w-4" />, color: 'text-blue-500' },
         { name: 'Customers', value: customersRes.count ?? 0, icon: <Users className="h-4 w-4" />, color: 'text-green-500' },
-        { name: 'Conversations', value: conversationsRes.count ?? 0, icon: <MessageSquare className="h-4 w-4" />, color: 'text-amber-500' },
+        { name: 'Conversations', value: conversationsRes.count ?? 0, icon: <MessageSquare className="h-4 w-4" />, color: 'text-purple-500' },
         { name: 'Messages', value: messagesRes.count ?? 0, icon: <Mail className="h-4 w-4" />, color: 'text-orange-500' },
         { name: 'FAQs', value: faqsRes.count ?? 0, icon: <HelpCircle className="h-4 w-4" />, color: 'text-cyan-500' },
         { name: 'Raw Emails', value: rawEmailsRes.count ?? 0, icon: <FileText className="h-4 w-4" />, color: 'text-pink-500' },

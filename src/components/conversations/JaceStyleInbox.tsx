@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Conversation } from '@/lib/types';
 import { SearchInput } from './SearchInput';
@@ -30,37 +30,24 @@ interface GroupedConversations {
 }
 
 export const JaceStyleInbox = ({ onSelect, selectedId, filter = 'needs-me', hideHeader = false }: JaceStyleInboxProps) => {
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const subFilter = searchParams.get('filter'); // 'at-risk', 'to-reply', 'drafts'
   
   const [searchQuery, setSearchQuery] = useState('');
-  
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [correctionOpen, setCorrectionOpen] = useState(false);
   const [selectedForCorrection, setSelectedForCorrection] = useState<Conversation | null>(null);
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
   const [keyboardIndex, setKeyboardIndex] = useState(0);
-  const [statusFilter, setStatusFilter] = useState<Set<string>>(new Set(['all']));
   const PAGE_SIZE = 50;
 
-  const toggleFilter = (key: string) => {
-    setStatusFilter(prev => {
-      const next = new Set(prev);
-      if (key === 'all') {
-        return new Set(['all']);
-      }
-      next.delete('all');
-      if (next.has(key)) {
-        next.delete(key);
-      } else {
-        next.add(key);
-      }
-      return next.size === 0 ? new Set(['all']) : next;
-    });
-  };
-
+  // Debounce search to avoid spamming requests while typing
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedSearch(searchQuery), 250);
+    return () => window.clearTimeout(t);
+  }, [searchQuery]);
 
   const fetchConversations = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -138,11 +125,14 @@ export const JaceStyleInbox = ({ onSelect, selectedId, filter = 'needs-me', hide
     } else if (filter === 'sent') {
       query = query.eq('status', 'resolved');
     } else if (filter === 'all-open') {
-      // Inbox: show ALL conversations — no filters
+      // Inbox: all active conversations, exclude auto-handled/resolved
+      query = query
+        .neq('decision_bucket', 'auto_handled')
+        .in('status', ['new', 'open', 'waiting_internal', 'ai_handling', 'escalated']);
     }
 
     // When searching, fetch more items so search works beyond the first page
-    const limit = PAGE_SIZE;
+    const limit = debouncedSearch && debouncedSearch.trim().length > 0 ? 250 : PAGE_SIZE;
     query = query.limit(limit);
 
     const { data, error } = await query;
@@ -173,7 +163,7 @@ export const JaceStyleInbox = ({ onSelect, selectedId, filter = 'needs-me', hide
   });
 
   const { data: conversations = [], isLoading, isFetching } = useQuery({
-    queryKey: ['jace-inbox', filter, subFilter],
+    queryKey: ['jace-inbox', filter, subFilter, debouncedSearch],
     queryFn: async () => {
       const result = await fetchConversations();
       setLastUpdated(new Date());
@@ -184,7 +174,7 @@ export const JaceStyleInbox = ({ onSelect, selectedId, filter = 'needs-me', hide
   });
 
   // Filter by search
-  const searchFilteredConversations = conversations.filter((conv: any) => {
+  const filteredConversations = conversations.filter((conv: any) => {
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
     return (
@@ -194,23 +184,6 @@ export const JaceStyleInbox = ({ onSelect, selectedId, filter = 'needs-me', hide
       conv.customer?.email?.toLowerCase().includes(q)
     );
   });
-
-  // Apply inline status filter (Inbox only)
-  const filteredConversations = filter === 'all-open' && !statusFilter.has('all')
-    ? searchFilteredConversations.filter((conv: any) => {
-        const isOpen = conv.status !== 'resolved' && conv.decision_bucket !== 'auto_handled';
-        const isDone = conv.status === 'resolved' || conv.decision_bucket === 'auto_handled';
-        const isDraft = !!conv.ai_draft_response && !conv.final_response && conv.requires_reply;
-        const isNeedsReply = conv.requires_reply && ['new', 'open', 'waiting_internal', 'ai_handling', 'escalated'].includes(conv.status);
-
-        return (
-          (statusFilter.has('open') && isOpen) ||
-          (statusFilter.has('done') && isDone) ||
-          (statusFilter.has('drafts') && isDraft) ||
-          (statusFilter.has('needs-reply') && isNeedsReply)
-        );
-      })
-    : searchFilteredConversations;
 
   // Group by date
   const groupedConversations: GroupedConversations = {
@@ -273,7 +246,7 @@ export const JaceStyleInbox = ({ onSelect, selectedId, filter = 'needs-me', hide
     }
     if (bucket === 'quick_win' && hasAiDraft) {
       return { 
-        badge: <Badge className={`bg-amber-50 text-amber-700 border border-amber-100 hover:bg-amber-100 ${BADGE_CLASS}`}>Draft ready</Badge>,
+        badge: <Badge className={`bg-purple-50 text-purple-700 border border-purple-100 hover:bg-purple-100 ${BADGE_CLASS}`}>Draft ready</Badge>,
         rowClass: ''
       };
     }
@@ -318,8 +291,8 @@ export const JaceStyleInbox = ({ onSelect, selectedId, filter = 'needs-me', hide
         className={cn(
           "px-3 py-2.5 cursor-pointer transition-all",
           isSelected
-            ? "bg-amber-50/60 border border-amber-200 ring-1 ring-primary/20 honey-glow-shadow z-10 rounded-xl"
-            : "border-b border-slate-100 hover:bg-slate-50 hover:shadow-[0_4px_16px_-4px_hsl(33_62%_55%/0.1)]"
+            ? "bg-purple-50/60 border border-purple-200 ring-1 ring-purple-100 shadow-sm z-10 rounded-xl"
+            : "border-b border-slate-100 hover:bg-slate-50"
         )}
       >
         {/* Row 1: Avatar + Sender + Time */}
@@ -357,8 +330,8 @@ export const JaceStyleInbox = ({ onSelect, selectedId, filter = 'needs-me', hide
     if (conversations.length === 0) return null;
     return (
       <div>
-        <div className="px-3 py-1.5 bg-amber-50/80 border-b border-slate-100 sticky top-0 z-10">
-          <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider">
+        <div className="px-3 py-1.5 bg-purple-50/80 border-b border-slate-100 sticky top-0 z-10">
+          <span className="text-[10px] font-bold text-purple-700 uppercase tracking-wider">
             {title}
           </span>
         </div>
@@ -393,7 +366,8 @@ export const JaceStyleInbox = ({ onSelect, selectedId, filter = 'needs-me', hide
   };
 
   const clearSubFilter = () => {
-    navigate('/');
+    // Navigate back to home page
+    window.location.href = '/';
   };
 
   return (
@@ -467,50 +441,12 @@ export const JaceStyleInbox = ({ onSelect, selectedId, filter = 'needs-me', hide
       </div>
       </>)}
 
-      {/* Inline filter chips — Inbox only */}
-      {filter === 'all-open' && !subFilter && (
-        <div className="flex items-center gap-1.5 px-3 py-2 border-b border-slate-100 overflow-x-auto flex-shrink-0 no-scrollbar">
-          {([
-            { key: 'all', label: 'All' },
-            { key: 'open', label: 'Open' },
-            { key: 'needs-reply', label: 'Needs Reply' },
-            { key: 'drafts', label: 'Drafts' },
-            { key: 'done', label: 'Done' },
-          ] as const).map(({ key, label }) => (
-            <button
-              key={key}
-              onClick={() => toggleFilter(key)}
-              className={cn(
-                "px-3 py-1 text-xs font-medium rounded-full whitespace-nowrap transition-all flex-shrink-0",
-                statusFilter.has(key)
-                  ? "bg-amber-100 text-amber-700 ring-1 ring-amber-200"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              )}
-            >
-              {label}
-              {key !== 'all' && (() => {
-                const count = key === 'open'
-                  ? searchFilteredConversations.filter((c: any) => c.status !== 'resolved' && c.decision_bucket !== 'auto_handled').length
-                  : key === 'done'
-                  ? searchFilteredConversations.filter((c: any) => c.status === 'resolved' || c.decision_bucket === 'auto_handled').length
-                  : key === 'drafts'
-                  ? searchFilteredConversations.filter((c: any) => !!c.ai_draft_response && !c.final_response && c.requires_reply).length
-                  : key === 'needs-reply'
-                  ? searchFilteredConversations.filter((c: any) => c.requires_reply && ['new', 'open', 'waiting_internal', 'ai_handling', 'escalated'].includes(c.status)).length
-                  : 0;
-                return count > 0 ? <span className="ml-1 opacity-70">{count}</span> : null;
-              })()}
-            </button>
-          ))}
-        </div>
-      )}
-
       {/* Conversation list */}
       <div className="flex-1 overflow-y-auto">
         {filteredConversations.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
-            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-[hsl(var(--accent-glow))] to-amber-50 flex items-center justify-center mb-6 honey-glow-shadow ring-8 ring-amber-50/50">
-              <Sparkles className="w-10 h-10 text-amber-500 animate-pulse honey-sparkle" />
+            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-purple-100 to-blue-50 flex items-center justify-center mb-6 shadow-inner ring-8 ring-purple-50/50">
+              <Sparkles className="w-10 h-10 text-purple-500 animate-pulse" />
             </div>
             <p className="text-lg font-semibold text-foreground/80">You're all caught up!</p>
             <p className="text-sm mt-1 text-muted-foreground/70">No messages need your attention right now</p>

@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { checkRateLimit, RATE_LIMITS } from "../_shared/rate-limit.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': Deno.env.get('ALLOWED_ORIGIN') || '*',
@@ -65,10 +64,6 @@ serve(async (req) => {
     if (body.message_body.trim().length === 0) {
       throw new Error('message_body cannot be empty');
     }
-
-    // --- Rate limiting ---
-    const rateLimited = await checkRateLimit(body.workspace_id, RATE_LIMITS['email-send']);
-    if (rateLimited) return rateLimited;
 
     console.log(`[${functionName}] Starting:`, {
       conversation_id: body.conversation_id,

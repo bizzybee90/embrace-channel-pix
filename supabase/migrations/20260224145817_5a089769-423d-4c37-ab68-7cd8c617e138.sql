@@ -1,1 +1,0 @@
-DO $$ BEGIN ALTER FUNCTION public.bb_norm_identifier(text, text) SET search_path = public; EXCEPTION WHEN OTHERS THEN NULL; END $$;

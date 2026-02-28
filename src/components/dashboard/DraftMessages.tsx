@@ -146,11 +146,10 @@ export function DraftMessages({ onNavigate, maxItems = 5 }: DraftMessagesProps) 
         if (!conv?.ai_draft_response) continue;
 
         // Send via edge function
-        const { error } = await supabase.functions.invoke('send-reply', {
+        const { error } = await supabase.functions.invoke('email-send', {
           body: {
-            conversation_id: id,
-            workspace_id: workspace!.id,
-            content: conv.ai_draft_response,
+            conversationId: id,
+            response: conv.ai_draft_response,
           },
         });
 

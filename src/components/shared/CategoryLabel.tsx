@@ -25,8 +25,8 @@ interface CategoryConfig {
   className: string;
 }
 
-// Unified premium amber style for all category pills
-const UNIFIED_PILL = 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border-amber-200 dark:border-amber-700';
+// Unified premium indigo style for all category pills
+const UNIFIED_PILL = 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 border-indigo-200 dark:border-indigo-700';
 
 const categoryConfigs: Record<string, CategoryConfig> = {
   // New 9-category taxonomy (primary keys)
@@ -192,7 +192,7 @@ export const CategoryLabel = ({
     <Badge 
       variant="outline" 
       className={cn(
-        "rounded-full border flex items-center gap-1 font-medium flex-shrink-0 whitespace-nowrap",
+        "rounded-full border flex items-center gap-1 font-medium",
         sizeClasses[size],
         config.className,
         editable && "cursor-pointer hover:ring-2 hover:ring-primary/20 transition-all group",

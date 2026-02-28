@@ -212,7 +212,7 @@ export const CustomerIntelligence = ({ workspaceId, customerId, conversationId }
       case 'opportunity': return 'bg-emerald-50 text-emerald-700 border-emerald-200';
       case 'risk': return 'bg-red-50 text-red-700 border-red-200';
       case 'preference': return 'bg-blue-50 text-blue-700 border-blue-200';
-      case 'behavior': return 'bg-amber-50 text-amber-700 border-amber-200';
+      case 'behavior': return 'bg-purple-50 text-purple-700 border-purple-200';
       default: return 'bg-slate-50 text-slate-600 border-slate-200';
     }
   };
@@ -238,7 +238,7 @@ export const CustomerIntelligence = ({ workspaceId, customerId, conversationId }
           <div className="h-3 w-full bg-muted rounded animate-pulse" />
           <div className="h-3 w-4/5 bg-muted rounded animate-pulse" />
         </div>
-        <p className="text-xs text-center font-medium bg-clip-text text-transparent bg-gradient-to-r from-amber-400 to-amber-600 animate-pulse">
+        <p className="text-xs text-center font-medium bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-blue-500 animate-pulse">
           ✨ AI analysing customer history...
         </p>
       </div>
@@ -261,7 +261,7 @@ export const CustomerIntelligence = ({ workspaceId, customerId, conversationId }
           <div className="h-3 w-full bg-muted rounded animate-pulse" />
           <div className="h-3 w-4/5 bg-muted rounded animate-pulse" />
         </div>
-        <p className="text-xs text-center font-medium bg-clip-text text-transparent bg-gradient-to-r from-amber-400 to-amber-600 animate-pulse">
+        <p className="text-xs text-center font-medium bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-blue-500 animate-pulse">
           {enriching ? '✨ AI analysing customer history...' : '✨ Building intelligence profile...'}
         </p>
       </div>
@@ -273,7 +273,7 @@ export const CustomerIntelligence = ({ workspaceId, customerId, conversationId }
     <div className="space-y-4">
       {/* Avatar + Name — primary top element */}
       <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-5 shadow-sm border border-slate-100/50 flex flex-col items-center text-center">
-        <div className="h-16 w-16 rounded-full bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center text-white text-xl font-bold shadow-lg mb-3">
+        <div className="h-16 w-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xl font-bold shadow-lg mb-3">
           {getInitials(customer?.name ?? null, customer?.email ?? null)}
         </div>
         <p className="font-semibold text-foreground text-base">
@@ -312,7 +312,7 @@ export const CustomerIntelligence = ({ workspaceId, customerId, conversationId }
       </div>
 
       {/* Tinted glass data sections */}
-      <div className="bg-gradient-to-b from-amber-50/40 to-white/80 border border-amber-100/50 shadow-sm rounded-2xl p-5">
+      <div className="bg-gradient-to-b from-indigo-50/40 to-white/80 border border-indigo-100/50 shadow-sm rounded-2xl p-5">
         {/* AI Summary */}
         {intelligence?.summary && (
           <div className="text-sm text-foreground/80 leading-relaxed mb-4 pb-3 border-b border-slate-100/80">
@@ -331,7 +331,7 @@ export const CustomerIntelligence = ({ workspaceId, customerId, conversationId }
                 </span>
               )}
               {intelligence.communication_patterns.message_length && (
-                <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 border border-amber-200 px-2 py-1 rounded-md text-xs font-medium">
+                <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 border border-purple-200 px-2 py-1 rounded-md text-xs font-medium">
                   <Hash className="h-3 w-3" />
                   {intelligence.communication_patterns.message_length} messages
                 </span>

@@ -167,7 +167,7 @@ export function BusinessContextPanel() {
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <Label htmlFor="is-hiring" className="flex items-center gap-2">
-                <Briefcase className="h-4 w-4 text-amber-500" />
+                <Briefcase className="h-4 w-4 text-purple-500" />
                 We're Hiring
               </Label>
               <p className="text-xs text-muted-foreground">

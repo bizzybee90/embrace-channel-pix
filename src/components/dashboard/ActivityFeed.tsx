@@ -213,7 +213,7 @@ export function ActivityFeed({ onNavigate, maxItems = 10 }: ActivityFeedProps) {
       case 'escalated':
         return <AlertCircle className="h-4 w-4 text-destructive" />;
       case 'reviewed':
-        return <CheckCircle2 className="h-4 w-4 text-amber-500" />;
+        return <CheckCircle2 className="h-4 w-4 text-purple-500" />;
       case 'inbox':
         return <Mail className="h-4 w-4 text-blue-500" />;
       default:
@@ -279,11 +279,11 @@ export function ActivityFeed({ onNavigate, maxItems = 10 }: ActivityFeedProps) {
           onClick={() => {
             if (activity.conversationId && onNavigate) {
               if (activity.type === 'draft_ready') {
-                onNavigate(`/needs-action?conversation=${activity.conversationId}`);
+                onNavigate(`/needs-action?id=${activity.conversationId}`);
               } else if (activity.type === 'inbox') {
                 onNavigate(`/needs-action`);
               } else {
-                onNavigate(`/needs-action?conversation=${activity.conversationId}`);
+                onNavigate(`/needs-action?id=${activity.conversationId}`);
               }
             }
           }}

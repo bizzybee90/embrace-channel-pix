@@ -98,7 +98,7 @@ export function ActiveJobs() {
       case 'email_import':
         return <Mail className="h-4 w-4 text-blue-500" />;
       case 'classification':
-        return <Tag className="h-4 w-4 text-amber-500" />;
+        return <Tag className="h-4 w-4 text-purple-500" />;
     }
   };
 

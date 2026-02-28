@@ -218,10 +218,10 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
       return <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-medium tracking-wide uppercase">Archived</span>;
     }
     if (hasDraft || (conversation as any).ai_draft_response) {
-      return <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 text-[10px] font-medium flex items-center gap-1 tracking-wide uppercase"><FileEdit className="h-2.5 w-2.5" />Draft</span>;
+      return <span className="px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 text-[10px] font-medium flex items-center gap-1 tracking-wide uppercase"><FileEdit className="h-2.5 w-2.5" />Draft</span>;
     }
     if (conversation.status === 'new') {
-      return <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 text-[10px] font-medium tracking-wide uppercase">New</span>;
+      return <span className="px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 text-[10px] font-medium tracking-wide uppercase">New</span>;
     }
     return null;
   };
@@ -299,11 +299,11 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
       >
         {/* Swipe backgrounds */}
         <div 
-          className="absolute inset-0 bg-amber-500/20 flex items-center justify-end pr-8 pointer-events-none transition-opacity duration-200"
+          className="absolute inset-0 bg-blue-500/20 flex items-center justify-end pr-8 pointer-events-none transition-opacity duration-200"
           style={{ opacity: !isRightSwipe && isSwiping ? swipeProgress : 0 }}
         >
           <CheckCircle2 
-            className="h-6 w-6 text-amber-600 dark:text-amber-400 transition-transform duration-200" 
+            className="h-6 w-6 text-blue-600 dark:text-blue-400 transition-transform duration-200" 
             style={{ transform: `scale(${swipeProgress})` }}
           />
         </div>

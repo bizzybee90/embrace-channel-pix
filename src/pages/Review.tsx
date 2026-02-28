@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ChannelIcon } from '@/components/shared/ChannelIcon';
 import { CategoryLabel, getCategoryConfig } from '@/components/shared/CategoryLabel';
@@ -99,7 +100,7 @@ const CATEGORIES = [
   { key: 'notification', label: 'Notification', dot: 'bg-slate-500' },
   { key: 'newsletter', label: 'Newsletter', dot: 'bg-pink-500' },
   { key: 'spam', label: 'Spam', dot: 'bg-red-600' },
-  { key: 'personal', label: 'Personal', dot: 'bg-amber-500' },
+  { key: 'personal', label: 'Personal', dot: 'bg-purple-500' },
 ];
 
 type AutomationLevel = 'auto' | 'draft_first' | 'always_review';
@@ -564,35 +565,17 @@ export default function Review() {
           <MobileHeader onMenuClick={() => setSidebarOpen(true)} showBackButton onBackClick={() => setMobileShowDetail(false)} backToText="Back" />
           <MobileSidebarSheet open={sidebarOpen} onOpenChange={setSidebarOpen} onNavigate={() => setSidebarOpen(false)} />
           <div className="flex-1 overflow-y-auto">
-            <div className="p-4 space-y-3">
-              {/* Sender row */}
-              <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                  <span className="text-sm font-bold text-primary">{getSenderName(conv)[0]?.toUpperCase()}</span>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h2 className="font-semibold text-sm truncate">{getSenderName(conv)}</h2>
-                  <p className="text-xs text-muted-foreground truncate">{getSenderEmail(conv)}</p>
-                </div>
+            <div className="p-4 space-y-4">
+              <div>
+                <h2 className="font-semibold text-base">{getSenderName(conv)}</h2>
+                <p className="text-xs text-muted-foreground">{getSenderEmail(conv)}</p>
               </div>
-
-              {/* AI summary bento strip */}
-              {conv.summary_for_human && (
-                <div className="p-3 bg-gradient-to-r from-amber-50/60 via-amber-50/40 to-amber-50/40 rounded-xl border border-white/60 shadow-sm ring-1 ring-slate-900/5 flex items-start gap-2">
-                  <Sparkles className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
-                  <span className="text-sm text-slate-700 leading-snug line-clamp-3">{conv.summary_for_human}</span>
-                </div>
-              )}
-
-              {/* Subject */}
-              <h3 className="font-semibold text-sm">{conv.title}</h3>
-
-              {/* Email body — read-only, no resize */}
-              <div className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed bg-slate-50 p-4 rounded-xl border border-slate-100 line-clamp-[8]">
-                {emailBody}
+              <div>
+                <h3 className="font-medium text-sm">{conv.title}</h3>
               </div>
-
-              {/* Classification + confidence */}
+              <Card className="p-3">
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap line-clamp-6">{emailBody}</p>
+              </Card>
               {conv.email_classification && (
                 <div className="flex items-center gap-2">
                   <CategoryLabel classification={conv.email_classification} size="md" />
@@ -601,38 +584,10 @@ export default function Review() {
                   )}
                 </div>
               )}
-
-              {/* AI Reasoning */}
-              <div className="bg-amber-50/50 border border-amber-100/50 rounded-xl p-4">
-                <div className="flex items-center gap-1.5 mb-1.5">
-                  <Bot className="h-3.5 w-3.5 text-amber-500" />
-                  <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">AI Reasoning</span>
-                </div>
-                <p className="text-sm text-foreground/80 leading-relaxed">
-                  {conv.why_this_needs_you || conv.ai_reasoning || (
-                    <>
-                      Classified as <strong className="capitalize">{conv.email_classification?.replace(/_/g, ' ')}</strong>
-                      {conv.requires_reply ? ' — needs a reply.' : ' — no reply needed.'}
-                      {confidencePercent != null && <> Confidence: <span className={cn("font-semibold", confidenceColor)}>{confidencePercent}%</span>.</>}
-                    </>
-                  )}
-                </p>
-              </div>
-
-              {/* AI Draft preview */}
-              {conv.ai_draft_response && (
-                <div className="bg-amber-50/50 rounded-xl p-4 ring-1 ring-amber-200/50">
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <Sparkles className="h-4 w-4 text-amber-600" />
-                    <span className="text-sm font-medium text-amber-700">AI draft ready</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground line-clamp-2">{conv.ai_draft_response.substring(0, 200)}</p>
-                </div>
-              )}
             </div>
           </div>
           <div className="flex-shrink-0 border-t bg-background p-4 space-y-2">
-            <Button className="w-full h-12 bg-amber-600 hover:bg-amber-700 text-white text-base font-semibold shadow-sm rounded-lg" onClick={handleConfirm} disabled={confirmMutation.isPending}>
+            <Button className="w-full h-12 bg-purple-600 hover:bg-purple-700 text-white text-base font-semibold shadow-sm rounded-lg" onClick={handleConfirm} disabled={confirmMutation.isPending}>
               <Check className="h-5 w-5 mr-2" />Confirm Correct
             </Button>
             <div className="flex gap-2">
@@ -658,7 +613,7 @@ export default function Review() {
             <h1 className="text-base font-semibold">AI Reconciliation</h1>
             <span className="text-xs text-muted-foreground">{confirmedTodayCount} of {totalItems} reconciled</span>
           </div>
-          <Progress value={progressPercent} className="h-2 [&>div]:bg-amber-600" />
+          <Progress value={progressPercent} className="h-2 [&>div]:bg-purple-600" />
         </div>
         <div className="flex-1 overflow-y-auto">
           <div className="p-3 space-y-2">
@@ -676,7 +631,7 @@ export default function Review() {
                       <p className="text-xs text-muted-foreground truncate">{conv.title}</p>
                     </div>
                     <div className="flex flex-col items-end gap-1">
-                      {conv.email_classification && <CategoryLabel classification={conv.email_classification} size="xs" />}
+                      {conv.email_classification && <CategoryLabel classification={conv.email_classification} size="xs" showIcon={false} />}
                       {conf != null && <span className={cn("text-xs font-bold", confColor)}>{conf}%</span>}
                     </div>
                   </div>
@@ -701,7 +656,7 @@ export default function Review() {
             </div>
             <h2 className="text-2xl font-bold text-slate-900 tracking-tight">You're all caught up!</h2>
             <p className="text-muted-foreground mb-6">
-              BizzyBee classified <strong>{weeklyStats?.totalProcessed || 0}</strong> emails with <strong className="text-amber-600">{weeklyStats?.accuracy || 100}%</strong> accuracy this week.
+              BizzyBee classified <strong>{weeklyStats?.totalProcessed || 0}</strong> emails with <strong className="text-purple-600">{weeklyStats?.accuracy || 100}%</strong> accuracy this week.
             </p>
 
             {weeklyStats && (
@@ -745,30 +700,29 @@ export default function Review() {
   return (
     <div className="flex h-screen bg-slate-50/50">
       <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden p-4">
-        <div className="flex-1 bg-white rounded-3xl shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] border border-slate-200/80 overflow-hidden flex flex-col">
-        {/* Top Bar — inside the pill */}
-        <div className="px-6 py-2.5 flex-shrink-0 flex items-center justify-between border-b border-slate-100">
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Top Bar */}
+        <div className="px-6 py-2.5 flex-shrink-0 flex items-center justify-between bg-white/80 backdrop-blur-sm border-b border-slate-100">
           <div className="flex items-center gap-3">
             <BackButton to="/" label="Home" />
             <h1 className="text-base font-semibold">AI Reconciliation</h1>
-            <Sparkles className="h-4 w-4 text-amber-500" />
+            <Sparkles className="h-4 w-4 text-purple-500" />
           </div>
           <div className="flex items-center gap-4">
             {weeklyStats && (
               <div className="flex items-center gap-1.5 text-sm">
-                <Trophy className="h-3.5 w-3.5 text-amber-500" />
+                <Trophy className="h-3.5 w-3.5 text-purple-500" />
                 <span className="text-muted-foreground">Accuracy:</span>
-                <span className="font-bold text-amber-600">{weeklyStats.accuracy}%</span>
+                <span className="font-bold text-purple-600">{weeklyStats.accuracy}%</span>
                 <span className="text-muted-foreground text-xs">this week</span>
               </div>
             )}
             <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground">
-                <strong className="text-amber-600">{confirmedTodayCount}</strong> of <strong>{totalItems}</strong> reconciled
+                <strong className="text-purple-600">{confirmedTodayCount}</strong> of <strong>{totalItems}</strong> reconciled
               </span>
               <div className="w-24">
-                <Progress value={progressPercent} className="h-2 [&>div]:bg-amber-600" />
+                <Progress value={progressPercent} className="h-2 [&>div]:bg-purple-600" />
               </div>
             </div>
           </div>
@@ -777,19 +731,19 @@ export default function Review() {
         {/* 3-Column Layout */}
         <div className="flex-1 flex overflow-hidden gap-4 p-4">
           {/* Column 1: Reconciliation Queue (350px) */}
-          <div className="w-[350px] min-w-[350px] flex-shrink-0 flex flex-col bg-slate-50/30 rounded-2xl border border-slate-100 overflow-hidden">
+          <div className="w-[350px] min-w-[350px] flex-shrink-0 flex flex-col bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
             <div className="px-3 py-2 border-b border-slate-100">
               <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">
                 Reconciliation Queue
               </span>
             </div>
 
-            <div className="flex-1 overflow-y-auto">
+            <ScrollArea className="flex-1">
               {/* To Review section */}
               {unreviewedQueue.length > 0 && (
                 <>
-                  <div className="px-3 py-1.5 bg-amber-50/80 border-b border-slate-100 sticky top-0 z-10">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">
+                  <div className="px-3 py-1.5 bg-purple-50/80 border-b border-slate-100 sticky top-0 z-10">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700 dark:text-purple-400">
                       To Review ({unreviewedQueue.length})
                     </span>
                   </div>
@@ -824,18 +778,18 @@ export default function Review() {
                             <span className={cn("text-[11px] font-bold flex-shrink-0 tabular-nums", confColor)}>{conf}%</span>
                           )}
                         </div>
-                        <div className="flex items-center gap-1.5 mt-0.5 pl-9 min-w-0">
-                          <p className="text-xs text-muted-foreground truncate min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 mt-0.5 pl-9">
+                          <p className="text-xs text-muted-foreground truncate flex-1">
                             {conv.title || 'No subject'}
                           </p>
                           {conv.email_classification && (
-                            <CategoryLabel classification={conv.email_classification} size="xs" />
+                            <CategoryLabel classification={conv.email_classification} size="xs" showIcon={false} />
                           )}
                           {conv.decision_bucket && (
                             <Badge variant="outline" className={cn(
                               "text-[10px] px-1.5 py-0 h-4 font-semibold uppercase tracking-wider rounded-md border flex-shrink-0",
                               conv.decision_bucket === 'act_now' && 'bg-red-50 text-red-600 border-red-200',
-                              conv.decision_bucket === 'quick_win' && conv.ai_draft_response && 'bg-amber-50 text-amber-700 border-amber-100',
+                              conv.decision_bucket === 'quick_win' && conv.ai_draft_response && 'bg-purple-50 text-purple-700 border-purple-100',
                               conv.decision_bucket === 'quick_win' && !conv.ai_draft_response && 'bg-amber-50 text-amber-600 border-amber-200',
                               conv.decision_bucket === 'wait' && 'bg-slate-100 text-slate-600 border-slate-200',
                               conv.decision_bucket === 'auto_handled' && 'bg-slate-100 text-slate-600 border-slate-200',
@@ -877,7 +831,7 @@ export default function Review() {
                           </div>
                           <span className="text-xs truncate flex-1 text-muted-foreground">{getSenderName(conv)}</span>
                           {conv.email_classification && (
-                            <CategoryLabel classification={conv.email_classification} size="xs" />
+                            <CategoryLabel classification={conv.email_classification} size="xs" showIcon={false} />
                           )}
                         </div>
                       </div>
@@ -889,11 +843,11 @@ export default function Review() {
               {unreviewedQueue.length === 0 && recentlyConfirmed.length === 0 && !isLoading && (
                 <div className="p-4 text-center text-muted-foreground text-sm">No emails to reconcile</div>
               )}
-            </div>
+            </ScrollArea>
           </div>
 
           {/* Column 2: Email Preview + AI Reasoning (flex) */}
-          <div className="flex-1 flex flex-col overflow-hidden bg-slate-50/30 rounded-2xl border border-slate-100">
+          <div className="flex-1 flex flex-col overflow-hidden bg-white rounded-2xl shadow-sm border border-slate-200">
             {currentConversation ? (
               <div className="flex-1 flex flex-col overflow-y-auto">
                 {/* Sender row */}
@@ -911,7 +865,7 @@ export default function Review() {
                 </div>
 
                 {/* AI context bento strip */}
-                <div className="mx-6 mt-4 mb-2 p-4 bg-gradient-to-r from-amber-50/60 via-amber-50/40 to-amber-50/40 rounded-2xl border border-white/60 shadow-sm ring-1 ring-slate-900/5 flex items-center gap-3 flex-wrap flex-shrink-0">
+                <div className="mx-6 mt-4 mb-2 p-4 bg-gradient-to-r from-amber-50/60 via-purple-50/40 to-blue-50/40 rounded-2xl border border-white/60 shadow-sm ring-1 ring-slate-900/5 flex items-center gap-3 flex-wrap flex-shrink-0">
                   {currentConversation.summary_for_human && (
                     <div className="flex items-center gap-1.5 flex-1 min-w-0">
                       <Sparkles className="h-4 w-4 text-amber-600 shrink-0" />
@@ -941,11 +895,11 @@ export default function Review() {
 
                   {/* AI Draft */}
                   {currentConversation.ai_draft_response && (
-                    <div className="bg-amber-50/50 dark:bg-amber-900/20 rounded-lg p-4 ring-1 ring-amber-200/50 mb-4">
+                    <div className="bg-purple-50/50 dark:bg-purple-900/20 rounded-lg p-4 ring-1 ring-purple-200/50 mb-4">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <Sparkles className="h-4 w-4 text-amber-600" />
-                          <span className="text-sm font-medium text-amber-700 dark:text-amber-300">AI draft ready</span>
+                          <Sparkles className="h-4 w-4 text-purple-600" />
+                          <span className="text-sm font-medium text-purple-700 dark:text-purple-300">AI draft ready</span>
                         </div>
                         <Button size="sm" variant="outline" className="h-7 text-xs gap-1.5 bg-white border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm rounded-lg" onClick={() => setShowDraftEditor(true)}>
                           <Send className="h-3 w-3" />Edit & Send
@@ -956,9 +910,9 @@ export default function Review() {
                   )}
 
                   {/* AI Reasoning card */}
-                  <div className="mt-4 bg-amber-50/50 border border-amber-100/50 rounded-2xl p-5">
+                  <div className="mt-4 bg-purple-50/50 border border-purple-100/50 rounded-2xl p-5">
                     <div className="flex items-center gap-1.5 mb-2">
-                      <Bot className="h-3.5 w-3.5 text-amber-500" />
+                      <Bot className="h-3.5 w-3.5 text-purple-500" />
                       <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">AI Reasoning</span>
                     </div>
                     <p className="text-sm text-foreground/80 leading-relaxed">
@@ -984,7 +938,7 @@ export default function Review() {
           </div>
 
           {/* Column 3: Reconciliation Panel (300px) */}
-          <div className="w-[300px] min-w-[300px] flex-shrink-0 flex flex-col bg-slate-50/30 rounded-2xl border border-slate-100 overflow-hidden">
+          <div className="w-[300px] min-w-[300px] flex-shrink-0 flex flex-col bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
             {currentConversation ? (
               <div className="flex-1 flex flex-col overflow-y-auto">
                 {/* The Verdict */}
@@ -1005,7 +959,7 @@ export default function Review() {
                       </div>
                       <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden mt-3">
                         <div
-                          className="h-full bg-gradient-to-r from-amber-500 to-amber-600 rounded-full transition-all duration-700 ease-out"
+                          className="h-full bg-gradient-to-r from-purple-500 to-blue-500 rounded-full transition-all duration-700 ease-out"
                           style={{ width: `${confidencePercent}%` }}
                         />
                       </div>
@@ -1037,7 +991,7 @@ export default function Review() {
                       <div className="grid grid-cols-2 gap-3 mt-4">
                         {/* CONFIRM — the hero button */}
                         <Button
-                          className="h-11 bg-amber-600 hover:bg-amber-700 text-white font-medium shadow-sm rounded-xl"
+                          className="h-11 bg-purple-600 hover:bg-purple-700 text-white font-medium shadow-sm rounded-xl"
                           onClick={handleConfirm}
                           disabled={confirmMutation.isPending}
                         >
@@ -1097,7 +1051,7 @@ export default function Review() {
                             className="h-16 text-xs resize-none"
                           />
                       <Button
-                            className="w-full bg-amber-600 hover:bg-amber-700 text-white shadow-sm rounded-lg"
+                            className="w-full bg-purple-600 hover:bg-purple-700 text-white shadow-sm rounded-lg"
                             onClick={handleChange}
                             disabled={confirmMutation.isPending}
                           >
@@ -1144,7 +1098,7 @@ export default function Review() {
                             key={opt.value}
                             className={cn(
                               "flex items-center gap-3 p-3 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50 transition-all text-sm font-medium text-slate-700",
-                              automationLevel === opt.value && "border-amber-500 bg-amber-50 ring-1 ring-amber-200"
+                              automationLevel === opt.value && "border-purple-500 bg-purple-50 ring-1 ring-purple-200"
                             )}
                             onClick={() => setAutomationLevel(opt.value as AutomationLevel)}
                           >
@@ -1162,7 +1116,7 @@ export default function Review() {
                             key={opt.value}
                             className={cn(
                               "px-3 py-2 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50 transition-all text-xs font-medium text-slate-700",
-                              tonePreference === opt.value && "border-amber-500 bg-amber-50 ring-1 ring-amber-200"
+                              tonePreference === opt.value && "border-purple-500 bg-purple-50 ring-1 ring-purple-200"
                             )}
                             onClick={() => setTonePreference(opt.value as TonePreference)}
                           >
@@ -1191,7 +1145,6 @@ export default function Review() {
               </div>
             )}
           </div>
-        </div>
         </div>
       </div>
 

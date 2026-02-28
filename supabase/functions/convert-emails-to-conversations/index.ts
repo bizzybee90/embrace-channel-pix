@@ -30,15 +30,6 @@ serve(async (req) => {
   }
 
   try {
-    // SECURITY: Internal-only function — require service role key
-    const authHeader = req.headers.get('Authorization');
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const token = authHeader?.replace('Bearer ', '');
-    if (token !== supabaseServiceKey) {
-      return new Response(JSON.stringify({ error: 'Unauthorized — service role required' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
-
     const { workspace_id, _iteration = 0 } = await req.json();
 
     if (!workspace_id) {
@@ -56,6 +47,7 @@ serve(async (req) => {
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const startTime = Date.now();

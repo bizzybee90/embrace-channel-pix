@@ -69,18 +69,6 @@ Deno.serve(async (req) => {
       throw new HttpError(405, "Method not allowed");
     }
 
-    // SECURITY: Internal-only — require worker token or service role key
-    const workerToken = req.headers.get("x-bb-worker-token")?.trim();
-    const expectedWorkerToken = Deno.env.get("BB_WORKER_TOKEN");
-    const authHeader = req.headers.get("Authorization");
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-
-    const isWorker = workerToken && expectedWorkerToken && workerToken === expectedWorkerToken;
-    const isServiceRole = authHeader?.replace("Bearer ", "") === serviceRoleKey;
-
-    if (!isWorker && !isServiceRole) {
-      throw new HttpError(401, "Unauthorized — worker token or service role required");
-    }
     const body = await req.json() as {
       workspace_id?: string;
       config_id?: string;

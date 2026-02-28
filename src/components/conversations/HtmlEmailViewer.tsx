@@ -51,16 +51,6 @@ export function HtmlEmailViewer({ htmlContent, open, onOpenChange }: HtmlEmailVi
         }
         table {
           max-width: 100%;
-          word-break: break-word;
-        }
-        td, th {
-          word-break: break-word;
-          overflow-wrap: break-word;
-        }
-        @media (max-width: 600px) {
-          table { width: 100% !important; }
-          td, th { display: block !important; width: 100% !important; }
-          img { max-width: 100% !important; height: auto !important; }
         }
       </style>
     </head>
@@ -80,8 +70,8 @@ export function HtmlEmailViewer({ htmlContent, open, onOpenChange }: HtmlEmailVi
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl flex flex-col p-0 mx-4 h-[80dvh] w-[calc(100vw-2rem)] rounded-3xl sm:rounded-3xl sm:h-[80vh] sm:w-auto sm:mx-auto">
-        <DialogHeader className="px-4 py-3 border-b flex-shrink-0 rounded-t-3xl">
+      <DialogContent className="max-w-4xl h-[80vh] flex flex-col p-0">
+        <DialogHeader className="px-4 py-3 border-b flex-shrink-0">
           <div className="flex items-center justify-between">
             <DialogTitle className="text-base">Formatted Email</DialogTitle>
             <div className="flex items-center gap-2">
@@ -89,7 +79,7 @@ export function HtmlEmailViewer({ htmlContent, open, onOpenChange }: HtmlEmailVi
                 variant="outline"
                 size="sm"
                 onClick={handleOpenInNewTab}
-                className="gap-1.5 rounded-xl"
+                className="gap-1.5"
               >
                 <ExternalLink className="h-3.5 w-3.5" />
                 Open in new tab
@@ -97,10 +87,10 @@ export function HtmlEmailViewer({ htmlContent, open, onOpenChange }: HtmlEmailVi
             </div>
           </div>
         </DialogHeader>
-        <div className="flex-1 overflow-hidden bg-white rounded-b-3xl">
+        <div className="flex-1 overflow-hidden bg-white rounded-b-lg">
           <iframe
             srcDoc={styledHtml}
-            sandbox=""
+            sandbox="allow-same-origin"
             className="w-full h-full border-0"
             title="Email content"
           />

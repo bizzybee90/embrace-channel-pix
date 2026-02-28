@@ -154,10 +154,11 @@ export const RecentActivityWidget = () => {
 
   const handleActivityClick = (activity: RecentActivity) => {
     if (activity.conversation_id) {
-      if (activity.type === 'resolution') {
-        navigate(`/done?conversation=${activity.conversation_id}`);
+      // Navigate to the appropriate page with the conversation selected
+      if (activity.type === 'escalation') {
+        navigate(`/needs-action?id=${activity.conversation_id}`);
       } else {
-        navigate(`/needs-action?conversation=${activity.conversation_id}`);
+        navigate(`/done?id=${activity.conversation_id}`);
       }
     }
   };

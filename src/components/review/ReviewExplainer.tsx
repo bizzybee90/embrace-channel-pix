@@ -19,7 +19,7 @@ export function ReviewExplainer() {
         <div className="space-y-4">
           <div>
             <h4 className="font-semibold flex items-center gap-2 mb-2">
-              <Bot className="h-4 w-4 text-amber-500" />
+              <Bot className="h-4 w-4 text-purple-500" />
               Teaching BizzyBee
             </h4>
             <p className="text-sm text-muted-foreground">
