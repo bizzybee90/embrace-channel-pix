@@ -147,7 +147,7 @@ export const AIConversationSummaryWidget = () => {
 
   const getCategoryColor = (category: string | null) => {
     const colors: Record<string, string> = {
-      scheduling: 'bg-blue-500/10 text-blue-700 dark:text-blue-400',
+      scheduling: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
       billing: 'bg-green-500/10 text-green-700 dark:text-green-400',
       support: 'bg-purple-500/10 text-purple-700 dark:text-purple-400',
       inquiry: 'bg-orange-500/10 text-orange-700 dark:text-orange-400',

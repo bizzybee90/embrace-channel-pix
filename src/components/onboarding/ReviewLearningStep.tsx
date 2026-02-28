@@ -290,7 +290,7 @@ export function ReviewLearningStep({ workspaceId, onComplete, onBack }: ReviewLe
             <div className="text-xs text-muted-foreground">Patterns Learned</div>
           </div>
           <div className="bg-muted/30 rounded-lg p-3 text-center">
-            <div className="text-xl font-bold text-blue-600">{learnedResponses.length}</div>
+            <div className="text-xl font-bold text-amber-600">{learnedResponses.length}</div>
             <div className="text-xs text-muted-foreground">Response Templates</div>
           </div>
         </div>

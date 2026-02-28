@@ -186,7 +186,7 @@ export const DocumentUpload = ({ workspaceId, onDocumentProcessed }: DocumentUpl
         );
       case 'processing':
         return (
-          <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
+          <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
             <Loader2 className="h-3 w-3 mr-1 animate-spin" />
             Processing
           </Badge>

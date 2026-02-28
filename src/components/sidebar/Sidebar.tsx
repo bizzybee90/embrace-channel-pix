@@ -105,7 +105,7 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
               { to: '/', icon: Home, label: 'Home', end: true },
               { to: '/inbox', icon: Inbox, label: 'Inbox' },
               { to: '/needs-action', icon: Zap, label: 'Needs Action', count: viewCounts?.toReply, color: 'text-destructive' },
-              { to: '/unread', icon: Mail, label: 'Unread', count: viewCounts?.unread, color: 'text-blue-500' },
+              { to: '/unread', icon: Mail, label: 'Unread', count: viewCounts?.unread, color: 'text-amber-500' },
               { to: '/drafts', icon: FileEdit, label: 'Drafts', count: viewCounts?.drafts, color: 'text-amber-500' },
               { to: '/review', icon: ClipboardCheck, label: 'Training', count: viewCounts?.review, color: 'text-purple-500' },
               { to: '/snoozed', icon: Clock, label: 'Snoozed', count: viewCounts?.snoozed, color: 'text-amber-500' },
@@ -180,12 +180,12 @@ export const Sidebar = ({ forceCollapsed = false, onNavigate, onFiltersClick, is
           <IconRailItem to="/" icon={Home} label="Home" end />
           <IconRailItem to="/inbox" icon={Inbox} label="Inbox" />
           <IconRailItem to="/needs-action" icon={Zap} label="Needs Action" count={viewCounts?.toReply} color="text-destructive" />
-          <IconRailItem to="/unread" icon={Mail} label="Unread" count={viewCounts?.unread} color="text-blue-500" />
+          <IconRailItem to="/unread" icon={Mail} label="Unread" count={viewCounts?.unread} color="text-amber-500" />
           <IconRailItem to="/drafts" icon={FileEdit} label="Drafts" count={viewCounts?.drafts} color="text-amber-500" />
           <IconRailItem to="/review" icon={ClipboardCheck} label="Training" count={viewCounts?.review} color="text-purple-500" />
           <IconRailItem to="/snoozed" icon={Clock} label="Snoozed" count={viewCounts?.snoozed} color="text-amber-500" />
           <IconRailItem to="/done" icon={Archive} label="Cleared" count={viewCounts?.done} color="text-green-500" />
-          <IconRailItem to="/sent" icon={Send} label="Sent" color="text-blue-500" />
+          <IconRailItem to="/sent" icon={Send} label="Sent" color="text-muted-foreground" />
         </nav>
 
         {/* Email import */}

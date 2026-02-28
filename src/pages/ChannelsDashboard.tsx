@@ -33,8 +33,8 @@ const channelConfig = {
   email: {
     icon: Mail,
     label: 'Email',
-    color: 'text-blue-600',
-    bgColor: 'bg-blue-50 dark:bg-blue-950/20',
+    color: 'text-amber-600',
+    bgColor: 'bg-amber-50 dark:bg-amber-950/20',
     emoji: '📧'
   },
   whatsapp: {

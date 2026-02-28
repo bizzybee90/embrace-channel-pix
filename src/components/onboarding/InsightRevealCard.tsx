@@ -59,7 +59,7 @@ export function InsightRevealCard({
   const colorClasses = {
     primary: 'text-primary',
     green: 'text-green-600',
-    blue: 'text-blue-600',
+    blue: 'text-amber-600',
     amber: 'text-amber-600',
     purple: 'text-purple-600',
   };
@@ -67,7 +67,7 @@ export function InsightRevealCard({
   const bgClasses = {
     primary: 'bg-primary/10',
     green: 'bg-green-100 dark:bg-green-900/30',
-    blue: 'bg-blue-100 dark:bg-blue-900/30',
+    blue: 'bg-amber-100 dark:bg-amber-900/30',
     amber: 'bg-amber-100 dark:bg-amber-900/30',
     purple: 'bg-purple-100 dark:bg-purple-900/30',
   };

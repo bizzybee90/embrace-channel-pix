@@ -53,7 +53,7 @@ export const InsightsWidget = ({ workspaceId }: InsightsWidgetProps) => {
   const getIcon = (type: string | null, severity: string | null) => {
     if (severity === 'critical') return <AlertTriangle className="h-4 w-4 text-red-500" />;
     if (severity === 'warning') return <AlertTriangle className="h-4 w-4 text-amber-500" />;
-    if (type === 'trend' || type === 'category_trend') return <TrendingUp className="h-4 w-4 text-blue-500" />;
+    if (type === 'trend' || type === 'category_trend') return <TrendingUp className="h-4 w-4 text-amber-500" />;
     if (type === 'opportunity' || type === 'automation_opportunity') return <Lightbulb className="h-4 w-4 text-yellow-500" />;
     if (type === 'summary') return <Sparkles className="h-4 w-4 text-indigo-500" />;
     return <Info className="h-4 w-4 text-slate-400" />;

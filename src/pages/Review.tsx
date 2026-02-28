@@ -93,10 +93,10 @@ const getSenderEmail = (conv: ReviewConversation): string => {
 // 9-category taxonomy for the change picker
 const CATEGORIES = [
   { key: 'quote', label: 'Quote', dot: 'bg-amber-500' },
-  { key: 'booking', label: 'Booking', dot: 'bg-blue-500' },
+  { key: 'booking', label: 'Booking', dot: 'bg-amber-500' },
   { key: 'complaint', label: 'Complaint', dot: 'bg-red-500' },
   { key: 'follow_up', label: 'Follow-up', dot: 'bg-orange-500' },
-  { key: 'inquiry', label: 'Enquiry', dot: 'bg-blue-400' },
+  { key: 'inquiry', label: 'Enquiry', dot: 'bg-amber-400' },
   { key: 'notification', label: 'Notification', dot: 'bg-slate-500' },
   { key: 'newsletter', label: 'Newsletter', dot: 'bg-pink-500' },
   { key: 'spam', label: 'Spam', dot: 'bg-red-600' },
@@ -647,9 +647,9 @@ export default function Review() {
   // ============ DESKTOP — ALL CAUGHT UP ============
   if (allCaughtUp) {
     return (
-      <div className="flex h-screen bg-slate-50/50">
-        <Sidebar />
-      <div className="flex-1 flex flex-col items-center justify-center">
+      <div className="flex h-screen w-full bg-slate-50/50 overflow-hidden">
+        <aside className="bg-slate-50/50 flex-shrink-0 overflow-y-auto relative z-50"><Sidebar /></aside>
+      <main className="flex-1 flex flex-col min-w-0 p-4"><div className="flex-1 bg-white rounded-3xl shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] border border-slate-200/80 flex flex-col items-center justify-center overflow-hidden">
           <div className="text-center max-w-md px-6 animate-fade-in">
             <div className="w-24 h-24 bg-gradient-to-br from-emerald-50 to-emerald-100/50 rounded-full flex items-center justify-center mx-auto mb-6 ring-8 ring-emerald-50/50">
               <Sparkles className="w-10 h-10 text-emerald-500" />
@@ -687,7 +687,7 @@ export default function Review() {
               Back to Inbox
             </Button>
           </div>
-        </div>
+        </div></div></main>
       </div>
     );
   }
@@ -698,11 +698,12 @@ export default function Review() {
     : '';
 
   return (
-    <div className="flex h-screen bg-slate-50/50">
-      <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Top Bar */}
-        <div className="px-6 py-2.5 flex-shrink-0 flex items-center justify-between bg-white/80 backdrop-blur-sm border-b border-slate-100">
+    <div className="flex h-screen w-full bg-slate-50/50 overflow-hidden">
+      <aside className="bg-slate-50/50 flex-shrink-0 overflow-y-auto relative z-50"><Sidebar /></aside>
+      <main className="flex-1 flex flex-col min-w-0 p-4">
+        <div className="flex-1 bg-white rounded-3xl shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] border border-slate-200/80 overflow-hidden flex flex-col">
+        {/* Top Bar — inside the pill */}
+        <div className="px-6 py-2.5 flex-shrink-0 flex items-center justify-between border-b border-slate-100">
           <div className="flex items-center gap-3">
             <BackButton to="/" label="Home" />
             <h1 className="text-base font-semibold">AI Reconciliation</h1>
@@ -758,8 +759,8 @@ export default function Review() {
                         onClick={() => { setCurrentIndex(idx); setShowChangePicker(false); }}
                         className={cn(
                          "px-3 py-2.5 cursor-pointer border-b border-slate-100 transition-all",
-                          "hover:bg-slate-50",
-                          idx === currentIndex && "bg-white shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] ring-1 ring-slate-900/5",
+                          "hover:bg-slate-50 hover:shadow-[0_4px_16px_-4px_hsl(33_62%_55%/0.1)]",
+                          idx === currentIndex && "bg-amber-50/60 border-amber-200 ring-1 ring-primary/20 honey-glow-shadow rounded-xl",
                           isFlashing && "bg-green-100 dark:bg-green-900/40 transition-colors duration-300"
                         )}
                       >
@@ -1092,7 +1093,7 @@ export default function Review() {
                         {[
                           { value: 'auto', label: 'Auto-handle', icon: <Bot className="h-3.5 w-3.5 text-green-500" /> },
                           { value: 'draft_first', label: 'Draft first', icon: <FileEdit className="h-3.5 w-3.5 text-amber-500" /> },
-                          { value: 'always_review', label: 'Always review', icon: <Eye className="h-3.5 w-3.5 text-blue-500" /> },
+                          { value: 'always_review', label: 'Always review', icon: <Eye className="h-3.5 w-3.5 text-amber-500" /> },
                         ].map(opt => (
                           <label
                             key={opt.value}
@@ -1146,7 +1147,8 @@ export default function Review() {
             )}
           </div>
         </div>
-      </div>
+        </div>
+      </main>
 
       {/* Draft Reply Editor Sheet */}
       {currentConversation?.ai_draft_response && (

@@ -31,14 +31,14 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 const CATEGORY_COLORS: Record<string, string> = {
   quote_request: 'bg-emerald-500',
-  booking_request: 'bg-blue-500',
-  general_inquiry: 'bg-violet-500',
+  booking_request: 'bg-amber-500',
+  general_inquiry: 'bg-amber-500',
   complaint: 'bg-amber-500',
   notification: 'bg-slate-400',
   newsletter: 'bg-pink-400',
   spam: 'bg-red-400',
   payment_billing: 'bg-teal-500',
-  job_application: 'bg-indigo-500',
+  job_application: 'bg-amber-500',
 };
 
 export function ClassificationBreakdown({ workspaceId }: ClassificationBreakdownProps) {

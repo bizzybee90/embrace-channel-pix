@@ -152,7 +152,7 @@ export function DraftVerificationBadge({
       case 'warning':
         return <AlertTriangle className="h-4 w-4 text-amber-500" />;
       default:
-        return <Info className="h-4 w-4 text-blue-500" />;
+        return <Info className="h-4 w-4 text-amber-500" />;
     }
   };
 

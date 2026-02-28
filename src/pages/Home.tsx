@@ -171,10 +171,10 @@ export const Home = () => {
       label: 'To Reply',
       count: stats.toReplyCount,
       icon: Mail,
-      iconColor: 'text-blue-600',
-      iconBoxBg: 'bg-blue-100',
-      cardBg: 'bg-gradient-to-b from-blue-50/80 to-white',
-      cardBorder: 'border border-blue-100',
+      iconColor: 'text-amber-600',
+      iconBoxBg: 'bg-amber-100',
+      cardBg: 'bg-gradient-to-b from-amber-50/80 to-white',
+      cardBorder: 'border border-amber-100',
       onClick: () => navigate('/needs-action?filter=needs-action'),
     },
     {
@@ -320,7 +320,7 @@ export const Home = () => {
               {/* Recent Activity */}
               <div className="bg-white rounded-3xl border border-slate-100/80 shadow-sm p-5 flex flex-col">
                 <div className="flex items-center gap-2 mb-4">
-                  <Activity className="h-4 w-4 text-blue-500" />
+                  <Activity className="h-4 w-4 text-amber-500" />
                   <h2 className="font-semibold text-slate-900">Recent Activity</h2>
                 </div>
                 <div className="flex-1">

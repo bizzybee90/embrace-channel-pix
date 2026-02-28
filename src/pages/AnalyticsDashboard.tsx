@@ -203,9 +203,11 @@ export default function AnalyticsDashboard() {
 
   return (
     <div className="flex h-screen w-full bg-slate-50/50 overflow-hidden">
-      <Sidebar />
-      <main className="flex-1 overflow-y-auto p-6">
+      <aside className="bg-slate-50/50 flex-shrink-0 overflow-y-auto relative z-50"><Sidebar /></aside>
+      <main className="flex-1 flex flex-col min-w-0 p-4">
+        <div className="flex-1 bg-white rounded-3xl shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] border border-slate-200/80 overflow-y-auto p-6">
         {renderContent()}
+        </div>
       </main>
     </div>
   );
@@ -253,8 +255,8 @@ export default function AnalyticsDashboard() {
           <>
             {/* Key Metrics */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-              <div className="bg-gradient-to-b from-blue-50/80 to-white border border-slate-100 rounded-3xl shadow-sm p-6">
-                <div className="bg-blue-100 text-blue-600 rounded-2xl w-12 h-12 flex items-center justify-center">
+              <div className="bg-gradient-to-b from-amber-50/80 to-white border border-slate-100 rounded-3xl shadow-sm p-6">
+                <div className="bg-amber-100 text-amber-600 rounded-2xl w-12 h-12 flex items-center justify-center">
                   <MessageSquare className="h-5 w-5" />
                 </div>
                 <p className="text-4xl font-extrabold tracking-tight text-slate-900 mt-2">{data.totalConversations}</p>
@@ -286,8 +288,8 @@ export default function AnalyticsDashboard() {
                 <p className="text-xs text-slate-500 font-medium mt-1">Resolution Rate</p>
               </div>
 
-              <div className="bg-gradient-to-b from-blue-50/80 to-white border border-slate-100 rounded-3xl shadow-sm p-6">
-                <div className="bg-blue-100 text-blue-600 rounded-2xl w-12 h-12 flex items-center justify-center">
+              <div className="bg-gradient-to-b from-amber-50/80 to-white border border-slate-100 rounded-3xl shadow-sm p-6">
+                <div className="bg-amber-100 text-amber-600 rounded-2xl w-12 h-12 flex items-center justify-center">
                   <Star className="h-5 w-5" />
                 </div>
                 <p className="text-4xl font-extrabold tracking-tight text-slate-900 mt-2">
@@ -433,7 +435,7 @@ export default function AnalyticsDashboard() {
                   <p className="text-xs text-slate-400">Required human review</p>
                 </div>
               </div>
-              <div className="bg-gradient-to-b from-blue-50/80 to-white border border-slate-100 rounded-3xl shadow-sm p-6">
+              <div className="bg-gradient-to-b from-amber-50/80 to-white border border-slate-100 rounded-3xl shadow-sm p-6">
                 <div className="text-center">
                   <p className="text-4xl font-extrabold tracking-tight text-slate-900">{data.humanHandled - data.escalated}</p>
                   <p className="text-sm text-slate-500 font-medium mt-1">Human Handled</p>

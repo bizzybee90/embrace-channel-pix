@@ -125,7 +125,7 @@ export function BehaviorStatsPanel() {
       case 'act_now':
         return <Badge variant="outline" className="bg-red-500/10 text-red-600 border-red-500/20">Needs Reply</Badge>;
       case 'quick_win':
-        return <Badge variant="outline" className="bg-blue-500/10 text-blue-600 border-blue-500/20">Quick Win</Badge>;
+        return <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/20">Quick Win</Badge>;
       default:
         return <Badge variant="outline" className="text-muted-foreground">Unknown</Badge>;
     }

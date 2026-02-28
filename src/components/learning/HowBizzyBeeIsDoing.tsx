@@ -137,8 +137,8 @@ export const HowBizzyBeeIsDoing = () => {
 
         {/* Time saved */}
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center flex-shrink-0">
-            <Clock className="w-5 h-5 text-blue-500" />
+          <div className="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center flex-shrink-0">
+            <Clock className="w-5 h-5 text-amber-500" />
           </div>
           <div>
             <p className="text-sm text-slate-500 font-medium">Time saved this week</p>

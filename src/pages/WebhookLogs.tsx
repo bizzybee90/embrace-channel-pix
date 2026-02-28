@@ -79,7 +79,7 @@ export default function WebhookLogs() {
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   {log.direction === 'inbound' ? (
-                    <ArrowDown className="h-5 w-5 text-blue-500 shrink-0" />
+                    <ArrowDown className="h-5 w-5 text-amber-500 shrink-0" />
                   ) : (
                     <ArrowUp className="h-5 w-5 text-green-500 shrink-0" />
                   )}

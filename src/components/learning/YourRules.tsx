@@ -32,14 +32,14 @@ const formatClassification = (str: string) =>
 
 const classificationColor = (cls: string): string => {
   const map: Record<string, string> = {
-    supplier_invoice: 'bg-blue-50 text-blue-700 border-blue-200',
+    supplier_invoice: 'bg-amber-50 text-amber-700 border-amber-200',
     spam: 'bg-red-50 text-red-700 border-red-200',
     notification: 'bg-slate-50 text-slate-700 border-slate-200',
     customer_enquiry: 'bg-emerald-50 text-emerald-700 border-emerald-200',
     booking_request: 'bg-purple-50 text-purple-700 border-purple-200',
     complaint: 'bg-orange-50 text-orange-700 border-orange-200',
     newsletter: 'bg-cyan-50 text-cyan-700 border-cyan-200',
-    internal: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+    internal: 'bg-amber-50 text-amber-700 border-amber-200',
   };
   return map[cls] || 'bg-slate-50 text-slate-700 border-slate-200';
 };

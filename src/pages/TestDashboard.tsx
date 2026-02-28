@@ -290,7 +290,7 @@ export default function TestDashboard() {
       case 'pending':
         return <Clock className="h-4 w-4 text-muted-foreground" />;
       case 'running':
-        return <RefreshCw className="h-4 w-4 text-blue-500 animate-spin" />;
+        return <RefreshCw className="h-4 w-4 text-amber-500 animate-spin" />;
       case 'success':
         return <CheckCircle2 className="h-4 w-4 text-green-500" />;
       case 'error':
@@ -303,7 +303,7 @@ export default function TestDashboard() {
       case 'pending':
         return <Badge variant="secondary">Pending</Badge>;
       case 'running':
-        return <Badge className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">Running</Badge>;
+        return <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">Running</Badge>;
       case 'success':
         return <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">Success</Badge>;
       case 'error':

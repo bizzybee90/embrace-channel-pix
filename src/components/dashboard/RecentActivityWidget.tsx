@@ -139,7 +139,7 @@ export const RecentActivityWidget = () => {
       return <CheckCircle2 className="h-4 w-4 text-green-500" />;
     }
     if (activity.actor_type === 'ai_agent') {
-      return <Bot className="h-4 w-4 text-blue-600" />;
+      return <Bot className="h-4 w-4 text-amber-600" />;
     }
     return <User className="h-4 w-4 text-green-600" />;
   };

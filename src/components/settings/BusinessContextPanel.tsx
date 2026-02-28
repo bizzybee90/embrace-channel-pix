@@ -185,7 +185,7 @@ export function BusinessContextPanel() {
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <Label htmlFor="stripe-case" className="flex items-center gap-2">
-                <CreditCard className="h-4 w-4 text-indigo-500" />
+                <CreditCard className="h-4 w-4 text-amber-500" />
                 Active Stripe Case
               </Label>
               <p className="text-xs text-muted-foreground">

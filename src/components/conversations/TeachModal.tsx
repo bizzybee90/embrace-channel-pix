@@ -29,7 +29,7 @@ const bucketOptions: { value: BucketChoice; label: string; description: string; 
     value: 'wait', 
     label: 'FYI only', 
     description: 'Show but no reply needed',
-    icon: <Mail className="h-4 w-4 text-blue-500" />
+    icon: <Mail className="h-4 w-4 text-amber-500" />
   },
   { 
     value: 'quick_win', 

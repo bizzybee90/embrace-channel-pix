@@ -71,7 +71,7 @@ const emailProviders = [
     id: 'outlook' as Provider, 
     name: 'Outlook', 
     icon: null,
-    iconColor: 'text-blue-600',
+    iconColor: 'text-amber-600',
     available: true 
   },
   { 

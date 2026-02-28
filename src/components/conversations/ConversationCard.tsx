@@ -17,7 +17,7 @@ const getStatusDotColor = (bucket: string | null | undefined, status: string | n
   if (bucket === 'act_now') return 'bg-destructive';
   if (bucket === 'quick_win') return 'bg-amber-500';
   if (bucket === 'auto_handled') return 'bg-green-500';
-  if (bucket === 'wait') return 'bg-blue-400';
+  if (bucket === 'wait') return 'bg-slate-400';
   if (status === 'resolved') return 'bg-green-500';
   return 'bg-muted-foreground/40';
 };

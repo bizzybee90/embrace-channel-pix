@@ -107,10 +107,10 @@ export const ActivitySidebarWidget = () => {
 
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 text-blue-600" />
+            <CheckCircle2 className="h-4 w-4 text-amber-600" />
             <span className="text-sm">Resolved</span>
           </div>
-          <span className="text-lg font-bold text-blue-600">{stats.resolved}</span>
+          <span className="text-lg font-bold text-amber-600">{stats.resolved}</span>
         </div>
       </div>
     </Card>

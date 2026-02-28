@@ -18,7 +18,7 @@ type AutomationLevel = 'safe' | 'balanced' | 'auto';
 const levels: { value: AutomationLevel; icon: React.ReactNode; label: string; description: string }[] = [
   {
     value: 'safe',
-    icon: <Shield className="h-6 w-6 text-blue-500" />,
+    icon: <Shield className="h-6 w-6 text-amber-500" />,
     label: 'Safe Mode',
     description: 'Everything goes to Review first. You approve before BizzyBee acts.',
   },

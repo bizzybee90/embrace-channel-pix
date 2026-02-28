@@ -171,7 +171,7 @@ export const CustomerTimeline = ({
         return <MessageSquare className="h-4 w-4 text-primary" />;
       case 'message':
         return event.actor_type === 'ai_agent' 
-          ? <Bot className="h-4 w-4 text-blue-500" />
+          ? <Bot className="h-4 w-4 text-amber-500" />
           : <User className="h-4 w-4 text-green-500" />;
       case 'event':
         if (event.event_type === 'escalation') {
@@ -210,7 +210,7 @@ export const CustomerTimeline = ({
       case 'resolved':
         return 'bg-green-500/10 text-green-600 dark:text-green-400';
       case 'new':
-        return 'bg-blue-500/10 text-blue-600 dark:text-blue-400';
+        return 'bg-amber-500/10 text-amber-600 dark:text-amber-400';
       case 'open':
         return 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400';
       case 'waiting_customer':
