@@ -215,7 +215,7 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
   // Status badge
   const getStatusBadge = () => {
     if (conversation.status === 'resolved' || conversation.decision_bucket === 'auto_handled') {
-      return <span className="px-2 py-0.5 rounded-md bg-muted text-muted-foreground text-[10px] font-medium tracking-wide uppercase">Archived</span>;
+      return <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-medium tracking-wide uppercase">Archived</span>;
     }
     if (hasDraft || (conversation as any).ai_draft_response) {
       return <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 text-[10px] font-medium flex items-center gap-1 tracking-wide uppercase"><FileEdit className="h-2.5 w-2.5" />Draft</span>;
@@ -323,7 +323,7 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
           onClick={handleClick}
           className={cn(
             "relative cursor-pointer transition-all duration-300 rounded-[22px] overflow-hidden",
-            "bg-card border border-border apple-shadow hover:apple-shadow-lg spring-press spring-bounce",
+            "bg-card ring-1 ring-black/[0.04] apple-shadow hover:apple-shadow-lg spring-press spring-bounce",
             selected && "ring-primary/40 bg-primary/[0.03]"
           )}
           style={{
@@ -344,9 +344,9 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
       className={cn(
         "relative cursor-pointer transition-all duration-200 overflow-hidden mx-2 my-1 p-0 rounded-xl",
         selected
-          ? "bg-white shadow-sm border border-border"
-          : "hover:bg-background-alt border border-transparent transition-colors",
-        isAutoHandled && !selected && "bg-background-alt"
+          ? "bg-white shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] ring-1 ring-slate-900/5"
+          : "hover:bg-slate-50/80 border border-transparent transition-colors",
+        isAutoHandled && !selected && "bg-slate-50"
       )}
     >
       {cardInner('p-3')}

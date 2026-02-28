@@ -62,7 +62,7 @@ export function EmailPreview({ body, summary, maxLength = 500, rawHtmlBody }: Em
         />
       )}
       
-      <div className="text-left text-sm text-foreground/80 whitespace-pre-wrap leading-relaxed bg-background-alt p-5 rounded-xl border border-border/50 mt-4 mb-6 line-clamp-[10] break-words w-full shadow-inner max-h-64 overflow-y-auto">
+      <div className="text-left text-sm text-slate-700 whitespace-pre-wrap leading-relaxed bg-slate-50 p-5 rounded-xl border border-slate-100 mt-4 mb-6 line-clamp-[10] break-words w-full shadow-inner max-h-64 overflow-y-auto">
         <p className="text-sm whitespace-pre-wrap leading-relaxed text-foreground/80">
           {mainContent}
         </p>

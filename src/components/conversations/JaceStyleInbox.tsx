@@ -285,13 +285,13 @@ export const JaceStyleInbox = ({ onSelect, selectedId, filter = 'needs-me', hide
     }
     if (bucket === 'wait') {
       return { 
-        badge: <Badge className={`bg-muted text-muted-foreground border border-border hover:bg-muted ${BADGE_CLASS}`}>FYI</Badge>,
+        badge: <Badge className={`bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200 ${BADGE_CLASS}`}>FYI</Badge>,
         rowClass: ''
       };
     }
     if (bucket === 'auto_handled') {
       return { 
-        badge: <Badge className={`bg-muted text-muted-foreground border border-border hover:bg-muted ${BADGE_CLASS}`}>Done</Badge>,
+        badge: <Badge className={`bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200 ${BADGE_CLASS}`}>Done</Badge>,
         rowClass: ''
       };
     }
@@ -318,8 +318,8 @@ export const JaceStyleInbox = ({ onSelect, selectedId, filter = 'needs-me', hide
         className={cn(
           "px-3 py-2.5 cursor-pointer transition-all",
           isSelected
-            ? "bg-amber-50/60 border border-amber-200 border border-primary/20 honey-glow-shadow z-10 rounded-xl"
-            : "border-b border-border/50 hover:bg-background-alt hover:shadow-[0_4px_16px_-4px_hsl(33_62%_55%/0.1)]"
+            ? "bg-amber-50/60 border border-amber-200 ring-1 ring-primary/20 honey-glow-shadow z-10 rounded-xl"
+            : "border-b border-slate-100 hover:bg-slate-50 hover:shadow-[0_4px_16px_-4px_hsl(33_62%_55%/0.1)]"
         )}
       >
         {/* Row 1: Avatar + Sender + Time */}
@@ -327,7 +327,7 @@ export const JaceStyleInbox = ({ onSelect, selectedId, filter = 'needs-me', hide
           <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
             <span className="text-[10px] font-bold text-primary">{initial}</span>
           </div>
-          <span className="text-sm font-semibold text-foreground truncate flex-1 min-w-0">
+          <span className="text-sm font-semibold text-slate-900 truncate flex-1 min-w-0">
             {customerName}
           </span>
           <span className="text-[11px] text-muted-foreground whitespace-nowrap flex-shrink-0">
@@ -336,7 +336,7 @@ export const JaceStyleInbox = ({ onSelect, selectedId, filter = 'needs-me', hide
         </div>
         {/* Row 2: Subject + Category + Badge (indented under avatar) */}
         <div className="pl-9 flex items-center gap-2">
-          <span className="text-xs text-muted-foreground truncate flex-1 min-w-0">
+          <span className="text-xs text-slate-500 truncate flex-1 min-w-0">
             {conv.title || 'No subject'}
           </span>
           {conv.category && (
@@ -357,7 +357,7 @@ export const JaceStyleInbox = ({ onSelect, selectedId, filter = 'needs-me', hide
     if (conversations.length === 0) return null;
     return (
       <div>
-        <div className="px-3 py-1.5 bg-amber-50/80 border-b border-border/50 sticky top-0 z-10">
+        <div className="px-3 py-1.5 bg-amber-50/80 border-b border-slate-100 sticky top-0 z-10">
           <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider">
             {title}
           </span>
@@ -401,7 +401,7 @@ export const JaceStyleInbox = ({ onSelect, selectedId, filter = 'needs-me', hide
       {!hideHeader && (<>
       {/* Header with title and metrics */}
       <div className={cn(
-        "bg-white/80 backdrop-blur-sm border-b border-border/50",
+        "bg-white/80 backdrop-blur-sm border-b border-slate-100",
         isMobile ? "px-4 py-3" : "px-6 py-4"
       )}>
         <div className="flex items-center justify-between">
@@ -469,7 +469,7 @@ export const JaceStyleInbox = ({ onSelect, selectedId, filter = 'needs-me', hide
 
       {/* Inline filter chips — Inbox only */}
       {filter === 'all-open' && !subFilter && (
-        <div className="flex items-center gap-1.5 px-3 py-2 border-b border-border/50 overflow-x-auto flex-shrink-0 no-scrollbar">
+        <div className="flex items-center gap-1.5 px-3 py-2 border-b border-slate-100 overflow-x-auto flex-shrink-0 no-scrollbar">
           {([
             { key: 'all', label: 'All' },
             { key: 'open', label: 'Open' },
@@ -484,7 +484,7 @@ export const JaceStyleInbox = ({ onSelect, selectedId, filter = 'needs-me', hide
                 "px-3 py-1 text-xs font-medium rounded-full whitespace-nowrap transition-all flex-shrink-0",
                 statusFilter.has(key)
                   ? "bg-amber-100 text-amber-700 ring-1 ring-amber-200"
-                  : "bg-muted text-muted-foreground hover:bg-muted"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
               )}
             >
               {label}

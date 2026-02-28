@@ -201,7 +201,7 @@ export const Home = () => {
 
   const mainContent = (
     <ScrollArea className="h-[calc(100vh-4rem)]">
-      <div className="p-4 md:p-6 space-y-6 min-h-full" style={{ background: "hsl(40, 20%, 98%)" }}>
+      <div className="p-4 md:p-6 space-y-6 bg-slate-50/50 min-h-full">
         {loading ? (
           <div className="space-y-4">
             <Skeleton className="h-28 rounded-2xl" />
@@ -215,13 +215,13 @@ export const Home = () => {
         ) : (
           <>
             {/* ── Hero Copilot Banner ── */}
-            <div className="w-full rounded-2xl p-8 relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-2" style={{ background: "white", border: "1px solid #e5e7eb", boxShadow: "0 1px 3px rgba(0,0,0,0.03)" }}>
+            <div className="w-full bg-gradient-to-r from-[hsl(var(--accent-glow))] via-white to-[hsl(var(--accent-glow))]/30 rounded-3xl p-8 ring-1 ring-primary/10 honey-glow-shadow relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-2">
               <div>
                 <div className="flex items-center gap-3">
                   <span className="text-3xl">🐝</span>
-                  <h1 className="text-3xl font-bold text-foreground tracking-tight">{getGreeting()}!</h1>
+                  <h1 className="text-3xl font-bold text-slate-900 tracking-tight">{getGreeting()}!</h1>
                 </div>
-                <p className="text-lg text-foreground/80 max-w-2xl mt-2 leading-relaxed">
+                <p className="text-lg text-slate-700 max-w-2xl mt-2 leading-relaxed">
                   {stats.atRiskCount > 0
                     ? `You have ${stats.atRiskCount} urgent item${stats.atRiskCount !== 1 ? 's' : ''} that need attention.`
                     : stats.toReplyCount > 0
@@ -229,7 +229,7 @@ export const Home = () => {
                       : 'Here is what BizzyBee has lined up for you.'}
                 </p>
                 {/* Frosted-glass AI Briefing Panel */}
-                <div className="mt-6 p-5 rounded-xl text-foreground text-[15px] leading-relaxed" style={{ background: "hsl(40, 20%, 98%)", border: "1px solid #e5e7eb" }}>
+                <div className="mt-6 p-5 bg-white/40 backdrop-blur-md rounded-2xl border border-white/60 ring-1 ring-primary/10 text-slate-800 text-[15px] leading-relaxed shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
                   {stats.clearedToday > 0 ? (
                     <p>
                       Since this morning, BizzyBee auto-handled <strong>{stats.clearedToday}</strong> message{stats.clearedToday !== 1 ? 's' : ''}
@@ -249,7 +249,7 @@ export const Home = () => {
                 </div>
               </div>
               {stats.clearedToday > 0 && (
-                <div className="border border-emerald-200 text-emerald-700 px-4 py-2 rounded-xl font-semibold flex items-center gap-2 text-sm whitespace-nowrap self-start md:self-center" style={{ background: "rgba(236,253,245,0.8)" }}>
+                <div className="bg-white/80 backdrop-blur-md border border-emerald-200 text-emerald-800 px-5 py-2.5 rounded-2xl honey-glow-shadow font-semibold flex items-center gap-2 text-sm whitespace-nowrap self-start md:self-center">
                   <CheckCircle2 className="w-5 h-5" />
                   {stats.clearedToday} messages auto-handled today
                 </div>
@@ -266,20 +266,20 @@ export const Home = () => {
                     key={m.label}
                     onClick={m.onClick}
                     className={cn(
-                      'rounded-2xl p-6 cursor-pointer transition-all duration-200',
+                      'rounded-3xl p-6 cursor-pointer transition-all duration-200',
                       active
-                        ? `${m.cardBg} ${m.cardBorder} hover:-translate-y-0.5`
-                        : 'bg-white border border-border opacity-50 grayscale'
+                        ? `${m.cardBg} ${m.cardBorder} shadow-sm hover:honey-glow-shadow hover:-translate-y-1`
+                        : 'bg-slate-50/80 border border-slate-100 opacity-60 grayscale shadow-none'
                     )}
                   >
                     <div className={cn(
-                      'w-12 h-12 rounded-2xl flex items-center justify-center ',
-                      active ? m.iconBoxBg : 'bg-background-alt'
+                      'w-12 h-12 rounded-2xl flex items-center justify-center shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]',
+                      active ? m.iconBoxBg : 'bg-slate-100'
                     )}>
-                      <Icon className={cn('h-5 w-5', active ? m.iconColor : 'text-muted-foreground/70')} />
+                      <Icon className={cn('h-5 w-5', active ? m.iconColor : 'text-slate-400')} />
                     </div>
-                    <p className="text-5xl font-extrabold tracking-tight text-foreground mt-5 mb-1">{m.count}</p>
-                    <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">{m.label}</p>
+                    <p className="text-5xl font-extrabold tracking-tight text-slate-900 mt-5 mb-1">{m.count}</p>
+                    <p className="text-sm font-medium text-slate-500 uppercase tracking-wide">{m.label}</p>
                   </div>
                 );
               })}
@@ -288,11 +288,11 @@ export const Home = () => {
             {/* ── All caught up ── */}
             {stats.toReplyCount === 0 && stats.reviewCount === 0 && stats.atRiskCount === 0 && (
               <div className="flex flex-col items-center justify-center h-[60vh] text-center">
-                <div className="w-24 h-24 rounded-full flex items-center justify-center mb-6 mx-auto" style={{ background: "rgba(236,253,245,0.6)" }}>
+                <div className="w-24 h-24 bg-gradient-to-br from-emerald-50 to-emerald-100/50 rounded-full flex items-center justify-center mb-6 ring-8 ring-emerald-50/50 mx-auto">
                   <Sparkles className="w-10 h-10 text-emerald-500" />
                 </div>
-                <h3 className="text-2xl font-bold text-foreground tracking-tight">You're all caught up!</h3>
-                <p className="text-muted-foreground mt-2 max-w-sm mx-auto text-lg">BizzyBee is actively monitoring your inbox. Go grab a coffee.</p>
+                <h3 className="text-2xl font-bold text-slate-900 tracking-tight">You're all caught up!</h3>
+                <p className="text-slate-500 mt-2 max-w-sm mx-auto text-lg">BizzyBee is actively monitoring your inbox. Go grab a coffee.</p>
               </div>
             )}
 
@@ -302,7 +302,7 @@ export const Home = () => {
               <div className="card-warm p-5 flex flex-col">
                 <div className="flex items-center gap-2 mb-4">
                   <FileEdit className="h-4 w-4 text-amber-500" />
-                  <h2 className="font-semibold text-foreground">Pending Drafts</h2>
+                  <h2 className="font-semibold text-slate-900">Pending Drafts</h2>
                 </div>
                 <div className="flex-1">
                   <DraftMessages onNavigate={handleNavigate} maxItems={4} />
@@ -310,7 +310,7 @@ export const Home = () => {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="w-full text-muted-foreground mt-3 hover:bg-background-alt"
+                  className="w-full text-slate-500 mt-3 hover:bg-slate-50"
                   onClick={() => navigate('/needs-action?filter=drafts')}
                 >
                   View all drafts
@@ -321,7 +321,7 @@ export const Home = () => {
               <div className="card-warm p-5 flex flex-col">
                 <div className="flex items-center gap-2 mb-4">
                   <Activity className="h-4 w-4 text-blue-500" />
-                  <h2 className="font-semibold text-foreground">Recent Activity</h2>
+                  <h2 className="font-semibold text-slate-900">Recent Activity</h2>
                 </div>
                 <div className="flex-1">
                   <ActivityFeed onNavigate={handleNavigate} maxItems={6} />
@@ -329,7 +329,7 @@ export const Home = () => {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="w-full text-muted-foreground mt-3 hover:bg-background-alt"
+                  className="w-full text-slate-500 mt-3 hover:bg-slate-50"
                   onClick={() => navigate('/activity')}
                 >
                   View all activity
@@ -344,7 +344,7 @@ export const Home = () => {
             </div>
 
             {/* System Status Footer */}
-            <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground/70 pt-4">
+            <div className="flex items-center justify-center gap-2 text-xs text-slate-400 pt-4">
               <CheckCircle2 className="h-3 w-3 text-emerald-400" />
               <span>System active</span>
               <span>•</span>

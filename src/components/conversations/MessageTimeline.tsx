@@ -235,7 +235,7 @@ export const MessageTimeline = ({
     return (
       <div key={message.id} className="animate-fade-in">
         {/* Clean plain text rendering in soft container */}
-        <div className="text-foreground whitespace-pre-wrap leading-relaxed bg-background-alt rounded-xl p-6 border border-border/50 text-[15px] font-sans">
+        <div className="text-slate-800 whitespace-pre-wrap leading-relaxed bg-slate-50/50 rounded-xl p-6 border border-slate-100 text-[15px] font-sans">
           {isEmail ? (
             <EmailThread body={plainText} />
           ) : (
@@ -250,7 +250,7 @@ export const MessageTimeline = ({
               variant="outline"
               size="sm"
               onClick={() => setHtmlViewerMessage(message)}
-              className="bg-white shadow-sm text-foreground/80"
+              className="bg-white shadow-sm text-slate-700"
             >
               <FileText className="w-4 h-4 mr-2" />
               View formatted

@@ -43,23 +43,16 @@ export const ThreeColumnLayout = ({ sidebar, main }: ThreeColumnLayoutProps) => 
   }
 
   return (
-    <div className="flex h-screen w-full overflow-hidden" style={{ background: "hsl(40, 20%, 98%)" }}>
+    <div className="flex h-screen w-full bg-slate-50/50 overflow-hidden">
       {/* Desktop Sidebar - icon rail */}
-      <aside className="flex-shrink-0 overflow-y-auto relative z-50" style={{ background: "hsl(40, 20%, 98%)" }}>
+      <aside className="bg-slate-50/50 flex-shrink-0 overflow-y-auto relative z-50">
         {sidebar}
       </aside>
 
       {/* Desktop Main Content - floating card */}
       <main className="flex-1 flex flex-col overflow-y-auto min-w-0 p-4">
-        <div
-          className="flex-1 overflow-y-auto"
-          style={{
-            background: "white",
-            borderRadius: 16,
-            border: "1px solid #e5e7eb",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.03)",
-          }}
-        >
+        {/* Main content card */}
+        <div className="flex-1 bg-white rounded-3xl shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] border border-slate-200/80 overflow-y-auto">
           {main}
         </div>
       </main>

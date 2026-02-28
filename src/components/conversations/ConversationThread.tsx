@@ -238,7 +238,7 @@ export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackBut
       case 'positive': return { emoji: '😊', label: 'Positive', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
       case 'negative': return { emoji: '😟', label: 'Negative', color: 'bg-red-50 text-red-700 border-red-200' };
       case 'frustrated': return { emoji: '😤', label: 'Frustrated', color: 'bg-orange-50 text-orange-700 border-orange-200' };
-      case 'neutral': return { emoji: '😐', label: 'Neutral', color: 'bg-background-alt text-muted-foreground border-border' };
+      case 'neutral': return { emoji: '😐', label: 'Neutral', color: 'bg-slate-50 text-slate-600 border-slate-200' };
       default: return null;
     }
   };
@@ -305,11 +305,11 @@ export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackBut
 
         {/* 2. Elevated AI Bento Strip — Frosted Glass (Home page aesthetic) */}
         {briefingText && (
-          <div className="flex-shrink-0 mx-6 mt-6 mb-2 p-5 bg-gradient-to-r from-amber-50/60 via-amber-50/40 to-amber-50/40 rounded-2xl border border-white/60 shadow-sm flex flex-col gap-3 border border-border">
+          <div className="flex-shrink-0 mx-6 mt-6 mb-2 p-5 bg-gradient-to-r from-amber-50/60 via-amber-50/40 to-amber-50/40 rounded-2xl border border-white/60 shadow-sm flex flex-col gap-3 ring-1 ring-slate-900/5">
             {/* Top row: AI Summary */}
             <div className="flex items-start gap-2">
               <Sparkles className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-              <p className="text-sm text-foreground/80 dark:text-foreground leading-relaxed line-clamp-2 font-medium flex-1">
+              <p className="text-sm text-slate-700 dark:text-slate-200 leading-relaxed line-clamp-2 font-medium flex-1">
                 {briefingText}
               </p>
             </div>
@@ -331,7 +331,7 @@ export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackBut
               {conversation.priority && conversation.priority !== 'medium' && (
                 <span className={cn(
                   "inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md border",
-                  conversation.priority === 'high' ? 'border-red-200 bg-red-50 text-red-700' : 'border-border bg-background-alt text-muted-foreground'
+                  conversation.priority === 'high' ? 'border-red-200 bg-red-50 text-red-700' : 'border-slate-200 bg-slate-50 text-slate-600'
                 )}>
                   <TrendingUp className="w-3 h-3" />
                   {conversation.priority}
@@ -368,14 +368,14 @@ export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackBut
             <div className="flex-shrink-0 px-4 pb-4 space-y-2">
               <button
                 onClick={() => handleReopen(true)}
-                className="border border-border rounded-full py-3 px-4 text-muted-foreground cursor-pointer shadow-sm bg-white hover:border-amber-300 transition-all flex items-center gap-3 w-full text-left text-sm"
+                className="border border-slate-200 rounded-full py-3 px-4 text-muted-foreground cursor-pointer shadow-sm bg-white hover:border-amber-300 transition-all flex items-center gap-3 w-full text-left text-sm"
               >
                 <Reply className="w-4 h-4" />
                 Reply...
               </button>
               <button
                 onClick={() => handleReopen(false)}
-                className="border border-border/50 rounded-full py-2 px-4 text-muted-foreground/70 cursor-pointer bg-background-alt hover:bg-muted transition-all flex items-center justify-center gap-2 w-full text-xs"
+                className="border border-slate-100 rounded-full py-2 px-4 text-muted-foreground/70 cursor-pointer bg-slate-50 hover:bg-slate-100 transition-all flex items-center justify-center gap-2 w-full text-xs"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
                 Reopen without replying
@@ -402,7 +402,7 @@ export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackBut
 
       {/* Permanent right intelligence panel on wide screens */}
       {isWide && intelligencePanel && (
-        <div className="flex-shrink-0 w-[300px] overflow-y-auto bg-gradient-to-b from-amber-50/30 to-white shadow-sm border border-border rounded-xl m-3 ml-0 p-3">
+        <div className="flex-shrink-0 w-[300px] overflow-y-auto bg-gradient-to-b from-amber-50/30 to-white shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] ring-1 ring-slate-900/5 rounded-xl m-3 ml-0 p-3">
           {intelligencePanel}
         </div>
       )}

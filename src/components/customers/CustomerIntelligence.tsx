@@ -45,7 +45,7 @@ interface CustomerInsight {
 const CollapsibleSection = ({ title, defaultOpen = false, children }: { title: string; defaultOpen?: boolean; children: React.ReactNode }) => {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="border-b border-border/50/80 last:border-b-0">
+    <div className="border-b border-slate-100/80 last:border-b-0">
       <button
         onClick={() => setOpen(!open)}
         className="flex items-center justify-between w-full py-2.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors"
@@ -203,7 +203,7 @@ export const CustomerIntelligence = ({ workspaceId, customerId, conversationId }
       case 'positive': return 'bg-emerald-50 text-emerald-700 border-emerald-200';
       case 'negative': return 'bg-red-50 text-red-700 border-red-200';
       case 'declining': return 'bg-orange-50 text-orange-700 border-orange-200';
-      default: return 'bg-background-alt text-muted-foreground border-border';
+      default: return 'bg-slate-50 text-slate-600 border-slate-200';
     }
   };
 
@@ -213,7 +213,7 @@ export const CustomerIntelligence = ({ workspaceId, customerId, conversationId }
       case 'risk': return 'bg-red-50 text-red-700 border-red-200';
       case 'preference': return 'bg-blue-50 text-blue-700 border-blue-200';
       case 'behavior': return 'bg-amber-50 text-amber-700 border-amber-200';
-      default: return 'bg-background-alt text-muted-foreground border-border';
+      default: return 'bg-slate-50 text-slate-600 border-slate-200';
     }
   };
 
@@ -272,7 +272,7 @@ export const CustomerIntelligence = ({ workspaceId, customerId, conversationId }
   return (
     <div className="space-y-4">
       {/* Avatar + Name — primary top element */}
-      <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-5 shadow-sm border border-border/50/50 flex flex-col items-center text-center">
+      <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-5 shadow-sm border border-slate-100/50 flex flex-col items-center text-center">
         <div className="h-16 w-16 rounded-full bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center text-white text-xl font-bold shadow-lg mb-3">
           {getInitials(customer?.name ?? null, customer?.email ?? null)}
         </div>
@@ -315,7 +315,7 @@ export const CustomerIntelligence = ({ workspaceId, customerId, conversationId }
       <div className="bg-gradient-to-b from-amber-50/40 to-white/80 border border-amber-100/50 shadow-sm rounded-2xl p-5">
         {/* AI Summary */}
         {intelligence?.summary && (
-          <div className="text-sm text-foreground/80 leading-relaxed mb-4 pb-3 border-b border-border/50/80">
+          <div className="text-sm text-foreground/80 leading-relaxed mb-4 pb-3 border-b border-slate-100/80">
             {intelligence.summary}
           </div>
         )}
@@ -374,7 +374,7 @@ export const CustomerIntelligence = ({ workspaceId, customerId, conversationId }
           <CollapsibleSection title="Insights">
             <div className="space-y-2">
               {insights.slice(0, 5).map((insight) => (
-                <div key={insight.id} className="rounded-xl bg-white/60 border border-border/50 p-2.5">
+                <div key={insight.id} className="rounded-xl bg-white/60 border border-slate-100 p-2.5">
                   <div className="flex items-start gap-2">
                     <Badge className={cn("text-xs capitalize shrink-0 border", getInsightTypeColor(insight.insight_type))}>
                       {insight.insight_type}
