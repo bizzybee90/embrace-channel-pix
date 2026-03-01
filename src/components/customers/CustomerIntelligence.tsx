@@ -312,7 +312,7 @@ export const CustomerIntelligence = ({ workspaceId, customerId, conversationId }
       </div>
 
       {/* Tinted glass data sections */}
-      <div className="bg-gradient-to-b from-indigo-50/40 to-white/80 border border-indigo-100/50 shadow-sm rounded-2xl p-5">
+      <div className="bg-gradient-to-b from-amber-50/40 to-white/80 border border-amber-100/50 shadow-sm rounded-2xl p-5">
         {/* AI Summary */}
         {intelligence?.summary && (
           <div className="text-sm text-foreground/80 leading-relaxed mb-4 pb-3 border-b border-slate-100/80">

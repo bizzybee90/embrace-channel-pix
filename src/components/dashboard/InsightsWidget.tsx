@@ -55,7 +55,7 @@ export const InsightsWidget = ({ workspaceId }: InsightsWidgetProps) => {
     if (severity === 'warning') return <AlertTriangle className="h-4 w-4 text-amber-500" />;
     if (type === 'trend' || type === 'category_trend') return <TrendingUp className="h-4 w-4 text-amber-500" />;
     if (type === 'opportunity' || type === 'automation_opportunity') return <Lightbulb className="h-4 w-4 text-yellow-500" />;
-    if (type === 'summary') return <Sparkles className="h-4 w-4 text-indigo-500" />;
+    if (type === 'summary') return <Sparkles className="h-4 w-4 text-amber-500" />;
     return <Info className="h-4 w-4 text-slate-400" />;
   };
 
@@ -77,7 +77,7 @@ export const InsightsWidget = ({ workspaceId }: InsightsWidgetProps) => {
   return (
     <div className="bg-white rounded-3xl border border-slate-100/80 shadow-sm p-5">
       <div className="flex items-center gap-2 mb-4">
-        <Lightbulb className="h-4 w-4 text-indigo-500" />
+        <Lightbulb className="h-4 w-4 text-amber-500" />
         <h2 className="font-semibold text-slate-900">Insights</h2>
       </div>
 
