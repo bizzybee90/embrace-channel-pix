@@ -332,7 +332,7 @@ export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackBut
                   variant="ghost"
                   size="sm"
                   onClick={() => setIntelligenceDrawerOpen(true)}
-                  className="ml-auto text-xs text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:text-indigo-200 dark:hover:bg-indigo-950/40 font-medium h-8 px-3"
+                  className="ml-auto text-xs text-amber-600 hover:text-amber-800 hover:bg-amber-50 dark:text-amber-400 dark:hover:text-amber-200 dark:hover:bg-amber-950/40 font-medium h-8 px-3"
                 >
                   Deep Dive
                   <ChevronRight className="w-3 h-3 ml-1" />
@@ -385,7 +385,7 @@ export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackBut
 
       {/* Permanent right intelligence panel on wide screens */}
       {isWide && intelligencePanel && (
-        <div className="flex-shrink-0 w-[300px] overflow-y-auto bg-gradient-to-b from-indigo-50/30 to-white shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] ring-1 ring-slate-900/5 rounded-xl m-3 ml-0 p-3">
+        <div className="flex-shrink-0 w-[300px] overflow-y-auto bg-gradient-to-b from-amber-50/30 to-white shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] ring-1 ring-slate-900/5 rounded-xl m-3 ml-0 p-3">
           {intelligencePanel}
         </div>
       )}
@@ -396,7 +396,7 @@ export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackBut
           <SheetContent side="right" className="w-[400px] sm:w-[450px] overflow-y-auto">
             <SheetHeader>
               <SheetTitle className="flex items-center gap-2">
-                <Brain className="h-4 w-4 text-indigo-600" />
+                <Brain className="h-4 w-4 text-amber-600" />
                 Customer Intelligence
               </SheetTitle>
             </SheetHeader>
