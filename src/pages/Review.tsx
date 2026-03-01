@@ -688,7 +688,6 @@ export default function Review() {
             </Button>
           </div>
         </div>
-        </div>
       </main>
       </div>
     );
