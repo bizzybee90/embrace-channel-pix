@@ -27,7 +27,7 @@ All colors MUST be HSL.
     --popover: 0 0% 100%;
     --popover-foreground: 220 15% 12%;
 
-    --primary: 217 91% 60%;
+    --primary: 35 55% 55%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 220 14% 96%;
@@ -44,7 +44,7 @@ All colors MUST be HSL.
 
     --border: 220 13% 91%;
     --input: 220 13% 91%;
-    --ring: 217 91% 60%;
+    --ring: 35 55% 55%;
 
     --radius: 0.75rem;
     
@@ -111,7 +111,7 @@ All colors MUST be HSL.
     --popover: 220 15% 11%;
     --popover-foreground: 220 10% 95%;
 
-    --primary: 217 91% 60%;
+    --primary: 35 55% 55%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 220 15% 16%;
@@ -128,7 +128,7 @@ All colors MUST be HSL.
 
     --border: 220 15% 18%;
     --input: 220 15% 18%;
-    --ring: 217 91% 60%;
+    --ring: 35 55% 55%;
     
     /* Priority colors - uniform across all views */
     --priority-urgent: 0 84% 60%;
