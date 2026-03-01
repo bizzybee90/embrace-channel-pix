@@ -82,7 +82,7 @@ export const HowBizzyBeeIsDoing = () => {
   const strokeDashoffset = circumference - (automationPct / 100) * circumference;
 
   return (
-    <div className="w-full bg-gradient-to-r from-purple-50/50 via-white to-emerald-50/40 rounded-3xl p-8 ring-1 ring-slate-900/5 shadow-sm mb-8">
+    <div className="w-full bg-gradient-to-r from-amber-50/50 via-white to-emerald-50/40 rounded-3xl p-8 ring-1 ring-slate-900/5 shadow-sm mb-8">
       <h2 className="text-base font-semibold text-slate-900 mb-6">How BizzyBee is doing</h2>
 
       <div className="flex flex-col md:flex-row gap-8 items-center justify-between">

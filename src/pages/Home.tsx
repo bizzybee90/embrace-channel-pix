@@ -191,10 +191,10 @@ export const Home = () => {
       label: 'Training',
       count: stats.reviewCount,
       icon: Sparkles,
-      iconColor: 'text-purple-600',
-      iconBoxBg: 'bg-purple-100',
-      cardBg: 'bg-gradient-to-b from-purple-50/80 to-white',
-      cardBorder: 'border border-purple-100',
+      iconColor: 'text-amber-600',
+      iconBoxBg: 'bg-amber-100',
+      cardBg: 'bg-gradient-to-b from-amber-50/80 to-white',
+      cardBorder: 'border border-amber-100',
       onClick: () => navigate('/review'),
     },
   ];
@@ -215,7 +215,7 @@ export const Home = () => {
         ) : (
           <>
             {/* ── Hero Copilot Banner ── */}
-            <div className="w-full bg-gradient-to-r from-amber-100/50 via-purple-50/50 to-blue-100/30 rounded-3xl p-8 ring-1 ring-slate-900/5 shadow-sm relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-2">
+            <div className="w-full bg-gradient-to-r from-amber-100/50 via-amber-50/50 to-amber-100/30 rounded-3xl p-8 ring-1 ring-slate-900/5 shadow-sm relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-2">
               <div>
                 <div className="flex items-center gap-3">
                   <span className="text-3xl">🐝</span>

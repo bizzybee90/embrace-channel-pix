@@ -88,7 +88,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   system: 'bg-slate-500/10 text-slate-600 border-slate-500/20',
   marketing: 'bg-pink-500/10 text-pink-600 border-pink-500/20',
   spam: 'bg-red-500/10 text-red-600 border-red-500/20',
-  recruitment: 'bg-purple-500/10 text-purple-600 border-purple-500/20',
+  recruitment: 'bg-amber-500/10 text-amber-600 border-amber-500/20',
   custom: 'bg-cyan-500/10 text-cyan-600 border-cyan-500/20',
 };
 

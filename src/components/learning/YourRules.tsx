@@ -36,7 +36,7 @@ const classificationColor = (cls: string): string => {
     spam: 'bg-red-50 text-red-700 border-red-200',
     notification: 'bg-slate-50 text-slate-700 border-slate-200',
     customer_enquiry: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    booking_request: 'bg-purple-50 text-purple-700 border-purple-200',
+    booking_request: 'bg-amber-50 text-amber-700 border-amber-200',
     complaint: 'bg-orange-50 text-orange-700 border-orange-200',
     newsletter: 'bg-cyan-50 text-cyan-700 border-cyan-200',
     internal: 'bg-amber-50 text-amber-700 border-amber-200',

@@ -40,7 +40,7 @@ const getSourceIcon = (faq: FAQ) => {
 const getPriorityBadge = (priority: number = 0) => {
   if (priority >= 9) return <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">Your Content</Badge>;
   if (priority >= 7) return <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">High Priority</Badge>;
-  if (priority >= 5) return <Badge className="bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">Competitor</Badge>;
+  if (priority >= 5) return <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">Competitor</Badge>;
   return <Badge variant="secondary">Low</Badge>;
 };
 
@@ -288,8 +288,8 @@ export default function KnowledgeBase() {
               <p className="text-4xl font-extrabold tracking-tight text-slate-900 mt-4">{groupedFaqs.website.length}</p>
               <p className="text-sm font-medium text-slate-500 uppercase tracking-wide mt-1">Website</p>
             </div>
-            <div className="bg-gradient-to-b from-purple-50/80 to-white border border-purple-100 rounded-3xl p-6 shadow-sm">
-              <div className="bg-purple-100 text-purple-600 rounded-2xl w-12 h-12 flex items-center justify-center">
+            <div className="bg-gradient-to-b from-amber-50/80 to-white border border-amber-100 rounded-3xl p-6 shadow-sm">
+              <div className="bg-amber-100 text-amber-600 rounded-2xl w-12 h-12 flex items-center justify-center">
                 <Users className="h-5 w-5" />
               </div>
               <p className="text-4xl font-extrabold tracking-tight text-slate-900 mt-4">{groupedFaqs.competitor.length}</p>

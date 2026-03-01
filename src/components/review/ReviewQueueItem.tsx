@@ -53,9 +53,9 @@ export const ReviewQueueItem = ({
       onClick={onClick}
       className={cn(
         "rounded-xl mx-2 my-1 p-3 cursor-pointer transition-all",
-        isActive && !isMultiSelectMode && "bg-white shadow-sm border border-purple-200 ring-1 ring-purple-50",
+        isActive && !isMultiSelectMode && "bg-white shadow-sm border border-amber-200 ring-1 ring-amber-50",
         !isActive && !isSelected && "border border-transparent hover:bg-slate-50/80",
-        isSelected && "bg-white shadow-sm border border-purple-200 ring-1 ring-purple-50",
+        isSelected && "bg-white shadow-sm border border-amber-200 ring-1 ring-amber-50",
         isReviewed && "opacity-50"
       )}
     >

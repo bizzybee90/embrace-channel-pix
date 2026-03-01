@@ -47,8 +47,8 @@ const channelConfig = {
   sms: {
     icon: Smartphone,
     label: 'SMS',
-    color: 'text-purple-600',
-    bgColor: 'bg-purple-50 dark:bg-purple-950/20',
+    color: 'text-amber-600',
+    bgColor: 'bg-amber-50 dark:bg-amber-950/20',
     emoji: '📱'
   },
   phone: {

@@ -82,8 +82,8 @@ export const InsightsWidget = ({ workspaceId }: InsightsWidgetProps) => {
       </div>
 
       {insights.length === 0 ? (
-        <div className="flex flex-col items-center justify-center h-48 rounded-2xl bg-gradient-to-br from-slate-50 to-purple-50/30 border border-purple-100/50 border-dashed m-4">
-          <Sparkles className="w-5 h-5 text-purple-500 animate-pulse mb-3" />
+        <div className="flex flex-col items-center justify-center h-48 rounded-2xl bg-gradient-to-br from-slate-50 to-amber-50/30 border border-amber-100/50 border-dashed m-4">
+          <Sparkles className="w-5 h-5 text-amber-500 animate-pulse mb-3" />
           <p className="text-sm font-medium text-slate-600">Gathering Intelligence...</p>
           <p className="text-xs text-slate-400 mt-1 max-w-[200px]">
             Insights will appear here as BizzyBee analyzes patterns.

@@ -93,8 +93,8 @@ export function SmartBatchActions({
   }
 
   return (
-    <div className="px-3 py-2 border-b bg-purple-50/50 dark:bg-purple-900/10 space-y-2">
-      <span className="text-xs font-medium text-purple-700 dark:text-purple-300 flex items-center gap-1">
+    <div className="px-3 py-2 border-b bg-amber-50/50 dark:bg-amber-900/10 space-y-2">
+      <span className="text-xs font-medium text-amber-700 dark:text-amber-300 flex items-center gap-1">
         <CheckCheck className="h-3 w-3" />
         Quick approve similar items
       </span>

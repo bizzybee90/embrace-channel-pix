@@ -276,7 +276,7 @@ export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackBut
           return (
           <div className="flex-shrink-0 px-4 py-2.5 border-b border-border/40 flex items-center justify-between bg-background">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white text-[11px] font-semibold flex-shrink-0 shadow-sm">
+              <div className="h-8 w-8 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-white text-[11px] font-semibold flex-shrink-0 shadow-sm">
                 {senderInitials}
               </div>
               <div className="min-w-0 flex items-center gap-2">
@@ -295,10 +295,10 @@ export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackBut
 
         {/* 2. Elevated AI Bento Strip — Frosted Glass (Home page aesthetic) */}
         {briefingText && (
-          <div className="flex-shrink-0 mx-6 mt-6 mb-2 p-5 bg-gradient-to-r from-amber-50/60 via-purple-50/40 to-blue-50/40 rounded-2xl border border-white/60 shadow-sm flex flex-col gap-3 ring-1 ring-slate-900/5">
+          <div className="flex-shrink-0 mx-6 mt-6 mb-2 p-5 bg-gradient-to-r from-amber-50/60 via-amber-50/40 to-amber-50/40 rounded-2xl border border-white/60 shadow-sm flex flex-col gap-3 ring-1 ring-slate-900/5">
             {/* Top row: AI Summary */}
             <div className="flex items-start gap-2">
-              <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0 mt-0.5" />
+              <Sparkles className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
               <p className="text-sm text-slate-700 dark:text-slate-200 leading-relaxed line-clamp-2 font-medium flex-1">
                 {briefingText}
               </p>
@@ -314,7 +314,7 @@ export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackBut
                 <CategoryLabel classification={conversation.category} size="sm" />
               )}
               {Array.isArray(topics) && topics.slice(0, 2).map((topic: string, i: number) => (
-                <span key={i} className="px-2 py-1 text-xs font-medium rounded-md border border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-700 dark:bg-blue-950/40 dark:text-blue-300">
+                <span key={i} className="px-2 py-1 text-xs font-medium rounded-md border border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
                   {topic}
                 </span>
               ))}
@@ -358,7 +358,7 @@ export const ConversationThread = ({ conversation, onUpdate, onBack, hideBackBut
             <div className="flex-shrink-0 px-4 pb-4">
               <button
                 onClick={handleReopen}
-                className="border border-slate-200 rounded-full py-3 px-4 text-muted-foreground cursor-pointer shadow-sm bg-white hover:border-purple-300 transition-all flex items-center gap-3 w-full text-left text-sm"
+                className="border border-slate-200 rounded-full py-3 px-4 text-muted-foreground cursor-pointer shadow-sm bg-white hover:border-amber-300 transition-all flex items-center gap-3 w-full text-left text-sm"
               >
                 <Reply className="w-4 h-4" />
                 Reopen &amp; reply...

@@ -182,7 +182,7 @@ export const CustomerTimeline = ({
         }
         return <ArrowRight className="h-4 w-4 text-muted-foreground" />;
       case 'note':
-        return <FileText className="h-4 w-4 text-purple-500" />;
+        return <FileText className="h-4 w-4 text-amber-500" />;
       default:
         return <Clock className="h-4 w-4 text-muted-foreground" />;
     }

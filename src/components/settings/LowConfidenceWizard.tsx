@@ -201,7 +201,7 @@ export function LowConfidenceWizard() {
       case 'auto_handled': return 'bg-green-500/10 text-green-600 border-green-500/20';
       case 'quick_win': return 'bg-amber-500/10 text-amber-600 border-amber-500/20';
       case 'act_now': return 'bg-orange-500/10 text-orange-600 border-orange-500/20';
-      case 'wait': return 'bg-purple-500/10 text-purple-600 border-purple-500/20';
+      case 'wait': return 'bg-amber-500/10 text-amber-600 border-amber-500/20';
       default: return 'bg-muted text-muted-foreground';
     }
   };
