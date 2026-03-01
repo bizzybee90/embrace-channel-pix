@@ -14,7 +14,7 @@ export const PowerModeLayout = ({ children, header }: PowerModeLayoutProps) => {
   const isMobile = useIsMobile();
 
   return (
-    <div className="flex h-screen w-full bg-slate-50/50 overflow-hidden font-sans">
+    <div className="flex h-screen w-full bg-background overflow-hidden font-sans">
       {/* Desktop Sidebar - Floats independently */}
       <aside className="hidden md:flex h-full flex-col z-20">
         <Sidebar />

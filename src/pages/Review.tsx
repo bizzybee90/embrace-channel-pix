@@ -647,9 +647,9 @@ export default function Review() {
   // ============ DESKTOP — ALL CAUGHT UP ============
   if (allCaughtUp) {
     return (
-      <div className="flex h-screen w-full bg-slate-50/50 overflow-hidden">
-        <aside className="bg-slate-50/50 flex-shrink-0 overflow-y-auto relative z-50"><Sidebar /></aside>
-      <main className="flex-1 flex flex-col min-w-0 p-4"><div className="flex-1 bg-white rounded-3xl shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] border border-slate-200/80 flex flex-col items-center justify-center overflow-hidden">
+       <div className="flex h-screen w-full bg-background overflow-hidden">
+        <aside className="bg-background flex-shrink-0 overflow-y-auto relative z-50 border-r border-border"><Sidebar /></aside>
+      <main className="flex-1 flex flex-col min-w-0 p-4"><div className="flex-1 bg-card rounded-3xl shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] border border-border flex flex-col items-center justify-center overflow-hidden">
           <div className="text-center max-w-md px-6 animate-fade-in">
             <div className="w-24 h-24 bg-gradient-to-br from-emerald-50 to-emerald-100/50 rounded-full flex items-center justify-center mx-auto mb-6 ring-8 ring-emerald-50/50">
               <Sparkles className="w-10 h-10 text-emerald-500" />
@@ -699,10 +699,10 @@ export default function Review() {
     : '';
 
   return (
-    <div className="flex h-screen w-full bg-slate-50/50 overflow-hidden">
-      <aside className="bg-slate-50/50 flex-shrink-0 overflow-y-auto relative z-50"><Sidebar /></aside>
+    <div className="flex h-screen w-full bg-background overflow-hidden">
+      <aside className="bg-background flex-shrink-0 overflow-y-auto relative z-50 border-r border-border"><Sidebar /></aside>
       <main className="flex-1 flex flex-col min-w-0 p-4">
-        <div className="flex-1 bg-white rounded-3xl shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] border border-slate-200/80 overflow-hidden flex flex-col">
+        <div className="flex-1 bg-card rounded-3xl shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] border border-border overflow-hidden flex flex-col">
         {/* Top Bar — inside the pill */}
         <div className="px-6 py-2.5 flex-shrink-0 flex items-center justify-between border-b border-slate-100">
           <div className="flex items-center gap-3">

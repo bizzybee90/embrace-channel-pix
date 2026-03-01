@@ -184,7 +184,7 @@ export default function AnalyticsDashboard() {
   if (isMobile) {
     return (
       <>
-        <div className="flex h-screen w-full bg-slate-50/50 overflow-hidden flex-col">
+        <div className="flex h-screen w-full bg-background overflow-hidden flex-col">
           <header className="flex-shrink-0 h-14 border-b border-border bg-card px-4 flex items-center justify-between">
             <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)} className="h-9 w-9">
               <Menu className="h-5 w-5" />
@@ -202,10 +202,10 @@ export default function AnalyticsDashboard() {
   }
 
   return (
-    <div className="flex h-screen w-full bg-slate-50/50 overflow-hidden">
-      <aside className="bg-slate-50/50 flex-shrink-0 overflow-y-auto relative z-50"><Sidebar /></aside>
+    <div className="flex h-screen w-full bg-background overflow-hidden">
+      <aside className="bg-background flex-shrink-0 overflow-y-auto relative z-50 border-r border-border"><Sidebar /></aside>
       <main className="flex-1 flex flex-col min-w-0 p-4">
-        <div className="flex-1 bg-white rounded-3xl shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] border border-slate-200/80 overflow-y-auto p-6">
+        <div className="flex-1 bg-card rounded-3xl shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] border border-border overflow-y-auto p-6">
         {renderContent()}
         </div>
       </main>

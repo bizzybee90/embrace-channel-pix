@@ -344,9 +344,9 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
       className={cn(
         "relative cursor-pointer transition-all duration-200 overflow-hidden mx-2 my-1 p-0 rounded-xl",
         selected
-          ? "bg-white shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] ring-1 ring-slate-900/5"
-          : "hover:bg-slate-50/80 border border-transparent transition-colors",
-        isAutoHandled && !selected && "bg-slate-50"
+          ? "bg-card shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] ring-1 ring-border"
+          : "hover:bg-secondary border border-transparent transition-colors",
+        isAutoHandled && !selected && "bg-secondary"
       )}
     >
       {cardInner('p-3')}

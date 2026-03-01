@@ -201,7 +201,7 @@ export const Home = () => {
 
   const mainContent = (
     <ScrollArea className="h-[calc(100vh-4rem)]">
-      <div className="p-4 md:p-6 space-y-6 bg-slate-50/50 min-h-full">
+      <div className="p-4 md:p-6 space-y-6 bg-background min-h-full">
         {loading ? (
           <div className="space-y-4">
             <Skeleton className="h-28 rounded-2xl" />
