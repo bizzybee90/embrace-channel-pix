@@ -134,7 +134,7 @@ export function TriageQuickActions({ conversation, onUpdate }: TriageQuickAction
       case 'act_now': return 'bg-red-500/10 text-red-600 border-red-200';
       case 'quick_win': return 'bg-yellow-500/10 text-yellow-600 border-yellow-200';
       case 'auto_handled': return 'bg-green-500/10 text-green-600 border-green-200';
-      case 'wait': return 'bg-slate-100 text-slate-600 border-slate-200';
+      case 'wait': return 'bg-blue-500/10 text-blue-600 border-blue-200';
       default: return 'bg-muted text-muted-foreground';
     }
   };

@@ -227,8 +227,8 @@ export const ReadingPane = ({ selectedEmailId, onBack }: ReadingPaneProps) => {
 
       {/* Universal Reply Pill */}
       <div className="sticky bottom-4 mx-4 mt-auto pt-4 z-20">
-        <button className="w-full bg-white/90 backdrop-blur-md border border-slate-200 shadow-[0_8px_30px_rgb(0,0,0,0.08)] rounded-full py-3.5 px-5 text-slate-500 text-left hover:border-amber-300 transition-all font-medium flex items-center group">
-          <Reply className="w-4 h-4 mr-3 text-amber-400 group-hover:text-amber-600 transition-colors" />
+        <button className="w-full bg-white/90 backdrop-blur-md border border-slate-200 shadow-[0_8px_30px_rgb(0,0,0,0.08)] rounded-full py-3.5 px-5 text-slate-500 text-left hover:border-purple-300 transition-all font-medium flex items-center group">
+          <Reply className="w-4 h-4 mr-3 text-purple-400 group-hover:text-purple-600 transition-colors" />
           Reply manually...
         </button>
       </div>

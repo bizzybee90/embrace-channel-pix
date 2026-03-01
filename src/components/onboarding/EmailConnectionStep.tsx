@@ -71,7 +71,7 @@ const emailProviders = [
     id: 'outlook' as Provider, 
     name: 'Outlook', 
     icon: null,
-    iconColor: 'text-amber-600',
+    iconColor: 'text-blue-600',
     available: true 
   },
   { 
@@ -85,7 +85,7 @@ const emailProviders = [
     id: 'yahoo' as Provider, 
     name: 'Yahoo Mail', 
     icon: null,
-    iconColor: 'text-amber-600',
+    iconColor: 'text-purple-600',
     available: false,
     comingSoon: true
   },

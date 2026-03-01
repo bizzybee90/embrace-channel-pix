@@ -33,8 +33,8 @@ const channelConfig = {
   email: {
     icon: Mail,
     label: 'Email',
-    color: 'text-amber-600',
-    bgColor: 'bg-amber-50 dark:bg-amber-950/20',
+    color: 'text-blue-600',
+    bgColor: 'bg-blue-50 dark:bg-blue-950/20',
     emoji: '📧'
   },
   whatsapp: {
@@ -47,8 +47,8 @@ const channelConfig = {
   sms: {
     icon: Smartphone,
     label: 'SMS',
-    color: 'text-amber-600',
-    bgColor: 'bg-amber-50 dark:bg-amber-950/20',
+    color: 'text-purple-600',
+    bgColor: 'bg-purple-50 dark:bg-purple-950/20',
     emoji: '📱'
   },
   phone: {
@@ -61,8 +61,8 @@ const channelConfig = {
   webchat: {
     icon: Monitor,
     label: 'Web Chat',
-    color: 'text-amber-600',
-    bgColor: 'bg-amber-50 dark:bg-amber-950/20',
+    color: 'text-indigo-600',
+    bgColor: 'bg-indigo-50 dark:bg-indigo-950/20',
     emoji: '💻'
   }
 };

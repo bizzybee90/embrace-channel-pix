@@ -17,7 +17,7 @@ const getStatusDotColor = (bucket: string | null | undefined, status: string | n
   if (bucket === 'act_now') return 'bg-destructive';
   if (bucket === 'quick_win') return 'bg-amber-500';
   if (bucket === 'auto_handled') return 'bg-green-500';
-  if (bucket === 'wait') return 'bg-slate-400';
+  if (bucket === 'wait') return 'bg-blue-400';
   if (status === 'resolved') return 'bg-green-500';
   return 'bg-muted-foreground/40';
 };
@@ -218,10 +218,10 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
       return <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-medium tracking-wide uppercase">Archived</span>;
     }
     if (hasDraft || (conversation as any).ai_draft_response) {
-      return <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 text-[10px] font-medium flex items-center gap-1 tracking-wide uppercase"><FileEdit className="h-2.5 w-2.5" />Draft</span>;
+      return <span className="px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 text-[10px] font-medium flex items-center gap-1 tracking-wide uppercase"><FileEdit className="h-2.5 w-2.5" />Draft</span>;
     }
     if (conversation.status === 'new') {
-      return <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 text-[10px] font-medium tracking-wide uppercase">New</span>;
+      return <span className="px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 text-[10px] font-medium tracking-wide uppercase">New</span>;
     }
     return null;
   };
@@ -299,11 +299,11 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
       >
         {/* Swipe backgrounds */}
         <div 
-          className="absolute inset-0 bg-amber-500/20 flex items-center justify-end pr-8 pointer-events-none transition-opacity duration-200"
+          className="absolute inset-0 bg-blue-500/20 flex items-center justify-end pr-8 pointer-events-none transition-opacity duration-200"
           style={{ opacity: !isRightSwipe && isSwiping ? swipeProgress : 0 }}
         >
           <CheckCircle2 
-            className="h-6 w-6 text-amber-600 dark:text-amber-400 transition-transform duration-200" 
+            className="h-6 w-6 text-blue-600 dark:text-blue-400 transition-transform duration-200" 
             style={{ transform: `scale(${swipeProgress})` }}
           />
         </div>
@@ -344,9 +344,9 @@ const ConversationCardComponent = ({ conversation, selected, onClick, onUpdate, 
       className={cn(
         "relative cursor-pointer transition-all duration-200 overflow-hidden mx-2 my-1 p-0 rounded-xl",
         selected
-          ? "bg-card shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] ring-1 ring-border"
-          : "hover:bg-secondary border border-transparent transition-colors",
-        isAutoHandled && !selected && "bg-secondary"
+          ? "bg-white shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] ring-1 ring-slate-900/5"
+          : "hover:bg-slate-50/80 border border-transparent transition-colors",
+        isAutoHandled && !selected && "bg-slate-50"
       )}
     >
       {cardInner('p-3')}

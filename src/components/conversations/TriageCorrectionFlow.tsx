@@ -78,17 +78,17 @@ const CLASSIFICATIONS = [
 ];
 
 const CATEGORY_COLORS: Record<string, string> = {
-  inquiry: 'bg-amber-500/10 text-amber-600 border-amber-500/20',
+  inquiry: 'bg-blue-500/10 text-blue-600 border-blue-500/20',
   complaint: 'bg-red-500/10 text-red-600 border-red-500/20',
   feedback: 'bg-green-500/10 text-green-600 border-green-500/20',
   lead: 'bg-amber-500/10 text-amber-600 border-amber-500/20',
   misdirected: 'bg-orange-500/10 text-orange-600 border-orange-500/20',
   financial: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20',
-  partner: 'bg-amber-500/10 text-amber-600 border-amber-500/20',
+  partner: 'bg-indigo-500/10 text-indigo-600 border-indigo-500/20',
   system: 'bg-slate-500/10 text-slate-600 border-slate-500/20',
   marketing: 'bg-pink-500/10 text-pink-600 border-pink-500/20',
   spam: 'bg-red-500/10 text-red-600 border-red-500/20',
-  recruitment: 'bg-amber-500/10 text-amber-600 border-amber-500/20',
+  recruitment: 'bg-purple-500/10 text-purple-600 border-purple-500/20',
   custom: 'bg-cyan-500/10 text-cyan-600 border-cyan-500/20',
 };
 

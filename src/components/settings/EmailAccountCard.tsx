@@ -79,7 +79,7 @@ const AUTOMATION_LEVELS = [
     label: 'Draft Only', 
     icon: Pencil, 
     description: 'AI drafts, you click to send',
-    color: 'text-amber-600 bg-amber-500/10 border-amber-500/30'
+    color: 'text-blue-600 bg-blue-500/10 border-blue-500/30'
   },
   { 
     value: 'review_required', 

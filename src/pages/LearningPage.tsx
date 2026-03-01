@@ -18,7 +18,7 @@ export default function LearningPage() {
 
   const mainContent = (
     <ScrollArea className="h-[calc(100vh-4rem)]">
-      <div className="p-4 md:p-6 space-y-6 bg-background min-h-full">
+      <div className="p-4 md:p-6 space-y-6 bg-slate-50/50 min-h-full">
         <h1 className="text-xl font-semibold text-slate-900 tracking-tight">Learning & Training</h1>
 
         <HowBizzyBeeIsDoing />

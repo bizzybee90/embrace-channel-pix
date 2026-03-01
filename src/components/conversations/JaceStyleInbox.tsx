@@ -246,7 +246,7 @@ export const JaceStyleInbox = ({ onSelect, selectedId, filter = 'needs-me', hide
     }
     if (bucket === 'quick_win' && hasAiDraft) {
       return { 
-        badge: <Badge className={`bg-amber-50 text-amber-700 border border-amber-100 hover:bg-amber-100 ${BADGE_CLASS}`}>Draft ready</Badge>,
+        badge: <Badge className={`bg-purple-50 text-purple-700 border border-purple-100 hover:bg-purple-100 ${BADGE_CLASS}`}>Draft ready</Badge>,
         rowClass: ''
       };
     }
@@ -291,7 +291,7 @@ export const JaceStyleInbox = ({ onSelect, selectedId, filter = 'needs-me', hide
         className={cn(
           "px-3 py-2.5 cursor-pointer transition-all",
           isSelected
-            ? "bg-amber-50/60 border border-amber-200 ring-1 ring-amber-100 shadow-sm z-10 rounded-xl"
+            ? "bg-purple-50/60 border border-purple-200 ring-1 ring-purple-100 shadow-sm z-10 rounded-xl"
             : "border-b border-slate-100 hover:bg-slate-50"
         )}
       >
@@ -330,8 +330,8 @@ export const JaceStyleInbox = ({ onSelect, selectedId, filter = 'needs-me', hide
     if (conversations.length === 0) return null;
     return (
       <div>
-        <div className="px-3 py-1.5 bg-amber-50/80 border-b border-slate-100 sticky top-0 z-10">
-          <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider">
+        <div className="px-3 py-1.5 bg-purple-50/80 border-b border-slate-100 sticky top-0 z-10">
+          <span className="text-[10px] font-bold text-purple-700 uppercase tracking-wider">
             {title}
           </span>
         </div>
@@ -445,8 +445,8 @@ export const JaceStyleInbox = ({ onSelect, selectedId, filter = 'needs-me', hide
       <div className="flex-1 overflow-y-auto">
         {filteredConversations.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
-            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-amber-100 to-amber-50 flex items-center justify-center mb-6 shadow-inner ring-8 ring-amber-50/50">
-              <Sparkles className="w-10 h-10 text-amber-500 animate-pulse" />
+            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-purple-100 to-blue-50 flex items-center justify-center mb-6 shadow-inner ring-8 ring-purple-50/50">
+              <Sparkles className="w-10 h-10 text-purple-500 animate-pulse" />
             </div>
             <p className="text-lg font-semibold text-foreground/80">You're all caught up!</p>
             <p className="text-sm mt-1 text-muted-foreground/70">No messages need your attention right now</p>

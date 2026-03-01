@@ -199,9 +199,9 @@ export function LowConfidenceWizard() {
   const getBucketColor = (bucket: string | null) => {
     switch (bucket) {
       case 'auto_handled': return 'bg-green-500/10 text-green-600 border-green-500/20';
-      case 'quick_win': return 'bg-amber-500/10 text-amber-600 border-amber-500/20';
+      case 'quick_win': return 'bg-blue-500/10 text-blue-600 border-blue-500/20';
       case 'act_now': return 'bg-orange-500/10 text-orange-600 border-orange-500/20';
-      case 'wait': return 'bg-amber-500/10 text-amber-600 border-amber-500/20';
+      case 'wait': return 'bg-purple-500/10 text-purple-600 border-purple-500/20';
       default: return 'bg-muted text-muted-foreground';
     }
   };
@@ -350,8 +350,8 @@ export function LowConfidenceWizard() {
                 <p className="text-2xl font-bold text-green-600">{classificationChangedResults.length}</p>
                 <p className="text-xs text-muted-foreground">Reclassified</p>
               </div>
-              <div className="bg-amber-500/10 rounded-lg p-3 text-center border border-amber-500/20">
-                <p className="text-2xl font-bold text-amber-600">{bucketOnlyChangedResults.length}</p>
+              <div className="bg-blue-500/10 rounded-lg p-3 text-center border border-blue-500/20">
+                <p className="text-2xl font-bold text-blue-600">{bucketOnlyChangedResults.length}</p>
                 <p className="text-xs text-muted-foreground">Bucket Changed</p>
               </div>
               <div className="bg-muted/50 rounded-lg p-3 text-center">
@@ -401,7 +401,7 @@ export function LowConfidenceWizard() {
             {bucketOnlyChangedResults.length > 0 && (
               <div className="space-y-2">
                 <p className="text-sm font-medium flex items-center gap-2">
-                  <ArrowRight className="h-4 w-4 text-amber-500" />
+                  <ArrowRight className="h-4 w-4 text-blue-500" />
                   Bucket Changed Only ({bucketOnlyChangedResults.length})
                 </p>
                 <ScrollArea className="h-28 border rounded-lg">

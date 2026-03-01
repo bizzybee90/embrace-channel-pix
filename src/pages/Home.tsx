@@ -171,10 +171,10 @@ export const Home = () => {
       label: 'To Reply',
       count: stats.toReplyCount,
       icon: Mail,
-      iconColor: 'text-amber-600',
-      iconBoxBg: 'bg-amber-100',
-      cardBg: 'bg-gradient-to-b from-amber-50/80 to-white',
-      cardBorder: 'border border-amber-100',
+      iconColor: 'text-blue-600',
+      iconBoxBg: 'bg-blue-100',
+      cardBg: 'bg-gradient-to-b from-blue-50/80 to-white',
+      cardBorder: 'border border-blue-100',
       onClick: () => navigate('/needs-action?filter=needs-action'),
     },
     {
@@ -191,17 +191,17 @@ export const Home = () => {
       label: 'Training',
       count: stats.reviewCount,
       icon: Sparkles,
-      iconColor: 'text-amber-600',
-      iconBoxBg: 'bg-amber-100',
-      cardBg: 'bg-gradient-to-b from-amber-50/80 to-white',
-      cardBorder: 'border border-amber-100',
+      iconColor: 'text-purple-600',
+      iconBoxBg: 'bg-purple-100',
+      cardBg: 'bg-gradient-to-b from-purple-50/80 to-white',
+      cardBorder: 'border border-purple-100',
       onClick: () => navigate('/review'),
     },
   ];
 
   const mainContent = (
     <ScrollArea className="h-[calc(100vh-4rem)]">
-      <div className="p-4 md:p-6 space-y-6 bg-background min-h-full">
+      <div className="p-4 md:p-6 space-y-6 bg-slate-50/50 min-h-full">
         {loading ? (
           <div className="space-y-4">
             <Skeleton className="h-28 rounded-2xl" />
@@ -215,7 +215,7 @@ export const Home = () => {
         ) : (
           <>
             {/* ── Hero Copilot Banner ── */}
-            <div className="w-full bg-gradient-to-r from-amber-100/50 via-amber-50/50 to-amber-100/30 rounded-3xl p-8 ring-1 ring-slate-900/5 shadow-sm relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-2">
+            <div className="w-full bg-gradient-to-r from-amber-100/50 via-purple-50/50 to-blue-100/30 rounded-3xl p-8 ring-1 ring-slate-900/5 shadow-sm relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-2">
               <div>
                 <div className="flex items-center gap-3">
                   <span className="text-3xl">🐝</span>
@@ -320,7 +320,7 @@ export const Home = () => {
               {/* Recent Activity */}
               <div className="bg-white rounded-3xl border border-slate-100/80 shadow-sm p-5 flex flex-col">
                 <div className="flex items-center gap-2 mb-4">
-                  <Activity className="h-4 w-4 text-amber-500" />
+                  <Activity className="h-4 w-4 text-blue-500" />
                   <h2 className="font-semibold text-slate-900">Recent Activity</h2>
                 </div>
                 <div className="flex-1">

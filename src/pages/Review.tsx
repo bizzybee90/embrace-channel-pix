@@ -93,14 +93,14 @@ const getSenderEmail = (conv: ReviewConversation): string => {
 // 9-category taxonomy for the change picker
 const CATEGORIES = [
   { key: 'quote', label: 'Quote', dot: 'bg-amber-500' },
-  { key: 'booking', label: 'Booking', dot: 'bg-amber-500' },
+  { key: 'booking', label: 'Booking', dot: 'bg-blue-500' },
   { key: 'complaint', label: 'Complaint', dot: 'bg-red-500' },
   { key: 'follow_up', label: 'Follow-up', dot: 'bg-orange-500' },
-  { key: 'inquiry', label: 'Enquiry', dot: 'bg-amber-400' },
+  { key: 'inquiry', label: 'Enquiry', dot: 'bg-blue-400' },
   { key: 'notification', label: 'Notification', dot: 'bg-slate-500' },
   { key: 'newsletter', label: 'Newsletter', dot: 'bg-pink-500' },
   { key: 'spam', label: 'Spam', dot: 'bg-red-600' },
-  { key: 'personal', label: 'Personal', dot: 'bg-amber-500' },
+  { key: 'personal', label: 'Personal', dot: 'bg-purple-500' },
 ];
 
 type AutomationLevel = 'auto' | 'draft_first' | 'always_review';
@@ -587,7 +587,7 @@ export default function Review() {
             </div>
           </div>
           <div className="flex-shrink-0 border-t bg-background p-4 space-y-2">
-            <Button className="w-full h-12 bg-amber-600 hover:bg-amber-700 text-white text-base font-semibold shadow-sm rounded-lg" onClick={handleConfirm} disabled={confirmMutation.isPending}>
+            <Button className="w-full h-12 bg-purple-600 hover:bg-purple-700 text-white text-base font-semibold shadow-sm rounded-lg" onClick={handleConfirm} disabled={confirmMutation.isPending}>
               <Check className="h-5 w-5 mr-2" />Confirm Correct
             </Button>
             <div className="flex gap-2">
@@ -613,7 +613,7 @@ export default function Review() {
             <h1 className="text-base font-semibold">AI Reconciliation</h1>
             <span className="text-xs text-muted-foreground">{confirmedTodayCount} of {totalItems} reconciled</span>
           </div>
-          <Progress value={progressPercent} className="h-2 [&>div]:bg-amber-600" />
+          <Progress value={progressPercent} className="h-2 [&>div]:bg-purple-600" />
         </div>
         <div className="flex-1 overflow-y-auto">
           <div className="p-3 space-y-2">
@@ -647,16 +647,16 @@ export default function Review() {
   // ============ DESKTOP — ALL CAUGHT UP ============
   if (allCaughtUp) {
     return (
-       <div className="flex h-screen w-full bg-background overflow-hidden">
-        <aside className="bg-background flex-shrink-0 overflow-y-auto relative z-50 border-r border-border"><Sidebar /></aside>
-      <main className="flex-1 flex flex-col min-w-0 p-4"><div className="flex-1 bg-card rounded-3xl shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] border border-border flex flex-col items-center justify-center overflow-hidden">
+      <div className="flex h-screen bg-slate-50/50">
+        <Sidebar />
+      <div className="flex-1 flex flex-col items-center justify-center">
           <div className="text-center max-w-md px-6 animate-fade-in">
             <div className="w-24 h-24 bg-gradient-to-br from-emerald-50 to-emerald-100/50 rounded-full flex items-center justify-center mx-auto mb-6 ring-8 ring-emerald-50/50">
               <Sparkles className="w-10 h-10 text-emerald-500" />
             </div>
             <h2 className="text-2xl font-bold text-slate-900 tracking-tight">You're all caught up!</h2>
             <p className="text-muted-foreground mb-6">
-              BizzyBee classified <strong>{weeklyStats?.totalProcessed || 0}</strong> emails with <strong className="text-amber-600">{weeklyStats?.accuracy || 100}%</strong> accuracy this week.
+              BizzyBee classified <strong>{weeklyStats?.totalProcessed || 0}</strong> emails with <strong className="text-purple-600">{weeklyStats?.accuracy || 100}%</strong> accuracy this week.
             </p>
 
             {weeklyStats && (
@@ -688,7 +688,6 @@ export default function Review() {
             </Button>
           </div>
         </div>
-      </main>
       </div>
     );
   }
@@ -699,32 +698,31 @@ export default function Review() {
     : '';
 
   return (
-    <div className="flex h-screen w-full bg-background overflow-hidden">
-      <aside className="bg-background flex-shrink-0 overflow-y-auto relative z-50 border-r border-border"><Sidebar /></aside>
-      <main className="flex-1 flex flex-col min-w-0 p-4">
-        <div className="flex-1 bg-card rounded-3xl shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] border border-border overflow-hidden flex flex-col">
-        {/* Top Bar — inside the pill */}
-        <div className="px-6 py-2.5 flex-shrink-0 flex items-center justify-between border-b border-slate-100">
+    <div className="flex h-screen bg-slate-50/50">
+      <Sidebar />
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Top Bar */}
+        <div className="px-6 py-2.5 flex-shrink-0 flex items-center justify-between bg-white/80 backdrop-blur-sm border-b border-slate-100">
           <div className="flex items-center gap-3">
             <BackButton to="/" label="Home" />
             <h1 className="text-base font-semibold">AI Reconciliation</h1>
-            <Sparkles className="h-4 w-4 text-amber-500" />
+            <Sparkles className="h-4 w-4 text-purple-500" />
           </div>
           <div className="flex items-center gap-4">
             {weeklyStats && (
               <div className="flex items-center gap-1.5 text-sm">
-                <Trophy className="h-3.5 w-3.5 text-amber-500" />
+                <Trophy className="h-3.5 w-3.5 text-purple-500" />
                 <span className="text-muted-foreground">Accuracy:</span>
-                <span className="font-bold text-amber-600">{weeklyStats.accuracy}%</span>
+                <span className="font-bold text-purple-600">{weeklyStats.accuracy}%</span>
                 <span className="text-muted-foreground text-xs">this week</span>
               </div>
             )}
             <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground">
-                <strong className="text-amber-600">{confirmedTodayCount}</strong> of <strong>{totalItems}</strong> reconciled
+                <strong className="text-purple-600">{confirmedTodayCount}</strong> of <strong>{totalItems}</strong> reconciled
               </span>
               <div className="w-24">
-                <Progress value={progressPercent} className="h-2 [&>div]:bg-amber-600" />
+                <Progress value={progressPercent} className="h-2 [&>div]:bg-purple-600" />
               </div>
             </div>
           </div>
@@ -744,8 +742,8 @@ export default function Review() {
               {/* To Review section */}
               {unreviewedQueue.length > 0 && (
                 <>
-                  <div className="px-3 py-1.5 bg-amber-50/80 border-b border-slate-100 sticky top-0 z-10">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">
+                  <div className="px-3 py-1.5 bg-purple-50/80 border-b border-slate-100 sticky top-0 z-10">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700 dark:text-purple-400">
                       To Review ({unreviewedQueue.length})
                     </span>
                   </div>
@@ -760,8 +758,8 @@ export default function Review() {
                         onClick={() => { setCurrentIndex(idx); setShowChangePicker(false); }}
                         className={cn(
                          "px-3 py-2.5 cursor-pointer border-b border-slate-100 transition-all",
-                          "hover:bg-slate-50 hover:shadow-[0_4px_16px_-4px_hsl(33_62%_55%/0.1)]",
-                          idx === currentIndex && "bg-amber-50/60 border-amber-200 ring-1 ring-primary/20 honey-glow-shadow rounded-xl",
+                          "hover:bg-slate-50",
+                          idx === currentIndex && "bg-white shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] ring-1 ring-slate-900/5",
                           isFlashing && "bg-green-100 dark:bg-green-900/40 transition-colors duration-300"
                         )}
                       >
@@ -791,7 +789,7 @@ export default function Review() {
                             <Badge variant="outline" className={cn(
                               "text-[10px] px-1.5 py-0 h-4 font-semibold uppercase tracking-wider rounded-md border flex-shrink-0",
                               conv.decision_bucket === 'act_now' && 'bg-red-50 text-red-600 border-red-200',
-                              conv.decision_bucket === 'quick_win' && conv.ai_draft_response && 'bg-amber-50 text-amber-700 border-amber-100',
+                              conv.decision_bucket === 'quick_win' && conv.ai_draft_response && 'bg-purple-50 text-purple-700 border-purple-100',
                               conv.decision_bucket === 'quick_win' && !conv.ai_draft_response && 'bg-amber-50 text-amber-600 border-amber-200',
                               conv.decision_bucket === 'wait' && 'bg-slate-100 text-slate-600 border-slate-200',
                               conv.decision_bucket === 'auto_handled' && 'bg-slate-100 text-slate-600 border-slate-200',
@@ -867,7 +865,7 @@ export default function Review() {
                 </div>
 
                 {/* AI context bento strip */}
-                <div className="mx-6 mt-4 mb-2 p-4 bg-gradient-to-r from-amber-50/60 via-amber-50/40 to-amber-50/40 rounded-2xl border border-white/60 shadow-sm ring-1 ring-slate-900/5 flex items-center gap-3 flex-wrap flex-shrink-0">
+                <div className="mx-6 mt-4 mb-2 p-4 bg-gradient-to-r from-amber-50/60 via-purple-50/40 to-blue-50/40 rounded-2xl border border-white/60 shadow-sm ring-1 ring-slate-900/5 flex items-center gap-3 flex-wrap flex-shrink-0">
                   {currentConversation.summary_for_human && (
                     <div className="flex items-center gap-1.5 flex-1 min-w-0">
                       <Sparkles className="h-4 w-4 text-amber-600 shrink-0" />
@@ -897,11 +895,11 @@ export default function Review() {
 
                   {/* AI Draft */}
                   {currentConversation.ai_draft_response && (
-                    <div className="bg-amber-50/50 dark:bg-amber-900/20 rounded-lg p-4 ring-1 ring-amber-200/50 mb-4">
+                    <div className="bg-purple-50/50 dark:bg-purple-900/20 rounded-lg p-4 ring-1 ring-purple-200/50 mb-4">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <Sparkles className="h-4 w-4 text-amber-600" />
-                          <span className="text-sm font-medium text-amber-700 dark:text-amber-300">AI draft ready</span>
+                          <Sparkles className="h-4 w-4 text-purple-600" />
+                          <span className="text-sm font-medium text-purple-700 dark:text-purple-300">AI draft ready</span>
                         </div>
                         <Button size="sm" variant="outline" className="h-7 text-xs gap-1.5 bg-white border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm rounded-lg" onClick={() => setShowDraftEditor(true)}>
                           <Send className="h-3 w-3" />Edit & Send
@@ -912,9 +910,9 @@ export default function Review() {
                   )}
 
                   {/* AI Reasoning card */}
-                  <div className="mt-4 bg-amber-50/50 border border-amber-100/50 rounded-2xl p-5">
+                  <div className="mt-4 bg-purple-50/50 border border-purple-100/50 rounded-2xl p-5">
                     <div className="flex items-center gap-1.5 mb-2">
-                      <Bot className="h-3.5 w-3.5 text-amber-500" />
+                      <Bot className="h-3.5 w-3.5 text-purple-500" />
                       <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">AI Reasoning</span>
                     </div>
                     <p className="text-sm text-foreground/80 leading-relaxed">
@@ -961,7 +959,7 @@ export default function Review() {
                       </div>
                       <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden mt-3">
                         <div
-                          className="h-full bg-gradient-to-r from-amber-500 to-amber-600 rounded-full transition-all duration-700 ease-out"
+                          className="h-full bg-gradient-to-r from-purple-500 to-blue-500 rounded-full transition-all duration-700 ease-out"
                           style={{ width: `${confidencePercent}%` }}
                         />
                       </div>
@@ -993,7 +991,7 @@ export default function Review() {
                       <div className="grid grid-cols-2 gap-3 mt-4">
                         {/* CONFIRM — the hero button */}
                         <Button
-                          className="h-11 bg-amber-600 hover:bg-amber-700 text-white font-medium shadow-sm rounded-xl"
+                          className="h-11 bg-purple-600 hover:bg-purple-700 text-white font-medium shadow-sm rounded-xl"
                           onClick={handleConfirm}
                           disabled={confirmMutation.isPending}
                         >
@@ -1053,7 +1051,7 @@ export default function Review() {
                             className="h-16 text-xs resize-none"
                           />
                       <Button
-                            className="w-full bg-amber-600 hover:bg-amber-700 text-white shadow-sm rounded-lg"
+                            className="w-full bg-purple-600 hover:bg-purple-700 text-white shadow-sm rounded-lg"
                             onClick={handleChange}
                             disabled={confirmMutation.isPending}
                           >
@@ -1094,13 +1092,13 @@ export default function Review() {
                         {[
                           { value: 'auto', label: 'Auto-handle', icon: <Bot className="h-3.5 w-3.5 text-green-500" /> },
                           { value: 'draft_first', label: 'Draft first', icon: <FileEdit className="h-3.5 w-3.5 text-amber-500" /> },
-                          { value: 'always_review', label: 'Always review', icon: <Eye className="h-3.5 w-3.5 text-amber-500" /> },
+                          { value: 'always_review', label: 'Always review', icon: <Eye className="h-3.5 w-3.5 text-blue-500" /> },
                         ].map(opt => (
                           <label
                             key={opt.value}
                             className={cn(
                               "flex items-center gap-3 p-3 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50 transition-all text-sm font-medium text-slate-700",
-                              automationLevel === opt.value && "border-amber-500 bg-amber-50 ring-1 ring-amber-200"
+                              automationLevel === opt.value && "border-purple-500 bg-purple-50 ring-1 ring-purple-200"
                             )}
                             onClick={() => setAutomationLevel(opt.value as AutomationLevel)}
                           >
@@ -1118,7 +1116,7 @@ export default function Review() {
                             key={opt.value}
                             className={cn(
                               "px-3 py-2 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50 transition-all text-xs font-medium text-slate-700",
-                              tonePreference === opt.value && "border-amber-500 bg-amber-50 ring-1 ring-amber-200"
+                              tonePreference === opt.value && "border-purple-500 bg-purple-50 ring-1 ring-purple-200"
                             )}
                             onClick={() => setTonePreference(opt.value as TonePreference)}
                           >
@@ -1148,8 +1146,7 @@ export default function Review() {
             )}
           </div>
         </div>
-        </div>
-      </main>
+      </div>
 
       {/* Draft Reply Editor Sheet */}
       {currentConversation?.ai_draft_response && (

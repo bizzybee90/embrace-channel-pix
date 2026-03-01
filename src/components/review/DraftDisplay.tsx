@@ -128,7 +128,7 @@ export const DraftDisplay = ({
     switch (severity) {
       case 'high': return 'text-destructive';
       case 'medium': return 'text-amber-600 dark:text-amber-400';
-      default: return 'text-amber-600 dark:text-amber-400';
+      default: return 'text-blue-600 dark:text-blue-400';
     }
   };
 

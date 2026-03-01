@@ -561,7 +561,7 @@ export function CompetitorReviewScreen({
                           }
                           className={cn(
                             'text-xs',
-                            competitor.match_reason === 'Local business' && 'text-amber-600 border-amber-300 bg-amber-50',
+                            competitor.match_reason === 'Local business' && 'text-blue-600 border-blue-300 bg-blue-50',
                             competitor.match_reason === 'Manual check' && 'text-muted-foreground'
                           )}
                         >

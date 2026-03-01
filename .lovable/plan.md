@@ -1,108 +1,56 @@
 
 
-# Visual Redesign: "Productivity SaaS + Bee Accent" Color System
+# Unify Visual Styles: Review Page + Inbox Pages
 
 ## Summary
 
-Replace the current all-amber "Premium Honey" palette with a cooler, more neutral base that uses bee gold and tech purple as focused accents. The app will feel like a modern productivity SaaS (think Linear, Notion) with the BizzyBee brand expressed through targeted color pops rather than dominant warmth. **No functionality changes.**
+Five changes to bring visual consistency across the Review page and all Inbox routes, based on your screenshots and feedback.
 
-## The New Palette (HSL values for CSS variables)
+## Changes
 
-| Tier | Role | Hex | HSL |
-|------|------|-----|-----|
-| Background | App shell | `#F5F6FB` | `233 33% 97%` |
-| Surface | Cards, panels | `#FFFFFF` | `0 0% 100%` |
-| Secondary surface | Muted panels | `#F0F1F7` | `233 33% 95%` |
-| Border | Thin dividers | `#D6D7E4` | `236 20% 87%` |
-| Primary | Bee gold CTA | `#F6B938` | `40 91% 59%` |
-| Primary foreground | Text on gold | `#111827` | `222 47% 11%` |
-| Secondary accent | Tech purple | `#6E5DE7` | `249 75% 64%` |
-| Secondary accent bg | Purple chip | `#E3DFFC` | `249 88% 93%` |
-| Foreground | Body text | `#111827` | `222 47% 11%` |
-| Muted foreground | Secondary text | `#6B7280` | `220 9% 46%` |
-| Selected row | Active item bg | `#F0F1F7` | `233 33% 95%` |
+### 1. White Background Panes (Inbox pages match Review page)
+The Review page already has white `bg-white` left and right panes with `rounded-2xl shadow-sm border border-slate-200`. The inbox pages (PowerModeLayout) already have this -- confirmed in the code. No change needed here; the white panels are already in place.
 
-## Changes by File
+### 2. Upgrade Review Page AI Summary Strip (grey/thin to colourful)
+The Review page's AI bento strip at line 852 uses a plain `bg-slate-50/50` with muted text. This will be upgraded to match the inbox pages' stunning frosted glass gradient:
+- **From**: `bg-slate-50/50` with plain `text-xs text-muted-foreground`
+- **To**: `bg-gradient-to-r from-amber-50/60 via-purple-50/40 to-blue-50/40 rounded-2xl border border-white/60 shadow-sm ring-1 ring-slate-900/5` with a Sparkles icon and `text-sm font-medium text-slate-700`
+- Will also add the CategoryLabel pill in the premium style (matching the inbox pages' indigo pill)
 
-### 1. `src/index.css` -- Root CSS variables (major)
+### 3. Universal CategoryLabel Pill Style
+The inbox middle pane (ConversationThread) uses a beautiful inline pill: `border-indigo-200 bg-indigo-50 text-indigo-700` with a Tag icon. The left pane (JaceStyleInbox) and Review page use the generic `CategoryLabel` component which has different per-category colours.
 
-Update the `:root` block with the new palette:
+**Solution**: Standardise the `CategoryLabel` component to always use the same premium indigo pill style (matching screenshot 3's middle pane "enquiry" pill), and enforce British spelling ("Enquiry" not "Inquiry") via the existing `toBritishLabel` function.
 
-- `--background`: `233 33% 97%` (was `210 40% 98%`)
-- `--foreground`: `222 47% 11%` (was `220 15% 12%`)
-- `--primary`: `40 91% 59%` (was `34 63% 55%` -- brighter, richer gold)
-- `--primary-foreground`: `222 47% 11%` (dark text on gold buttons for contrast)
-- `--secondary`: `233 33% 95%` (was `220 14% 96%` -- cooler lilac-grey)
-- `--muted`: `233 33% 95%` (match secondary)
-- `--accent`: `233 33% 95%` (match secondary)
-- `--border`: `236 20% 87%` (was `220 13% 91%` -- slightly more visible)
-- `--input`: `236 20% 87%` (match border)
-- `--ring`: `40 91% 59%` (match primary)
+### 4. Highlight Selected Email in Left Pane
+Currently the active row uses `bg-white shadow ring-1 ring-slate-900/5` which is subtle. Will update to a soft purple highlight that complements the app's purple accent:
+- **Active state**: `bg-purple-50/60 border border-purple-200 ring-1 ring-purple-100 shadow-sm`
+- This matches the Review page's `ReviewQueueItem` active style: `bg-white shadow-sm border border-purple-200 ring-1 ring-purple-50`
 
-Add new custom property for the secondary purple accent:
-- `--accent-purple`: `249 75% 64%`
-- `--accent-purple-foreground`: `0 0% 100%`
-- `--accent-purple-soft`: `249 88% 93%`
+### 5. Fix "inquiry" Spelling in Review Page Categories
+The Review page CATEGORIES array (line 99) has `label: 'Enquiry'` but `key: 'inquiry'` -- this is correct. But the CategoryLabel in the middle pane of ConversationThread at line 315 renders `conversation.category` raw without going through the British spelling normaliser. Will pipe it through `toBritishLabel`.
 
-Update the `.honey-glow-shadow` utility to use the new primary value (no code change needed since it references `var(--primary)`).
+## Files Modified
 
-Dark mode values will be adjusted proportionally to maintain the same relationships.
+1. **`src/pages/Review.tsx`** -- Upgrade AI bento strip from grey/thin to frosted glass gradient with Sparkles icon and premium pill styling
+2. **`src/components/conversations/JaceStyleInbox.tsx`** -- Update active row to soft purple highlight
+3. **`src/components/shared/CategoryLabel.tsx`** -- Unify all category pills to use the premium indigo style
+4. **`src/components/conversations/ConversationThread.tsx`** -- Ensure category in bento strip uses `CategoryLabel` component (with British spelling) instead of raw text
 
-### 2. `tailwind.config.ts` -- Register purple accent
+## Technical Details
 
-Add the new purple accent color under `theme.extend.colors` so it can be used as `text-accent-purple`, `bg-accent-purple-soft`, etc.:
-
-```text
-"accent-purple": {
-  DEFAULT: "hsl(var(--accent-purple))",
-  foreground: "hsl(var(--accent-purple-foreground))",
-  soft: "hsl(var(--accent-purple-soft))",
-}
+### Review page AI strip (lines 851-864 of Review.tsx)
+```
+Before: bg-slate-50/50, border-b border-slate-100, text-xs text-muted-foreground
+After:  mx-6 mt-4 mb-2 p-4 bg-gradient-to-r from-amber-50/60 via-purple-50/40 to-blue-50/40 rounded-2xl border border-white/60 shadow-sm ring-1 ring-slate-900/5
 ```
 
-### 3. `src/components/layout/PowerModeLayout.tsx` -- Background color
+### Active row highlight (JaceStyleInbox.tsx line 293)
+```
+Before: bg-white shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] ring-1 ring-slate-900/5
+After:  bg-purple-50/60 border border-purple-200 ring-1 ring-purple-100 shadow-sm
+```
 
-Change `bg-slate-50/50` to `bg-background` so it pulls from the new CSS variable instead of a hardcoded Tailwind class. This ensures the layout respects the design system.
-
-### 4. `src/components/layout/ThreeColumnLayout.tsx` -- Background color
-
-Same change: `bg-slate-50/50` to `bg-background` for consistency.
-
-### 5. `src/components/sidebar/Sidebar.tsx` -- Sidebar border
-
-Update the sidebar border from the current ring styling to use `border-r border-border` for consistency with the new `--border` variable (`#D6D7E4`).
-
-### 6. `src/components/ui/button.tsx` -- Primary button text
-
-The primary button currently uses `text-primary-foreground` which will now resolve to dark charcoal (`#111827`) on gold (`#F6B938`). This is correct for accessibility. No code change needed -- just confirming the variable cascade works.
-
-### 7. `src/components/conversations/ConversationCard.tsx` -- Selected state
-
-Update the selected conversation card styling to use the new selected-row background (`bg-secondary`) instead of any amber-specific highlighting. The selected state becomes a clean, subtle highlight.
-
-### 8. `src/pages/Review.tsx` -- No changes needed
-
-The Review page already uses design-system tokens (`bg-background`, `text-foreground`, etc.). The new root variables will automatically cascade.
-
-### 9. Pages using hardcoded `bg-slate-50/50` (Home, Settings, Analytics, KnowledgeBase, ChannelsDashboard)
-
-Search for any remaining `bg-slate-50/50` references and replace with `bg-background`.
-
-## What This Achieves
-
-- **Cool, modern base**: The lilac-grey background (`#F5F6FB`) feels professional and easy on the eyes for all-day use
-- **Bee brand as accent**: Gold buttons and highlights pop against the cool base without overwhelming
-- **Tech purple secondary**: Provides visual variety for filters, pills, selection states, and charts
-- **Unified system**: Every page inherits from the same CSS variables, so changing the palette is a single-file edit going forward
-- **Dark mode preserved**: Dark mode values adjusted proportionally
-
-## Files Modified (estimated: 5-8 files)
-
-1. `src/index.css` -- Root variables + dark mode
-2. `tailwind.config.ts` -- Register purple accent
-3. `src/components/layout/PowerModeLayout.tsx` -- `bg-background`
-4. `src/components/layout/ThreeColumnLayout.tsx` -- `bg-background`
-5. `src/components/sidebar/Sidebar.tsx` -- Border consistency
-6. `src/components/conversations/ConversationCard.tsx` -- Selected state
-7. Any other files with hardcoded `bg-slate-50/50`
+### CategoryLabel unified style (CategoryLabel.tsx)
+All category pills will use a consistent style: `bg-indigo-50 text-indigo-700 border-indigo-200` with the category icon, replacing the per-category colour map. The `toBritishLabel` function will be applied to all label output.
 

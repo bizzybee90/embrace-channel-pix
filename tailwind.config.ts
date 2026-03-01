@@ -76,11 +76,6 @@ export default {
           phone: "hsl(var(--channel-phone))",
           webchat: "hsl(var(--channel-webchat))",
         },
-        "accent-purple": {
-          DEFAULT: "hsl(var(--accent-purple))",
-          foreground: "hsl(var(--accent-purple-foreground))",
-          soft: "hsl(var(--accent-purple-soft))",
-        },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",

@@ -101,7 +101,7 @@ export function DraftReplyEditor({
       <SheetContent className="sm:max-w-2xl w-full flex flex-col">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-amber-500" />
+            <Sparkles className="h-5 w-5 text-purple-500" />
             Edit & Send Reply
             {workspaceId && (
               <DraftVerificationBadge

@@ -29,7 +29,7 @@ const bucketOptions: { value: BucketChoice; label: string; description: string; 
     value: 'wait', 
     label: 'FYI only', 
     description: 'Show but no reply needed',
-    icon: <Mail className="h-4 w-4 text-amber-500" />
+    icon: <Mail className="h-4 w-4 text-blue-500" />
   },
   { 
     value: 'quick_win', 
@@ -145,7 +145,7 @@ export function TeachModal({ open, onOpenChange, conversation, onSuccess }: Teac
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-amber-500" />
+            <Sparkles className="h-5 w-5 text-purple-500" />
             Teach BizzyBee
           </DialogTitle>
           <DialogDescription>

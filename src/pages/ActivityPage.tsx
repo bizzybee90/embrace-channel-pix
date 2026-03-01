@@ -183,7 +183,7 @@ export const ActivityPage = () => {
       case 'escalated':
         return <AlertCircle className="h-4 w-4 text-destructive" />;
       case 'reviewed':
-        return <CheckCircle2 className="h-4 w-4 text-amber-500" />;
+        return <CheckCircle2 className="h-4 w-4 text-purple-500" />;
       default:
         return <Activity className="h-4 w-4 text-muted-foreground" />;
     }

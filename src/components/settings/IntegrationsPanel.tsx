@@ -45,7 +45,7 @@ export const IntegrationsPanel = () => {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Phone className="h-5 w-5 text-amber-600" />
+            <Phone className="h-5 w-5 text-blue-600" />
             Twilio (SMS & WhatsApp)
           </CardTitle>
           <CardDescription>

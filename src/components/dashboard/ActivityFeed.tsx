@@ -213,9 +213,9 @@ export function ActivityFeed({ onNavigate, maxItems = 10 }: ActivityFeedProps) {
       case 'escalated':
         return <AlertCircle className="h-4 w-4 text-destructive" />;
       case 'reviewed':
-        return <CheckCircle2 className="h-4 w-4 text-amber-500" />;
+        return <CheckCircle2 className="h-4 w-4 text-purple-500" />;
       case 'inbox':
-        return <Mail className="h-4 w-4 text-amber-500" />;
+        return <Mail className="h-4 w-4 text-blue-500" />;
       default:
         return <Clock className="h-4 w-4 text-muted-foreground" />;
     }

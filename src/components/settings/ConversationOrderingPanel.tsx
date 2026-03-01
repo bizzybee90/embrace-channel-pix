@@ -211,7 +211,7 @@ export const ConversationOrderingPanel = () => {
       </Card>
 
       {/* Info Card */}
-      <Card className="border-amber-500/20 bg-amber-500/5">
+      <Card className="border-blue-500/20 bg-blue-500/5">
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             💡 How Custom Ordering Works

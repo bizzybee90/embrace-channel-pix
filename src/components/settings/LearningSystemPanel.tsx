@@ -328,7 +328,7 @@ export function LearningSystemPanel() {
               <div className="flex items-center justify-between">
                 <div>
                   <h4 className="font-medium flex items-center gap-2">
-                    <Database className="h-4 w-4 text-amber-500" />
+                    <Database className="h-4 w-4 text-blue-500" />
                     Sender Rules
                   </h4>
                   <p className="text-sm text-muted-foreground">
@@ -356,7 +356,7 @@ export function LearningSystemPanel() {
               <div className="flex items-center justify-between">
                 <div>
                   <h4 className="font-medium flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4 text-amber-500" />
+                    <TrendingUp className="h-4 w-4 text-purple-500" />
                     Behavior Stats
                   </h4>
                   <p className="text-sm text-muted-foreground">

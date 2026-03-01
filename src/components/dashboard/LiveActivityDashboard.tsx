@@ -218,19 +218,19 @@ export const LiveActivityDashboard = () => {
           title="Unread"
           value={stats.unread}
           icon={<MessageSquare className="h-6 w-6" />}
-          iconColor="text-amber-600 dark:text-amber-400"
-          bgColor="bg-amber-50 dark:bg-amber-950/20"
+          iconColor="text-purple-600 dark:text-purple-400"
+          bgColor="bg-purple-50 dark:bg-purple-950/20"
         />
       ) : (
-        <Card className="p-6 bg-amber-50 dark:bg-amber-950/20">
+        <Card className="p-6 bg-purple-50 dark:bg-purple-950/20">
           <div className="flex items-center justify-between mb-4">
             <div>
               <p className="text-sm font-medium text-muted-foreground">Unread Conversations</p>
-              <h3 className="text-4xl font-bold mt-2 text-amber-600 dark:text-amber-400">
+              <h3 className="text-4xl font-bold mt-2 text-purple-600 dark:text-purple-400">
                 {stats.unread}
               </h3>
             </div>
-            <MessageSquare className="h-10 w-10 text-amber-600 dark:text-amber-400" />
+            <MessageSquare className="h-10 w-10 text-purple-600 dark:text-purple-400" />
           </div>
           <div className="space-y-2 pt-4 border-t">
             <div className="flex justify-between text-sm">
@@ -266,8 +266,8 @@ export const LiveActivityDashboard = () => {
               title="Email"
               value={stats.unreadByChannel.email}
               icon={<MessageSquare className="h-5 w-5" />}
-              iconColor="text-amber-600"
-              bgColor="bg-amber-50/50 dark:bg-amber-950/10"
+              iconColor="text-blue-600"
+              bgColor="bg-blue-50/50 dark:bg-blue-950/10"
             />
             <MetricPillCard
               title="WhatsApp"
@@ -280,8 +280,8 @@ export const LiveActivityDashboard = () => {
               title="SMS"
               value={stats.unreadByChannel.sms}
               icon={<MessageSquare className="h-5 w-5" />}
-              iconColor="text-amber-600"
-              bgColor="bg-amber-50/50 dark:bg-amber-950/10"
+              iconColor="text-purple-600"
+              bgColor="bg-purple-50/50 dark:bg-purple-950/10"
             />
             <MetricPillCard
               title="Phone"
@@ -294,8 +294,8 @@ export const LiveActivityDashboard = () => {
               title="Web Chat"
               value={stats.unreadByChannel.webchat}
               icon={<MessageSquare className="h-5 w-5" />}
-              iconColor="text-amber-600"
-              bgColor="bg-amber-50/50 dark:bg-amber-950/10"
+              iconColor="text-indigo-600"
+              bgColor="bg-indigo-50/50 dark:bg-indigo-950/10"
             />
           </div>
         </div>
@@ -335,8 +335,8 @@ export const LiveActivityDashboard = () => {
               value={`${Math.round(stats.avgConfidence)}%`}
               subtitle="AI accuracy"
               icon={<Zap className="h-5 w-5" />}
-              iconColor="text-amber-600 dark:text-amber-400"
-              bgColor="bg-amber-50 dark:bg-amber-950/20"
+              iconColor="text-blue-600 dark:text-blue-400"
+              bgColor="bg-blue-50 dark:bg-blue-950/20"
             />
           </>
         ) : (
@@ -379,16 +379,16 @@ export const LiveActivityDashboard = () => {
               </div>
             </Card>
 
-            <Card className="p-6 bg-amber-50 dark:bg-amber-950/20">
+            <Card className="p-6 bg-blue-50 dark:bg-blue-950/20">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Avg Confidence</p>
-                  <h3 className="text-3xl font-bold mt-2 text-amber-600 dark:text-amber-400">
+                  <h3 className="text-3xl font-bold mt-2 text-blue-600 dark:text-blue-400">
                     {Math.round(stats.avgConfidence)}%
                   </h3>
                   <p className="text-xs text-muted-foreground mt-1">AI certainty score</p>
                 </div>
-                <Zap className="h-8 w-8 text-amber-600 dark:text-amber-400" />
+                <Zap className="h-8 w-8 text-blue-600 dark:text-blue-400" />
               </div>
             </Card>
           </>
