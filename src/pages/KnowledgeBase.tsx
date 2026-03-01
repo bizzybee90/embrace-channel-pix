@@ -263,12 +263,12 @@ export default function KnowledgeBase() {
   }
 
   return (
-    <div className="flex h-screen w-full bg-slate-50/50 overflow-hidden">
-      <aside className="bg-slate-50/50 flex-shrink-0 overflow-y-auto relative z-50 hidden md:flex">
+    <div className="flex h-screen w-full bg-background overflow-hidden">
+      <aside className="bg-background flex-shrink-0 overflow-y-auto relative z-50 hidden md:flex border-r border-border">
         <Sidebar />
       </aside>
       <main className="flex-1 flex flex-col min-w-0 p-4">
-        <div className="flex-1 bg-white rounded-3xl shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] border border-slate-200/80 overflow-y-auto">
+        <div className="flex-1 bg-card rounded-3xl shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] border border-border overflow-y-auto">
         <div className="max-w-5xl mx-auto p-6 space-y-6">
           {/* Header */}
           <div className="flex items-center justify-between">
